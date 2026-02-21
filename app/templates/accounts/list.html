@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Rekeningen - Check The Pockets{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Rekeningen</h1>
+</div>
+
+{% if accounts %}
+<div class="accounts-grid">
+    {% for acc in accounts %}
+    <div class="card account-card">
+        <div class="account-header">
+            <span class="pill">{{ acc.bank|upper }}</span>
+            <span class="muted">{{ acc.transactions|length }} transacties</span>
+        </div>
+        <h3>{{ acc.name }}</h3>
+        {% if acc.iban %}
+        <p class="muted">{{ acc.iban }}</p>
+        {% endif %}
+        <div class="account-actions">
+            <a href="/?account_id={{ acc.id }}" class="btn btn-sm">Bekijk transacties</a>
+            <form method="post" action="/accounts/{{ acc.id }}/delete" style="display:inline;"
+                  onsubmit="return confirm('Weet je zeker dat je deze rekening en alle transacties wilt verwijderen?')">
+                <button type="submit" class="btn btn-sm btn-danger">Verwijderen</button>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card" style="text-align:center; padding:3rem;">
+    <p style="margin-bottom:1rem;">Nog geen rekeningen. Importeer een CSV om te beginnen.</p>
+    <a href="/import" class="btn btn-primary">CSV importeren</a>
+</div>
+{% endif %}
+{% endblock %}
