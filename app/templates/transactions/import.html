@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Importeren - Check The Pockets{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>CSV importeren</h1>
+</div>
+
+{% if error %}
+<div class="alert alert-error">{{ error }}</div>
+{% endif %}
+
+<div class="card">
+    <form method="post" action="/import" enctype="multipart/form-data">
+        <div class="form-group">
+            <label for="bank">Bank</label>
+            <select name="bank" id="bank" required>
+                <option value="">Selecteer een bank...</option>
+                {% for key, name in banks.items() %}
+                <option value="{{ key }}">{{ name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="account_name">Rekeningnaam (optioneel)</label>
+            <input type="text" id="account_name" name="account_name" placeholder="bijv. Betaalrekening">
+        </div>
+        <div class="form-group">
+            <label for="file">CSV bestand</label>
+            <input type="file" id="file" name="file" accept=".csv,.txt,.tab" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Importeren</button>
+    </form>
+</div>
+
+<div class="card">
+    <h2>Ondersteunde formaten</h2>
+    <ul class="format-list">
+        <li><strong>ABN AMRO</strong> - Tab-gescheiden exportbestand (.tab of .txt)</li>
+        <li><strong>Bunq</strong> - CSV export vanuit de Bunq app</li>
+        <li><strong>ICS</strong> - CSV export van je creditcard overzicht</li>
+    </ul>
+</div>
+{% endblock %}
