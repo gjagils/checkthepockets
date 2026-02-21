@@ -1,3 +1,9 @@
+# Check The Pockets
+.env
+*.sqlite3
+app/static/img/logo.png
+app/static/img/favicon.png
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

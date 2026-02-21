@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Transacties - Check The Pockets{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Transacties</h1>
+    <a href="/import" class="btn btn-primary">CSV importeren</a>
+</div>
+
+<div class="card">
+    <form method="get" action="/" class="filter-bar">
+        <div class="form-group">
+            <label for="account_id">Rekening</label>
+            <select name="account_id" id="account_id" onchange="this.form.submit()">
+                <option value="">Alle rekeningen</option>
+                {% for acc in accounts %}
+                <option value="{{ acc.id }}" {% if current_account_id == acc.id %}selected{% endif %}>
+                    {{ acc.name }}{% if acc.iban %} ({{ acc.iban }}){% endif %}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+    </form>
+</div>
+
+{% if transactions %}
+<div class="card">
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Datum</th>
+                    <th>Omschrijving</th>
+                    <th>Tegenpartij</th>
+                    <th class="text-right">Bedrag</th>
+                    <th>Rekening</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for tx in transactions %}
+                <tr>
+                    <td class="nowrap">{{ tx.date.strftime('%d-%m-%Y') }}</td>
+                    <td class="desc-cell">{{ tx.description[:80] }}{% if tx.description|length > 80 %}...{% endif %}</td>
+                    <td>{{ tx.counterparty or '-' }}</td>
+                    <td class="text-right nowrap {% if tx.amount >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
+                        {{ "%.2f"|format(tx.amount) }} {{ tx.currency }}
+                    </td>
+                    <td class="nowrap">{{ tx.account.name }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if total_pages > 1 %}
+<div class="pagination">
+    {% if page > 1 %}
+    <a href="?page={{ page - 1 }}{% if current_account_id %}&account_id={{ current_account_id }}{% endif %}">Vorige</a>
+    {% endif %}
+
+    {% for p in range(1, total_pages + 1) %}
+        {% if p == page %}
+        <span class="current">{{ p }}</span>
+        {% elif p <= 3 or p > total_pages - 3 or (p >= page - 1 and p <= page + 1) %}
+        <a href="?page={{ p }}{% if current_account_id %}&account_id={{ current_account_id }}{% endif %}">{{ p }}</a>
+        {% elif p == 4 or p == total_pages - 3 %}
+        <span class="dots">...</span>
+        {% endif %}
+    {% endfor %}
+
+    {% if page < total_pages %}
+    <a href="?page={{ page + 1 }}{% if current_account_id %}&account_id={{ current_account_id }}{% endif %}">Volgende</a>
+    {% endif %}
+</div>
+{% endif %}
+
+{% else %}
+<div class="card" style="text-align:center; padding:3rem;">
+    <p style="margin-bottom:1rem;">Nog geen transacties geimporteerd.</p>
+    <a href="/import" class="btn btn-primary">Eerste CSV importeren</a>
+</div>
+{% endif %}
+{% endblock %}

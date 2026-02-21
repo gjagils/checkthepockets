@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Inloggen - Check The Pockets{% endblock %}
+{% block content %}
+<div class="auth-container">
+    <div class="auth-logo"><img src="/static/img/logo.png" alt="Check The Pockets"></div>
+    <h1>Inloggen</h1>
+    {% if error %}
+    <div class="alert alert-error">{{ error }}</div>
+    {% endif %}
+    <form method="post" action="/login">
+        <div class="form-group">
+            <label for="username">Gebruikersnaam</label>
+            <input type="text" id="username" name="username" required autofocus>
+        </div>
+        <div class="form-group">
+            <label for="password">Wachtwoord</label>
+            <input type="password" id="password" name="password" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Inloggen</button>
+    </form>
+    <p class="auth-link">Nog geen account? <a href="/register">Registreren</a></p>
+</div>
+{% endblock %}

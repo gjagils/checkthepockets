@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Check The Pockets{% endblock %}</title>
+    <link rel="icon" type="image/png" href="/static/img/favicon.png">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    {% if user %}
+    <nav class="navbar">
+        <a href="/" class="nav-brand">
+            <img src="/static/img/logo.png" alt="Logo">
+            CHECK <span class="brand-the">THE POCKETS</span>
+        </a>
+        <div class="nav-links">
+            <a href="/">Transacties</a>
+            <a href="/import">Importeren</a>
+            <a href="/accounts">Rekeningen</a>
+            <span class="nav-user">{{ user.username }}</span>
+            <a href="/logout" class="btn btn-sm">Uitloggen</a>
+        </div>
+    </nav>
+    {% endif %}
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

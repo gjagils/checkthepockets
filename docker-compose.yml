@@ -1,0 +1,34 @@
+services:
+  app:
+    build: .
+    container_name: checkthepockets
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8100}:8000"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-checkthepockets}:${POSTGRES_PASSWORD:-checkthepockets}@db:5432/${POSTGRES_DB:-checkthepockets}
+      - SECRET_KEY=${SECRET_KEY:-verander-dit-in-een-lang-willekeurig-wachtwoord}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./app/static/img:/app/app/static/img
+
+  db:
+    image: postgres:16-alpine
+    container_name: checkthepockets-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-checkthepockets}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-checkthepockets}
+      - POSTGRES_DB=${POSTGRES_DB:-checkthepockets}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-checkthepockets}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
