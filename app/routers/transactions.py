@@ -4,7 +4,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
-from app.models import Account, Transaction
+from app.models import Account, Transaction, Category
 from app.auth import require_login
 from app.parsers import abn_amro, bunq, ics
 from app.parsers.base import ParseError
@@ -51,6 +51,19 @@ def transaction_list(
     accounts = db.query(Account).filter(Account.user_id == user.id).all()
     total_pages = max(1, (total + PER_PAGE - 1) // PER_PAGE)
 
+    # Get categories grouped by parent for the dropdown
+    all_cats = (
+        db.query(Category)
+        .filter(Category.user_id == user.id)
+        .order_by(Category.name)
+        .all()
+    )
+    parents = [c for c in all_cats if c.parent_id is None]
+    children_map = {}
+    for c in all_cats:
+        if c.parent_id is not None:
+            children_map.setdefault(c.parent_id, []).append(c)
+
     return templates.TemplateResponse(
         "transactions/list.html",
         {
@@ -62,8 +75,35 @@ def transaction_list(
             "page": page,
             "total_pages": total_pages,
             "total": total,
+            "parents": parents,
+            "children_map": children_map,
         },
     )
+
+
+@router.post("/transactions/{transaction_id}/category")
+def set_category(
+    request: Request,
+    transaction_id: int,
+    category_id: int = Form(0),
+    redirect_to: str = Form("/"),
+    db: Session = Depends(get_db),
+):
+    user = require_login(request, db)
+
+    tx = (
+        db.query(Transaction)
+        .join(Account)
+        .filter(Transaction.id == transaction_id, Account.user_id == user.id)
+        .first()
+    )
+    if not tx:
+        return RedirectResponse(redirect_to, status_code=302)
+
+    tx.category_id = category_id if category_id else None
+    db.commit()
+
+    return RedirectResponse(redirect_to, status_code=302)
 
 
 @router.get("/import")

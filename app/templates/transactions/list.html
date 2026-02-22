@@ -42,7 +42,21 @@
                     <td class="nowrap">{{ tx.date.strftime('%d-%m-%Y') }}</td>
                     <td class="desc-cell">{{ tx.description[:80] }}{% if tx.description|length > 80 %}...{% endif %}</td>
                     <td>{{ tx.counterparty or '-' }}</td>
-                    <td>{{ tx.category.name if tx.category else '-' }}</td>
+                    <td class="nowrap">
+                        <form method="post" action="/transactions/{{ tx.id }}/category" class="inline-cat-form">
+                            <input type="hidden" name="redirect_to" value="/?page={{ page }}{% if current_account_id %}&account_id={{ current_account_id }}{% endif %}">
+                            <select name="category_id" class="select-sm" onchange="this.form.submit()">
+                                <option value="0">-</option>
+                                {% for parent in parents %}
+                                <optgroup label="{{ parent.name }}">
+                                    {% for sub in children_map.get(parent.id, []) %}
+                                    <option value="{{ sub.id }}" {% if tx.category_id == sub.id %}selected{% endif %}>{{ sub.name }}</option>
+                                    {% endfor %}
+                                </optgroup>
+                                {% endfor %}
+                            </select>
+                        </form>
+                    </td>
                     <td class="text-right nowrap {% if tx.amount >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
                         {{ "%.2f"|format(tx.amount) }} {{ tx.currency }}
                     </td>
