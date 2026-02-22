@@ -671,6 +671,51 @@ tr:hover { background: rgba(31, 111, 178, 0.03); }
     border: 1px solid var(--ctp-border);
 }
 
+/* ===== Budget ===== */
+.budget-input {
+    width: 100px;
+    padding: 0.3rem 0.5rem;
+    border: 2px solid var(--ctp-border);
+    border-radius: 8px;
+    text-align: right;
+    font-size: 0.85rem;
+    font-family: inherit;
+    background: var(--ctp-bg);
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+.budget-input:focus {
+    outline: none;
+    border-color: var(--ctp-denim);
+    box-shadow: 0 0 0 3px rgba(31, 111, 178, 0.12);
+}
+.budget-input.budget-saved {
+    border-color: var(--ctp-check);
+    box-shadow: 0 0 0 3px rgba(45, 190, 96, 0.15);
+}
+
+.budget-bar {
+    display: inline-block;
+    width: 80px;
+    height: 8px;
+    background: var(--ctp-border);
+    border-radius: 4px;
+    overflow: hidden;
+    vertical-align: middle;
+    margin-right: 0.4rem;
+}
+.budget-bar-fill {
+    height: 100%;
+    background: var(--ctp-check);
+    border-radius: 4px;
+    transition: width 0.3s;
+}
+.budget-bar-fill.bar-warn {
+    background: var(--ctp-coin);
+}
+.budget-bar-fill.bar-over {
+    background: var(--ctp-danger);
+}
+
 /* ===== Responsive ===== */
 @media (max-width: 640px) {
     .navbar {

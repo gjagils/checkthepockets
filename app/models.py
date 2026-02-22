@@ -26,6 +26,7 @@ class User(Base):
     accounts = relationship("Account", back_populates="user", cascade="all, delete-orphan")
     categories = relationship("Category", back_populates="user", cascade="all, delete-orphan")
     savings_plans = relationship("SavingsPlan", back_populates="user", cascade="all, delete-orphan")
+    budgets = relationship("Budget", back_populates="user", cascade="all, delete-orphan")
 
 
 class Account(Base):
@@ -71,6 +72,7 @@ class Category(Base):
     account = relationship("Account", back_populates="categories")
     transactions = relationship("Transaction", back_populates="category")
     savings_lines = relationship("SavingsLine", back_populates="category")
+    budgets = relationship("Budget", back_populates="category")
 
     __table_args__ = (
         UniqueConstraint("user_id", "account_id", "name", name="uq_user_account_category"),
@@ -154,4 +156,22 @@ class SavingsEntry(Base):
 
     __table_args__ = (
         UniqueConstraint("line_id", "month", name="uq_savings_entry_line_month"),
+    )
+
+
+class Budget(Base):
+    __tablename__ = "budgets"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    category_id = Column(Integer, ForeignKey("categories.id"), nullable=False)
+    year = Column(Integer, nullable=False)
+    month = Column(Integer, nullable=False)
+    amount = Column(Numeric(12, 2), nullable=False, default=0)
+
+    user = relationship("User", back_populates="budgets")
+    category = relationship("Category", back_populates="budgets")
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "category_id", "year", "month", name="uq_budget_user_cat_year_month"),
     )
