@@ -51,12 +51,13 @@ def categories_list(request: Request, db: Session = Depends(get_db)):
 def create_category(
     request: Request,
     name: str = Form(...),
-    parent_id: int | None = Form(None),
+    parent_id: str = Form(""),
     color: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
     name = name.strip()
+    parent_id = int(parent_id) if parent_id.strip() else None
 
     if not name:
         return RedirectResponse("/categories", status_code=302)
@@ -97,7 +98,7 @@ def edit_category(
     category_id: int,
     request: Request,
     name: str = Form(...),
-    parent_id: int | None = Form(None),
+    parent_id: str = Form(""),
     color: str = Form(""),
     db: Session = Depends(get_db),
 ):
@@ -111,6 +112,7 @@ def edit_category(
         return RedirectResponse("/categories", status_code=302)
 
     name = name.strip()
+    parent_id = int(parent_id) if parent_id.strip() else None
     if not name:
         return RedirectResponse("/categories", status_code=302)
 

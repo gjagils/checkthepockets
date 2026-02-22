@@ -110,8 +110,8 @@
                 {% for tx in transactions %}
                 <tr>
                     <td class="nowrap">{{ tx.date.strftime('%d-%m-%Y') }}</td>
-                    <td class="desc-cell">{{ tx.description[:80] }}{% if tx.description and tx.description|length > 80 %}...{% endif %}</td>
-                    <td>{{ tx.counterparty or '-' }}</td>
+                    <td class="desc-cell" title="{{ tx.description or '' }}">{{ tx.description[:80] }}{% if tx.description and tx.description|length > 80 %}...{% endif %}</td>
+                    <td class="counterparty-cell" title="{{ tx.counterparty or '' }}">{{ tx.counterparty or '-' }}</td>
                     <td class="nowrap">
                         {% if tx.category_rel %}
                         <span class="category-pill" style="--cat-color: {{ tx.category_rel.color or '#1F6FB2' }}">
