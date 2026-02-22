@@ -42,7 +42,7 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("name", sa.String(255), nullable=False),
-        sa.Column("category", sa.String(100), nullable=True),
+        sa.Column("category_id", sa.Integer(), sa.ForeignKey("categories.id"), nullable=True),
         sa.Column("annual_budget", sa.Numeric(12, 2), server_default="0"),
         sa.Column("frequency", sa.String(20), nullable=False, server_default="monthly"),
         sa.Column("default_amount", sa.Numeric(12, 2), server_default="0"),

@@ -29,7 +29,7 @@
                     <td class="sticky-col">
                         <div class="line-name">{{ line.name }}</div>
                         {% if line.category %}
-                        <div class="line-category">{{ line.category }}</div>
+                        <div class="line-category">{{ line.category.name }}</div>
                         {% endif %}
                         <div class="line-freq">{{ frequency_labels.get(line.frequency, line.frequency) }}</div>
                     </td>
@@ -58,7 +58,7 @@
                         <strong>{{ "%.2f"|format(line_totals.get(line.id, 0)) }}</strong>
                     </td>
                     <td class="nowrap">
-                        {% if line.category %}
+                        {% if line.category_id %}
                         <form method="post" action="/savings/lines/{{ line.id }}/fill-from-transactions" style="display:inline;">
                             <button type="submit" class="btn btn-sm" title="Vul vanuit transacties">Sync</button>
                         </form>
@@ -102,7 +102,12 @@
             </div>
             <div class="form-group">
                 <label for="line_category">Categorie (optioneel)</label>
-                <input type="text" name="category" id="line_category" placeholder="bijv. Vakantie">
+                <select name="category_id" id="line_category">
+                    <option value="0">Geen categorie</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat.id }}">{{ cat.name }}</option>
+                    {% endfor %}
+                </select>
             </div>
             <div class="form-group">
                 <label for="line_freq">Frequentie</label>
@@ -139,12 +144,12 @@
     <div class="accounts-grid">
         {% for sug in category_suggestions %}
         <div class="card" style="margin-bottom: 0;">
-            <h3>{{ sug.category }}</h3>
+            <h3>{{ sug.category_name }}</h3>
             <p class="muted">{{ sug.tx_count }} transacties &middot; Totaal: {{ "%.2f"|format(sug.total) }} EUR</p>
             <form method="post" action="/savings/lines" style="margin-top: 0.75rem;">
                 <input type="hidden" name="plan_id" value="{{ plan.id }}">
-                <input type="hidden" name="name" value="{{ sug.category }}">
-                <input type="hidden" name="category" value="{{ sug.category }}">
+                <input type="hidden" name="name" value="{{ sug.category_name }}">
+                <input type="hidden" name="category_id" value="{{ sug.category_id }}">
                 <input type="hidden" name="frequency" value="monthly">
                 <input type="hidden" name="default_amount" value="0">
                 <button type="submit" class="btn btn-sm btn-accent">Toevoegen aan plan</button>
@@ -180,7 +185,6 @@ function cellKeydown(e, input) {
     if (e.key === 'Enter') {
         input.blur();
     } else if (e.key === 'Escape') {
-        // Restore original value
         var cell = input.parentElement;
         var display = cell.querySelector('.cell-display');
         input.style.display = 'none';
@@ -188,7 +192,6 @@ function cellKeydown(e, input) {
     } else if (e.key === 'Tab') {
         e.preventDefault();
         input.blur();
-        // Move to next cell
         var td = input.closest('td');
         var nextTd = e.shiftKey ? td.previousElementSibling : td.nextElementSibling;
         if (nextTd && nextTd.classList.contains('savings-cell')) {
@@ -204,11 +207,9 @@ function saveCell(input) {
     var entryId = cell.dataset.entryId;
     var newValue = input.value.trim();
 
-    // Show display again
     input.style.display = 'none';
     display.style.display = '';
 
-    // Send AJAX update
     var formData = new FormData();
     formData.append('entry_id', entryId);
     formData.append('amount', newValue);
@@ -220,25 +221,21 @@ function saveCell(input) {
     .then(function(r) { return r.json(); })
     .then(function(data) {
         if (data.ok) {
-            // Update display
             if (data.amount !== null) {
                 display.textContent = data.amount.toFixed(2);
             } else {
                 display.textContent = '-';
             }
 
-            // Update cell status color
             cell.className = 'text-right savings-cell cell-' + data.status;
 
-            // Update line total
             var lineRow = cell.closest('tr');
             var lineId = lineRow.dataset.lineId;
-            var totalCell = document.querySelector('.line-total[data-line-id="' + lineId + '']');
+            var totalCell = document.querySelector('.line-total[data-line-id="' + lineId + '"]');
             if (totalCell) {
                 totalCell.innerHTML = '<strong>' + data.line_total.toFixed(2) + '</strong>';
             }
 
-            // Update running balances
             if (data.running_balances) {
                 for (var m in data.running_balances) {
                     var balCell = document.querySelector('.balance-cell[data-month="' + m + '"]');

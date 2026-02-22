@@ -24,6 +24,7 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     accounts = relationship("Account", back_populates="user", cascade="all, delete-orphan")
+    categories = relationship("Category", back_populates="user", cascade="all, delete-orphan")
     savings_plans = relationship("SavingsPlan", back_populates="user", cascade="all, delete-orphan")
 
 
@@ -50,6 +51,26 @@ class Account(Base):
     )
 
 
+class Category(Base):
+    __tablename__ = "categories"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name = Column(String(100), nullable=False)
+    parent_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
+    color = Column(String(7), nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    is_income = Column(Integer, default=0)
+
+    user = relationship("User", back_populates="categories")
+    transactions = relationship("Transaction", back_populates="category")
+    savings_lines = relationship("SavingsLine", back_populates="category")
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "name", name="uq_user_category"),
+    )
+
+
 class Transaction(Base):
     __tablename__ = "transactions"
 
@@ -62,11 +83,13 @@ class Transaction(Base):
     counterparty = Column(String(255), nullable=True)
     counterparty_iban = Column(String(34), nullable=True)
     balance_after = Column(Numeric(12, 2), nullable=True)
-    category = Column(String(100), nullable=True)
+    category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
+    parent_id = Column(Integer, nullable=True)
     import_hash = Column(String(64), unique=True, nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     account = relationship("Account", back_populates="transactions")
+    category = relationship("Category", back_populates="transactions")
 
 
 class SavingsPlan(Base):
@@ -97,13 +120,14 @@ class SavingsLine(Base):
     id = Column(Integer, primary_key=True)
     plan_id = Column(Integer, ForeignKey("savings_plans.id", ondelete="CASCADE"), nullable=False)
     name = Column(String(255), nullable=False)
-    category = Column(String(100), nullable=True)
+    category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
     annual_budget = Column(Numeric(12, 2), default=0)
     frequency = Column(String(20), nullable=False, default="monthly")
     default_amount = Column(Numeric(12, 2), default=0)
     sort_order = Column(Integer, default=0)
 
     plan = relationship("SavingsPlan", back_populates="lines")
+    category = relationship("Category", back_populates="savings_lines")
     entries = relationship(
         "SavingsEntry", back_populates="line", cascade="all, delete-orphan",
         order_by="SavingsEntry.month",

@@ -8,7 +8,10 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 
 from app.database import get_db
-from app.models import Account, Transaction, SavingsPlan, SavingsLine, SavingsEntry
+from app.models import (
+    Account, Transaction, Category,
+    SavingsPlan, SavingsLine, SavingsEntry,
+)
 from app.auth import require_login
 
 router = APIRouter(prefix="/savings")
@@ -58,21 +61,22 @@ def _smart_fill_entries(line: SavingsLine, target_month: int | None = None):
     return entries
 
 
-def _get_transaction_totals_by_month(db: Session, account_id: int, year: int, category: str | None = None):
+def _get_transaction_totals_by_month(
+    db: Session, account_id: int, year: int, category_id: int | None = None
+):
     """Get sum of transaction amounts per month for an account in a given year."""
     query = (
         db.query(
             func.extract("month", Transaction.date).label("month"),
             func.sum(Transaction.amount).label("total"),
         )
-        .join(Account)
         .filter(
             Transaction.account_id == account_id,
             func.extract("year", Transaction.date) == year,
         )
     )
-    if category:
-        query = query.filter(Transaction.category == category)
+    if category_id:
+        query = query.filter(Transaction.category_id == category_id)
 
     query = query.group_by(func.extract("month", Transaction.date))
     return {int(row.month): row.total for row in query.all()}
@@ -128,8 +132,8 @@ def _determine_entry_status(
     return "pending"
 
 
-def _build_category_lines(
-    db: Session, plan: SavingsPlan, existing_line_categories: set[str]
+def _build_category_suggestions(
+    db: Session, plan: SavingsPlan, existing_category_ids: set[int]
 ):
     """
     Build suggested lines from transaction categories on this savings account.
@@ -137,25 +141,26 @@ def _build_category_lines(
     """
     rows = (
         db.query(
-            Transaction.category,
+            Category.id,
+            Category.name,
             func.sum(Transaction.amount).label("total"),
             func.count(Transaction.id).label("tx_count"),
         )
+        .join(Transaction, Transaction.category_id == Category.id)
         .filter(
             Transaction.account_id == plan.account_id,
             func.extract("year", Transaction.date) == plan.year,
-            Transaction.category.isnot(None),
-            Transaction.category != "",
         )
-        .group_by(Transaction.category)
+        .group_by(Category.id, Category.name)
         .all()
     )
 
     suggestions = []
     for row in rows:
-        if row.category not in existing_line_categories:
+        if row.id not in existing_category_ids:
             suggestions.append({
-                "category": row.category,
+                "category_id": row.id,
+                "category_name": row.name,
                 "total": row.total,
                 "tx_count": row.tx_count,
             })
@@ -268,6 +273,7 @@ def plan_detail(
         .options(
             joinedload(SavingsPlan.account),
             joinedload(SavingsPlan.lines).joinedload(SavingsLine.entries),
+            joinedload(SavingsPlan.lines).joinedload(SavingsLine.category),
         )
         .filter(SavingsPlan.id == plan_id, SavingsPlan.user_id == user.id)
         .first()
@@ -288,9 +294,9 @@ def plan_detail(
     # Get transaction totals per category per month for matching info
     category_totals = {}
     for line in plan.lines:
-        if line.category:
+        if line.category_id:
             totals = _get_transaction_totals_by_month(
-                db, plan.account_id, plan.year, line.category
+                db, plan.account_id, plan.year, line.category_id
             )
             category_totals[line.id] = totals
 
@@ -316,8 +322,16 @@ def plan_detail(
         line_totals[line.id] = total
 
     # Suggestions from categories
-    existing_categories = {line.category for line in plan.lines if line.category}
-    category_suggestions = _build_category_lines(db, plan, existing_categories)
+    existing_category_ids = {line.category_id for line in plan.lines if line.category_id}
+    category_suggestions = _build_category_suggestions(db, plan, existing_category_ids)
+
+    # All user categories for the dropdown
+    categories = (
+        db.query(Category)
+        .filter(Category.user_id == user.id)
+        .order_by(Category.name)
+        .all()
+    )
 
     db.commit()
 
@@ -332,6 +346,7 @@ def plan_detail(
             "line_totals": line_totals,
             "category_totals": category_totals,
             "category_suggestions": category_suggestions,
+            "categories": categories,
             "frequency_labels": FREQUENCY_LABELS,
             "today": today,
         },
@@ -343,7 +358,7 @@ def add_line(
     request: Request,
     plan_id: int = Form(...),
     name: str = Form(...),
-    category: str = Form(""),
+    category_id: int = Form(0),
     frequency: str = Form("monthly"),
     default_amount: str = Form("0"),
     target_month: int = Form(0),
@@ -371,10 +386,12 @@ def add_line(
         .scalar()
     ) or 0
 
+    cat_id = category_id if category_id else None
+
     line = SavingsLine(
         plan_id=plan_id,
         name=name.strip(),
-        category=category.strip() or None,
+        category_id=cat_id,
         frequency=frequency,
         default_amount=amount,
         annual_budget=amount * len(FREQUENCY_MONTHS.get(frequency, list(range(1, 13)))),
@@ -389,10 +406,10 @@ def add_line(
         db.add(entry)
 
     # If category is set, try to fill from existing transactions
-    if line.category:
+    if cat_id:
         today = datetime.date.today()
         tx_totals = _get_transaction_totals_by_month(
-            db, plan.account_id, plan.year, line.category
+            db, plan.account_id, plan.year, cat_id
         )
         for entry in entries:
             if entry.month in tx_totals:
@@ -452,7 +469,7 @@ def update_entry(
         Decimal("0"),
     )
 
-    # Recalculate full running balance for this month
+    # Recalculate full running balance
     all_lines = (
         db.query(SavingsLine)
         .options(joinedload(SavingsLine.entries))
@@ -543,14 +560,14 @@ def fill_from_transactions(
         .filter(SavingsLine.id == line_id, SavingsPlan.user_id == user.id)
         .first()
     )
-    if not line or not line.category:
+    if not line or not line.category_id:
         return RedirectResponse("/savings", status_code=302)
 
     plan = line.plan
     today = datetime.date.today()
 
     tx_totals = _get_transaction_totals_by_month(
-        db, plan.account_id, plan.year, line.category
+        db, plan.account_id, plan.year, line.category_id
     )
 
     for entry in line.entries:
