@@ -1,7 +1,7 @@
 """Add is_income to savings_lines
 
-Revision ID: 005
-Revises: 004
+Revision ID: 010
+Revises: 009
 Create Date: 2026-02-22
 """
 from typing import Sequence, Union
@@ -9,8 +9,8 @@ from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
 
-revision: str = "005"
-down_revision: Union[str, None] = "004"
+revision: str = "010"
+down_revision: Union[str, None] = "009"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
