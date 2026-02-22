@@ -22,13 +22,16 @@
             <a href="/budgets">Budget</a>
             <a href="/recurring">Terugkerend</a>
             <a href="/import">Importeren</a>
+            <a href="/categories">Categorieën</a>
+            <a href="/budgets">Budgetten</a>
+            <a href="/savings">Sparen</a>
             <a href="/accounts">Rekeningen</a>
             <span class="nav-user">{{ user.username }}</span>
             <a href="/logout" class="btn btn-sm">Uitloggen</a>
         </div>
     </nav>
     {% endif %}
-    <main class="container">
+    <main class="container {% block container_class %}{% endblock %}">
         {% block content %}{% endblock %}
     </main>
     {% block scripts %}{% endblock %}

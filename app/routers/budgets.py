@@ -1,201 +1,157 @@
-import calendar
-from datetime import date
-from decimal import Decimal, InvalidOperation
+import datetime
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Request, Form, Query
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
-from sqlalchemy import func, extract
+from sqlalchemy import func
 
 from app.database import get_db
-from app.models import Account, Transaction, Category, Budget
+from app.models import Account, Budget, Category, Transaction
 from app.auth import require_login
 
-router = APIRouter()
+router = APIRouter(prefix="/budgets")
 templates = Jinja2Templates(directory="app/templates")
 
-MONTH_NAMES_NL = [
-    "", "Januari", "Februari", "Maart", "April", "Mei", "Juni",
-    "Juli", "Augustus", "September", "Oktober", "November", "December",
-]
+MONTH_NAMES_NL = {
+    1: "Januari", 2: "Februari", 3: "Maart", 4: "April",
+    5: "Mei", 6: "Juni", 7: "Juli", 8: "Augustus",
+    9: "September", 10: "Oktober", 11: "November", 12: "December",
+}
 
 
-def _get_spending_by_category(db: Session, user_id: int, year: int, month: int) -> dict[int, Decimal]:
-    """Get total spending (negative amounts) per category for a given month."""
-    # Exclude parent transactions that have been split into children
-    split_parent_ids = (
-        db.query(Transaction.parent_id)
-        .filter(Transaction.parent_id.isnot(None))
-        .distinct()
-        .subquery()
-    )
-
-    rows = (
-        db.query(
-            Transaction.category_id,
-            func.sum(Transaction.amount).label("total"),
-        )
-        .join(Account)
-        .filter(
-            Account.user_id == user_id,
-            extract("year", Transaction.date) == year,
-            extract("month", Transaction.date) == month,
-            Transaction.category_id.isnot(None),
-            Transaction.amount < 0,
-            Transaction.id.notin_(split_parent_ids),
-        )
-        .group_by(Transaction.category_id)
-        .all()
-    )
-    return {cat_id: abs(total) for cat_id, total in rows}
-
-
-@router.get("/budgets")
+@router.get("")
 def budget_overview(
     request: Request,
-    year: int | None = Query(None),
-    month: int | None = Query(None),
+    year: int = Query(0),
+    month: int = Query(0),
+    account_id: int = Query(0),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
+    today = datetime.date.today()
+    current_year = year if year else today.year
+    current_month = month if month else today.month
 
-    today = date.today()
-    y = year or today.year
-    m = month or today.month
-
-    # Clamp month
-    if m < 1:
-        m = 12
-        y -= 1
-    elif m > 12:
-        m = 1
-        y += 1
-
-    # Previous / next month
-    prev_m, prev_y = (m - 1, y) if m > 1 else (12, y - 1)
-    next_m, next_y = (m + 1, y) if m < 12 else (1, y + 1)
-
-    # Days progress in month
-    days_in_month = calendar.monthrange(y, m)[1]
-    if y == today.year and m == today.month:
-        day_progress = today.day / days_in_month
-    elif date(y, m, 1) < today:
-        day_progress = 1.0
-    else:
-        day_progress = 0.0
-
-    # Load budgets and spending
-    budgets = (
-        db.query(Budget)
-        .filter(Budget.user_id == user.id)
+    accounts = (
+        db.query(Account)
+        .filter(Account.user_id == user.id)
+        .order_by(Account.name)
         .all()
     )
-    spending = _get_spending_by_category(db, user.id, y, m)
 
-    # Load all categories
-    all_cats = db.query(Category).filter(Category.user_id == user.id).all()
-    categories_by_id = {cat.id: cat for cat in all_cats}
-    budgets_by_cat = {b.category_id: b for b in budgets}
+    # Get all categories with hierarchy
+    cat_query = db.query(Category).filter(Category.user_id == user.id)
+    if account_id:
+        cat_query = cat_query.filter(Category.account_id == account_id)
+    all_categories = cat_query.order_by(Category.sort_order, Category.name).all()
 
-    # Build budget line helper
-    def _make_line(b, cat):
-        spent = spending.get(cat.id, Decimal("0"))
-        pct = float(spent / b.amount * 100) if b.amount else 0
-        return {
-            "budget": b,
-            "category": cat,
-            "spent": spent,
-            "remaining": b.amount - spent,
-            "pct": min(pct, 100),
-            "over": spent > b.amount,
-            "over_amount": spent - b.amount if spent > b.amount else Decimal("0"),
-        }
+    top_level = [c for c in all_categories if c.parent_id is None and not c.is_income]
+    children_map = {}
+    for c in all_categories:
+        if c.parent_id is not None:
+            children_map.setdefault(c.parent_id, []).append(c)
 
-    # Group budgets by parent category
-    budget_groups = []
+    # Get budgets for this month
+    budgets = (
+        db.query(Budget)
+        .filter(
+            Budget.user_id == user.id,
+            Budget.year == current_year,
+            Budget.month == current_month,
+        )
+        .all()
+    )
+    budget_map = {b.category_id: b.amount for b in budgets}
+
+    # Get actual spending per category for this month
+    # Include both parent-level and subcategory transactions
+    spending_query = (
+        db.query(
+            Category.id,
+            func.sum(Transaction.amount).label("total"),
+        )
+        .join(Transaction, Transaction.category_id == Category.id)
+        .join(Account, Account.id == Transaction.account_id)
+        .filter(
+            Account.user_id == user.id,
+            func.extract("year", Transaction.date) == current_year,
+            func.extract("month", Transaction.date) == current_month,
+            Transaction.amount < 0,
+        )
+    )
+    if account_id:
+        spending_query = spending_query.filter(Transaction.account_id == account_id)
+
+    spending = spending_query.group_by(Category.id).all()
+    spending_map = {row.id: abs(row.total) for row in spending}
+
+    # Build data for template
+    budget_data = []
     total_budgeted = Decimal("0")
     total_spent = Decimal("0")
 
-    # Find parent categories that have children with budgets
-    parent_cats = sorted(
-        [c for c in all_cats if not c.parent_id and c.children],
-        key=lambda c: c.name,
-    )
+    for parent in top_level:
+        children = children_map.get(parent.id, [])
+        parent_budget = budget_map.get(parent.id, Decimal("0"))
+        parent_spent = spending_map.get(parent.id, Decimal("0"))
 
-    grouped_cat_ids = set()
+        child_rows = []
+        group_budget = parent_budget
+        group_spent = parent_spent
 
-    for parent in parent_cats:
-        children = sorted(parent.children, key=lambda c: c.name)
-        lines = []
         for child in children:
-            b = budgets_by_cat.get(child.id)
-            if b:
-                line = _make_line(b, child)
-                lines.append(line)
-                grouped_cat_ids.add(child.id)
+            if child.is_income:
+                continue
+            cb = budget_map.get(child.id, Decimal("0"))
+            cs = spending_map.get(child.id, Decimal("0"))
+            group_budget += cb
+            group_spent += cs
+            child_rows.append({
+                "id": child.id,
+                "name": child.name,
+                "color": child.color,
+                "budget": cb,
+                "spent": cs,
+                "remaining": cb - cs,
+            })
 
-        if not lines:
-            continue
-
-        group_budgeted = sum(l["budget"].amount for l in lines)
-        group_spent = sum(l["spent"] for l in lines)
-        group_pct = float(group_spent / group_budgeted * 100) if group_budgeted else 0
-
-        total_budgeted += group_budgeted
+        total_budgeted += group_budget
         total_spent += group_spent
 
-        budget_groups.append({
+        budget_data.append({
             "parent": parent,
-            "lines": lines,
-            "total_budgeted": group_budgeted,
-            "total_spent": group_spent,
-            "total_remaining": group_budgeted - group_spent,
-            "pct": min(group_pct, 100),
-            "over": group_spent > group_budgeted,
+            "children": child_rows,
+            "group_budget": group_budget,
+            "group_spent": group_spent,
+            "group_remaining": group_budget - group_spent,
+            "parent_budget": parent_budget,
+            "parent_spent": parent_spent,
         })
 
-    # Standalone budgets (categories without parent, or parents without children)
-    standalone_lines = []
-    for b in budgets:
-        cat = categories_by_id.get(b.category_id)
-        if not cat or cat.id in grouped_cat_ids:
-            continue
-        # Skip parent categories (their children have the budgets)
-        if cat.children:
-            continue
-        line = _make_line(b, cat)
-        standalone_lines.append(line)
-        total_budgeted += b.amount
-        total_spent += line["spent"]
-
-    standalone_lines.sort(key=lambda x: x["category"].name)
-
-    # Categories available for new budgets: only leaf categories without a budget
-    budgeted_cat_ids = {b.category_id for b in budgets}
-    available_categories = sorted(
-        [c for c in all_cats if c.id not in budgeted_cat_ids and not c.children],
-        key=lambda c: (c.parent.name if c.parent else "", c.name),
+    # Years with transactions
+    tx_years = (
+        db.query(func.extract("year", Transaction.date).label("yr"))
+        .join(Account)
+        .filter(Account.user_id == user.id)
+        .distinct()
+        .all()
     )
+    years = sorted({int(r.yr) for r in tx_years} | {current_year})
 
     return templates.TemplateResponse(
         "budgets/overview.html",
         {
             "request": request,
             "user": user,
-            "budget_groups": budget_groups,
-            "standalone_lines": standalone_lines,
-            "available_categories": available_categories,
-            "all_parent_cats": parent_cats,
-            "year": y,
-            "month": m,
-            "month_name": MONTH_NAMES_NL[m],
-            "prev_year": prev_y,
-            "prev_month": prev_m,
-            "next_year": next_y,
-            "next_month": next_m,
-            "is_current_month": y == today.year and m == today.month,
-            "day_progress": day_progress,
+            "current_year": current_year,
+            "current_month": current_month,
+            "years": years,
+            "months": MONTH_NAMES_NL,
+            "accounts": accounts,
+            "current_account_id": account_id or None,
+            "budget_data": budget_data,
             "total_budgeted": total_budgeted,
             "total_spent": total_spent,
             "total_remaining": total_budgeted - total_spent,
@@ -203,85 +159,99 @@ def budget_overview(
     )
 
 
-@router.post("/budgets")
-def create_budget(
+@router.post("/save")
+def save_budget(
     request: Request,
     category_id: int = Form(...),
-    amount: str = Form(...),
+    year: int = Form(...),
+    month: int = Form(...),
+    amount: str = Form("0"),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
 
-    # Validate category belongs to user
-    cat = db.query(Category).filter(
-        Category.id == category_id, Category.user_id == user.id
-    ).first()
+    # Verify category belongs to user
+    cat = (
+        db.query(Category)
+        .filter(Category.id == category_id, Category.user_id == user.id)
+        .first()
+    )
     if not cat:
-        return RedirectResponse("/budgets", status_code=302)
+        return JSONResponse({"ok": False}, status_code=400)
 
-    # Parse amount
-    try:
-        parsed_amount = Decimal(amount.strip().replace(",", "."))
-        if parsed_amount <= 0:
-            return RedirectResponse("/budgets", status_code=302)
-    except (InvalidOperation, ValueError):
-        return RedirectResponse("/budgets", status_code=302)
+    parsed = Decimal(amount.replace(",", ".").strip() or "0")
 
-    # Check for existing budget on this category
-    existing = db.query(Budget).filter(
-        Budget.user_id == user.id, Budget.category_id == category_id
-    ).first()
-    if existing:
-        existing.amount = parsed_amount
+    budget = (
+        db.query(Budget)
+        .filter(
+            Budget.user_id == user.id,
+            Budget.category_id == category_id,
+            Budget.year == year,
+            Budget.month == month,
+        )
+        .first()
+    )
+
+    if budget:
+        budget.amount = parsed
     else:
         budget = Budget(
             user_id=user.id,
             category_id=category_id,
-            amount=parsed_amount,
+            year=year,
+            month=month,
+            amount=parsed,
         )
         db.add(budget)
 
     db.commit()
-    return RedirectResponse("/budgets", status_code=302)
+
+    return JSONResponse({"ok": True, "amount": float(parsed)})
 
 
-@router.post("/budgets/{budget_id}/edit")
-def edit_budget(
-    budget_id: int,
+@router.post("/copy")
+def copy_budgets(
     request: Request,
-    amount: str = Form(...),
+    from_year: int = Form(...),
+    from_month: int = Form(...),
+    to_year: int = Form(...),
+    to_month: int = Form(...),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
-    budget = db.query(Budget).filter(
-        Budget.id == budget_id, Budget.user_id == user.id
-    ).first()
-    if not budget:
-        return RedirectResponse("/budgets", status_code=302)
 
-    try:
-        parsed_amount = Decimal(amount.strip().replace(",", "."))
-        if parsed_amount <= 0:
-            return RedirectResponse("/budgets", status_code=302)
-    except (InvalidOperation, ValueError):
-        return RedirectResponse("/budgets", status_code=302)
+    source = (
+        db.query(Budget)
+        .filter(
+            Budget.user_id == user.id,
+            Budget.year == from_year,
+            Budget.month == from_month,
+        )
+        .all()
+    )
 
-    budget.amount = parsed_amount
+    for src in source:
+        existing = (
+            db.query(Budget)
+            .filter(
+                Budget.user_id == user.id,
+                Budget.category_id == src.category_id,
+                Budget.year == to_year,
+                Budget.month == to_month,
+            )
+            .first()
+        )
+        if existing:
+            existing.amount = src.amount
+        else:
+            db.add(Budget(
+                user_id=user.id,
+                category_id=src.category_id,
+                year=to_year,
+                month=to_month,
+                amount=src.amount,
+            ))
+
     db.commit()
-    return RedirectResponse("/budgets", status_code=302)
 
-
-@router.post("/budgets/{budget_id}/delete")
-def delete_budget(
-    budget_id: int,
-    request: Request,
-    db: Session = Depends(get_db),
-):
-    user = require_login(request, db)
-    budget = db.query(Budget).filter(
-        Budget.id == budget_id, Budget.user_id == user.id
-    ).first()
-    if budget:
-        db.delete(budget)
-        db.commit()
-    return RedirectResponse("/budgets", status_code=302)
+    return RedirectResponse(f"/budgets?year={to_year}&month={to_month}", status_code=302)

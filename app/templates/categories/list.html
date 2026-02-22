@@ -5,175 +5,324 @@
     <h1>Categorieën</h1>
 </div>
 
-<div class="categories-layout">
-    <!-- Create form -->
-    <div class="card">
-        <h2>Nieuwe categorie</h2>
-        <form method="post" action="/categories">
-            <div class="form-group">
-                <label for="name">Naam</label>
-                <input type="text" id="name" name="name" required placeholder="bijv. Boodschappen">
-            </div>
-            <div class="form-group">
-                <label for="parent_id">Groep (optioneel)</label>
-                <select name="parent_id" id="parent_id">
-                    <option value="">Geen - hoofdcategorie</option>
-                    {% for cat in all_categories %}
-                    {% if not cat.parent_id %}
-                    <option value="{{ cat.id }}">{{ cat.name }}</option>
-                    {% endif %}
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Kleur</label>
-                <div class="color-picker">
-                    {% for c in default_colors %}
-                    <label class="color-option">
-                        <input type="radio" name="color" value="{{ c }}" {% if loop.first %}checked{% endif %}>
-                        <span class="color-swatch" style="background:{{ c }}"></span>
-                    </label>
-                    {% endfor %}
-                </div>
-            </div>
-            <div class="form-group">
-                <label class="checkbox-label">
-                    <input type="checkbox" name="is_income" value="1">
-                    Inkomsten-categorie
-                </label>
-            </div>
-            <button type="submit" class="btn btn-primary">Toevoegen</button>
-        </form>
-    </div>
+<!-- Account filter -->
+<div class="card">
+    <form method="get" action="/categories" class="filter-bar">
+        <div class="form-group">
+            <label for="account_id">Rekening</label>
+            <select name="account_id" id="account_id" onchange="this.form.submit()">
+                <option value="0">Alle rekeningen</option>
+                {% for acc in accounts %}
+                <option value="{{ acc.id }}" {% if current_account_id == acc.id %}selected{% endif %}>
+                    {{ acc.name }}{% if acc.iban %} ({{ acc.iban }}){% endif %}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+    </form>
+</div>
 
-    <!-- Category list -->
-    <div class="card">
-        <h2>Overzicht</h2>
-        {% if categories %}
-        <div class="category-list">
-            {% for cat in categories %}
-            <div class="category-group">
-                <div class="category-item">
-                    <div class="category-info">
-                        <span class="category-color" style="background:{{ cat.color or '#1F6FB2' }}"></span>
-                        <strong>{{ cat.name }}</strong>
-                        {% if cat.is_income %}
-                        <span class="badge badge-income">Inkomsten</span>
-                        {% else %}
-                        <span class="badge badge-expense">Uitgaven</span>
-                        {% endif %}
-                        <span class="muted">{{ cat.transactions|length }} transacties</span>
-                    </div>
-                    <div class="category-actions">
-                        <button class="btn btn-sm" onclick="toggleEdit({{ cat.id }})">Bewerken</button>
+<!-- Category list -->
+{% if top_level %}
+<div class="card">
+    <p class="muted" style="margin-bottom:0.75rem;">Sleep categorieën om de volgorde aan te passen.</p>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th></th>
+                    <th>Categorie</th>
+                    <th>Rekening</th>
+                    <th>Type</th>
+                    <th>Kleur</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="category-list">
+                {% for cat in top_level %}
+                <tr class="category-parent draggable-row" draggable="true" data-id="{{ cat.id }}" data-type="parent">
+                    <td class="drag-handle" title="Versleep">&#9776;</td>
+                    <td><strong>{{ cat.name }}</strong></td>
+                    <td class="nowrap">{{ cat.account.name if cat.account else '-' }}</td>
+                    <td>{{ 'Inkomen' if cat.is_income else 'Uitgave' }}</td>
+                    <td>
+                        {% if cat.color %}
+                        <span class="color-dot" style="background:{{ cat.color }};"></span> {{ cat.color }}
+                        {% else %}-{% endif %}
+                    </td>
+                    <td class="nowrap">
+                        <button type="button" class="btn btn-sm" onclick="toggleEdit('cat-{{ cat.id }}')">Bewerk</button>
                         <form method="post" action="/categories/{{ cat.id }}/delete" style="display:inline;"
-                              onsubmit="return confirm('Categorie \'{{ cat.name }}\' verwijderen? Transacties worden niet verwijderd.')">
-                            <button type="submit" class="btn btn-sm btn-danger">Verwijderen</button>
+                              onsubmit="return confirm('Hoofdcategorie en alle subcategorieën verwijderen?')">
+                            <button type="submit" class="btn btn-sm btn-danger">X</button>
                         </form>
-                    </div>
-                </div>
-                <!-- Edit form (hidden) -->
-                <div class="category-edit" id="edit-{{ cat.id }}" style="display:none;">
-                    <form method="post" action="/categories/{{ cat.id }}/edit" class="edit-form">
-                        <div class="form-group">
-                            <input type="text" name="name" value="{{ cat.name }}" required>
-                        </div>
-                        <div class="form-group">
-                            <select name="parent_id">
-                                <option value="">Hoofdcategorie</option>
-                                {% for pcat in all_categories %}
-                                {% if pcat.id != cat.id and not pcat.parent_id %}
-                                <option value="{{ pcat.id }}">{{ pcat.name }}</option>
-                                {% endif %}
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="color-picker">
-                            {% for c in default_colors %}
-                            <label class="color-option">
-                                <input type="radio" name="color" value="{{ c }}" {% if cat.color == c %}checked{% endif %}>
-                                <span class="color-swatch" style="background:{{ c }}"></span>
-                            </label>
-                            {% endfor %}
-                        </div>
-                        <div class="form-group">
-                            <label class="checkbox-label">
-                                <input type="checkbox" name="is_income" value="1" {% if cat.is_income %}checked{% endif %}>
-                                Inkomsten-categorie
-                            </label>
-                        </div>
-                        <div style="margin-top:0.5rem;">
-                            <button type="submit" class="btn btn-sm btn-primary">Opslaan</button>
-                            <button type="button" class="btn btn-sm" onclick="toggleEdit({{ cat.id }})">Annuleren</button>
-                        </div>
-                    </form>
-                </div>
-                <!-- Children -->
-                {% if cat.children %}
-                <div class="category-children">
-                    {% for child in cat.children|sort(attribute='name') %}
-                    <div class="category-item category-child">
-                        <div class="category-info">
-                            <span class="category-color" style="background:{{ child.color or cat.color or '#1F6FB2' }}"></span>
-                            <span>{{ child.name }}</span>
-                            <span class="muted">{{ child.transactions|length }} transacties</span>
-                        </div>
-                        <div class="category-actions">
-                            <button class="btn btn-sm" onclick="toggleEdit({{ child.id }})">Bewerken</button>
-                            <form method="post" action="/categories/{{ child.id }}/delete" style="display:inline;"
-                                  onsubmit="return confirm('Subcategorie \'{{ child.name }}\' verwijderen?')">
-                                <button type="submit" class="btn btn-sm btn-danger">Verwijderen</button>
-                            </form>
-                        </div>
-                    </div>
-                    <!-- Edit form for child (hidden) -->
-                    <div class="category-edit" id="edit-{{ child.id }}" style="display:none;">
-                        <form method="post" action="/categories/{{ child.id }}/edit" class="edit-form">
+                    </td>
+                </tr>
+                <tr class="edit-row" id="cat-{{ cat.id }}" style="display:none;">
+                    <td colspan="6">
+                        <form method="post" action="/categories/{{ cat.id }}/edit" class="filter-bar" style="flex-wrap:wrap; padding:0.5rem 0;">
                             <div class="form-group">
-                                <input type="text" name="name" value="{{ child.name }}" required>
+                                <label>Naam</label>
+                                <input type="text" name="name" value="{{ cat.name }}" required>
                             </div>
                             <div class="form-group">
-                                <select name="parent_id">
-                                    <option value="">Hoofdcategorie</option>
-                                    {% for pcat in all_categories %}
-                                    {% if pcat.id != child.id and not pcat.parent_id %}
-                                    <option value="{{ pcat.id }}" {% if child.parent_id == pcat.id %}selected{% endif %}>{{ pcat.name }}</option>
-                                    {% endif %}
+                                <label>Rekening</label>
+                                <select name="account_id">
+                                    <option value="0">Geen</option>
+                                    {% for acc in accounts %}
+                                    <option value="{{ acc.id }}" {% if cat.account_id == acc.id %}selected{% endif %}>{{ acc.name }}</option>
                                     {% endfor %}
                                 </select>
                             </div>
-                            <div class="color-picker">
-                                {% for c in default_colors %}
-                                <label class="color-option">
-                                    <input type="radio" name="color" value="{{ c }}" {% if child.color == c %}checked{% endif %}>
-                                    <span class="color-swatch" style="background:{{ c }}"></span>
-                                </label>
-                                {% endfor %}
+                            <div class="form-group">
+                                <label>Kleur</label>
+                                <input type="color" name="color" value="{{ cat.color or '#89b4fa' }}">
                             </div>
-                            <div style="margin-top:0.5rem;">
-                                <button type="submit" class="btn btn-sm btn-primary">Opslaan</button>
-                                <button type="button" class="btn btn-sm" onclick="toggleEdit({{ child.id }})">Annuleren</button>
+                            <div class="form-group">
+                                <label>
+                                    <input type="checkbox" name="is_income" value="1" {% if cat.is_income %}checked{% endif %}> Inkomen
+                                </label>
+                            </div>
+                            <div class="form-group" style="align-self:flex-end;">
+                                <button type="submit" class="btn btn-primary btn-sm">Opslaan</button>
+                                <button type="button" class="btn btn-sm" onclick="toggleEdit('cat-{{ cat.id }}')">Annuleren</button>
                             </div>
                         </form>
-                    </div>
-                    {% endfor %}
-                </div>
-                {% endif %}
-            </div>
-            {% endfor %}
-        </div>
-        {% else %}
-        <p class="muted" style="text-align:center; padding:1rem;">Nog geen categorieën. Maak je eerste categorie aan.</p>
-        {% endif %}
+                    </td>
+                </tr>
+                {% for sub in children_map.get(cat.id, []) %}
+                <tr class="category-child draggable-row" draggable="true" data-id="{{ sub.id }}" data-type="child" data-parent="{{ cat.id }}">
+                    <td class="drag-handle" title="Versleep">&#9776;</td>
+                    <td style="padding-left: 2rem;">↳ {{ sub.name }}</td>
+                    <td class="nowrap">{{ sub.account.name if sub.account else '-' }}</td>
+                    <td>{{ 'Inkomen' if sub.is_income else 'Uitgave' }}</td>
+                    <td>
+                        {% if sub.color %}
+                        <span class="color-dot" style="background:{{ sub.color }};"></span> {{ sub.color }}
+                        {% else %}-{% endif %}
+                    </td>
+                    <td class="nowrap">
+                        <button type="button" class="btn btn-sm" onclick="toggleEdit('cat-{{ sub.id }}')">Bewerk</button>
+                        <form method="post" action="/categories/{{ sub.id }}/delete" style="display:inline;"
+                              onsubmit="return confirm('Subcategorie verwijderen?')">
+                            <button type="submit" class="btn btn-sm btn-danger">X</button>
+                        </form>
+                    </td>
+                </tr>
+                <tr class="edit-row" id="cat-{{ sub.id }}" style="display:none;">
+                    <td colspan="6">
+                        <form method="post" action="/categories/{{ sub.id }}/edit" class="filter-bar" style="flex-wrap:wrap; padding:0.5rem 0;">
+                            <div class="form-group">
+                                <label>Naam</label>
+                                <input type="text" name="name" value="{{ sub.name }}" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Kleur</label>
+                                <input type="color" name="color" value="{{ sub.color or '#89b4fa' }}">
+                            </div>
+                            <div class="form-group" style="align-self:flex-end;">
+                                <button type="submit" class="btn btn-primary btn-sm">Opslaan</button>
+                                <button type="button" class="btn btn-sm" onclick="toggleEdit('cat-{{ sub.id }}')">Annuleren</button>
+                            </div>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 </div>
-{% endblock %}
+{% else %}
+<div class="card" style="text-align:center; padding:3rem;">
+    <p>Nog geen categorieën aangemaakt.</p>
+</div>
+{% endif %}
 
-{% block scripts %}
+<!-- Add category forms -->
+<div class="accounts-grid">
+    <!-- Hoofdcategorie -->
+    <div class="card">
+        <h2>Hoofdcategorie toevoegen</h2>
+        <form method="post" action="/categories">
+            <div class="form-stack">
+                <div class="form-group">
+                    <label for="cat_name">Naam</label>
+                    <input type="text" name="name" id="cat_name" required placeholder="bijv. Vaste lasten">
+                </div>
+                <div class="form-group">
+                    <label for="cat_account">Rekening</label>
+                    <select name="account_id" id="cat_account" required>
+                        <option value="">Kies rekening...</option>
+                        {% for acc in accounts %}
+                        <option value="{{ acc.id }}">{{ acc.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="cat_color">Kleur (optioneel)</label>
+                    <input type="color" name="color" id="cat_color" value="#89b4fa">
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" name="is_income" value="1"> Inkomen
+                    </label>
+                </div>
+                <button type="submit" class="btn btn-primary">Toevoegen</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Subcategorie -->
+    <div class="card">
+        <h2>Subcategorie toevoegen</h2>
+        <form method="post" action="/categories">
+            <div class="form-stack">
+                <div class="form-group">
+                    <label for="sub_parent">Hoofdcategorie</label>
+                    <select name="parent_id" id="sub_parent" required>
+                        <option value="">Kies hoofdcategorie...</option>
+                        {% for cat in top_level %}
+                        <option value="{{ cat.id }}">{{ cat.name }}{% if cat.account %} ({{ cat.account.name }}){% endif %}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="sub_name">Naam</label>
+                    <input type="text" name="name" id="sub_name" required placeholder="bijv. Huur">
+                </div>
+                <div class="form-group">
+                    <label for="sub_color">Kleur (optioneel)</label>
+                    <input type="color" name="color" id="sub_color" value="#89b4fa">
+                </div>
+                <button type="submit" class="btn btn-primary">Toevoegen</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
 function toggleEdit(id) {
-    const el = document.getElementById('edit-' + id);
-    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+    var row = document.getElementById(id);
+    row.style.display = row.style.display === 'none' ? '' : 'none';
 }
+
+// Drag and drop for category reordering
+(function() {
+    var dragRow = null;
+    var tbody = document.getElementById('category-list');
+    if (!tbody) return;
+
+    tbody.addEventListener('dragstart', function(e) {
+        var row = e.target.closest('.draggable-row');
+        if (!row) return;
+        dragRow = row;
+        row.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+    });
+
+    tbody.addEventListener('dragend', function(e) {
+        if (dragRow) dragRow.classList.remove('dragging');
+        dragRow = null;
+        // Remove all drag-over indicators
+        tbody.querySelectorAll('.drag-over').forEach(function(el) {
+            el.classList.remove('drag-over');
+        });
+    });
+
+    tbody.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+
+        var targetRow = e.target.closest('.draggable-row');
+        if (!targetRow || targetRow === dragRow) return;
+
+        // Only allow reordering within same level
+        var dragType = dragRow.dataset.type;
+        var targetType = targetRow.dataset.type;
+
+        if (dragType === 'parent' && targetType !== 'parent') return;
+        if (dragType === 'child' && (targetType !== 'child' || targetRow.dataset.parent !== dragRow.dataset.parent)) return;
+
+        tbody.querySelectorAll('.drag-over').forEach(function(el) {
+            el.classList.remove('drag-over');
+        });
+        targetRow.classList.add('drag-over');
+    });
+
+    tbody.addEventListener('drop', function(e) {
+        e.preventDefault();
+        var targetRow = e.target.closest('.draggable-row');
+        if (!targetRow || !dragRow || targetRow === dragRow) return;
+
+        var dragType = dragRow.dataset.type;
+        var targetType = targetRow.dataset.type;
+
+        if (dragType === 'parent' && targetType !== 'parent') return;
+        if (dragType === 'child' && (targetType !== 'child' || targetRow.dataset.parent !== dragRow.dataset.parent)) return;
+
+        // Move the row (and its edit-row + children if parent)
+        if (dragType === 'parent') {
+            // Collect all rows belonging to this parent (the parent row, its edit row, and all children)
+            var dragGroup = collectParentGroup(dragRow);
+            var targetGroup = collectParentGroup(targetRow);
+
+            // Insert drag group before target group
+            var firstTarget = targetGroup[0];
+            dragGroup.forEach(function(row) {
+                tbody.insertBefore(row, firstTarget);
+            });
+        } else {
+            // Child: move just the child row + its edit row
+            var editRow = dragRow.nextElementSibling;
+            var targetEdit = targetRow.nextElementSibling;
+
+            if (editRow && editRow.classList.contains('edit-row')) {
+                tbody.insertBefore(dragRow, targetRow);
+                tbody.insertBefore(editRow, targetRow);
+            } else {
+                tbody.insertBefore(dragRow, targetRow);
+            }
+        }
+
+        targetRow.classList.remove('drag-over');
+        saveOrder();
+    });
+
+    function collectParentGroup(parentRow) {
+        var rows = [parentRow];
+        var next = parentRow.nextElementSibling;
+
+        // Include edit row
+        if (next && next.classList.contains('edit-row')) {
+            rows.push(next);
+            next = next.nextElementSibling;
+        }
+
+        // Include all child rows and their edit rows
+        while (next && (next.classList.contains('category-child') || next.classList.contains('edit-row'))) {
+            rows.push(next);
+            next = next.nextElementSibling;
+        }
+
+        return rows;
+    }
+
+    function saveOrder() {
+        var rows = tbody.querySelectorAll('.draggable-row');
+        var items = [];
+        var order = 0;
+        rows.forEach(function(row) {
+            items.push({ id: parseInt(row.dataset.id), sort_order: order });
+            order++;
+        });
+
+        fetch('/categories/reorder', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items: items })
+        });
+    }
+})();
 </script>
 {% endblock %}

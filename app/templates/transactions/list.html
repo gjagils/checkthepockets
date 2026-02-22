@@ -110,34 +110,23 @@
                 {% for tx in transactions %}
                 <tr>
                     <td class="nowrap">{{ tx.date.strftime('%d-%m-%Y') }}</td>
-                    <td class="desc-cell" title="{{ tx.description or '' }}">{{ tx.description[:80] }}{% if tx.description and tx.description|length > 80 %}...{% endif %}</td>
-                    <td class="counterparty-cell" title="{{ tx.counterparty or '' }}">{{ tx.counterparty or '-' }}</td>
+                    <td class="desc-cell">{{ tx.description or '-' }}</td>
+                    <td>{{ tx.counterparty or '-' }}</td>
                     <td class="nowrap">
-                        <form method="post" action="/transactions/{{ tx.id }}/category" class="inline-category-form">
-                            <select name="category_id" class="category-select {% if tx.category_rel %}has-category{% endif %}" style="{% if tx.category_rel %}--cat-color: {{ tx.category_rel.color or '#1F6FB2' }}{% endif %}" onchange="this.form.submit()">
-                                <option value="">— Geen —</option>
-                                {% for cat in categories %}
-                                {% if not cat.parent_id %}
-                                    {% if cat.children %}
-                                    <optgroup label="{{ cat.name }}">
-                                        {% for child in cat.children|sort(attribute='name') %}
-                                        <option value="{{ child.id }}" {% if tx.category_id == child.id %}selected{% endif %}>
-                                            {{ child.name }}
-                                        </option>
-                                        {% endfor %}
-                                    </optgroup>
-                                    {% else %}
-                                    <option value="{{ cat.id }}" {% if tx.category_id == cat.id %}selected{% endif %}>
-                                        {{ cat.name }}
-                                    </option>
-                                    {% endif %}
-                                {% endif %}
+                        {% set acct_cats = cats_by_account.get(tx.account_id, {"parents": [], "children": {}}) %}
+                        <form method="post" action="/transactions/{{ tx.id }}/category" class="inline-cat-form">
+                            <input type="hidden" name="redirect_to" value="/?page={{ page }}{% if current_account_id %}&account_id={{ current_account_id }}{% endif %}">
+                            <select name="category_id" class="select-sm" onchange="this.form.submit()">
+                                <option value="0">-</option>
+                                {% for parent in acct_cats["parents"] %}
+                                <optgroup label="{{ parent.name }}">
+                                    {% for sub in acct_cats["children"].get(parent.id, []) %}
+                                    <option value="{{ sub.id }}" {% if tx.category_id == sub.id %}selected{% endif %}>{{ sub.name }}</option>
+                                    {% endfor %}
+                                </optgroup>
                                 {% endfor %}
                             </select>
                         </form>
-                        {% for tag in tx.tags %}
-                        <span class="tag-pill">{{ tag.name }}</span>
-                        {% endfor %}
                     </td>
                     <td class="text-right nowrap {% if tx.amount >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
                         {{ "%.2f"|format(tx.amount) }} {{ tx.currency }}

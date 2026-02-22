@@ -1,172 +1,234 @@
 from fastapi import APIRouter, Depends, Request, Form, Query
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from typing import List
 
 from app.database import get_db
-from app.models import Category, Transaction
+from app.models import Account, Category
 from app.auth import require_login
 
-router = APIRouter()
+router = APIRouter(prefix="/categories")
 templates = Jinja2Templates(directory="app/templates")
 
-DEFAULT_COLORS = [
-    "#1F6FB2", "#2DBE60", "#F2B233", "#E54D4D", "#9B59B6",
-    "#1ABC9C", "#E67E22", "#3498DB", "#E91E63", "#00BCD4",
-]
 
-
-@router.get("/categories")
-def categories_list(request: Request, db: Session = Depends(get_db)):
+@router.get("")
+def categories_list(
+    request: Request,
+    account_id: int = Query(0),
+    db: Session = Depends(get_db),
+):
     user = require_login(request, db)
 
-    # Get top-level categories (no parent) with their children
-    categories = (
-        db.query(Category)
-        .filter(Category.user_id == user.id, Category.parent_id.is_(None))
-        .order_by(Category.name)
+    accounts = (
+        db.query(Account)
+        .filter(Account.user_id == user.id)
+        .order_by(Account.name)
         .all()
     )
 
-    all_categories = (
-        db.query(Category)
-        .filter(Category.user_id == user.id)
-        .order_by(Category.name)
-        .all()
-    )
+    query = db.query(Category).filter(Category.user_id == user.id)
+    if account_id:
+        query = query.filter(Category.account_id == account_id)
+
+    all_categories = query.order_by(Category.sort_order, Category.name).all()
+
+    # Build hierarchy: top-level (parent_id=None) with their children
+    top_level = [c for c in all_categories if c.parent_id is None]
+    children_map = {}
+    for c in all_categories:
+        if c.parent_id is not None:
+            children_map.setdefault(c.parent_id, []).append(c)
 
     return templates.TemplateResponse(
         "categories/list.html",
         {
             "request": request,
             "user": user,
-            "categories": categories,
-            "all_categories": all_categories,
-            "default_colors": DEFAULT_COLORS,
+            "accounts": accounts,
+            "current_account_id": account_id or None,
+            "top_level": top_level,
+            "children_map": children_map,
         },
     )
 
 
-@router.post("/categories")
+@router.post("")
 def create_category(
     request: Request,
     name: str = Form(...),
-    parent_id: str = Form(""),
+    account_id: int = Form(0),
+    parent_id: int = Form(0),
     color: str = Form(""),
-    is_income: str = Form(""),
+    is_income: int = Form(0),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
-    name = name.strip()
-    parent_id = int(parent_id) if parent_id.strip() else None
 
-    if not name:
-        return RedirectResponse("/categories", status_code=302)
+    acc_id = account_id if account_id else None
+    par_id = parent_id if parent_id else None
 
-    # Check for duplicate
-    existing = (
-        db.query(Category)
-        .filter(Category.user_id == user.id, Category.name == name)
-        .first()
-    )
-    if existing:
-        return RedirectResponse("/categories", status_code=302)
+    # Verify account belongs to user
+    if acc_id:
+        account = (
+            db.query(Account)
+            .filter(Account.id == acc_id, Account.user_id == user.id)
+            .first()
+        )
+        if not account:
+            return RedirectResponse("/categories", status_code=302)
 
-    # Validate parent belongs to user
-    if parent_id:
+    # If parent is set, inherit account_id and is_income from parent
+    if par_id:
         parent = (
             db.query(Category)
-            .filter(Category.id == parent_id, Category.user_id == user.id)
+            .filter(Category.id == par_id, Category.user_id == user.id)
             .first()
         )
         if not parent:
-            parent_id = None
+            return RedirectResponse("/categories", status_code=302)
+        acc_id = parent.account_id
+        is_income = parent.is_income
 
-    category = Category(
-        user_id=user.id,
-        name=name,
-        parent_id=parent_id if parent_id else None,
-        color=color or None,
-        is_income=1 if is_income else 0,
+    # New category gets highest sort_order + 1
+    max_order = (
+        db.query(Category.sort_order)
+        .filter(Category.user_id == user.id, Category.parent_id == par_id)
+        .order_by(Category.sort_order.desc())
+        .first()
     )
-    db.add(category)
+    next_order = (max_order[0] + 1) if max_order and max_order[0] is not None else 0
+
+    cat = Category(
+        user_id=user.id,
+        account_id=acc_id,
+        name=name.strip(),
+        parent_id=par_id,
+        color=color.strip() or None,
+        is_income=is_income,
+        sort_order=next_order,
+    )
+    db.add(cat)
     db.commit()
 
-    return RedirectResponse("/categories", status_code=302)
+    redirect = "/categories"
+    if acc_id:
+        redirect += f"?account_id={acc_id}"
+    return RedirectResponse(redirect, status_code=302)
 
 
-@router.post("/categories/{category_id}/edit")
+@router.post("/{category_id}/edit")
 def edit_category(
-    category_id: int,
     request: Request,
+    category_id: int,
     name: str = Form(...),
-    parent_id: str = Form(""),
+    account_id: int = Form(0),
     color: str = Form(""),
-    is_income: str = Form(""),
+    is_income: int = Form(0),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
-    category = (
+
+    cat = (
         db.query(Category)
         .filter(Category.id == category_id, Category.user_id == user.id)
         .first()
     )
-    if not category:
+    if not cat:
         return RedirectResponse("/categories", status_code=302)
 
-    name = name.strip()
-    parent_id = int(parent_id) if parent_id.strip() else None
-    if not name:
-        return RedirectResponse("/categories", status_code=302)
+    acc_id = account_id if account_id else None
 
-    # Prevent setting self as parent or a child as parent
-    if parent_id == category_id:
-        parent_id = None
-
-    # Validate parent belongs to user and is not a child of this category
-    if parent_id:
-        parent = (
-            db.query(Category)
-            .filter(Category.id == parent_id, Category.user_id == user.id)
+    # Verify account belongs to user
+    if acc_id:
+        account = (
+            db.query(Account)
+            .filter(Account.id == acc_id, Account.user_id == user.id)
             .first()
         )
-        if not parent or parent.parent_id == category_id:
-            parent_id = None
+        if not account:
+            return RedirectResponse("/categories", status_code=302)
 
-    category.name = name
-    category.parent_id = parent_id if parent_id else None
-    category.color = color or None
-    category.is_income = 1 if is_income else 0
+    cat.name = name.strip()
+    cat.color = color.strip() or None
+
+    # Only main categories can change account and is_income
+    # Children inherit from parent
+    if cat.parent_id is None:
+        cat.account_id = acc_id
+        cat.is_income = is_income
+
+        # Cascade to children: update account_id and is_income
+        children = (
+            db.query(Category)
+            .filter(Category.parent_id == category_id, Category.user_id == user.id)
+            .all()
+        )
+        for child in children:
+            child.account_id = acc_id
+            child.is_income = is_income
+
     db.commit()
-
     return RedirectResponse("/categories", status_code=302)
 
 
-@router.post("/categories/{category_id}/delete")
-def delete_category(
-    category_id: int,
+class ReorderItem(BaseModel):
+    id: int
+    sort_order: int
+
+
+class ReorderRequest(BaseModel):
+    items: List[ReorderItem]
+
+
+@router.post("/reorder")
+def reorder_categories(
     request: Request,
+    payload: ReorderRequest,
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
-    category = (
+
+    ids = [item.id for item in payload.items]
+    categories = (
+        db.query(Category)
+        .filter(Category.id.in_(ids), Category.user_id == user.id)
+        .all()
+    )
+    cat_map = {c.id: c for c in categories}
+
+    for item in payload.items:
+        if item.id in cat_map:
+            cat_map[item.id].sort_order = item.sort_order
+
+    db.commit()
+    return JSONResponse({"ok": True})
+
+
+@router.post("/{category_id}/delete")
+def delete_category(
+    request: Request,
+    category_id: int,
+    db: Session = Depends(get_db),
+):
+    user = require_login(request, db)
+
+    cat = (
         db.query(Category)
         .filter(Category.id == category_id, Category.user_id == user.id)
         .first()
     )
-    if not category:
+    if not cat:
         return RedirectResponse("/categories", status_code=302)
 
-    # Move child categories to parent (or top-level)
-    for child in category.children:
-        child.parent_id = category.parent_id
+    # Delete children first
+    db.query(Category).filter(
+        Category.parent_id == category_id,
+        Category.user_id == user.id,
+    ).delete()
 
-    # Unset category on transactions
-    db.query(Transaction).filter(Transaction.category_id == category_id).update(
-        {"category_id": None}
-    )
-
-    db.delete(category)
+    db.delete(cat)
     db.commit()
 
     return RedirectResponse("/categories", status_code=302)

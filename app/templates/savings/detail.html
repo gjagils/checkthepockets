@@ -1,0 +1,335 @@
+{% extends "base.html" %}
+{% block title %}Spaarplan {{ plan.account.name }} {{ plan.year }} - Check The Pockets{% endblock %}
+{% block container_class %}container-wide{% endblock %}
+
+{% macro render_line(line) %}
+<tr class="savings-row" data-line-id="{{ line.id }}">
+    <td class="sticky-col">
+        <div class="line-info-row">
+            <div class="line-actions-stack">
+                <button type="button" class="btn btn-sm btn-icon" onclick="toggleEditRow({{ line.id }})" title="Bewerken">&#9998;</button>
+                {% if line.category_id %}
+                <form method="post" action="/savings/lines/{{ line.id }}/fill-from-transactions">
+                    <button type="submit" class="btn btn-sm btn-icon" title="Vul vanuit transacties">&#8635;</button>
+                </form>
+                {% endif %}
+                <form method="post" action="/savings/lines/{{ line.id }}/delete"
+                      onsubmit="return confirm('Regel verwijderen?')">
+                    <button type="submit" class="btn btn-sm btn-icon btn-danger" title="Verwijderen">&times;</button>
+                </form>
+            </div>
+            <div>
+                <div class="line-name">{{ line.name }}</div>
+                {% if line.category %}
+                <div class="line-category">{{ line.category.name }}</div>
+                {% endif %}
+                <div class="line-freq">{{ frequency_labels.get(line.frequency, line.frequency) }}</div>
+            </div>
+        </div>
+    </td>
+    {% for m in range(1, 13) %}
+    {% set entry = namespace(val=None, status='forecast', id=0) %}
+    {% for e in line.entries %}
+        {% if e.month == m %}
+            {% set entry.val = e.amount %}
+            {% set entry.status = e.status %}
+            {% set entry.id = e.id %}
+        {% endif %}
+    {% endfor %}
+    <td class="text-right savings-cell cell-{{ entry.status }}"
+        data-entry-id="{{ entry.id }}"
+        data-month="{{ m }}">
+        <span class="cell-display" onclick="startEdit(this)">
+            {% if entry.val is not none %}&euro;&nbsp;{{ "%.2f"|format(entry.val|abs)|replace(".", ",") }}{% else %}-{% endif %}
+        </span>
+        <input type="text" class="cell-input" style="display:none;"
+               value="{% if entry.val is not none %}{{ "%.2f"|format(entry.val|abs) }}{% endif %}"
+               onblur="saveCell(this)"
+               onkeydown="cellKeydown(event, this)">
+    </td>
+    {% endfor %}
+    <td class="text-right nowrap line-total" data-line-id="{{ line.id }}">
+        <strong>&euro;&nbsp;{{ "%.2f"|format(line_totals.get(line.id, 0))|replace(".", ",") }}</strong>
+    </td>
+</tr>
+<tr class="edit-row" id="edit-row-{{ line.id }}" style="display:none;">
+    <td colspan="14">
+        <form method="post" action="/savings/lines/{{ line.id }}/edit" class="filter-bar" style="flex-wrap:wrap; padding:0.5rem 0;">
+            <div class="form-group">
+                <label>Naam</label>
+                <input type="text" name="name" value="{{ line.name }}" required>
+            </div>
+            <div class="form-group">
+                <label>Categorie</label>
+                <select name="category_id">
+                    <option value="0">Geen categorie</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat.id }}" {% if line.category_id == cat.id %}selected{% endif %}>{{ cat.name }}{% if cat.is_income %} (inkomen){% endif %}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Frequentie</label>
+                <select name="frequency">
+                    {% for key, label in frequency_labels.items() %}
+                    <option value="{{ key }}" {% if line.frequency == key %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Bedrag per keer</label>
+                <input type="text" name="default_amount" value="{{ "%.2f"|format(line.default_amount) }}">
+            </div>
+            <div class="form-group" style="align-self:flex-end;">
+                <button type="submit" class="btn btn-primary btn-sm">Opslaan</button>
+                <button type="button" class="btn btn-sm" onclick="toggleEditRow({{ line.id }})">Annuleren</button>
+            </div>
+        </form>
+    </td>
+</tr>
+{% endmacro %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>{{ plan.account.name }} - {{ plan.year }}</h1>
+        <p class="muted">Startsaldo: &euro;&nbsp;{{ "%.2f"|format(plan.starting_balance)|replace(".", ",") }}{% if plan.account.iban %} &middot; {{ plan.account.iban }}{% endif %}</p>
+    </div>
+    <a href="/savings?year={{ plan.year }}" class="btn btn-sm">Terug naar overzicht</a>
+</div>
+
+<!-- Savings grid table -->
+<div class="card" style="padding:0; overflow:visible;">
+    <div class="table-wrap savings-table-wrap">
+        <table class="savings-grid">
+            <thead>
+                <tr>
+                    <th class="sticky-col">Regel</th>
+                    {% for m in range(1, 13) %}
+                    <th class="text-right month-col">{{ months[m] }}</th>
+                    {% endfor %}
+                    <th class="text-right">Totaal</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Inkomen -->
+                {% if income_lines %}
+                <tr class="section-header">
+                    <td class="sticky-col" colspan="14"><strong>Inkomen</strong></td>
+                </tr>
+                {% for line in income_lines %}
+                    {{ render_line(line) }}
+                {% endfor %}
+                {% endif %}
+
+                <!-- Saldo rij -->
+                <tr class="balance-row">
+                    <td class="sticky-col"><strong>Saldo</strong></td>
+                    {% for m in range(1, 13) %}
+                    <td class="text-right nowrap balance-cell" data-month="{{ m }}">
+                        {% set bal = running_balance.get(m, 0) %}
+                        <strong class="{% if bal >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
+                            &euro;&nbsp;{{ "%.2f"|format(bal)|replace(".", ",") }}
+                        </strong>
+                    </td>
+                    {% endfor %}
+                    <td></td>
+                </tr>
+
+                <!-- Uitgaven -->
+                {% if expense_lines %}
+                <tr class="section-header">
+                    <td class="sticky-col" colspan="14"><strong>Uitgaven</strong></td>
+                </tr>
+                {% for line in expense_lines %}
+                    {{ render_line(line) }}
+                {% endfor %}
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add line form -->
+<div class="card">
+    <h2>Regel toevoegen</h2>
+    <form method="post" action="/savings/lines">
+        <input type="hidden" name="plan_id" value="{{ plan.id }}">
+        <div class="filter-bar" style="flex-wrap: wrap;">
+            <div class="form-group">
+                <label for="line_name">Naam</label>
+                <input type="text" name="name" id="line_name" required placeholder="bijv. Maandelijks sparen">
+            </div>
+            <div class="form-group">
+                <label for="line_category">Categorie (optioneel)</label>
+                <select name="category_id" id="line_category">
+                    <option value="0">Geen categorie</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat.id }}">{{ cat.name }}{% if cat.is_income %} (inkomen){% endif %}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="line_freq">Frequentie</label>
+                <select name="frequency" id="line_freq" onchange="toggleTargetMonth(this.value)">
+                    {% for key, label in frequency_labels.items() %}
+                    <option value="{{ key }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="line_amount">Bedrag per keer</label>
+                <input type="text" name="default_amount" id="line_amount" value="0" placeholder="0,00">
+            </div>
+            <div class="form-group" id="target-month-group" style="display:none;">
+                <label for="line_target_month">Maand</label>
+                <select name="target_month" id="line_target_month">
+                    {% for m in range(1, 13) %}
+                    <option value="{{ m }}">{{ months[m] }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group" style="align-self: flex-end;">
+                <button type="submit" class="btn btn-primary">Toevoegen</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Category suggestions -->
+{% if category_suggestions %}
+<div class="card">
+    <h2>Suggesties vanuit transacties</h2>
+    <p class="muted" style="margin-bottom: 1rem;">Deze categorieen zijn gevonden in de transacties van deze spaarrekening maar staan nog niet in het plan.</p>
+    <div class="accounts-grid">
+        {% for sug in category_suggestions %}
+        <div class="card" style="margin-bottom: 0;">
+            <h3>{{ sug.category_name }}</h3>
+            <p class="muted">{{ sug.tx_count }} transacties &middot; Totaal: &euro;&nbsp;{{ "%.2f"|format(sug.total)|replace(".", ",") }}</p>
+            <form method="post" action="/savings/lines" style="margin-top: 0.75rem;">
+                <input type="hidden" name="plan_id" value="{{ plan.id }}">
+                <input type="hidden" name="name" value="{{ sug.category_name }}">
+                <input type="hidden" name="category_id" value="{{ sug.category_id }}">
+                <input type="hidden" name="frequency" value="monthly">
+                <input type="hidden" name="default_amount" value="0">
+                <button type="submit" class="btn btn-sm btn-accent">Toevoegen aan plan</button>
+            </form>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Legend -->
+<div class="card">
+    <div class="savings-legend">
+        <span class="legend-item"><span class="legend-dot legend-confirmed"></span> Bevestigd (transacties verwerkt)</span>
+        <span class="legend-item"><span class="legend-dot legend-pending"></span> Lopend (transacties aanwezig, maand nog open)</span>
+        <span class="legend-item"><span class="legend-dot legend-forecast"></span> Prognose</span>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function startEdit(displayEl) {
+    var cell = displayEl.parentElement;
+    var input = cell.querySelector('.cell-input');
+    displayEl.style.display = 'none';
+    input.style.display = 'block';
+    input.focus();
+    input.select();
+}
+
+function cellKeydown(e, input) {
+    if (e.key === 'Enter') {
+        input.blur();
+    } else if (e.key === 'Escape') {
+        var cell = input.parentElement;
+        var display = cell.querySelector('.cell-display');
+        input.style.display = 'none';
+        display.style.display = '';
+    } else if (e.key === 'Tab') {
+        e.preventDefault();
+        input.blur();
+        var td = input.closest('td');
+        var nextTd = e.shiftKey ? td.previousElementSibling : td.nextElementSibling;
+        if (nextTd && nextTd.classList.contains('savings-cell')) {
+            var nextDisplay = nextTd.querySelector('.cell-display');
+            if (nextDisplay) startEdit(nextDisplay);
+        }
+    }
+}
+
+function fmtEuro(val) {
+    return '\u20AC\u00A0' + Math.abs(val).toFixed(2).replace('.', ',');
+}
+
+function saveCell(input) {
+    var cell = input.parentElement;
+    var display = cell.querySelector('.cell-display');
+    var entryId = cell.dataset.entryId;
+    var newValue = input.value.trim().replace(',', '.');
+
+    input.style.display = 'none';
+    display.style.display = '';
+
+    var formData = new FormData();
+    formData.append('entry_id', entryId);
+    formData.append('amount', newValue);
+
+    fetch('/savings/entries/update', {
+        method: 'POST',
+        body: formData,
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.ok) {
+            if (data.amount !== null) {
+                display.textContent = fmtEuro(data.amount);
+            } else {
+                display.textContent = '-';
+            }
+
+            cell.className = 'text-right savings-cell cell-' + data.status;
+
+            var lineRow = cell.closest('tr');
+            var lineId = lineRow.dataset.lineId;
+            var totalCell = document.querySelector('.line-total[data-line-id="' + lineId + '"]');
+            if (totalCell) {
+                totalCell.innerHTML = '<strong>' + fmtEuro(data.line_total) + '</strong>';
+            }
+
+            if (data.running_balances) {
+                for (var m in data.running_balances) {
+                    var balCell = document.querySelector('.balance-cell[data-month="' + m + '"]');
+                    if (balCell) {
+                        var bal = data.running_balances[m];
+                        var cls = bal >= 0 ? 'amount-positive' : 'amount-negative';
+                        balCell.innerHTML = '<strong class="' + cls + '">' + fmtEuro(bal) + '</strong>';
+                    }
+                }
+            }
+        }
+    });
+}
+
+function toggleTargetMonth(freq) {
+    var group = document.getElementById('target-month-group');
+    if (freq === 'yearly' || freq === 'one-off') {
+        group.style.display = '';
+    } else {
+        group.style.display = 'none';
+    }
+}
+
+function toggleEditRow(lineId) {
+    var row = document.getElementById('edit-row-' + lineId);
+    if (row.style.display === 'none') {
+        row.style.display = '';
+    } else {
+        row.style.display = 'none';
+    }
+}
+</script>
+{% endblock %}

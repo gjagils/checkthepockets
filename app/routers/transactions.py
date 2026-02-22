@@ -3,12 +3,10 @@ from datetime import date as date_type
 from fastapi import APIRouter, Depends, Request, UploadFile, File, Form, Query
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy.orm import Session
-from sqlalchemy import or_
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
-from app.models import Account, Transaction, Category, Tag, Rule
+from app.models import Account, Transaction, Category
 from app.auth import require_login
 from app.parsers import abn_amro, bunq, ics
 from app.parsers.base import ParseError, ParsedTransaction
@@ -46,6 +44,7 @@ def transaction_list(
     query = (
         db.query(Transaction)
         .join(Account)
+        .options(joinedload(Transaction.category))
         .filter(Account.user_id == user.id)
     )
 
@@ -136,24 +135,23 @@ def transaction_list(
     )
     total_pages = max(1, (total + PER_PAGE - 1) // PER_PAGE)
 
-    # Build filter params for pagination links
-    filter_params = {}
-    if account_id:
-        filter_params["account_id"] = account_id
-    if category_id:
-        filter_params["category_id"] = category_id
-    if tag_id:
-        filter_params["tag_id"] = tag_id
-    if search:
-        filter_params["search"] = search
-    if date_from:
-        filter_params["date_from"] = date_from
-    if date_to:
-        filter_params["date_to"] = date_to
-    if amount_min:
-        filter_params["amount_min"] = amount_min
-    if amount_max:
-        filter_params["amount_max"] = amount_max
+    # Get categories grouped by account_id -> parent -> children
+    all_cats = (
+        db.query(Category)
+        .filter(Category.user_id == user.id)
+        .order_by(Category.name)
+        .all()
+    )
+    # {account_id: {"parents": [...], "children": {parent_id: [...]}}}
+    cats_by_account = {}
+    for c in all_cats:
+        aid = c.account_id
+        if aid not in cats_by_account:
+            cats_by_account[aid] = {"parents": [], "children": {}}
+        if c.parent_id is None:
+            cats_by_account[aid]["parents"].append(c)
+        else:
+            cats_by_account[aid]["children"].setdefault(c.parent_id, []).append(c)
 
     return templates.TemplateResponse(
         "transactions/list.html",
@@ -176,142 +174,34 @@ def transaction_list(
             "page": page,
             "total_pages": total_pages,
             "total": total,
+            "cats_by_account": cats_by_account,
         },
     )
-
-
-@router.get("/transactions/{transaction_id}/edit")
-def edit_transaction_page(
-    transaction_id: int,
-    request: Request,
-    db: Session = Depends(get_db),
-):
-    user = require_login(request, db)
-    transaction = (
-        db.query(Transaction)
-        .join(Account)
-        .filter(Transaction.id == transaction_id, Account.user_id == user.id)
-        .first()
-    )
-    if not transaction:
-        return RedirectResponse("/", status_code=302)
-
-    categories = (
-        db.query(Category)
-        .filter(Category.user_id == user.id)
-        .order_by(Category.name)
-        .all()
-    )
-    tags = (
-        db.query(Tag)
-        .filter(Tag.user_id == user.id)
-        .order_by(Tag.name)
-        .all()
-    )
-
-    return templates.TemplateResponse(
-        "transactions/edit.html",
-        {
-            "request": request,
-            "user": user,
-            "transaction": transaction,
-            "categories": categories,
-            "tags": tags,
-        },
-    )
-
-
-@router.post("/transactions/{transaction_id}/edit")
-def edit_transaction(
-    transaction_id: int,
-    request: Request,
-    description: str = Form(""),
-    counterparty: str = Form(""),
-    category_id: str = Form(""),
-    tag_ids: list[int] = Form(default=[]),
-    new_tag: str = Form(""),
-    db: Session = Depends(get_db),
-):
-    user = require_login(request, db)
-    transaction = (
-        db.query(Transaction)
-        .join(Account)
-        .filter(Transaction.id == transaction_id, Account.user_id == user.id)
-        .first()
-    )
-    if not transaction:
-        return RedirectResponse("/", status_code=302)
-
-    transaction.description = description.strip() or None
-    transaction.counterparty = counterparty.strip() or None
-
-    # Category
-    cat_id = int(category_id) if category_id.strip() else None
-    if cat_id:
-        cat = db.query(Category).filter(
-            Category.id == cat_id, Category.user_id == user.id
-        ).first()
-        transaction.category_id = cat.id if cat else None
-    else:
-        transaction.category_id = None
-
-    # Tags
-    valid_tags = (
-        db.query(Tag)
-        .filter(Tag.id.in_(tag_ids), Tag.user_id == user.id)
-        .all()
-    ) if tag_ids else []
-
-    # Create new tag if provided
-    new_tag_name = new_tag.strip()
-    if new_tag_name:
-        existing = db.query(Tag).filter(
-            Tag.user_id == user.id, Tag.name == new_tag_name
-        ).first()
-        if existing:
-            if existing not in valid_tags:
-                valid_tags.append(existing)
-        else:
-            tag_obj = Tag(user_id=user.id, name=new_tag_name)
-            db.add(tag_obj)
-            db.flush()
-            valid_tags.append(tag_obj)
-
-    transaction.tags = valid_tags
-    db.commit()
-
-    return RedirectResponse("/", status_code=302)
 
 
 @router.post("/transactions/{transaction_id}/category")
-def quick_set_category(
-    transaction_id: int,
+def set_category(
     request: Request,
-    category_id: str = Form(""),
+    transaction_id: int,
+    category_id: int = Form(0),
+    redirect_to: str = Form("/"),
     db: Session = Depends(get_db),
 ):
-    """Quick category assignment from the transaction list."""
     user = require_login(request, db)
-    transaction = (
+
+    tx = (
         db.query(Transaction)
         .join(Account)
         .filter(Transaction.id == transaction_id, Account.user_id == user.id)
         .first()
     )
-    if not transaction:
-        return RedirectResponse("/", status_code=302)
+    if not tx:
+        return RedirectResponse(redirect_to, status_code=302)
 
-    cat_id = int(category_id) if category_id.strip() else None
-    if cat_id:
-        cat = db.query(Category).filter(
-            Category.id == cat_id, Category.user_id == user.id
-        ).first()
-        transaction.category_id = cat.id if cat else None
-    else:
-        transaction.category_id = None
-
+    tx.category_id = category_id if category_id else None
     db.commit()
-    return RedirectResponse(request.headers.get("referer", "/"), status_code=302)
+
+    return RedirectResponse(redirect_to, status_code=302)
 
 
 @router.get("/import")

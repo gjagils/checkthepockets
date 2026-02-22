@@ -10,6 +10,7 @@ app = FastAPI(title="Check The Pockets", docs_url=None, redoc_url=None)
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 app.include_router(auth.router)
+app.include_router(dashboard.router)
 app.include_router(transactions.router)
 app.include_router(accounts.router)
 app.include_router(categories.router)

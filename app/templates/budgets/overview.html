@@ -1,245 +1,218 @@
 {% extends "base.html" %}
-{% block title %}Budget {{ month_name }} {{ year }} - Check The Pockets{% endblock %}
+{% block title %}Budgetten - Check The Pockets{% endblock %}
 {% block content %}
 <div class="page-header">
-    <h1>Budget</h1>
-    <div class="month-nav">
-        <a href="/budgets?year={{ prev_year }}&month={{ prev_month }}" class="btn btn-sm">&laquo;</a>
-        <span class="month-label">{{ month_name }} {{ year }}</span>
-        <a href="/budgets?year={{ next_year }}&month={{ next_month }}" class="btn btn-sm">&raquo;</a>
-        {% if not is_current_month %}
-        <a href="/budgets" class="btn btn-sm">Vandaag</a>
-        {% endif %}
-    </div>
+    <h1>Budgetten</h1>
 </div>
 
-<!-- Totals -->
-{% if budget_groups or standalone_lines %}
-<div class="budget-totals">
+<!-- Filters -->
+<div class="card">
+    <form method="get" action="/budgets" class="filter-bar" style="flex-wrap:wrap;">
+        <div class="form-group">
+            <label for="year">Jaar</label>
+            <select name="year" id="year">
+                {% for y in years %}
+                <option value="{{ y }}" {% if y == current_year %}selected{% endif %}>{{ y }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="month">Maand</label>
+            <select name="month" id="month">
+                {% for m in range(1, 13) %}
+                <option value="{{ m }}" {% if m == current_month %}selected{% endif %}>{{ months[m] }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="account_id">Rekening</label>
+            <select name="account_id" id="account_id">
+                <option value="0">Alle rekeningen</option>
+                {% for acc in accounts %}
+                <option value="{{ acc.id }}" {% if current_account_id == acc.id %}selected{% endif %}>
+                    {{ acc.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group" style="align-self:flex-end;">
+            <button type="submit" class="btn btn-primary btn-sm">Toon</button>
+        </div>
+    </form>
+</div>
+
+<!-- Summary -->
+<div class="import-summary">
     <div class="summary-card">
-        <div class="value">{{ "%.2f"|format(total_budgeted) }}</div>
-        <div class="label">Totaal budget</div>
+        <div class="value">&euro;&nbsp;{{ "%.2f"|format(total_budgeted)|replace(".", ",") }}</div>
+        <div class="label">Gebudgetteerd</div>
     </div>
     <div class="summary-card">
-        <div class="value amount-negative">{{ "%.2f"|format(total_spent) }}</div>
+        <div class="value">&euro;&nbsp;{{ "%.2f"|format(total_spent)|replace(".", ",") }}</div>
         <div class="label">Uitgegeven</div>
     </div>
     <div class="summary-card">
-        <div class="value {% if total_remaining < 0 %}amount-negative{% else %}amount-positive{% endif %}">
-            {{ "%.2f"|format(total_remaining) }}
+        <div class="value {% if total_remaining >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
+            &euro;&nbsp;{{ "%.2f"|format(total_remaining)|replace(".", ",") }}
         </div>
         <div class="label">Resterend</div>
     </div>
 </div>
+
+<!-- Budget table -->
+{% if budget_data %}
+<div class="card">
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Categorie</th>
+                    <th class="text-right">Budget</th>
+                    <th class="text-right">Uitgegeven</th>
+                    <th class="text-right">Resterend</th>
+                    <th>Voortgang</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for group in budget_data %}
+                <tr class="category-parent">
+                    <td><strong>{{ group.parent.name }}</strong></td>
+                    <td class="text-right nowrap"><strong>&euro;&nbsp;{{ "%.2f"|format(group.group_budget)|replace(".", ",") }}</strong></td>
+                    <td class="text-right nowrap"><strong>&euro;&nbsp;{{ "%.2f"|format(group.group_spent)|replace(".", ",") }}</strong></td>
+                    <td class="text-right nowrap">
+                        <strong class="{% if group.group_remaining >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
+                            &euro;&nbsp;{{ "%.2f"|format(group.group_remaining)|replace(".", ",") }}
+                        </strong>
+                    </td>
+                    <td>
+                        {% if group.group_budget > 0 %}
+                        {% set pct = ((group.group_spent / group.group_budget) * 100)|int %}
+                        <div class="budget-bar">
+                            <div class="budget-bar-fill {% if pct > 100 %}bar-over{% elif pct > 80 %}bar-warn{% endif %}" style="width:{{ [pct, 100]|min }}%"></div>
+                        </div>
+                        <span class="muted">{{ pct }}%</span>
+                        {% else %}-{% endif %}
+                    </td>
+                </tr>
+
+                {% if not group.children %}
+                <!-- Parent heeft geen subcategorieën, toon budget-input op parent -->
+                <tr class="category-child">
+                    <td style="padding-left:2rem;">
+                        <span class="muted">Budget instellen:</span>
+                    </td>
+                    <td class="text-right">
+                        <input type="text" class="budget-input"
+                               data-category-id="{{ group.parent.id }}"
+                               value="{{ "%.2f"|format(group.parent_budget)|replace(".", ",") }}"
+                               onblur="saveBudget(this)"
+                               onkeydown="if(event.key==='Enter')this.blur()">
+                    </td>
+                    <td colspan="3"></td>
+                </tr>
+                {% endif %}
+
+                {% for child in group.children %}
+                <tr class="category-child">
+                    <td style="padding-left: 2rem;">
+                        {% if child.color %}
+                        <span class="color-dot" style="background:{{ child.color }};"></span>
+                        {% endif %}
+                        {{ child.name }}
+                    </td>
+                    <td class="text-right">
+                        <input type="text" class="budget-input"
+                               data-category-id="{{ child.id }}"
+                               value="{{ "%.2f"|format(child.budget)|replace(".", ",") }}"
+                               onblur="saveBudget(this)"
+                               onkeydown="if(event.key==='Enter')this.blur()">
+                    </td>
+                    <td class="text-right nowrap">&euro;&nbsp;{{ "%.2f"|format(child.spent)|replace(".", ",") }}</td>
+                    <td class="text-right nowrap">
+                        <span class="{% if child.remaining >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
+                            &euro;&nbsp;{{ "%.2f"|format(child.remaining)|replace(".", ",") }}
+                        </span>
+                    </td>
+                    <td>
+                        {% if child.budget > 0 %}
+                        {% set cpct = ((child.spent / child.budget) * 100)|int %}
+                        <div class="budget-bar">
+                            <div class="budget-bar-fill {% if cpct > 100 %}bar-over{% elif cpct > 80 %}bar-warn{% endif %}" style="width:{{ [cpct, 100]|min }}%"></div>
+                        </div>
+                        <span class="muted">{{ cpct }}%</span>
+                        {% else %}-{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="card" style="text-align:center; padding:3rem;">
+    <p>Geen uitgavecategorieën gevonden. Maak eerst categorieën aan bij <a href="/categories">Categorieën</a>.</p>
+</div>
 {% endif %}
 
-<div class="budgets-layout">
-    <!-- Budget lines -->
-    <div>
-        {% if budget_groups or standalone_lines %}
-        <div class="budget-list">
-
-            {% for group in budget_groups %}
-            <div class="budget-group">
-                <!-- Group header -->
-                <div class="budget-group-header">
-                    <div class="budget-group-title">
-                        <span class="category-pill" style="--cat-color: {{ group.parent.color or '#1F6FB2' }}">
-                            {{ group.parent.name }}
-                        </span>
-                        {% if group.parent.is_income %}
-                        <span class="badge badge-income">Inkomsten</span>
-                        {% else %}
-                        <span class="badge badge-expense">Uitgaven</span>
-                        {% endif %}
-                    </div>
-                    <div class="budget-group-totals">
-                        <span class="budget-spent">{{ "%.2f"|format(group.total_spent) }}</span>
-                        <span class="muted"> / </span>
-                        <span class="budget-limit">{{ "%.2f"|format(group.total_budgeted) }}</span>
-                    </div>
-                </div>
-
-                <div class="progress-bar" style="margin-bottom: 0.75rem;">
-                    <div class="progress-fill {% if group.over %}progress-over{% elif group.pct > 80 %}progress-warn{% endif %}"
-                         style="width: {{ group.pct }}%"></div>
-                    {% if is_current_month and day_progress > 0 %}
-                    <div class="progress-marker" style="left: {{ (day_progress * 100)|round }}%"
-                         title="Dag {{ (day_progress * 100)|round|int }}% van de maand"></div>
-                    {% endif %}
-                </div>
-
-                <!-- Child category budget cards -->
-                {% for line in group.lines %}
-                <div class="card budget-card budget-card-child {% if line.over %}budget-over{% endif %}">
-                    <div class="budget-header">
-                        <div class="budget-cat-info">
-                            <span class="category-pill" style="--cat-color: {{ line.category.color or line.category.parent.color or '#1F6FB2' }}">
-                                {{ line.category.name }}
-                            </span>
-                        </div>
-                        <div class="budget-amounts">
-                            <span class="budget-spent">{{ "%.2f"|format(line.spent) }}</span>
-                            <span class="muted"> / </span>
-                            <span class="budget-limit">{{ "%.2f"|format(line.budget.amount) }}</span>
-                        </div>
-                    </div>
-
-                    <div class="progress-bar">
-                        <div class="progress-fill {% if line.over %}progress-over{% elif line.pct > 80 %}progress-warn{% endif %}"
-                             style="width: {{ line.pct }}%"></div>
-                        {% if is_current_month and day_progress > 0 %}
-                        <div class="progress-marker" style="left: {{ (day_progress * 100)|round }}%"
-                             title="Dag {{ (day_progress * 100)|round|int }}% van de maand"></div>
-                        {% endif %}
-                    </div>
-
-                    <div class="budget-footer">
-                        {% if line.over %}
-                        <span class="budget-status budget-status-over">{{ "%.2f"|format(line.over_amount) }} over budget</span>
-                        {% else %}
-                        <span class="budget-status">{{ "%.2f"|format(line.remaining) }} resterend</span>
-                        {% endif %}
-                        <div class="budget-actions">
-                            <button class="btn btn-sm" onclick="toggleBudgetEdit({{ line.budget.id }})">Bewerken</button>
-                            <form method="post" action="/budgets/{{ line.budget.id }}/delete" style="display:inline;"
-                                  onsubmit="return confirm('Budget verwijderen?')">
-                                <button type="submit" class="btn btn-sm btn-danger">Verwijderen</button>
-                            </form>
-                        </div>
-                    </div>
-
-                    <!-- Edit form (hidden) -->
-                    <div class="budget-edit" id="budget-edit-{{ line.budget.id }}" style="display:none;">
-                        <form method="post" action="/budgets/{{ line.budget.id }}/edit" class="edit-form">
-                            <div class="form-group">
-                                <label>Maandbedrag</label>
-                                <input type="number" step="0.01" min="0.01" name="amount"
-                                       value="{{ '%.2f'|format(line.budget.amount) }}" required>
-                            </div>
-                            <button type="submit" class="btn btn-sm btn-primary">Opslaan</button>
-                            <button type="button" class="btn btn-sm" onclick="toggleBudgetEdit({{ line.budget.id }})">Annuleren</button>
-                        </form>
-                    </div>
-                </div>
+<!-- Copy budgets -->
+<div class="card">
+    <h2>Budget kopiëren</h2>
+    <p class="muted" style="margin-bottom:1rem;">Kopieer budgetten van een andere maand naar de huidige.</p>
+    <form method="post" action="/budgets/copy" class="filter-bar" style="flex-wrap:wrap;">
+        <input type="hidden" name="to_year" value="{{ current_year }}">
+        <input type="hidden" name="to_month" value="{{ current_month }}">
+        <div class="form-group">
+            <label>Van jaar</label>
+            <select name="from_year">
+                {% for y in years %}
+                <option value="{{ y }}" {% if y == current_year %}selected{% endif %}>{{ y }}</option>
                 {% endfor %}
-            </div>
-            {% endfor %}
-
-            {% for line in standalone_lines %}
-            <div class="card budget-card {% if line.over %}budget-over{% endif %}">
-                <div class="budget-header">
-                    <div class="budget-cat-info">
-                        <span class="category-pill" style="--cat-color: {{ line.category.color or '#1F6FB2' }}">
-                            {{ line.category.name }}
-                        </span>
-                    </div>
-                    <div class="budget-amounts">
-                        <span class="budget-spent">{{ "%.2f"|format(line.spent) }}</span>
-                        <span class="muted"> / </span>
-                        <span class="budget-limit">{{ "%.2f"|format(line.budget.amount) }}</span>
-                    </div>
-                </div>
-
-                <div class="progress-bar">
-                    <div class="progress-fill {% if line.over %}progress-over{% elif line.pct > 80 %}progress-warn{% endif %}"
-                         style="width: {{ line.pct }}%"></div>
-                    {% if is_current_month and day_progress > 0 %}
-                    <div class="progress-marker" style="left: {{ (day_progress * 100)|round }}%"
-                         title="Dag {{ (day_progress * 100)|round|int }}% van de maand"></div>
-                    {% endif %}
-                </div>
-
-                <div class="budget-footer">
-                    {% if line.over %}
-                    <span class="budget-status budget-status-over">{{ "%.2f"|format(line.over_amount) }} over budget</span>
-                    {% else %}
-                    <span class="budget-status">{{ "%.2f"|format(line.remaining) }} resterend</span>
-                    {% endif %}
-                    <div class="budget-actions">
-                        <button class="btn btn-sm" onclick="toggleBudgetEdit({{ line.budget.id }})">Bewerken</button>
-                        <form method="post" action="/budgets/{{ line.budget.id }}/delete" style="display:inline;"
-                              onsubmit="return confirm('Budget verwijderen?')">
-                            <button type="submit" class="btn btn-sm btn-danger">Verwijderen</button>
-                        </form>
-                    </div>
-                </div>
-
-                <!-- Edit form (hidden) -->
-                <div class="budget-edit" id="budget-edit-{{ line.budget.id }}" style="display:none;">
-                    <form method="post" action="/budgets/{{ line.budget.id }}/edit" class="edit-form">
-                        <div class="form-group">
-                            <label>Maandbedrag</label>
-                            <input type="number" step="0.01" min="0.01" name="amount"
-                                   value="{{ '%.2f'|format(line.budget.amount) }}" required>
-                        </div>
-                        <button type="submit" class="btn btn-sm btn-primary">Opslaan</button>
-                        <button type="button" class="btn btn-sm" onclick="toggleBudgetEdit({{ line.budget.id }})">Annuleren</button>
-                    </form>
-                </div>
-            </div>
-            {% endfor %}
-
+            </select>
         </div>
-        {% else %}
-        <div class="card">
-            <p class="muted" style="text-align:center; padding:1rem;">Nog geen budgetten ingesteld. Voeg rechts je eerste budget toe.</p>
+        <div class="form-group">
+            <label>Van maand</label>
+            <select name="from_month">
+                {% for m in range(1, 13) %}
+                {% set prev = current_month - 1 if current_month > 1 else 12 %}
+                <option value="{{ m }}" {% if m == prev %}selected{% endif %}>{{ months[m] }}</option>
+                {% endfor %}
+            </select>
         </div>
-        {% endif %}
-    </div>
-
-    <!-- Add budget form -->
-    <div>
-        <div class="card">
-            <h2>Budget toevoegen</h2>
-            {% if available_categories %}
-            <form method="post" action="/budgets">
-                <div class="form-group">
-                    <label for="category_id">Categorie</label>
-                    <select name="category_id" id="category_id" required>
-                        <option value="">Kies categorie...</option>
-                        {% for parent in all_parent_cats %}
-                            {% set ns = namespace(has_available=false) %}
-                            {% for child in parent.children|sort(attribute='name') %}
-                                {% if child in available_categories %}{% set ns.has_available = true %}{% endif %}
-                            {% endfor %}
-                            {% if ns.has_available %}
-                            <optgroup label="{{ parent.name }}">
-                                {% for child in parent.children|sort(attribute='name') %}
-                                    {% if child in available_categories %}
-                                    <option value="{{ child.id }}">{{ child.name }}</option>
-                                    {% endif %}
-                                {% endfor %}
-                            </optgroup>
-                            {% endif %}
-                        {% endfor %}
-                        {% for cat in available_categories %}
-                            {% if not cat.parent_id %}
-                            <option value="{{ cat.id }}">{{ cat.name }}</option>
-                            {% endif %}
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="amount">Maandbedrag (&euro;)</label>
-                    <input type="number" step="0.01" min="0.01" id="amount" name="amount"
-                           required placeholder="bijv. 300.00">
-                </div>
-                <button type="submit" class="btn btn-primary">Toevoegen</button>
-            </form>
-            {% else %}
-            <p class="muted">Alle categorieën hebben al een budget.</p>
-            {% endif %}
+        <div class="form-group" style="align-self:flex-end;">
+            <button type="submit" class="btn btn-primary btn-sm"
+                    onclick="return confirm('Budgetten kopiëren? Bestaande waarden worden overschreven.')">
+                Kopiëren
+            </button>
         </div>
-    </div>
+    </form>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-function toggleBudgetEdit(id) {
-    const el = document.getElementById('budget-edit-' + id);
-    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+function saveBudget(input) {
+    var catId = input.dataset.categoryId;
+    var value = input.value.trim().replace(',', '.');
+
+    var formData = new FormData();
+    formData.append('category_id', catId);
+    formData.append('year', '{{ current_year }}');
+    formData.append('month', '{{ current_month }}');
+    formData.append('amount', value);
+
+    fetch('/budgets/save', {
+        method: 'POST',
+        body: formData,
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.ok) {
+            input.value = Math.abs(data.amount).toFixed(2).replace('.', ',');
+            input.classList.add('budget-saved');
+            setTimeout(function() { input.classList.remove('budget-saved'); }, 600);
+        }
+    });
 }
 </script>
 {% endblock %}
