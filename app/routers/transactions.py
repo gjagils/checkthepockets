@@ -566,7 +566,7 @@ async def split_transaction(
     # Create child transactions
     created = 0
     auto_categorized = 0
-    for line in parsed_lines:
+    for idx, line in enumerate(parsed_lines):
         # Make amount negative for debits (expenses), positive for credits (refunds)
         amount = -line.amount_eur if line.is_debit else line.amount_eur
 
@@ -582,7 +582,7 @@ async def split_transaction(
                 date=line.transaction_date,
                 amount=amount,
                 currency="EUR",
-                description=f"ICS-SPLIT-{transaction.id}-{line.description}-{line.transaction_date}",
+                description=f"ICS-SPLIT-{transaction.id}-{idx}-{line.description}-{line.transaction_date}",
             ).import_hash,
         )
         db.add(child)
