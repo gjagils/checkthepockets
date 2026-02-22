@@ -53,6 +53,7 @@ def create_category(
     name: str = Form(...),
     parent_id: str = Form(""),
     color: str = Form(""),
+    is_income: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
@@ -86,6 +87,7 @@ def create_category(
         name=name,
         parent_id=parent_id if parent_id else None,
         color=color or None,
+        is_income=1 if is_income else 0,
     )
     db.add(category)
     db.commit()
@@ -100,6 +102,7 @@ def edit_category(
     name: str = Form(...),
     parent_id: str = Form(""),
     color: str = Form(""),
+    is_income: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
@@ -133,6 +136,7 @@ def edit_category(
     category.name = name
     category.parent_id = parent_id if parent_id else None
     category.color = color or None
+    category.is_income = 1 if is_income else 0
     db.commit()
 
     return RedirectResponse("/categories", status_code=302)

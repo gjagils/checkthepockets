@@ -68,6 +68,7 @@ class Category(Base):
     name = Column(String(100), nullable=False)
     parent_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
     color = Column(String(7), nullable=True)  # hex color like #FF5733
+    is_income = Column(Integer, server_default="0")  # 0=expenses, 1=income
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     user = relationship("User", back_populates="categories")

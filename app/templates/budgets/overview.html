@@ -47,6 +47,11 @@
                         <span class="category-pill" style="--cat-color: {{ group.parent.color or '#1F6FB2' }}">
                             {{ group.parent.name }}
                         </span>
+                        {% if group.parent.is_income %}
+                        <span class="badge badge-income">Inkomsten</span>
+                        {% else %}
+                        <span class="badge badge-expense">Uitgaven</span>
+                        {% endif %}
                     </div>
                     <div class="budget-group-totals">
                         <span class="budget-spent">{{ "%.2f"|format(group.total_spent) }}</span>
