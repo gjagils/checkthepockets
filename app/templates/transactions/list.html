@@ -113,13 +113,23 @@
                     <td class="desc-cell" title="{{ tx.description or '' }}">{{ tx.description[:80] }}{% if tx.description and tx.description|length > 80 %}...{% endif %}</td>
                     <td class="counterparty-cell" title="{{ tx.counterparty or '' }}">{{ tx.counterparty or '-' }}</td>
                     <td class="nowrap">
-                        {% if tx.category_rel %}
-                        <span class="category-pill" style="--cat-color: {{ tx.category_rel.color or '#1F6FB2' }}">
-                            {{ tx.category_rel.name }}
-                        </span>
-                        {% else %}
-                        <span class="muted">-</span>
-                        {% endif %}
+                        <form method="post" action="/transactions/{{ tx.id }}/category" class="inline-category-form">
+                            <select name="category_id" class="category-select {% if tx.category_rel %}has-category{% endif %}" style="{% if tx.category_rel %}--cat-color: {{ tx.category_rel.color or '#1F6FB2' }}{% endif %}" onchange="this.form.submit()">
+                                <option value="">— Geen —</option>
+                                {% for cat in categories %}
+                                {% if not cat.parent_id %}
+                                <option value="{{ cat.id }}" {% if tx.category_id == cat.id %}selected{% endif %}>
+                                    {{ cat.name }}
+                                </option>
+                                {% for child in cat.children|sort(attribute='name') %}
+                                <option value="{{ child.id }}" {% if tx.category_id == child.id %}selected{% endif %}>
+                                    &nbsp;&nbsp;{{ child.name }}
+                                </option>
+                                {% endfor %}
+                                {% endif %}
+                                {% endfor %}
+                            </select>
+                        </form>
                         {% for tag in tx.tags %}
                         <span class="tag-pill">{{ tag.name }}</span>
                         {% endfor %}

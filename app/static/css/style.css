@@ -484,6 +484,32 @@ tr:hover { background: rgba(31, 111, 178, 0.03); }
     white-space: nowrap;
 }
 
+/* ===== Inline Category Select ===== */
+.inline-category-form {
+    display: inline;
+}
+.category-select {
+    padding: 2px 6px;
+    border-radius: 999px;
+    border: 1.5px solid var(--ctp-border);
+    background: var(--ctp-bg);
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--ctp-muted);
+    cursor: pointer;
+    max-width: 160px;
+    appearance: auto;
+}
+.category-select.has-category {
+    background: color-mix(in srgb, var(--cat-color, var(--ctp-denim)) 15%, transparent);
+    color: var(--cat-color, var(--ctp-denim));
+    border-color: color-mix(in srgb, var(--cat-color, var(--ctp-denim)) 30%, transparent);
+}
+.category-select:focus {
+    outline: 2px solid var(--ctp-denim);
+    outline-offset: 1px;
+}
+
 /* ===== Tag Pills ===== */
 .tag-pill {
     display: inline-flex;
