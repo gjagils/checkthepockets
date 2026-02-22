@@ -25,10 +25,12 @@
 <!-- Category list -->
 {% if top_level %}
 <div class="card">
+    <p class="muted" style="margin-bottom:0.75rem;">Sleep categorieën om de volgorde aan te passen.</p>
     <div class="table-wrap">
         <table>
             <thead>
                 <tr>
+                    <th></th>
                     <th>Categorie</th>
                     <th>Rekening</th>
                     <th>Type</th>
@@ -36,9 +38,10 @@
                     <th></th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="category-list">
                 {% for cat in top_level %}
-                <tr class="category-parent">
+                <tr class="category-parent draggable-row" draggable="true" data-id="{{ cat.id }}" data-type="parent">
+                    <td class="drag-handle" title="Versleep">&#9776;</td>
                     <td><strong>{{ cat.name }}</strong></td>
                     <td class="nowrap">{{ cat.account.name if cat.account else '-' }}</td>
                     <td>{{ 'Inkomen' if cat.is_income else 'Uitgave' }}</td>
@@ -56,7 +59,7 @@
                     </td>
                 </tr>
                 <tr class="edit-row" id="cat-{{ cat.id }}" style="display:none;">
-                    <td colspan="5">
+                    <td colspan="6">
                         <form method="post" action="/categories/{{ cat.id }}/edit" class="filter-bar" style="flex-wrap:wrap; padding:0.5rem 0;">
                             <div class="form-group">
                                 <label>Naam</label>
@@ -88,7 +91,8 @@
                     </td>
                 </tr>
                 {% for sub in children_map.get(cat.id, []) %}
-                <tr class="category-child">
+                <tr class="category-child draggable-row" draggable="true" data-id="{{ sub.id }}" data-type="child" data-parent="{{ cat.id }}">
+                    <td class="drag-handle" title="Versleep">&#9776;</td>
                     <td style="padding-left: 2rem;">↳ {{ sub.name }}</td>
                     <td class="nowrap">{{ sub.account.name if sub.account else '-' }}</td>
                     <td>{{ 'Inkomen' if sub.is_income else 'Uitgave' }}</td>
@@ -106,7 +110,7 @@
                     </td>
                 </tr>
                 <tr class="edit-row" id="cat-{{ sub.id }}" style="display:none;">
-                    <td colspan="5">
+                    <td colspan="6">
                         <form method="post" action="/categories/{{ sub.id }}/edit" class="filter-bar" style="flex-wrap:wrap; padding:0.5rem 0;">
                             <div class="form-group">
                                 <label>Naam</label>
@@ -202,5 +206,123 @@ function toggleEdit(id) {
     var row = document.getElementById(id);
     row.style.display = row.style.display === 'none' ? '' : 'none';
 }
+
+// Drag and drop for category reordering
+(function() {
+    var dragRow = null;
+    var tbody = document.getElementById('category-list');
+    if (!tbody) return;
+
+    tbody.addEventListener('dragstart', function(e) {
+        var row = e.target.closest('.draggable-row');
+        if (!row) return;
+        dragRow = row;
+        row.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+    });
+
+    tbody.addEventListener('dragend', function(e) {
+        if (dragRow) dragRow.classList.remove('dragging');
+        dragRow = null;
+        // Remove all drag-over indicators
+        tbody.querySelectorAll('.drag-over').forEach(function(el) {
+            el.classList.remove('drag-over');
+        });
+    });
+
+    tbody.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+
+        var targetRow = e.target.closest('.draggable-row');
+        if (!targetRow || targetRow === dragRow) return;
+
+        // Only allow reordering within same level
+        var dragType = dragRow.dataset.type;
+        var targetType = targetRow.dataset.type;
+
+        if (dragType === 'parent' && targetType !== 'parent') return;
+        if (dragType === 'child' && (targetType !== 'child' || targetRow.dataset.parent !== dragRow.dataset.parent)) return;
+
+        tbody.querySelectorAll('.drag-over').forEach(function(el) {
+            el.classList.remove('drag-over');
+        });
+        targetRow.classList.add('drag-over');
+    });
+
+    tbody.addEventListener('drop', function(e) {
+        e.preventDefault();
+        var targetRow = e.target.closest('.draggable-row');
+        if (!targetRow || !dragRow || targetRow === dragRow) return;
+
+        var dragType = dragRow.dataset.type;
+        var targetType = targetRow.dataset.type;
+
+        if (dragType === 'parent' && targetType !== 'parent') return;
+        if (dragType === 'child' && (targetType !== 'child' || targetRow.dataset.parent !== dragRow.dataset.parent)) return;
+
+        // Move the row (and its edit-row + children if parent)
+        if (dragType === 'parent') {
+            // Collect all rows belonging to this parent (the parent row, its edit row, and all children)
+            var dragGroup = collectParentGroup(dragRow);
+            var targetGroup = collectParentGroup(targetRow);
+
+            // Insert drag group before target group
+            var firstTarget = targetGroup[0];
+            dragGroup.forEach(function(row) {
+                tbody.insertBefore(row, firstTarget);
+            });
+        } else {
+            // Child: move just the child row + its edit row
+            var editRow = dragRow.nextElementSibling;
+            var targetEdit = targetRow.nextElementSibling;
+
+            if (editRow && editRow.classList.contains('edit-row')) {
+                tbody.insertBefore(dragRow, targetRow);
+                tbody.insertBefore(editRow, targetRow);
+            } else {
+                tbody.insertBefore(dragRow, targetRow);
+            }
+        }
+
+        targetRow.classList.remove('drag-over');
+        saveOrder();
+    });
+
+    function collectParentGroup(parentRow) {
+        var rows = [parentRow];
+        var next = parentRow.nextElementSibling;
+
+        // Include edit row
+        if (next && next.classList.contains('edit-row')) {
+            rows.push(next);
+            next = next.nextElementSibling;
+        }
+
+        // Include all child rows and their edit rows
+        while (next && (next.classList.contains('category-child') || next.classList.contains('edit-row'))) {
+            rows.push(next);
+            next = next.nextElementSibling;
+        }
+
+        return rows;
+    }
+
+    function saveOrder() {
+        var rows = tbody.querySelectorAll('.draggable-row');
+        var items = [];
+        var order = 0;
+        rows.forEach(function(row) {
+            items.push({ id: parseInt(row.dataset.id), sort_order: order });
+            order++;
+        });
+
+        fetch('/categories/reorder', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items: items })
+        });
+    }
+})();
 </script>
 {% endblock %}

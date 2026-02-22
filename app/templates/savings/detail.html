@@ -1,14 +1,31 @@
 {% extends "base.html" %}
 {% block title %}Spaarplan {{ plan.account.name }} {{ plan.year }} - Check The Pockets{% endblock %}
+{% block container_class %}container-wide{% endblock %}
 
 {% macro render_line(line) %}
 <tr class="savings-row" data-line-id="{{ line.id }}">
     <td class="sticky-col">
-        <div class="line-name">{{ line.name }}</div>
-        {% if line.category %}
-        <div class="line-category">{{ line.category.name }}</div>
-        {% endif %}
-        <div class="line-freq">{{ frequency_labels.get(line.frequency, line.frequency) }}</div>
+        <div class="line-info-row">
+            <div class="line-actions-stack">
+                <button type="button" class="btn btn-sm btn-icon" onclick="toggleEditRow({{ line.id }})" title="Bewerken">&#9998;</button>
+                {% if line.category_id %}
+                <form method="post" action="/savings/lines/{{ line.id }}/fill-from-transactions">
+                    <button type="submit" class="btn btn-sm btn-icon" title="Vul vanuit transacties">&#8635;</button>
+                </form>
+                {% endif %}
+                <form method="post" action="/savings/lines/{{ line.id }}/delete"
+                      onsubmit="return confirm('Regel verwijderen?')">
+                    <button type="submit" class="btn btn-sm btn-icon btn-danger" title="Verwijderen">&times;</button>
+                </form>
+            </div>
+            <div>
+                <div class="line-name">{{ line.name }}</div>
+                {% if line.category %}
+                <div class="line-category">{{ line.category.name }}</div>
+                {% endif %}
+                <div class="line-freq">{{ frequency_labels.get(line.frequency, line.frequency) }}</div>
+            </div>
+        </div>
     </td>
     {% for m in range(1, 13) %}
     {% set entry = namespace(val=None, status='forecast', id=0) %}
@@ -23,7 +40,7 @@
         data-entry-id="{{ entry.id }}"
         data-month="{{ m }}">
         <span class="cell-display" onclick="startEdit(this)">
-            {% if entry.val is not none %}{{ "%.2f"|format(entry.val|abs) }}{% else %}-{% endif %}
+            {% if entry.val is not none %}&euro;&nbsp;{{ "%.2f"|format(entry.val|abs)|replace(".", ",") }}{% else %}-{% endif %}
         </span>
         <input type="text" class="cell-input" style="display:none;"
                value="{% if entry.val is not none %}{{ "%.2f"|format(entry.val|abs) }}{% endif %}"
@@ -32,23 +49,11 @@
     </td>
     {% endfor %}
     <td class="text-right nowrap line-total" data-line-id="{{ line.id }}">
-        <strong>{{ "%.2f"|format(line_totals.get(line.id, 0)) }}</strong>
-    </td>
-    <td class="nowrap">
-        <button type="button" class="btn btn-sm" onclick="toggleEditRow({{ line.id }})" title="Bewerken">Bewerk</button>
-        {% if line.category_id %}
-        <form method="post" action="/savings/lines/{{ line.id }}/fill-from-transactions" style="display:inline;">
-            <button type="submit" class="btn btn-sm" title="Vul vanuit transacties">Sync</button>
-        </form>
-        {% endif %}
-        <form method="post" action="/savings/lines/{{ line.id }}/delete" style="display:inline;"
-              onsubmit="return confirm('Regel verwijderen?')">
-            <button type="submit" class="btn btn-sm btn-danger">X</button>
-        </form>
+        <strong>&euro;&nbsp;{{ "%.2f"|format(line_totals.get(line.id, 0))|replace(".", ",") }}</strong>
     </td>
 </tr>
 <tr class="edit-row" id="edit-row-{{ line.id }}" style="display:none;">
-    <td colspan="15">
+    <td colspan="14">
         <form method="post" action="/savings/lines/{{ line.id }}/edit" class="filter-bar" style="flex-wrap:wrap; padding:0.5rem 0;">
             <div class="form-group">
                 <label>Naam</label>
@@ -88,14 +93,14 @@
 <div class="page-header">
     <div>
         <h1>{{ plan.account.name }} - {{ plan.year }}</h1>
-        <p class="muted">Startsaldo: {{ "%.2f"|format(plan.starting_balance) }} EUR{% if plan.account.iban %} &middot; {{ plan.account.iban }}{% endif %}</p>
+        <p class="muted">Startsaldo: &euro;&nbsp;{{ "%.2f"|format(plan.starting_balance)|replace(".", ",") }}{% if plan.account.iban %} &middot; {{ plan.account.iban }}{% endif %}</p>
     </div>
     <a href="/savings?year={{ plan.year }}" class="btn btn-sm">Terug naar overzicht</a>
 </div>
 
 <!-- Savings grid table -->
-<div class="card">
-    <div class="table-wrap">
+<div class="card" style="padding:0; overflow:visible;">
+    <div class="table-wrap savings-table-wrap">
         <table class="savings-grid">
             <thead>
                 <tr>
@@ -104,14 +109,13 @@
                     <th class="text-right month-col">{{ months[m] }}</th>
                     {% endfor %}
                     <th class="text-right">Totaal</th>
-                    <th></th>
                 </tr>
             </thead>
             <tbody>
                 <!-- Inkomen -->
                 {% if income_lines %}
                 <tr class="section-header">
-                    <td class="sticky-col" colspan="15"><strong>Inkomen</strong></td>
+                    <td class="sticky-col" colspan="14"><strong>Inkomen</strong></td>
                 </tr>
                 {% for line in income_lines %}
                     {{ render_line(line) }}
@@ -125,18 +129,17 @@
                     <td class="text-right nowrap balance-cell" data-month="{{ m }}">
                         {% set bal = running_balance.get(m, 0) %}
                         <strong class="{% if bal >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
-                            {{ "%.2f"|format(bal) }}
+                            &euro;&nbsp;{{ "%.2f"|format(bal)|replace(".", ",") }}
                         </strong>
                     </td>
                     {% endfor %}
-                    <td></td>
                     <td></td>
                 </tr>
 
                 <!-- Uitgaven -->
                 {% if expense_lines %}
                 <tr class="section-header">
-                    <td class="sticky-col" colspan="15"><strong>Uitgaven</strong></td>
+                    <td class="sticky-col" colspan="14"><strong>Uitgaven</strong></td>
                 </tr>
                 {% for line in expense_lines %}
                     {{ render_line(line) }}
@@ -202,7 +205,7 @@
         {% for sug in category_suggestions %}
         <div class="card" style="margin-bottom: 0;">
             <h3>{{ sug.category_name }}</h3>
-            <p class="muted">{{ sug.tx_count }} transacties &middot; Totaal: {{ "%.2f"|format(sug.total) }} EUR</p>
+            <p class="muted">{{ sug.tx_count }} transacties &middot; Totaal: &euro;&nbsp;{{ "%.2f"|format(sug.total)|replace(".", ",") }}</p>
             <form method="post" action="/savings/lines" style="margin-top: 0.75rem;">
                 <input type="hidden" name="plan_id" value="{{ plan.id }}">
                 <input type="hidden" name="name" value="{{ sug.category_name }}">
@@ -258,11 +261,15 @@ function cellKeydown(e, input) {
     }
 }
 
+function fmtEuro(val) {
+    return '\u20AC\u00A0' + Math.abs(val).toFixed(2).replace('.', ',');
+}
+
 function saveCell(input) {
     var cell = input.parentElement;
     var display = cell.querySelector('.cell-display');
     var entryId = cell.dataset.entryId;
-    var newValue = input.value.trim();
+    var newValue = input.value.trim().replace(',', '.');
 
     input.style.display = 'none';
     display.style.display = '';
@@ -279,7 +286,7 @@ function saveCell(input) {
     .then(function(data) {
         if (data.ok) {
             if (data.amount !== null) {
-                display.textContent = Math.abs(data.amount).toFixed(2);
+                display.textContent = fmtEuro(data.amount);
             } else {
                 display.textContent = '-';
             }
@@ -290,7 +297,7 @@ function saveCell(input) {
             var lineId = lineRow.dataset.lineId;
             var totalCell = document.querySelector('.line-total[data-line-id="' + lineId + '"]');
             if (totalCell) {
-                totalCell.innerHTML = '<strong>' + data.line_total.toFixed(2) + '</strong>';
+                totalCell.innerHTML = '<strong>' + fmtEuro(data.line_total) + '</strong>';
             }
 
             if (data.running_balances) {
@@ -299,7 +306,7 @@ function saveCell(input) {
                     if (balCell) {
                         var bal = data.running_balances[m];
                         var cls = bal >= 0 ? 'amount-positive' : 'amount-negative';
-                        balCell.innerHTML = '<strong class="' + cls + '">' + bal.toFixed(2) + '</strong>';
+                        balCell.innerHTML = '<strong class="' + cls + '">' + fmtEuro(bal) + '</strong>';
                     }
                 }
             }

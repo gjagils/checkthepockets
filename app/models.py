@@ -65,6 +65,7 @@ class Category(Base):
     color = Column(String(7), nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     is_income = Column(Integer, default=0)
+    sort_order = Column(Integer, default=0)
 
     user = relationship("User", back_populates="categories")
     account = relationship("Account", back_populates="categories")

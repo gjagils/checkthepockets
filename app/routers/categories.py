@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Depends, Request, Form, Query
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from typing import List
 
 from app.database import get_db
 from app.models import Account, Category
@@ -30,7 +32,7 @@ def categories_list(
     if account_id:
         query = query.filter(Category.account_id == account_id)
 
-    all_categories = query.order_by(Category.name).all()
+    all_categories = query.order_by(Category.sort_order, Category.name).all()
 
     # Build hierarchy: top-level (parent_id=None) with their children
     top_level = [c for c in all_categories if c.parent_id is None]
@@ -89,6 +91,15 @@ def create_category(
         acc_id = parent.account_id
         is_income = parent.is_income
 
+    # New category gets highest sort_order + 1
+    max_order = (
+        db.query(Category.sort_order)
+        .filter(Category.user_id == user.id, Category.parent_id == par_id)
+        .order_by(Category.sort_order.desc())
+        .first()
+    )
+    next_order = (max_order[0] + 1) if max_order and max_order[0] is not None else 0
+
     cat = Category(
         user_id=user.id,
         account_id=acc_id,
@@ -96,6 +107,7 @@ def create_category(
         parent_id=par_id,
         color=color.strip() or None,
         is_income=is_income,
+        sort_order=next_order,
     )
     db.add(cat)
     db.commit()
@@ -159,6 +171,39 @@ def edit_category(
 
     db.commit()
     return RedirectResponse("/categories", status_code=302)
+
+
+class ReorderItem(BaseModel):
+    id: int
+    sort_order: int
+
+
+class ReorderRequest(BaseModel):
+    items: List[ReorderItem]
+
+
+@router.post("/reorder")
+def reorder_categories(
+    request: Request,
+    payload: ReorderRequest,
+    db: Session = Depends(get_db),
+):
+    user = require_login(request, db)
+
+    ids = [item.id for item in payload.items]
+    categories = (
+        db.query(Category)
+        .filter(Category.id.in_(ids), Category.user_id == user.id)
+        .all()
+    )
+    cat_map = {c.id: c for c in categories}
+
+    for item in payload.items:
+        if item.id in cat_map:
+            cat_map[item.id].sort_order = item.sort_order
+
+    db.commit()
+    return JSONResponse({"ok": True})
 
 
 @router.post("/{category_id}/delete")

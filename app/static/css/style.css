@@ -49,6 +49,10 @@ a:hover { color: var(--ctp-denim-dark); }
     margin: 0 auto;
     padding: 2rem 1rem;
 }
+.container.container-wide {
+    max-width: 100%;
+    padding: 2rem 2rem;
+}
 
 /* ===== Navbar ===== */
 .navbar {
@@ -455,6 +459,24 @@ tr:hover { background: rgba(31, 111, 178, 0.03); }
     color: var(--ctp-muted);
 }
 
+/* ===== Category Drag & Drop ===== */
+.drag-handle {
+    cursor: grab;
+    color: var(--ctp-muted);
+    font-size: 1.1rem;
+    padding: 0.5rem !important;
+    width: 30px;
+    user-select: none;
+}
+.drag-handle:active { cursor: grabbing; }
+.draggable-row.dragging {
+    opacity: 0.4;
+    background: rgba(31, 111, 178, 0.06);
+}
+.draggable-row.drag-over {
+    border-top: 3px solid var(--ctp-denim);
+}
+
 /* ===== Savings Planner ===== */
 .savings-top-bar {
     display: flex;
@@ -465,6 +487,20 @@ tr:hover { background: rgba(31, 111, 178, 0.03); }
 
 .savings-grid {
     min-width: 900px;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+.savings-table-wrap {
+    overflow-x: auto;
+    overflow-y: visible;
+    max-height: none;
+}
+.savings-grid thead th {
+    position: sticky;
+    top: 49px; /* navbar height */
+    z-index: 4;
+    background: var(--ctp-bg);
+    box-shadow: 0 2px 4px rgba(11, 27, 43, 0.08);
 }
 .savings-grid th.sticky-col,
 .savings-grid td.sticky-col {
@@ -472,13 +508,13 @@ tr:hover { background: rgba(31, 111, 178, 0.03); }
     left: 0;
     background: var(--ctp-surface);
     z-index: 2;
-    min-width: 150px;
-    max-width: 200px;
+    min-width: 200px;
+    max-width: 280px;
     border-right: 2px solid var(--ctp-border);
 }
 .savings-grid th.sticky-col {
     background: var(--ctp-bg);
-    z-index: 3;
+    z-index: 5;
 }
 .savings-grid th.month-col {
     min-width: 72px;
@@ -535,6 +571,29 @@ tr:hover { background: rgba(31, 111, 178, 0.03); }
 }
 
 /* Line info in first column */
+.line-info-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.line-actions-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex-shrink: 0;
+}
+.line-actions-stack form {
+    margin: 0;
+    line-height: 0;
+}
+.btn-icon {
+    padding: 0.2rem 0.45rem;
+    font-size: 0.85rem;
+    line-height: 1;
+    min-width: 26px;
+    text-align: center;
+    border-radius: 6px;
+}
 .line-name {
     font-weight: 600;
     font-size: 0.9rem;
