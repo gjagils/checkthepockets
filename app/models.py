@@ -24,6 +24,7 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     accounts = relationship("Account", back_populates="user", cascade="all, delete-orphan")
+    savings_plans = relationship("SavingsPlan", back_populates="user", cascade="all, delete-orphan")
 
 
 class Account(Base):
@@ -39,6 +40,9 @@ class Account(Base):
     user = relationship("User", back_populates="accounts")
     transactions = relationship(
         "Transaction", back_populates="account", cascade="all, delete-orphan"
+    )
+    savings_plans = relationship(
+        "SavingsPlan", back_populates="account", cascade="all, delete-orphan"
     )
 
     __table_args__ = (
@@ -63,3 +67,60 @@ class Transaction(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     account = relationship("Account", back_populates="transactions")
+
+
+class SavingsPlan(Base):
+    __tablename__ = "savings_plans"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
+    year = Column(Integer, nullable=False)
+    starting_balance = Column(Numeric(12, 2), default=0)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    user = relationship("User", back_populates="savings_plans")
+    account = relationship("Account", back_populates="savings_plans")
+    lines = relationship(
+        "SavingsLine", back_populates="plan", cascade="all, delete-orphan",
+        order_by="SavingsLine.sort_order",
+    )
+
+    __table_args__ = (
+        UniqueConstraint("account_id", "year", name="uq_savings_plan_account_year"),
+    )
+
+
+class SavingsLine(Base):
+    __tablename__ = "savings_lines"
+
+    id = Column(Integer, primary_key=True)
+    plan_id = Column(Integer, ForeignKey("savings_plans.id", ondelete="CASCADE"), nullable=False)
+    name = Column(String(255), nullable=False)
+    category = Column(String(100), nullable=True)
+    annual_budget = Column(Numeric(12, 2), default=0)
+    frequency = Column(String(20), nullable=False, default="monthly")
+    default_amount = Column(Numeric(12, 2), default=0)
+    sort_order = Column(Integer, default=0)
+
+    plan = relationship("SavingsPlan", back_populates="lines")
+    entries = relationship(
+        "SavingsEntry", back_populates="line", cascade="all, delete-orphan",
+        order_by="SavingsEntry.month",
+    )
+
+
+class SavingsEntry(Base):
+    __tablename__ = "savings_entries"
+
+    id = Column(Integer, primary_key=True)
+    line_id = Column(Integer, ForeignKey("savings_lines.id", ondelete="CASCADE"), nullable=False)
+    month = Column(Integer, nullable=False)
+    amount = Column(Numeric(12, 2), nullable=True)
+    status = Column(String(20), default="forecast")  # forecast, pending, confirmed
+
+    line = relationship("SavingsLine", back_populates="entries")
+
+    __table_args__ = (
+        UniqueConstraint("line_id", "month", name="uq_savings_entry_line_month"),
+    )

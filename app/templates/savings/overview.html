@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Sparen - Check The Pockets{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Spaarplanner</h1>
+</div>
+
+<div class="card">
+    <div class="savings-top-bar">
+        <form method="get" action="/savings" class="filter-bar">
+            <div class="form-group">
+                <label for="year">Jaar</label>
+                <select name="year" id="year" onchange="this.form.submit()">
+                    {% for y in years %}
+                    <option value="{{ y }}" {% if y == current_year %}selected{% endif %}>{{ y }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if plans %}
+<div class="accounts-grid">
+    {% for plan in plans %}
+    <div class="card account-card">
+        <div class="account-header">
+            <span class="pill">{{ plan.account.bank|upper }}</span>
+            <span class="muted">{{ plan.year }}</span>
+        </div>
+        <h3>{{ plan.account.name }}</h3>
+        {% if plan.account.iban %}
+        <p class="muted">{{ plan.account.iban }}</p>
+        {% endif %}
+        <p class="muted">Startsaldo: {{ "%.2f"|format(plan.starting_balance) }} EUR</p>
+        <p class="muted">{{ plan.lines|length }} spaarregels</p>
+        <div class="account-actions">
+            <a href="/savings/{{ plan.id }}" class="btn btn-sm btn-primary">Openen</a>
+            <form method="post" action="/savings/{{ plan.id }}/delete" style="display:inline;"
+                  onsubmit="return confirm('Weet je zeker dat je dit spaarplan wilt verwijderen?')">
+                <button type="submit" class="btn btn-sm btn-danger">Verwijderen</button>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="card" style="margin-top: 1.5rem;">
+    <h2>Nieuw spaarplan</h2>
+    {% if accounts %}
+    <form method="post" action="/savings">
+        <div class="filter-bar" style="flex-wrap: wrap;">
+            <div class="form-group">
+                <label for="account_id">Spaarrekening</label>
+                <select name="account_id" id="account_id" required>
+                    <option value="">Kies een rekening</option>
+                    {% for acc in accounts %}
+                    <option value="{{ acc.id }}">{{ acc.name }}{% if acc.iban %} ({{ acc.iban }}){% endif %}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="new_year">Jaar</label>
+                <input type="number" name="year" id="new_year" value="{{ current_year }}" min="2020" max="2050" required>
+            </div>
+            <div class="form-group">
+                <label for="starting_balance">Startsaldo</label>
+                <input type="text" name="starting_balance" id="starting_balance" value="0" placeholder="0,00">
+            </div>
+            <div class="form-group" style="align-self: flex-end;">
+                <button type="submit" class="btn btn-primary">Aanmaken</button>
+            </div>
+        </div>
+    </form>
+    {% else %}
+    <p class="muted">Importeer eerst transacties om rekeningen aan te maken.</p>
+    <a href="/import" class="btn btn-primary" style="margin-top: 0.5rem;">CSV importeren</a>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+{% block title %}Spaarplan {{ plan.account.name }} {{ plan.year }} - Check The Pockets{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>{{ plan.account.name }} - {{ plan.year }}</h1>
+        <p class="muted">Startsaldo: {{ "%.2f"|format(plan.starting_balance) }} EUR{% if plan.account.iban %} &middot; {{ plan.account.iban }}{% endif %}</p>
+    </div>
+    <a href="/savings?year={{ plan.year }}" class="btn btn-sm">Terug naar overzicht</a>
+</div>
+
+<!-- Savings grid table -->
+<div class="card">
+    <div class="table-wrap">
+        <table class="savings-grid">
+            <thead>
+                <tr>
+                    <th class="sticky-col">Regel</th>
+                    {% for m in range(1, 13) %}
+                    <th class="text-right month-col">{{ months[m] }}</th>
+                    {% endfor %}
+                    <th class="text-right">Totaal</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for line in plan.lines %}
+                <tr class="savings-row" data-line-id="{{ line.id }}">
+                    <td class="sticky-col">
+                        <div class="line-name">{{ line.name }}</div>
+                        {% if line.category %}
+                        <div class="line-category">{{ line.category }}</div>
+                        {% endif %}
+                        <div class="line-freq">{{ frequency_labels.get(line.frequency, line.frequency) }}</div>
+                    </td>
+                    {% for m in range(1, 13) %}
+                    {% set entry = namespace(val=None, status='forecast', id=0) %}
+                    {% for e in line.entries %}
+                        {% if e.month == m %}
+                            {% set entry.val = e.amount %}
+                            {% set entry.status = e.status %}
+                            {% set entry.id = e.id %}
+                        {% endif %}
+                    {% endfor %}
+                    <td class="text-right savings-cell cell-{{ entry.status }}"
+                        data-entry-id="{{ entry.id }}"
+                        data-month="{{ m }}">
+                        <span class="cell-display" onclick="startEdit(this)">
+                            {% if entry.val is not none %}{{ "%.2f"|format(entry.val) }}{% else %}-{% endif %}
+                        </span>
+                        <input type="text" class="cell-input" style="display:none;"
+                               value="{% if entry.val is not none %}{{ "%.2f"|format(entry.val) }}{% endif %}"
+                               onblur="saveCell(this)"
+                               onkeydown="cellKeydown(event, this)">
+                    </td>
+                    {% endfor %}
+                    <td class="text-right nowrap line-total" data-line-id="{{ line.id }}">
+                        <strong>{{ "%.2f"|format(line_totals.get(line.id, 0)) }}</strong>
+                    </td>
+                    <td class="nowrap">
+                        {% if line.category %}
+                        <form method="post" action="/savings/lines/{{ line.id }}/fill-from-transactions" style="display:inline;">
+                            <button type="submit" class="btn btn-sm" title="Vul vanuit transacties">Sync</button>
+                        </form>
+                        {% endif %}
+                        <form method="post" action="/savings/lines/{{ line.id }}/delete" style="display:inline;"
+                              onsubmit="return confirm('Regel verwijderen?')">
+                            <button type="submit" class="btn btn-sm btn-danger">X</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr class="balance-row">
+                    <td class="sticky-col"><strong>Saldo</strong></td>
+                    {% for m in range(1, 13) %}
+                    <td class="text-right nowrap balance-cell" data-month="{{ m }}">
+                        {% set bal = running_balance.get(m, 0) %}
+                        <strong class="{% if bal >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
+                            {{ "%.2f"|format(bal) }}
+                        </strong>
+                    </td>
+                    {% endfor %}
+                    <td></td>
+                    <td></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+
+<!-- Add line form -->
+<div class="card">
+    <h2>Regel toevoegen</h2>
+    <form method="post" action="/savings/lines">
+        <input type="hidden" name="plan_id" value="{{ plan.id }}">
+        <div class="filter-bar" style="flex-wrap: wrap;">
+            <div class="form-group">
+                <label for="line_name">Naam</label>
+                <input type="text" name="name" id="line_name" required placeholder="bijv. Maandelijks sparen">
+            </div>
+            <div class="form-group">
+                <label for="line_category">Categorie (optioneel)</label>
+                <input type="text" name="category" id="line_category" placeholder="bijv. Vakantie">
+            </div>
+            <div class="form-group">
+                <label for="line_freq">Frequentie</label>
+                <select name="frequency" id="line_freq" onchange="toggleTargetMonth(this.value)">
+                    {% for key, label in frequency_labels.items() %}
+                    <option value="{{ key }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="line_amount">Bedrag per keer</label>
+                <input type="text" name="default_amount" id="line_amount" value="0" placeholder="0,00">
+            </div>
+            <div class="form-group" id="target-month-group" style="display:none;">
+                <label for="line_target_month">Maand</label>
+                <select name="target_month" id="line_target_month">
+                    {% for m in range(1, 13) %}
+                    <option value="{{ m }}">{{ months[m] }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group" style="align-self: flex-end;">
+                <button type="submit" class="btn btn-primary">Toevoegen</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Category suggestions -->
+{% if category_suggestions %}
+<div class="card">
+    <h2>Suggesties vanuit transacties</h2>
+    <p class="muted" style="margin-bottom: 1rem;">Deze categorieen zijn gevonden in de transacties van deze spaarrekening maar staan nog niet in het plan.</p>
+    <div class="accounts-grid">
+        {% for sug in category_suggestions %}
+        <div class="card" style="margin-bottom: 0;">
+            <h3>{{ sug.category }}</h3>
+            <p class="muted">{{ sug.tx_count }} transacties &middot; Totaal: {{ "%.2f"|format(sug.total) }} EUR</p>
+            <form method="post" action="/savings/lines" style="margin-top: 0.75rem;">
+                <input type="hidden" name="plan_id" value="{{ plan.id }}">
+                <input type="hidden" name="name" value="{{ sug.category }}">
+                <input type="hidden" name="category" value="{{ sug.category }}">
+                <input type="hidden" name="frequency" value="monthly">
+                <input type="hidden" name="default_amount" value="0">
+                <button type="submit" class="btn btn-sm btn-accent">Toevoegen aan plan</button>
+            </form>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Legend -->
+<div class="card">
+    <div class="savings-legend">
+        <span class="legend-item"><span class="legend-dot legend-confirmed"></span> Bevestigd (transacties verwerkt)</span>
+        <span class="legend-item"><span class="legend-dot legend-pending"></span> Lopend (transacties aanwezig, maand nog open)</span>
+        <span class="legend-item"><span class="legend-dot legend-forecast"></span> Prognose</span>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function startEdit(displayEl) {
+    var cell = displayEl.parentElement;
+    var input = cell.querySelector('.cell-input');
+    displayEl.style.display = 'none';
+    input.style.display = 'block';
+    input.focus();
+    input.select();
+}
+
+function cellKeydown(e, input) {
+    if (e.key === 'Enter') {
+        input.blur();
+    } else if (e.key === 'Escape') {
+        // Restore original value
+        var cell = input.parentElement;
+        var display = cell.querySelector('.cell-display');
+        input.style.display = 'none';
+        display.style.display = '';
+    } else if (e.key === 'Tab') {
+        e.preventDefault();
+        input.blur();
+        // Move to next cell
+        var td = input.closest('td');
+        var nextTd = e.shiftKey ? td.previousElementSibling : td.nextElementSibling;
+        if (nextTd && nextTd.classList.contains('savings-cell')) {
+            var nextDisplay = nextTd.querySelector('.cell-display');
+            if (nextDisplay) startEdit(nextDisplay);
+        }
+    }
+}
+
+function saveCell(input) {
+    var cell = input.parentElement;
+    var display = cell.querySelector('.cell-display');
+    var entryId = cell.dataset.entryId;
+    var newValue = input.value.trim();
+
+    // Show display again
+    input.style.display = 'none';
+    display.style.display = '';
+
+    // Send AJAX update
+    var formData = new FormData();
+    formData.append('entry_id', entryId);
+    formData.append('amount', newValue);
+
+    fetch('/savings/entries/update', {
+        method: 'POST',
+        body: formData,
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.ok) {
+            // Update display
+            if (data.amount !== null) {
+                display.textContent = data.amount.toFixed(2);
+            } else {
+                display.textContent = '-';
+            }
+
+            // Update cell status color
+            cell.className = 'text-right savings-cell cell-' + data.status;
+
+            // Update line total
+            var lineRow = cell.closest('tr');
+            var lineId = lineRow.dataset.lineId;
+            var totalCell = document.querySelector('.line-total[data-line-id="' + lineId + '']');
+            if (totalCell) {
+                totalCell.innerHTML = '<strong>' + data.line_total.toFixed(2) + '</strong>';
+            }
+
+            // Update running balances
+            if (data.running_balances) {
+                for (var m in data.running_balances) {
+                    var balCell = document.querySelector('.balance-cell[data-month="' + m + '"]');
+                    if (balCell) {
+                        var bal = data.running_balances[m];
+                        var cls = bal >= 0 ? 'amount-positive' : 'amount-negative';
+                        balCell.innerHTML = '<strong class="' + cls + '">' + bal.toFixed(2) + '</strong>';
+                    }
+                }
+            }
+        }
+    });
+}
+
+function toggleTargetMonth(freq) {
+    var group = document.getElementById('target-month-group');
+    if (freq === 'yearly' || freq === 'one-off') {
+        group.style.display = '';
+    } else {
+        group.style.display = 'none';
+    }
+}
+</script>
+{% endblock %}
