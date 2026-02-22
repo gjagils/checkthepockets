@@ -23,6 +23,14 @@ MONTH_NAMES_NL = [
 
 def _get_spending_by_category(db: Session, user_id: int, year: int, month: int) -> dict[int, Decimal]:
     """Get total spending (negative amounts) per category for a given month."""
+    # Exclude parent transactions that have been split into children
+    split_parent_ids = (
+        db.query(Transaction.parent_id)
+        .filter(Transaction.parent_id.isnot(None))
+        .distinct()
+        .subquery()
+    )
+
     rows = (
         db.query(
             Transaction.category_id,
@@ -35,6 +43,7 @@ def _get_spending_by_category(db: Session, user_id: int, year: int, month: int) 
             extract("month", Transaction.date) == month,
             Transaction.category_id.isnot(None),
             Transaction.amount < 0,
+            Transaction.id.notin_(split_parent_ids),
         )
         .group_by(Transaction.category_id)
         .all()

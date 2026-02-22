@@ -150,9 +150,11 @@ class Transaction(Base):
     counterparty_iban = Column(String(34), nullable=True)
     balance_after = Column(Numeric(12, 2), nullable=True)
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
+    parent_id = Column(Integer, ForeignKey("transactions.id", ondelete="CASCADE"), nullable=True)
     import_hash = Column(String(64), unique=True, nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     account = relationship("Account", back_populates="transactions")
     category_rel = relationship("Category", back_populates="transactions")
     tags = relationship("Tag", secondary=transaction_tags, back_populates="transactions")
+    parent = relationship("Transaction", remote_side="Transaction.id", backref="children")

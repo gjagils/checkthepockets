@@ -10,7 +10,8 @@ from app.database import get_db
 from app.models import Account, Transaction, Category, Tag, Rule
 from app.auth import require_login
 from app.parsers import abn_amro, bunq, ics
-from app.parsers.base import ParseError
+from app.parsers.base import ParseError, ParsedTransaction
+from app.parsers.ics_pdf import parse_ics_pdf
 from app.rules_engine import apply_rules_to_transaction
 
 router = APIRouter()
@@ -46,6 +47,15 @@ def transaction_list(
         .join(Account)
         .filter(Account.user_id == user.id)
     )
+
+    # Hide parent transactions that have been split (children replace them)
+    split_parent_ids = (
+        db.query(Transaction.parent_id)
+        .filter(Transaction.parent_id.isnot(None))
+        .distinct()
+        .subquery()
+    )
+    query = query.filter(Transaction.id.notin_(split_parent_ids))
 
     # Filters
     if account_id:
@@ -456,3 +466,165 @@ async def import_csv(
             "account": account,
         },
     )
+
+
+# ===== Split / Specificeer =====
+
+@router.get("/transactions/{transaction_id}/split")
+def split_transaction_page(
+    transaction_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Show the split transaction page where user uploads an ICS PDF."""
+    user = require_login(request, db)
+    transaction = (
+        db.query(Transaction)
+        .join(Account)
+        .filter(Transaction.id == transaction_id, Account.user_id == user.id)
+        .first()
+    )
+    if not transaction:
+        return RedirectResponse("/", status_code=302)
+
+    # Check if already split
+    existing_children = (
+        db.query(Transaction)
+        .filter(Transaction.parent_id == transaction_id)
+        .all()
+    )
+
+    return templates.TemplateResponse(
+        "transactions/split.html",
+        {
+            "request": request,
+            "user": user,
+            "transaction": transaction,
+            "existing_children": existing_children,
+        },
+    )
+
+
+@router.post("/transactions/{transaction_id}/split")
+async def split_transaction(
+    transaction_id: int,
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    """Parse ICS PDF and create child transactions."""
+    user = require_login(request, db)
+    transaction = (
+        db.query(Transaction)
+        .join(Account)
+        .filter(Transaction.id == transaction_id, Account.user_id == user.id)
+        .first()
+    )
+    if not transaction:
+        return RedirectResponse("/", status_code=302)
+
+    content = await file.read()
+    if not content:
+        return templates.TemplateResponse(
+            "transactions/split.html",
+            {
+                "request": request,
+                "user": user,
+                "transaction": transaction,
+                "existing_children": [],
+                "error": "Leeg bestand",
+            },
+            status_code=400,
+        )
+
+    try:
+        parsed_lines = parse_ics_pdf(content)
+    except ParseError as e:
+        return templates.TemplateResponse(
+            "transactions/split.html",
+            {
+                "request": request,
+                "user": user,
+                "transaction": transaction,
+                "existing_children": [],
+                "error": f"Fout bij verwerken PDF: {e}",
+            },
+            status_code=400,
+        )
+
+    # Load active rules for auto-categorization
+    active_rules = (
+        db.query(Rule)
+        .filter(Rule.user_id == user.id, Rule.is_active == 1)
+        .all()
+    )
+
+    # Delete existing children if re-splitting
+    db.query(Transaction).filter(Transaction.parent_id == transaction_id).delete()
+    db.flush()
+
+    # Create child transactions
+    created = 0
+    auto_categorized = 0
+    for line in parsed_lines:
+        # Make amount negative for debits (expenses), positive for credits (refunds)
+        amount = -line.amount_eur if line.is_debit else line.amount_eur
+
+        child = Transaction(
+            account_id=transaction.account_id,
+            date=line.transaction_date,
+            amount=amount,
+            currency="EUR",
+            description=line.description,
+            counterparty=line.description.split()[0] if line.description else None,
+            parent_id=transaction.id,
+            import_hash=ParsedTransaction(
+                date=line.transaction_date,
+                amount=amount,
+                currency="EUR",
+                description=f"ICS-SPLIT-{transaction.id}-{line.description}-{line.transaction_date}",
+            ).import_hash,
+        )
+        db.add(child)
+        db.flush()
+
+        if active_rules and apply_rules_to_transaction(active_rules, child, db):
+            auto_categorized += 1
+
+        created += 1
+
+    db.commit()
+
+    return templates.TemplateResponse(
+        "transactions/split_result.html",
+        {
+            "request": request,
+            "user": user,
+            "transaction": transaction,
+            "created": created,
+            "auto_categorized": auto_categorized,
+        },
+    )
+
+
+@router.post("/transactions/{transaction_id}/unsplit")
+def unsplit_transaction(
+    transaction_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Remove all child transactions and restore the parent."""
+    user = require_login(request, db)
+    transaction = (
+        db.query(Transaction)
+        .join(Account)
+        .filter(Transaction.id == transaction_id, Account.user_id == user.id)
+        .first()
+    )
+    if not transaction:
+        return RedirectResponse("/", status_code=302)
+
+    db.query(Transaction).filter(Transaction.parent_id == transaction_id).delete()
+    db.commit()
+
+    return RedirectResponse("/", status_code=302)

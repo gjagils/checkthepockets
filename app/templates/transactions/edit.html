@@ -86,4 +86,12 @@
     </table>
 </div>
 {% endif %}
+
+<div class="card">
+    <h2>Creditcard specificeren</h2>
+    <p class="muted" style="margin-bottom:0.75rem;">
+        Is dit een ICS creditcard-incasso? Upload het ICS PDF-afschrift om de boeking op te splitsen in individuele transacties.
+    </p>
+    <a href="/transactions/{{ transaction.id }}/split" class="btn btn-accent">Specificeer met PDF</a>
+</div>
 {% endblock %}

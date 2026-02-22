@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Specificeer transactie - Check The Pockets{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Creditcard specificeren</h1>
+    <a href="/" class="btn btn-sm">Terug</a>
+</div>
+
+<div class="card">
+    <h2>Originele transactie</h2>
+    <table class="detail-table">
+        <tr>
+            <th>Datum</th>
+            <td>{{ transaction.date.strftime('%d-%m-%Y') }}</td>
+        </tr>
+        <tr>
+            <th>Bedrag</th>
+            <td class="{% if transaction.amount < 0 %}amount-negative{% else %}amount-positive{% endif %}">
+                {{ "%.2f"|format(transaction.amount) }} {{ transaction.currency }}
+            </td>
+        </tr>
+        <tr>
+            <th>Omschrijving</th>
+            <td>{{ transaction.description or '-' }}</td>
+        </tr>
+        <tr>
+            <th>Tegenpartij</th>
+            <td>{{ transaction.counterparty or '-' }}</td>
+        </tr>
+    </table>
+</div>
+
+{% if error %}
+<div class="alert alert-error">{{ error }}</div>
+{% endif %}
+
+{% if existing_children %}
+<div class="card">
+    <h2>Huidige specificatie ({{ existing_children|length }} regels)</h2>
+    <p class="muted" style="margin-bottom:0.75rem;">Deze transactie is al gespecificeerd. Upload een nieuwe PDF om te overschrijven.</p>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Datum</th>
+                    <th>Omschrijving</th>
+                    <th class="text-right">Bedrag</th>
+                    <th>Categorie</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for child in existing_children|sort(attribute='date') %}
+                <tr>
+                    <td class="nowrap">{{ child.date.strftime('%d-%m-%Y') }}</td>
+                    <td class="desc-cell">{{ child.description or '-' }}</td>
+                    <td class="text-right nowrap {% if child.amount < 0 %}amount-negative{% else %}amount-positive{% endif %}">
+                        {{ "%.2f"|format(child.amount) }}
+                    </td>
+                    <td>
+                        {% if child.category_rel %}
+                        <span class="category-pill" style="--cat-color: {{ child.category_rel.color or '#1F6FB2' }}">
+                            {{ child.category_rel.name }}
+                        </span>
+                        {% else %}
+                        <span class="muted">-</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div style="margin-top:0.75rem;">
+        <form method="post" action="/transactions/{{ transaction.id }}/unsplit" style="display:inline;"
+              onsubmit="return confirm('Specificatie verwijderen? De originele transactie wordt hersteld.')">
+            <button type="submit" class="btn btn-sm btn-danger">Specificatie verwijderen</button>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+<div class="card">
+    <h2>ICS PDF uploaden</h2>
+    <p class="muted" style="margin-bottom:1rem;">
+        Upload het PDF-afschrift van ICS om de creditcardafschrijving op te splitsen in losse boekingen.
+    </p>
+    <form method="post" action="/transactions/{{ transaction.id }}/split" enctype="multipart/form-data">
+        <div class="form-group">
+            <label for="file">ICS PDF afschrift</label>
+            <input type="file" id="file" name="file" accept=".pdf" required>
+        </div>
+        <button type="submit" class="btn btn-primary">
+            {% if existing_children %}Opnieuw specificeren{% else %}Specificeren{% endif %}
+        </button>
+    </form>
+</div>
+{% endblock %}
