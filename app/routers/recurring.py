@@ -148,7 +148,7 @@ def create_recurring(
     name: str = Form(...),
     amount_expected: str = Form(...),
     frequency: str = Form(...),
-    category_id: int | None = Form(None),
+    category_id: str = Form(""),
     counterparty: str = Form(""),
     description_match: str = Form(""),
     db: Session = Depends(get_db),
@@ -166,19 +166,20 @@ def create_recurring(
     except (InvalidOperation, ValueError):
         return RedirectResponse("/recurring", status_code=302)
 
-    if category_id:
+    cat_id = int(category_id) if category_id.strip() else None
+    if cat_id:
         cat = db.query(Category).filter(
-            Category.id == category_id, Category.user_id == user.id
+            Category.id == cat_id, Category.user_id == user.id
         ).first()
         if not cat:
-            category_id = None
+            cat_id = None
 
     item = RecurringTransaction(
         user_id=user.id,
         name=name,
         amount_expected=parsed_amount,
         frequency=frequency,
-        category_id=category_id,
+        category_id=cat_id,
         counterparty=counterparty.strip() or None,
         description_match=description_match.strip() or None,
     )
@@ -195,7 +196,7 @@ def edit_recurring(
     name: str = Form(...),
     amount_expected: str = Form(...),
     frequency: str = Form(...),
-    category_id: int | None = Form(None),
+    category_id: str = Form(""),
     counterparty: str = Form(""),
     description_match: str = Form(""),
     db: Session = Depends(get_db),
@@ -222,9 +223,10 @@ def edit_recurring(
     item.counterparty = counterparty.strip() or None
     item.description_match = description_match.strip() or None
 
-    if category_id:
+    cat_id = int(category_id) if category_id.strip() else None
+    if cat_id:
         cat = db.query(Category).filter(
-            Category.id == category_id, Category.user_id == user.id
+            Category.id == cat_id, Category.user_id == user.id
         ).first()
         item.category_id = cat.id if cat else None
     else:

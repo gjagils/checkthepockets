@@ -227,7 +227,7 @@ def edit_transaction(
     request: Request,
     description: str = Form(""),
     counterparty: str = Form(""),
-    category_id: int | None = Form(None),
+    category_id: str = Form(""),
     tag_ids: list[int] = Form(default=[]),
     new_tag: str = Form(""),
     db: Session = Depends(get_db),
@@ -246,9 +246,10 @@ def edit_transaction(
     transaction.counterparty = counterparty.strip() or None
 
     # Category
-    if category_id:
+    cat_id = int(category_id) if category_id.strip() else None
+    if cat_id:
         cat = db.query(Category).filter(
-            Category.id == category_id, Category.user_id == user.id
+            Category.id == cat_id, Category.user_id == user.id
         ).first()
         transaction.category_id = cat.id if cat else None
     else:
@@ -286,7 +287,7 @@ def edit_transaction(
 def quick_set_category(
     transaction_id: int,
     request: Request,
-    category_id: int | None = Form(None),
+    category_id: str = Form(""),
     db: Session = Depends(get_db),
 ):
     """Quick category assignment from the transaction list."""
@@ -300,9 +301,10 @@ def quick_set_category(
     if not transaction:
         return RedirectResponse("/", status_code=302)
 
-    if category_id:
+    cat_id = int(category_id) if category_id.strip() else None
+    if cat_id:
         cat = db.query(Category).filter(
-            Category.id == category_id, Category.user_id == user.id
+            Category.id == cat_id, Category.user_id == user.id
         ).first()
         transaction.category_id = cat.id if cat else None
     else:

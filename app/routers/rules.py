@@ -75,8 +75,8 @@ def create_rule(
     match_value: str = Form(...),
     amount_min: str = Form(""),
     amount_max: str = Form(""),
-    assign_category_id: int | None = Form(None),
-    assign_tag_id: int | None = Form(None),
+    assign_category_id: str = Form(""),
+    assign_tag_id: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
@@ -90,20 +90,24 @@ def create_rule(
     if match_type not in MATCH_TYPES:
         return RedirectResponse("/rules", status_code=302)
 
+    # Parse optional IDs
+    cat_id = int(assign_category_id) if assign_category_id.strip() else None
+    tag_id = int(assign_tag_id) if assign_tag_id.strip() else None
+
     # Validate category/tag belong to user
-    if assign_category_id:
+    if cat_id:
         cat = db.query(Category).filter(
-            Category.id == assign_category_id, Category.user_id == user.id
+            Category.id == cat_id, Category.user_id == user.id
         ).first()
         if not cat:
-            assign_category_id = None
+            cat_id = None
 
-    if assign_tag_id:
+    if tag_id:
         tag = db.query(Tag).filter(
-            Tag.id == assign_tag_id, Tag.user_id == user.id
+            Tag.id == tag_id, Tag.user_id == user.id
         ).first()
         if not tag:
-            assign_tag_id = None
+            tag_id = None
 
     # Parse amounts
     parsed_min = None
@@ -127,8 +131,8 @@ def create_rule(
         match_value=match_value,
         amount_min=parsed_min,
         amount_max=parsed_max,
-        assign_category_id=assign_category_id,
-        assign_tag_id=assign_tag_id,
+        assign_category_id=cat_id,
+        assign_tag_id=tag_id,
     )
     db.add(rule)
     db.commit()
@@ -146,8 +150,8 @@ def edit_rule(
     match_value: str = Form(...),
     amount_min: str = Form(""),
     amount_max: str = Form(""),
-    assign_category_id: int | None = Form(None),
-    assign_tag_id: int | None = Form(None),
+    assign_category_id: str = Form(""),
+    assign_tag_id: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
@@ -181,17 +185,21 @@ def edit_rule(
     else:
         rule.amount_max = None
 
-    if assign_category_id:
+    # Parse optional IDs
+    cat_id = int(assign_category_id) if assign_category_id.strip() else None
+    tag_id = int(assign_tag_id) if assign_tag_id.strip() else None
+
+    if cat_id:
         cat = db.query(Category).filter(
-            Category.id == assign_category_id, Category.user_id == user.id
+            Category.id == cat_id, Category.user_id == user.id
         ).first()
         rule.assign_category_id = cat.id if cat else None
     else:
         rule.assign_category_id = None
 
-    if assign_tag_id:
+    if tag_id:
         tag = db.query(Tag).filter(
-            Tag.id == assign_tag_id, Tag.user_id == user.id
+            Tag.id == tag_id, Tag.user_id == user.id
         ).first()
         rule.assign_tag_id = tag.id if tag else None
     else:
