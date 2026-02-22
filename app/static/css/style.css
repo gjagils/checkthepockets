@@ -278,6 +278,26 @@ a:hover { color: var(--ctp-denim-dark); }
     font-size: 0.75rem;
     letter-spacing: 0.02em;
 }
+.badge-income {
+    background: color-mix(in srgb, var(--ctp-check) 15%, transparent);
+    color: var(--ctp-check);
+}
+.badge-expense {
+    background: color-mix(in srgb, var(--ctp-danger) 15%, transparent);
+    color: var(--ctp-danger);
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+.checkbox-label input[type="checkbox"] {
+    width: 1rem;
+    height: 1rem;
+}
 
 .pill {
     display: inline-flex;
@@ -738,6 +758,9 @@ tr:hover { background: rgba(31, 111, 178, 0.03); }
     }
     .filter-bar .form-group {
         min-width: 100%;
+    }
+    .search-row {
+        flex-direction: column;
     }
     .accounts-grid {
         grid-template-columns: 1fr;

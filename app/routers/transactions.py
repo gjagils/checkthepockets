@@ -1,3 +1,5 @@
+from datetime import date as date_type
+
 from fastapi import APIRouter, Depends, Request, UploadFile, File, Form, Query
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -7,7 +9,9 @@ from app.database import get_db
 from app.models import Account, Transaction, Category
 from app.auth import require_login
 from app.parsers import abn_amro, bunq, ics
-from app.parsers.base import ParseError
+from app.parsers.base import ParseError, ParsedTransaction
+from app.parsers.ics_pdf import parse_ics_pdf
+from app.rules_engine import apply_rules_to_transaction
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -26,6 +30,13 @@ def transaction_list(
     request: Request,
     page: int = Query(1, ge=1),
     account_id: int | None = Query(None),
+    category_id: int | None = Query(None),
+    tag_id: int | None = Query(None),
+    search: str | None = Query(None),
+    date_from: str | None = Query(None),
+    date_to: str | None = Query(None),
+    amount_min: str | None = Query(None),
+    amount_max: str | None = Query(None),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
@@ -37,8 +48,69 @@ def transaction_list(
         .filter(Account.user_id == user.id)
     )
 
+    # Hide parent transactions that have been split (children replace them)
+    split_parent_ids = (
+        db.query(Transaction.parent_id)
+        .filter(Transaction.parent_id.isnot(None))
+        .distinct()
+        .subquery()
+    )
+    query = query.filter(Transaction.id.notin_(split_parent_ids))
+
+    # Filters
     if account_id:
         query = query.filter(Transaction.account_id == account_id)
+
+    if category_id:
+        if category_id == -1:
+            query = query.filter(Transaction.category_id.is_(None))
+        else:
+            # Include child categories
+            cat = db.query(Category).filter(
+                Category.id == category_id, Category.user_id == user.id
+            ).first()
+            if cat:
+                child_ids = [c.id for c in cat.children]
+                query = query.filter(
+                    Transaction.category_id.in_([category_id] + child_ids)
+                )
+
+    if tag_id:
+        query = query.filter(Transaction.tags.any(Tag.id == tag_id))
+
+    if search:
+        search_term = f"%{search.strip()}%"
+        query = query.filter(
+            or_(
+                Transaction.description.ilike(search_term),
+                Transaction.counterparty.ilike(search_term),
+                Transaction.counterparty_iban.ilike(search_term),
+            )
+        )
+
+    if date_from:
+        try:
+            query = query.filter(Transaction.date >= date_type.fromisoformat(date_from))
+        except ValueError:
+            pass
+
+    if date_to:
+        try:
+            query = query.filter(Transaction.date <= date_type.fromisoformat(date_to))
+        except ValueError:
+            pass
+
+    if amount_min:
+        try:
+            query = query.filter(Transaction.amount >= float(amount_min))
+        except ValueError:
+            pass
+
+    if amount_max:
+        try:
+            query = query.filter(Transaction.amount <= float(amount_max))
+        except ValueError:
+            pass
 
     total = query.count()
     transactions = (
@@ -49,6 +121,18 @@ def transaction_list(
     )
 
     accounts = db.query(Account).filter(Account.user_id == user.id).all()
+    categories = (
+        db.query(Category)
+        .filter(Category.user_id == user.id)
+        .order_by(Category.name)
+        .all()
+    )
+    tags = (
+        db.query(Tag)
+        .filter(Tag.user_id == user.id)
+        .order_by(Tag.name)
+        .all()
+    )
     total_pages = max(1, (total + PER_PAGE - 1) // PER_PAGE)
 
     # Get categories grouped by account_id -> parent -> children
@@ -76,7 +160,17 @@ def transaction_list(
             "user": user,
             "transactions": transactions,
             "accounts": accounts,
+            "categories": categories,
+            "tags": tags,
             "current_account_id": account_id,
+            "current_category_id": category_id,
+            "current_tag_id": tag_id,
+            "search": search or "",
+            "date_from": date_from or "",
+            "date_to": date_to or "",
+            "amount_min": amount_min or "",
+            "amount_max": amount_max or "",
+            "filter_params": filter_params,
             "page": page,
             "total_pages": total_pages,
             "total": total,
@@ -210,9 +304,17 @@ async def import_csv(
         db.add(account)
         db.flush()
 
+    # Load active rules for auto-categorization
+    active_rules = (
+        db.query(Rule)
+        .filter(Rule.user_id == user.id, Rule.is_active == 1)
+        .all()
+    )
+
     # Import transactions, skip duplicates
     imported = 0
     skipped = 0
+    auto_categorized = 0
     for tx in parsed:
         exists = (
             db.query(Transaction)
@@ -235,6 +337,12 @@ async def import_csv(
             import_hash=tx.import_hash,
         )
         db.add(db_tx)
+        db.flush()
+
+        # Apply rules to new transaction
+        if active_rules and apply_rules_to_transaction(active_rules, db_tx, db):
+            auto_categorized += 1
+
         imported += 1
 
     db.commit()
@@ -246,7 +354,189 @@ async def import_csv(
             "user": user,
             "imported": imported,
             "skipped": skipped,
+            "auto_categorized": auto_categorized,
             "total": len(parsed),
             "account": account,
         },
     )
+
+
+# ===== Split / Specificeer =====
+
+@router.get("/transactions/{transaction_id}/split")
+def split_transaction_page(
+    transaction_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Show the split transaction page where user uploads an ICS PDF."""
+    user = require_login(request, db)
+    transaction = (
+        db.query(Transaction)
+        .join(Account)
+        .filter(Transaction.id == transaction_id, Account.user_id == user.id)
+        .first()
+    )
+    if not transaction:
+        return RedirectResponse("/", status_code=302)
+
+    # Check if already split
+    existing_children = (
+        db.query(Transaction)
+        .filter(Transaction.parent_id == transaction_id)
+        .all()
+    )
+
+    return templates.TemplateResponse(
+        "transactions/split.html",
+        {
+            "request": request,
+            "user": user,
+            "transaction": transaction,
+            "existing_children": existing_children,
+        },
+    )
+
+
+@router.post("/transactions/{transaction_id}/split")
+async def split_transaction(
+    transaction_id: int,
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    """Parse ICS PDF and create child transactions."""
+    user = require_login(request, db)
+    transaction = (
+        db.query(Transaction)
+        .join(Account)
+        .filter(Transaction.id == transaction_id, Account.user_id == user.id)
+        .first()
+    )
+    if not transaction:
+        return RedirectResponse("/", status_code=302)
+
+    content = await file.read()
+    if not content:
+        return templates.TemplateResponse(
+            "transactions/split.html",
+            {
+                "request": request,
+                "user": user,
+                "transaction": transaction,
+                "existing_children": [],
+                "error": "Leeg bestand",
+            },
+            status_code=400,
+        )
+
+    try:
+        parsed_lines = parse_ics_pdf(content)
+    except ParseError as e:
+        return templates.TemplateResponse(
+            "transactions/split.html",
+            {
+                "request": request,
+                "user": user,
+                "transaction": transaction,
+                "existing_children": [],
+                "error": f"Fout bij verwerken PDF: {e}",
+            },
+            status_code=400,
+        )
+
+    # Load active rules for auto-categorization
+    active_rules = (
+        db.query(Rule)
+        .filter(Rule.user_id == user.id, Rule.is_active == 1)
+        .all()
+    )
+
+    # Delete existing children if re-splitting
+    db.query(Transaction).filter(Transaction.parent_id == transaction_id).delete()
+    db.flush()
+
+    # Create child transactions
+    try:
+        created = 0
+        auto_categorized = 0
+        for idx, line in enumerate(parsed_lines):
+            # Make amount negative for debits (expenses), positive for credits (refunds)
+            amount = -line.amount_eur if line.is_debit else line.amount_eur
+
+            child = Transaction(
+                account_id=transaction.account_id,
+                date=line.transaction_date,
+                amount=amount,
+                currency="EUR",
+                description=line.description,
+                counterparty=line.description.split()[0] if line.description else None,
+                parent_id=transaction.id,
+                import_hash=ParsedTransaction(
+                    date=line.transaction_date,
+                    amount=amount,
+                    currency="EUR",
+                    description=f"ICS-SPLIT-{transaction.id}-{idx}-{line.description}-{line.transaction_date}",
+                ).import_hash,
+            )
+            db.add(child)
+            db.flush()
+
+            if active_rules and apply_rules_to_transaction(active_rules, child, db):
+                auto_categorized += 1
+
+            created += 1
+
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        existing_children = (
+            db.query(Transaction)
+            .filter(Transaction.parent_id == transaction_id)
+            .all()
+        )
+        return templates.TemplateResponse(
+            "transactions/split.html",
+            {
+                "request": request,
+                "user": user,
+                "transaction": transaction,
+                "existing_children": existing_children,
+                "error": "Splitsen mislukt: een of meer transacties bestaan al. Maak eerst de vorige split ongedaan en probeer opnieuw.",
+            },
+            status_code=400,
+        )
+
+    return templates.TemplateResponse(
+        "transactions/split_result.html",
+        {
+            "request": request,
+            "user": user,
+            "transaction": transaction,
+            "created": created,
+            "auto_categorized": auto_categorized,
+        },
+    )
+
+
+@router.post("/transactions/{transaction_id}/unsplit")
+def unsplit_transaction(
+    transaction_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Remove all child transactions and restore the parent."""
+    user = require_login(request, db)
+    transaction = (
+        db.query(Transaction)
+        .join(Account)
+        .filter(Transaction.id == transaction_id, Account.user_id == user.id)
+        .first()
+    )
+    if not transaction:
+        return RedirectResponse("/", status_code=302)
+
+    db.query(Transaction).filter(Transaction.parent_id == transaction_id).delete()
+    db.commit()
+
+    return RedirectResponse("/", status_code=302)

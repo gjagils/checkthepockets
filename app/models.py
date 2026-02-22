@@ -8,11 +8,20 @@ from sqlalchemy import (
     DateTime,
     Text,
     ForeignKey,
+    Table,
     UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 
 from app.database import Base
+
+
+transaction_tags = Table(
+    "transaction_tags",
+    Base.metadata,
+    Column("transaction_id", Integer, ForeignKey("transactions.id", ondelete="CASCADE"), primary_key=True),
+    Column("tag_id", Integer, ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True),
+)
 
 
 class User(Base):
@@ -27,6 +36,10 @@ class User(Base):
     categories = relationship("Category", back_populates="user", cascade="all, delete-orphan")
     savings_plans = relationship("SavingsPlan", back_populates="user", cascade="all, delete-orphan")
     budgets = relationship("Budget", back_populates="user", cascade="all, delete-orphan")
+    tags = relationship("Tag", back_populates="user", cascade="all, delete-orphan")
+    rules = relationship("Rule", back_populates="user", cascade="all, delete-orphan")
+    budgets = relationship("Budget", back_populates="user", cascade="all, delete-orphan")
+    recurring_transactions = relationship("RecurringTransaction", back_populates="user", cascade="all, delete-orphan")
 
 
 class Account(Base):
@@ -79,6 +92,98 @@ class Category(Base):
     )
 
 
+    name = Column(String(100), nullable=False)
+    parent_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
+    color = Column(String(7), nullable=True)  # hex color like #FF5733
+    is_income = Column(Integer, server_default="0")  # 0=expenses, 1=income
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    user = relationship("User", back_populates="categories")
+    parent = relationship("Category", remote_side="Category.id", backref="children")
+    transactions = relationship("Transaction", back_populates="category_rel")
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "name", name="uq_user_category"),
+    )
+
+
+class Tag(Base):
+    __tablename__ = "tags"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name = Column(String(50), nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    user = relationship("User", back_populates="tags")
+    transactions = relationship("Transaction", secondary=transaction_tags, back_populates="tags")
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "name", name="uq_user_tag"),
+    )
+
+
+class Rule(Base):
+    __tablename__ = "rules"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name = Column(String(100), nullable=False)
+    is_active = Column(Integer, default=1)  # 1=active, 0=inactive
+
+    # IF conditions
+    match_field = Column(String(20), nullable=False)  # "counterparty", "description", "counterparty_iban"
+    match_type = Column(String(20), nullable=False)  # "contains", "exact", "starts_with"
+    match_value = Column(String(255), nullable=False)
+    amount_min = Column(Numeric(12, 2), nullable=True)
+    amount_max = Column(Numeric(12, 2), nullable=True)
+
+    # THEN actions
+    assign_category_id = Column(Integer, ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)
+    assign_tag_id = Column(Integer, ForeignKey("tags.id", ondelete="SET NULL"), nullable=True)
+
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    user = relationship("User", back_populates="rules")
+    assign_category = relationship("Category")
+    assign_tag = relationship("Tag")
+
+
+class Budget(Base):
+    __tablename__ = "budgets"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    category_id = Column(Integer, ForeignKey("categories.id", ondelete="CASCADE"), nullable=False)
+    amount = Column(Numeric(12, 2), nullable=False)  # monthly limit (positive number)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    user = relationship("User", back_populates="budgets")
+    category = relationship("Category")
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "category_id", name="uq_user_category_budget"),
+    )
+
+
+class RecurringTransaction(Base):
+    __tablename__ = "recurring_transactions"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name = Column(String(150), nullable=False)
+    amount_expected = Column(Numeric(12, 2), nullable=False)
+    frequency = Column(String(20), nullable=False)  # "monthly", "weekly", "yearly", "quarterly"
+    category_id = Column(Integer, ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)
+    counterparty = Column(String(255), nullable=True)
+    description_match = Column(String(255), nullable=True)  # for auto-detection
+    is_active = Column(Integer, default=1)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    user = relationship("User", back_populates="recurring_transactions")
+    category = relationship("Category")
+
+
 class Transaction(Base):
     __tablename__ = "transactions"
 
@@ -93,6 +198,7 @@ class Transaction(Base):
     balance_after = Column(Numeric(12, 2), nullable=True)
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
     parent_id = Column(Integer, nullable=True)
+    parent_id = Column(Integer, ForeignKey("transactions.id", ondelete="CASCADE"), nullable=True)
     import_hash = Column(String(64), unique=True, nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
@@ -175,3 +281,6 @@ class Budget(Base):
     __table_args__ = (
         UniqueConstraint("user_id", "category_id", "year", "month", name="uq_budget_user_cat_year_month"),
     )
+    category_rel = relationship("Category", back_populates="transactions")
+    tags = relationship("Tag", secondary=transaction_tags, back_populates="transactions")
+    parent = relationship("Transaction", remote_side="Transaction.id", backref="children")

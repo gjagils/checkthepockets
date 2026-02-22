@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+{% block title %}Terugkerend - Check The Pockets{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Terugkerende transacties</h1>
+</div>
+
+<!-- Summary -->
+{% if items %}
+<div class="recurring-summary">
+    <div class="summary-card">
+        <div class="value">{{ total_active }}</div>
+        <div class="label">Actief</div>
+    </div>
+    <div class="summary-card">
+        <div class="value amount-positive">{{ total_confirmed }}</div>
+        <div class="label">Ontvangen deze periode</div>
+    </div>
+    <div class="summary-card">
+        {% if total_due > 0 %}
+        <div class="value" style="color:var(--ctp-coin-dark);">{{ total_due }}</div>
+        {% else %}
+        <div class="value amount-positive">0</div>
+        {% endif %}
+        <div class="label">Nog verwacht</div>
+    </div>
+</div>
+{% endif %}
+
+<div class="recurring-layout">
+    <!-- List -->
+    <div>
+        {% if items %}
+        <div class="recurring-list">
+            {% for entry in items %}
+            {% set item = entry.item %}
+            <div class="card recurring-card {% if not item.is_active %}recurring-inactive{% endif %}">
+                <div class="recurring-header">
+                    <div>
+                        <strong>{{ item.name }}</strong>
+                        {% if not item.is_active %}
+                        <span class="pill" style="background:var(--ctp-danger-bg); color:var(--ctp-danger);">Inactief</span>
+                        {% endif %}
+                    </div>
+                    <div class="recurring-amount {% if item.amount_expected < 0 %}amount-negative{% else %}amount-positive{% endif %}">
+                        {{ "%.2f"|format(item.amount_expected) }}
+                    </div>
+                </div>
+
+                <div class="recurring-meta">
+                    <span class="pill">{{ frequencies.get(item.frequency, item.frequency) }}</span>
+                    {% if item.category %}
+                    <span class="category-pill" style="--cat-color: {{ item.category.color or '#1F6FB2' }}">
+                        {{ item.category.name }}
+                    </span>
+                    {% endif %}
+                    {% if item.counterparty %}
+                    <span class="muted">Tegenpartij: {{ item.counterparty }}</span>
+                    {% endif %}
+                </div>
+
+                <div class="recurring-status">
+                    <span class="muted">Periode: {{ entry.period_start.strftime('%d-%m') }} t/m {{ entry.period_end.strftime('%d-%m-%Y') }}</span>
+                    {% if entry.matched_transaction %}
+                    <span class="recurring-badge recurring-badge-ok">
+                        Gevonden: {{ entry.matched_transaction.date.strftime('%d-%m') }}
+                        ({{ "%.2f"|format(entry.matched_transaction.amount) }})
+                    </span>
+                    {% elif entry.is_due %}
+                    <span class="recurring-badge recurring-badge-due">Nog niet gevonden</span>
+                    {% endif %}
+                </div>
+
+                <div class="recurring-actions">
+                    <button class="btn btn-sm" onclick="toggleRecurringEdit({{ item.id }})">Bewerken</button>
+                    <form method="post" action="/recurring/{{ item.id }}/toggle" style="display:inline;">
+                        <button type="submit" class="btn btn-sm">
+                            {{ "Deactiveren" if item.is_active else "Activeren" }}
+                        </button>
+                    </form>
+                    <form method="post" action="/recurring/{{ item.id }}/delete" style="display:inline;"
+                          onsubmit="return confirm('Verwijderen?')">
+                        <button type="submit" class="btn btn-sm btn-danger">Verwijderen</button>
+                    </form>
+                </div>
+
+                <!-- Edit form (hidden) -->
+                <div class="recurring-edit" id="recurring-edit-{{ item.id }}" style="display:none;">
+                    <form method="post" action="/recurring/{{ item.id }}/edit">
+                        <div class="rule-condition">
+                            <div class="form-group">
+                                <label>Naam</label>
+                                <input type="text" name="name" value="{{ item.name }}" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Verwacht bedrag</label>
+                                <input type="number" step="0.01" name="amount_expected"
+                                       value="{{ '%.2f'|format(item.amount_expected) }}" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Frequentie</label>
+                                <select name="frequency">
+                                    {% for key, label in frequencies.items() %}
+                                    <option value="{{ key }}" {% if item.frequency == key %}selected{% endif %}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="rule-condition">
+                            <div class="form-group">
+                                <label>Categorie</label>
+                                <select name="category_id">
+                                    <option value="">Geen</option>
+                                    {% for cat in categories %}
+                                    {% if not cat.parent_id %}
+                                    <optgroup label="{{ cat.name }}">
+                                        <option value="{{ cat.id }}" {% if item.category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+                                        {% for child in cat.children|sort(attribute='name') %}
+                                        <option value="{{ child.id }}" {% if item.category_id == child.id %}selected{% endif %}>{{ child.name }}</option>
+                                        {% endfor %}
+                                    </optgroup>
+                                    {% endif %}
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Tegenpartij (zoekterm)</label>
+                                <input type="text" name="counterparty" value="{{ item.counterparty or '' }}">
+                            </div>
+                            <div class="form-group">
+                                <label>Omschrijving (zoekterm)</label>
+                                <input type="text" name="description_match" value="{{ item.description_match or '' }}">
+                            </div>
+                        </div>
+                        <div style="margin-top:0.5rem; display:flex; gap:0.5rem;">
+                            <button type="submit" class="btn btn-sm btn-primary">Opslaan</button>
+                            <button type="button" class="btn btn-sm" onclick="toggleRecurringEdit({{ item.id }})">Annuleren</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="card">
+            <p class="muted" style="text-align:center; padding:1rem;">Nog geen terugkerende transacties. Voeg rechts je eerste toe.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Add form -->
+    <div>
+        <div class="card">
+            <h2>Toevoegen</h2>
+            <form method="post" action="/recurring">
+                <div class="form-group">
+                    <label for="name">Naam</label>
+                    <input type="text" id="name" name="name" required placeholder="bijv. Huur, Spotify, Salaris">
+                </div>
+                <div class="form-group">
+                    <label for="amount_expected">Verwacht bedrag</label>
+                    <input type="number" step="0.01" id="amount_expected" name="amount_expected" required
+                           placeholder="-750.00 (negatief = uitgave)">
+                </div>
+                <div class="form-group">
+                    <label for="frequency">Frequentie</label>
+                    <select name="frequency" id="frequency">
+                        {% for key, label in frequencies.items() %}
+                        <option value="{{ key }}" {% if key == 'monthly' %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="category_id">Categorie</label>
+                    <select name="category_id" id="category_id">
+                        <option value="">Geen</option>
+                        {% for cat in categories %}
+                        {% if not cat.parent_id %}
+                        <optgroup label="{{ cat.name }}">
+                            <option value="{{ cat.id }}">{{ cat.name }}</option>
+                            {% for child in cat.children|sort(attribute='name') %}
+                            <option value="{{ child.id }}">{{ child.name }}</option>
+                            {% endfor %}
+                        </optgroup>
+                        {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="counterparty">Tegenpartij (zoekterm)</label>
+                    <input type="text" id="counterparty" name="counterparty"
+                           placeholder="bijv. Spotify">
+                </div>
+                <div class="form-group">
+                    <label for="description_match">Omschrijving (zoekterm)</label>
+                    <input type="text" id="description_match" name="description_match"
+                           placeholder="bijv. maandhuur">
+                </div>
+                <button type="submit" class="btn btn-primary">Toevoegen</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleRecurringEdit(id) {
+    const el = document.getElementById('recurring-edit-' + id);
+    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+</script>
+{% endblock %}

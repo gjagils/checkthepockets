@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Specificatie voltooid - Check The Pockets{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Specificatie voltooid</h1>
+</div>
+
+<div class="import-summary">
+    <div class="summary-card">
+        <div class="value amount-positive">{{ created }}</div>
+        <div class="label">Boekingen aangemaakt</div>
+    </div>
+    {% if auto_categorized %}
+    <div class="summary-card">
+        <div class="value" style="color:var(--ctp-denim);">{{ auto_categorized }}</div>
+        <div class="label">Auto-gecategoriseerd</div>
+    </div>
+    {% endif %}
+</div>
+
+<div class="card">
+    <p>De transactie van <strong>{{ "%.2f"|format(transaction.amount) }} {{ transaction.currency }}</strong>
+       op {{ transaction.date.strftime('%d-%m-%Y') }} is opgesplitst in {{ created }} losse boekingen.</p>
+    <p class="muted" style="margin-top:0.5rem;">De originele transactie is verborgen in het overzicht en vervangen door de individuele boekingen.</p>
+</div>
+
+<div style="display:flex; gap:0.75rem; margin-top:1rem;">
+    <a href="/" class="btn btn-primary">Bekijk transacties</a>
+    <a href="/transactions/{{ transaction.id }}/split" class="btn">Bekijk specificatie</a>
+</div>
+{% endblock %}
