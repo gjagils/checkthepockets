@@ -93,31 +93,16 @@ def budget_overview(
     )
     spending = _get_spending_by_category(db, user.id, y, m)
 
-    # Also include child category spending under parent budget
-    categories_by_id = {}
+    # Load all categories
     all_cats = db.query(Category).filter(Category.user_id == user.id).all()
-    for cat in all_cats:
-        categories_by_id[cat.id] = cat
+    categories_by_id = {cat.id: cat for cat in all_cats}
+    budgets_by_cat = {b.category_id: b for b in budgets}
 
-    # Build budget lines
-    budget_lines = []
-    total_budgeted = Decimal("0")
-    total_spent = Decimal("0")
-
-    for b in budgets:
-        cat = categories_by_id.get(b.category_id)
-        if not cat:
-            continue
-
-        # Sum spending for this category + children
-        cat_ids = [cat.id] + [c.id for c in cat.children]
-        spent = sum(spending.get(cid, Decimal("0")) for cid in cat_ids)
+    # Build budget line helper
+    def _make_line(b, cat):
+        spent = spending.get(cat.id, Decimal("0"))
         pct = float(spent / b.amount * 100) if b.amount else 0
-
-        total_budgeted += b.amount
-        total_spent += spent
-
-        budget_lines.append({
+        return {
             "budget": b,
             "category": cat,
             "spent": spent,
@@ -125,25 +110,83 @@ def budget_overview(
             "pct": min(pct, 100),
             "over": spent > b.amount,
             "over_amount": spent - b.amount if spent > b.amount else Decimal("0"),
+        }
+
+    # Group budgets by parent category
+    budget_groups = []
+    total_budgeted = Decimal("0")
+    total_spent = Decimal("0")
+
+    # Find parent categories that have children with budgets
+    parent_cats = sorted(
+        [c for c in all_cats if not c.parent_id and c.children],
+        key=lambda c: c.name,
+    )
+
+    grouped_cat_ids = set()
+
+    for parent in parent_cats:
+        children = sorted(parent.children, key=lambda c: c.name)
+        lines = []
+        for child in children:
+            b = budgets_by_cat.get(child.id)
+            if b:
+                line = _make_line(b, child)
+                lines.append(line)
+                grouped_cat_ids.add(child.id)
+
+        if not lines:
+            continue
+
+        group_budgeted = sum(l["budget"].amount for l in lines)
+        group_spent = sum(l["spent"] for l in lines)
+        group_pct = float(group_spent / group_budgeted * 100) if group_budgeted else 0
+
+        total_budgeted += group_budgeted
+        total_spent += group_spent
+
+        budget_groups.append({
+            "parent": parent,
+            "lines": lines,
+            "total_budgeted": group_budgeted,
+            "total_spent": group_spent,
+            "total_remaining": group_budgeted - group_spent,
+            "pct": min(group_pct, 100),
+            "over": group_spent > group_budgeted,
         })
 
-    budget_lines.sort(key=lambda x: x["category"].name)
+    # Standalone budgets (categories without parent, or parents without children)
+    standalone_lines = []
+    for b in budgets:
+        cat = categories_by_id.get(b.category_id)
+        if not cat or cat.id in grouped_cat_ids:
+            continue
+        # Skip parent categories (their children have the budgets)
+        if cat.children:
+            continue
+        line = _make_line(b, cat)
+        standalone_lines.append(line)
+        total_budgeted += b.amount
+        total_spent += line["spent"]
 
-    # Categories without a budget (for the add form)
+    standalone_lines.sort(key=lambda x: x["category"].name)
+
+    # Categories available for new budgets: only leaf categories without a budget
     budgeted_cat_ids = {b.category_id for b in budgets}
-    available_categories = [
-        c for c in all_cats
-        if c.id not in budgeted_cat_ids
-    ]
-    available_categories.sort(key=lambda c: c.name)
+    available_categories = sorted(
+        [c for c in all_cats if c.id not in budgeted_cat_ids and not c.children],
+        key=lambda c: (c.parent.name if c.parent else "", c.name),
+    )
 
     return templates.TemplateResponse(
         "budgets/overview.html",
         {
             "request": request,
             "user": user,
-            "budget_lines": budget_lines,
+            "budget_groups": budget_groups,
+            "standalone_lines": standalone_lines,
             "available_categories": available_categories,
+            "all_parent_cats": parent_cats,
             "year": y,
             "month": m,
             "month_name": MONTH_NAMES_NL[m],
