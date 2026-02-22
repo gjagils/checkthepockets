@@ -51,18 +51,23 @@ def transaction_list(
     accounts = db.query(Account).filter(Account.user_id == user.id).all()
     total_pages = max(1, (total + PER_PAGE - 1) // PER_PAGE)
 
-    # Get categories grouped by parent for the dropdown
+    # Get categories grouped by account_id -> parent -> children
     all_cats = (
         db.query(Category)
         .filter(Category.user_id == user.id)
         .order_by(Category.name)
         .all()
     )
-    parents = [c for c in all_cats if c.parent_id is None]
-    children_map = {}
+    # {account_id: {"parents": [...], "children": {parent_id: [...]}}}
+    cats_by_account = {}
     for c in all_cats:
-        if c.parent_id is not None:
-            children_map.setdefault(c.parent_id, []).append(c)
+        aid = c.account_id
+        if aid not in cats_by_account:
+            cats_by_account[aid] = {"parents": [], "children": {}}
+        if c.parent_id is None:
+            cats_by_account[aid]["parents"].append(c)
+        else:
+            cats_by_account[aid]["children"].setdefault(c.parent_id, []).append(c)
 
     return templates.TemplateResponse(
         "transactions/list.html",
@@ -75,8 +80,7 @@ def transaction_list(
             "page": page,
             "total_pages": total_pages,
             "total": total,
-            "parents": parents,
-            "children_map": children_map,
+            "cats_by_account": cats_by_account,
         },
     )
 

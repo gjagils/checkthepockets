@@ -43,13 +43,14 @@
                     <td class="desc-cell">{{ tx.description or '-' }}</td>
                     <td>{{ tx.counterparty or '-' }}</td>
                     <td class="nowrap">
+                        {% set acct_cats = cats_by_account.get(tx.account_id, {"parents": [], "children": {}}) %}
                         <form method="post" action="/transactions/{{ tx.id }}/category" class="inline-cat-form">
                             <input type="hidden" name="redirect_to" value="/?page={{ page }}{% if current_account_id %}&account_id={{ current_account_id }}{% endif %}">
                             <select name="category_id" class="select-sm" onchange="this.form.submit()">
                                 <option value="0">-</option>
-                                {% for parent in parents %}
+                                {% for parent in acct_cats["parents"] %}
                                 <optgroup label="{{ parent.name }}">
-                                    {% for sub in children_map.get(parent.id, []) %}
+                                    {% for sub in acct_cats["children"].get(parent.id, []) %}
                                     <option value="{{ sub.id }}" {% if tx.category_id == sub.id %}selected{% endif %}>{{ sub.name }}</option>
                                     {% endfor %}
                                 </optgroup>
