@@ -37,6 +37,7 @@ class User(Base):
     tags = relationship("Tag", back_populates="user", cascade="all, delete-orphan")
     rules = relationship("Rule", back_populates="user", cascade="all, delete-orphan")
     budgets = relationship("Budget", back_populates="user", cascade="all, delete-orphan")
+    recurring_transactions = relationship("RecurringTransaction", back_populates="user", cascade="all, delete-orphan")
 
 
 class Account(Base):
@@ -135,6 +136,24 @@ class Budget(Base):
     __table_args__ = (
         UniqueConstraint("user_id", "category_id", name="uq_user_category_budget"),
     )
+
+
+class RecurringTransaction(Base):
+    __tablename__ = "recurring_transactions"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name = Column(String(150), nullable=False)
+    amount_expected = Column(Numeric(12, 2), nullable=False)
+    frequency = Column(String(20), nullable=False)  # "monthly", "weekly", "yearly", "quarterly"
+    category_id = Column(Integer, ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)
+    counterparty = Column(String(255), nullable=True)
+    description_match = Column(String(255), nullable=True)  # for auto-detection
+    is_active = Column(Integer, default=1)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    user = relationship("User", back_populates="recurring_transactions")
+    category = relationship("Category")
 
 
 class Transaction(Base):

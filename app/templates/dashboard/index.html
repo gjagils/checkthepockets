@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Dashboard {{ month_name }} {{ year }} - Check The Pockets{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Dashboard</h1>
+    <div class="month-nav">
+        <a href="/dashboard?year={{ prev_year }}&month={{ prev_month }}" class="btn btn-sm">&laquo;</a>
+        <span class="month-label">{{ month_name }} {{ year }}</span>
+        <a href="/dashboard?year={{ next_year }}&month={{ next_month }}" class="btn btn-sm">&raquo;</a>
+        {% if not is_current_month %}
+        <a href="/dashboard" class="btn btn-sm">Vandaag</a>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Summary cards -->
+<div class="dash-summary">
+    <div class="summary-card">
+        <div class="value amount-positive">{{ "%.2f"|format(income) }}</div>
+        <div class="label">Inkomsten</div>
+    </div>
+    <div class="summary-card">
+        <div class="value amount-negative">{{ "%.2f"|format(expenses) }}</div>
+        <div class="label">Uitgaven</div>
+    </div>
+    <div class="summary-card">
+        <div class="value {% if net >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
+            {{ "%.2f"|format(net) }}
+        </div>
+        <div class="label">Netto</div>
+    </div>
+    <div class="summary-card">
+        <div class="value">{{ tx_count }}</div>
+        <div class="label">Transacties</div>
+    </div>
+</div>
+
+<div class="dash-grid">
+    <!-- Spending by category -->
+    <div class="card">
+        <h2>Uitgaven per categorie</h2>
+        {% if cat_spending %}
+        <div class="cat-bars">
+            {% for cs in cat_spending %}
+            <div class="cat-bar-row">
+                <div class="cat-bar-label">
+                    <span class="category-pill" style="--cat-color: {{ cs.color }}">{{ cs.name }}</span>
+                </div>
+                <div class="cat-bar-track">
+                    <div class="cat-bar-fill" style="width:{{ cs.pct }}%; background:{{ cs.color }};"></div>
+                </div>
+                <div class="cat-bar-amount">{{ "%.2f"|format(cs.amount) }}</div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="muted" style="text-align:center; padding:1rem;">Geen uitgaven deze maand.</p>
+        {% endif %}
+    </div>
+
+    <!-- Trend chart -->
+    <div class="card">
+        <h2>Trend (6 maanden)</h2>
+        <div class="trend-chart">
+            {% for t in trend_months %}
+            <div class="trend-column">
+                <div class="trend-bars">
+                    <div class="trend-bar trend-bar-income" style="height:{{ t.income_pct }}%;"
+                         title="Inkomsten: {{ '%.2f'|format(t.income) }}"></div>
+                    <div class="trend-bar trend-bar-expense" style="height:{{ t.expenses_pct }}%;"
+                         title="Uitgaven: {{ '%.2f'|format(t.expenses) }}"></div>
+                </div>
+                <div class="trend-label">{{ t.label }}</div>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="trend-legend">
+            <span><span class="legend-dot" style="background:var(--ctp-check);"></span> Inkomsten</span>
+            <span><span class="legend-dot" style="background:var(--ctp-danger);"></span> Uitgaven</span>
+        </div>
+    </div>
+</div>
+
+<!-- Quick links -->
+<div class="dash-links">
+    {% if budget_total > 0 %}
+    <a href="/budgets?year={{ year }}&month={{ month }}" class="card dash-link-card">
+        <h3>Budget</h3>
+        <div class="progress-bar" style="margin-bottom:0.25rem;">
+            <div class="progress-fill {% if budget_used_pct > 80 %}progress-warn{% endif %} {% if budget_used_pct >= 100 %}progress-over{% endif %}"
+                 style="width:{{ budget_used_pct }}%;"></div>
+        </div>
+        <span class="muted">{{ "%.0f"|format(budget_used_pct) }}% van budget gebruikt</span>
+    </a>
+    {% endif %}
+    {% if recurring_count > 0 %}
+    <a href="/recurring" class="card dash-link-card">
+        <h3>Terugkerend</h3>
+        <span class="muted">{{ recurring_count }} actieve items</span>
+    </a>
+    {% endif %}
+    <a href="/?date_from={{ year }}-{{ '%02d'|format(month) }}-01&date_to={{ year }}-{{ '%02d'|format(month) }}-{{ 28 }}" class="card dash-link-card">
+        <h3>Transacties</h3>
+        <span class="muted">{{ tx_count }} deze maand</span>
+    </a>
+</div>
+{% endblock %}
