@@ -7,10 +7,11 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_
 
 from app.database import get_db
-from app.models import Account, Transaction, Category, Tag
+from app.models import Account, Transaction, Category, Tag, Rule
 from app.auth import require_login
 from app.parsers import abn_amro, bunq, ics
 from app.parsers.base import ParseError
+from app.rules_engine import apply_rules_to_transaction
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -400,9 +401,17 @@ async def import_csv(
         db.add(account)
         db.flush()
 
+    # Load active rules for auto-categorization
+    active_rules = (
+        db.query(Rule)
+        .filter(Rule.user_id == user.id, Rule.is_active == 1)
+        .all()
+    )
+
     # Import transactions, skip duplicates
     imported = 0
     skipped = 0
+    auto_categorized = 0
     for tx in parsed:
         exists = (
             db.query(Transaction)
@@ -425,6 +434,12 @@ async def import_csv(
             import_hash=tx.import_hash,
         )
         db.add(db_tx)
+        db.flush()
+
+        # Apply rules to new transaction
+        if active_rules and apply_rules_to_transaction(active_rules, db_tx, db):
+            auto_categorized += 1
+
         imported += 1
 
     db.commit()
@@ -436,6 +451,7 @@ async def import_csv(
             "user": user,
             "imported": imported,
             "skipped": skipped,
+            "auto_categorized": auto_categorized,
             "total": len(parsed),
             "account": account,
         },

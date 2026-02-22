@@ -18,6 +18,12 @@
         <div class="value">{{ skipped }}</div>
         <div class="label">Duplicaten overgeslagen</div>
     </div>
+    {% if auto_categorized %}
+    <div class="summary-card">
+        <div class="value" style="color:var(--ctp-denim);">{{ auto_categorized }}</div>
+        <div class="label">Auto-gecategoriseerd</div>
+    </div>
+    {% endif %}
 </div>
 
 <div class="card">

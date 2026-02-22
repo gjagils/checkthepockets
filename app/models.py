@@ -35,6 +35,7 @@ class User(Base):
     accounts = relationship("Account", back_populates="user", cascade="all, delete-orphan")
     categories = relationship("Category", back_populates="user", cascade="all, delete-orphan")
     tags = relationship("Tag", back_populates="user", cascade="all, delete-orphan")
+    rules = relationship("Rule", back_populates="user", cascade="all, delete-orphan")
 
 
 class Account(Base):
@@ -90,6 +91,32 @@ class Tag(Base):
     __table_args__ = (
         UniqueConstraint("user_id", "name", name="uq_user_tag"),
     )
+
+
+class Rule(Base):
+    __tablename__ = "rules"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name = Column(String(100), nullable=False)
+    is_active = Column(Integer, default=1)  # 1=active, 0=inactive
+
+    # IF conditions
+    match_field = Column(String(20), nullable=False)  # "counterparty", "description", "counterparty_iban"
+    match_type = Column(String(20), nullable=False)  # "contains", "exact", "starts_with"
+    match_value = Column(String(255), nullable=False)
+    amount_min = Column(Numeric(12, 2), nullable=True)
+    amount_max = Column(Numeric(12, 2), nullable=True)
+
+    # THEN actions
+    assign_category_id = Column(Integer, ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)
+    assign_tag_id = Column(Integer, ForeignKey("tags.id", ondelete="SET NULL"), nullable=True)
+
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    user = relationship("User", back_populates="rules")
+    assign_category = relationship("Category")
+    assign_tag = relationship("Tag")
 
 
 class Transaction(Base):

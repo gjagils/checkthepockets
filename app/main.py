@@ -3,7 +3,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.auth import LoginRequired
-from app.routers import auth, transactions, accounts, categories
+from app.routers import auth, transactions, accounts, categories, rules
 
 app = FastAPI(title="Check The Pockets", docs_url=None, redoc_url=None)
 
@@ -13,6 +13,7 @@ app.include_router(auth.router)
 app.include_router(transactions.router)
 app.include_router(accounts.router)
 app.include_router(categories.router)
+app.include_router(rules.router)
 
 
 @app.exception_handler(LoginRequired)

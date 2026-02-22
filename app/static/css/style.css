@@ -661,6 +661,117 @@ tr:hover { background: rgba(31, 111, 178, 0.03); }
     letter-spacing: 0;
 }
 
+/* ===== Rules Page ===== */
+.rules-layout {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    gap: 1.5rem;
+    align-items: flex-start;
+}
+
+.rule-fieldset {
+    border: 2px solid var(--ctp-border);
+    border-radius: var(--ctp-radius-sm);
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+.rule-fieldset legend {
+    font-weight: 700;
+    font-size: 0.85rem;
+    color: var(--ctp-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0 0.5rem;
+}
+
+.rule-condition {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+.rule-condition .form-group {
+    flex: 1;
+    min-width: 120px;
+}
+
+.rules-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.rule-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.65rem 0;
+    border-bottom: 1px solid var(--ctp-border);
+    gap: 1rem;
+}
+.rule-item:last-child {
+    border-bottom: none;
+}
+
+.rule-inactive {
+    opacity: 0.5;
+}
+
+.rule-summary {
+    flex: 1;
+    min-width: 0;
+}
+.rule-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.2rem;
+}
+.rule-description {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.85rem;
+}
+
+.rule-actions {
+    display: flex;
+    gap: 0.25rem;
+    flex-shrink: 0;
+}
+
+.rule-edit {
+    padding: 0.75rem;
+    background: var(--ctp-bg);
+    border-radius: var(--ctp-radius-sm);
+    margin-bottom: 0.5rem;
+    border-bottom: 1px solid var(--ctp-border);
+}
+
+/* ===== Suggestions ===== */
+.suggestions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+.suggestion-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--ctp-border);
+}
+.suggestion-item:last-child {
+    border-bottom: none;
+}
+.suggestion-info {
+    flex: 1;
+    font-size: 0.85rem;
+}
+.suggestion-action {
+    flex-shrink: 0;
+}
+
 /* ===== Responsive ===== */
 @media (max-width: 640px) {
     .navbar {
@@ -692,6 +803,13 @@ tr:hover { background: rgba(31, 111, 178, 0.03); }
     }
     .categories-layout {
         grid-template-columns: 1fr;
+    }
+    .rules-layout {
+        grid-template-columns: 1fr;
+    }
+    .rule-item {
+        flex-direction: column;
+        align-items: flex-start;
     }
     .desc-cell { max-width: 180px; }
 }

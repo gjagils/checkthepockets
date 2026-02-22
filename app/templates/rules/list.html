@@ -1,0 +1,279 @@
+{% extends "base.html" %}
+{% block title %}Regels - Check The Pockets{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Regels</h1>
+</div>
+
+{% if request.query_params.get('applied') %}
+<div class="alert alert-success">
+    {{ request.query_params.get('applied') }} transactie(s) bijgewerkt door regels toe te passen.
+</div>
+{% endif %}
+
+<!-- Suggestions -->
+{% if suggestions %}
+<div class="card">
+    <h2>Voorgestelde regels</h2>
+    <p class="muted" style="margin-bottom:0.75rem;">Op basis van je categoriseergedrag:</p>
+    <div class="suggestions-list">
+        {% for s in suggestions %}
+        <form method="post" action="/rules" class="suggestion-item">
+            <div class="suggestion-info">
+                <span>Als <strong>tegenpartij</strong> <em>"{{ s.counterparty }}"</em> bevat</span>
+                <span class="muted">({{ s.count }}x gecategoriseerd)</span>
+            </div>
+            <div class="suggestion-action">
+                <span class="category-pill" style="--cat-color: {{ s.category_color or '#1F6FB2' }}">
+                    {{ s.category_name }}
+                </span>
+            </div>
+            <input type="hidden" name="name" value="{{ s.counterparty }} → {{ s.category_name }}">
+            <input type="hidden" name="match_field" value="counterparty">
+            <input type="hidden" name="match_type" value="contains">
+            <input type="hidden" name="match_value" value="{{ s.counterparty }}">
+            <input type="hidden" name="assign_category_id" value="{{ s.category_id }}">
+            <button type="submit" class="btn btn-sm btn-primary">Toevoegen</button>
+        </form>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<div class="rules-layout">
+    <!-- Create form -->
+    <div class="card">
+        <h2>Nieuwe regel</h2>
+        <form method="post" action="/rules">
+            <div class="form-group">
+                <label for="name">Naam</label>
+                <input type="text" id="name" name="name" required placeholder="bijv. Albert Heijn → Boodschappen">
+            </div>
+
+            <fieldset class="rule-fieldset">
+                <legend>Als (IF)</legend>
+                <div class="rule-condition">
+                    <div class="form-group">
+                        <label for="match_field">Veld</label>
+                        <select name="match_field" id="match_field">
+                            {% for key, label in match_fields.items() %}
+                            <option value="{{ key }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="match_type">Conditie</label>
+                        <select name="match_type" id="match_type">
+                            {% for key, label in match_types.items() %}
+                            <option value="{{ key }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group" style="flex:2;">
+                        <label for="match_value">Waarde</label>
+                        <input type="text" id="match_value" name="match_value" required placeholder="bijv. Albert Heijn">
+                    </div>
+                </div>
+                <div class="rule-condition">
+                    <div class="form-group">
+                        <label for="amount_min">Bedrag min (optioneel)</label>
+                        <input type="number" step="0.01" id="amount_min" name="amount_min" placeholder="-100.00">
+                    </div>
+                    <div class="form-group">
+                        <label for="amount_max">Bedrag max (optioneel)</label>
+                        <input type="number" step="0.01" id="amount_max" name="amount_max" placeholder="0.00">
+                    </div>
+                </div>
+            </fieldset>
+
+            <fieldset class="rule-fieldset">
+                <legend>Dan (THEN)</legend>
+                <div class="rule-condition">
+                    <div class="form-group">
+                        <label for="assign_category_id">Categorie toewijzen</label>
+                        <select name="assign_category_id" id="assign_category_id">
+                            <option value="">Geen</option>
+                            {% for cat in categories %}
+                            {% if not cat.parent_id %}
+                            <optgroup label="{{ cat.name }}">
+                                <option value="{{ cat.id }}">{{ cat.name }}</option>
+                                {% for child in cat.children|sort(attribute='name') %}
+                                <option value="{{ child.id }}">{{ child.name }}</option>
+                                {% endfor %}
+                            </optgroup>
+                            {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="assign_tag_id">Tag toewijzen</label>
+                        <select name="assign_tag_id" id="assign_tag_id">
+                            <option value="">Geen</option>
+                            {% for tag in tags %}
+                            <option value="{{ tag.id }}">{{ tag.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </fieldset>
+
+            <button type="submit" class="btn btn-primary">Regel toevoegen</button>
+        </form>
+    </div>
+
+    <!-- Rules list + Apply -->
+    <div>
+        <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+                <h2 style="margin-bottom:0;">Actieve regels ({{ rules|length }})</h2>
+                {% if rules %}
+                <div style="display:flex; gap:0.5rem;">
+                    <form method="post" action="/rules/apply">
+                        <input type="hidden" name="only_uncategorized" value="1">
+                        <button type="submit" class="btn btn-sm btn-accent">Toepassen (zonder categorie)</button>
+                    </form>
+                    <form method="post" action="/rules/apply"
+                          onsubmit="return confirm('Alle regels toepassen op alle transacties? Dit overschrijft bestaande categorieën.')">
+                        <button type="submit" class="btn btn-sm btn-primary">Toepassen (alles)</button>
+                    </form>
+                </div>
+                {% endif %}
+            </div>
+
+            {% if rules %}
+            <div class="rules-list">
+                {% for rule in rules %}
+                <div class="rule-item {% if not rule.is_active %}rule-inactive{% endif %}">
+                    <div class="rule-summary">
+                        <div class="rule-header">
+                            <strong>{{ rule.name }}</strong>
+                            {% if not rule.is_active %}
+                            <span class="pill" style="background:var(--ctp-danger-bg); color:var(--ctp-danger);">Inactief</span>
+                            {% endif %}
+                        </div>
+                        <div class="rule-description">
+                            <span class="muted">Als</span>
+                            <span class="pill">{{ match_fields.get(rule.match_field, rule.match_field) }}</span>
+                            <span class="muted">{{ match_types.get(rule.match_type, rule.match_type) }}</span>
+                            <strong>"{{ rule.match_value }}"</strong>
+                            {% if rule.amount_min is not none or rule.amount_max is not none %}
+                            <span class="muted">
+                                {% if rule.amount_min is not none %}van {{ "%.2f"|format(rule.amount_min) }}{% endif %}
+                                {% if rule.amount_max is not none %}t/m {{ "%.2f"|format(rule.amount_max) }}{% endif %}
+                            </span>
+                            {% endif %}
+                            <span class="muted">→</span>
+                            {% if rule.assign_category %}
+                            <span class="category-pill" style="--cat-color: {{ rule.assign_category.color or '#1F6FB2' }}">
+                                {{ rule.assign_category.name }}
+                            </span>
+                            {% endif %}
+                            {% if rule.assign_tag %}
+                            <span class="tag-pill">{{ rule.assign_tag.name }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="rule-actions">
+                        <button class="btn btn-sm" onclick="toggleEdit({{ rule.id }})">Bewerken</button>
+                        <form method="post" action="/rules/{{ rule.id }}/toggle" style="display:inline;">
+                            <button type="submit" class="btn btn-sm">
+                                {{ "Deactiveren" if rule.is_active else "Activeren" }}
+                            </button>
+                        </form>
+                        <form method="post" action="/rules/{{ rule.id }}/delete" style="display:inline;"
+                              onsubmit="return confirm('Regel verwijderen?')">
+                            <button type="submit" class="btn btn-sm btn-danger">Verwijderen</button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Edit form (hidden) -->
+                <div class="rule-edit" id="edit-{{ rule.id }}" style="display:none;">
+                    <form method="post" action="/rules/{{ rule.id }}/edit">
+                        <div class="rule-condition">
+                            <div class="form-group">
+                                <label>Naam</label>
+                                <input type="text" name="name" value="{{ rule.name }}" required>
+                            </div>
+                        </div>
+                        <div class="rule-condition">
+                            <div class="form-group">
+                                <label>Veld</label>
+                                <select name="match_field">
+                                    {% for key, label in match_fields.items() %}
+                                    <option value="{{ key }}" {% if rule.match_field == key %}selected{% endif %}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Conditie</label>
+                                <select name="match_type">
+                                    {% for key, label in match_types.items() %}
+                                    <option value="{{ key }}" {% if rule.match_type == key %}selected{% endif %}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group" style="flex:2;">
+                                <label>Waarde</label>
+                                <input type="text" name="match_value" value="{{ rule.match_value }}" required>
+                            </div>
+                        </div>
+                        <div class="rule-condition">
+                            <div class="form-group">
+                                <label>Bedrag min</label>
+                                <input type="number" step="0.01" name="amount_min" value="{{ '%.2f'|format(rule.amount_min) if rule.amount_min is not none else '' }}">
+                            </div>
+                            <div class="form-group">
+                                <label>Bedrag max</label>
+                                <input type="number" step="0.01" name="amount_max" value="{{ '%.2f'|format(rule.amount_max) if rule.amount_max is not none else '' }}">
+                            </div>
+                            <div class="form-group">
+                                <label>Categorie</label>
+                                <select name="assign_category_id">
+                                    <option value="">Geen</option>
+                                    {% for cat in categories %}
+                                    {% if not cat.parent_id %}
+                                    <optgroup label="{{ cat.name }}">
+                                        <option value="{{ cat.id }}" {% if rule.assign_category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+                                        {% for child in cat.children|sort(attribute='name') %}
+                                        <option value="{{ child.id }}" {% if rule.assign_category_id == child.id %}selected{% endif %}>{{ child.name }}</option>
+                                        {% endfor %}
+                                    </optgroup>
+                                    {% endif %}
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Tag</label>
+                                <select name="assign_tag_id">
+                                    <option value="">Geen</option>
+                                    {% for tag in tags %}
+                                    <option value="{{ tag.id }}" {% if rule.assign_tag_id == tag.id %}selected{% endif %}>{{ tag.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div style="margin-top:0.5rem; display:flex; gap:0.5rem;">
+                            <button type="submit" class="btn btn-sm btn-primary">Opslaan</button>
+                            <button type="button" class="btn btn-sm" onclick="toggleEdit({{ rule.id }})">Annuleren</button>
+                        </div>
+                    </form>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="muted" style="text-align:center; padding:1rem;">Nog geen regels. Maak je eerste regel aan of accepteer een suggestie.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleEdit(id) {
+    const el = document.getElementById('edit-' + id);
+    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+</script>
+{% endblock %}
