@@ -328,6 +328,11 @@ tr:hover { background: rgba(31, 111, 178, 0.03); }
     vertical-align: middle;
 }
 
+.select-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.85rem;
+}
+
 .form-stack {
     display: flex;
     flex-direction: column;

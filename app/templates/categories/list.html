@@ -40,7 +40,21 @@
                 {% for cat in top_level %}
                 <tr class="category-parent">
                     <td><strong>{{ cat.name }}</strong></td>
-                    <td class="nowrap">{{ cat.account.name if cat.account else '-' }}</td>
+                    <td class="nowrap">
+                        {% if cat.account %}
+                            {{ cat.account.name }}
+                        {% else %}
+                            <form method="post" action="/categories/{{ cat.id }}/edit" style="display:inline-flex; align-items:center; gap:0.5rem;">
+                                <select name="account_id" class="select-sm">
+                                    <option value="0">-- kies --</option>
+                                    {% for acc in accounts %}
+                                    <option value="{{ acc.id }}">{{ acc.name }}</option>
+                                    {% endfor %}
+                                </select>
+                                <button type="submit" class="btn btn-sm">Koppel</button>
+                            </form>
+                        {% endif %}
+                    </td>
                     <td>{{ 'Inkomen' if cat.is_income else 'Uitgave' }}</td>
                     <td>
                         {% if cat.color %}
@@ -96,12 +110,10 @@
                 </div>
                 <div class="form-group">
                     <label for="cat_account">Rekening</label>
-                    <select name="account_id" id="cat_account">
-                        <option value="0">Geen rekening</option>
+                    <select name="account_id" id="cat_account" required>
+                        <option value="">Kies rekening...</option>
                         {% for acc in accounts %}
-                        <option value="{{ acc.id }}" {% if current_account_id == acc.id %}selected{% endif %}>
-                            {{ acc.name }}
-                        </option>
+                        <option value="{{ acc.id }}">{{ acc.name }}</option>
                         {% endfor %}
                     </select>
                 </div>

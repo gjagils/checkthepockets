@@ -105,6 +105,48 @@ def create_category(
     return RedirectResponse(redirect, status_code=302)
 
 
+@router.post("/{category_id}/edit")
+def edit_category(
+    request: Request,
+    category_id: int,
+    account_id: int = Form(0),
+    db: Session = Depends(get_db),
+):
+    user = require_login(request, db)
+
+    cat = (
+        db.query(Category)
+        .filter(Category.id == category_id, Category.user_id == user.id)
+        .first()
+    )
+    if not cat:
+        return RedirectResponse("/categories", status_code=302)
+
+    acc_id = account_id if account_id else None
+
+    # Verify account belongs to user
+    if acc_id:
+        account = (
+            db.query(Account)
+            .filter(Account.id == acc_id, Account.user_id == user.id)
+            .first()
+        )
+        if not account:
+            return RedirectResponse("/categories", status_code=302)
+
+    # Update parent and all children
+    cat.account_id = acc_id
+    for child in (
+        db.query(Category)
+        .filter(Category.parent_id == category_id, Category.user_id == user.id)
+        .all()
+    ):
+        child.account_id = acc_id
+
+    db.commit()
+    return RedirectResponse("/categories", status_code=302)
+
+
 @router.post("/{category_id}/delete")
 def delete_category(
     request: Request,
@@ -121,8 +163,6 @@ def delete_category(
     if not cat:
         return RedirectResponse("/categories", status_code=302)
 
-    acc_id = cat.account_id
-
     # Delete children first
     db.query(Category).filter(
         Category.parent_id == category_id,
@@ -132,7 +172,4 @@ def delete_category(
     db.delete(cat)
     db.commit()
 
-    redirect = "/categories"
-    if acc_id:
-        redirect += f"?account_id={acc_id}"
-    return RedirectResponse(redirect, status_code=302)
+    return RedirectResponse("/categories", status_code=302)
