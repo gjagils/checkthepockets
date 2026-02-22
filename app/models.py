@@ -38,7 +38,6 @@ class User(Base):
     budgets = relationship("Budget", back_populates="user", cascade="all, delete-orphan")
     tags = relationship("Tag", back_populates="user", cascade="all, delete-orphan")
     rules = relationship("Rule", back_populates="user", cascade="all, delete-orphan")
-    budgets = relationship("Budget", back_populates="user", cascade="all, delete-orphan")
     recurring_transactions = relationship("RecurringTransaction", back_populates="user", cascade="all, delete-orphan")
 
 
@@ -92,21 +91,6 @@ class Category(Base):
     )
 
 
-    name = Column(String(100), nullable=False)
-    parent_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
-    color = Column(String(7), nullable=True)  # hex color like #FF5733
-    is_income = Column(Integer, server_default="0")  # 0=expenses, 1=income
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-
-    user = relationship("User", back_populates="categories")
-    parent = relationship("Category", remote_side="Category.id", backref="children")
-    transactions = relationship("Transaction", back_populates="category_rel")
-
-    __table_args__ = (
-        UniqueConstraint("user_id", "name", name="uq_user_category"),
-    )
-
-
 class Tag(Base):
     __tablename__ = "tags"
 
@@ -149,23 +133,6 @@ class Rule(Base):
     assign_tag = relationship("Tag")
 
 
-class Budget(Base):
-    __tablename__ = "budgets"
-
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    category_id = Column(Integer, ForeignKey("categories.id", ondelete="CASCADE"), nullable=False)
-    amount = Column(Numeric(12, 2), nullable=False)  # monthly limit (positive number)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-
-    user = relationship("User", back_populates="budgets")
-    category = relationship("Category")
-
-    __table_args__ = (
-        UniqueConstraint("user_id", "category_id", name="uq_user_category_budget"),
-    )
-
-
 class RecurringTransaction(Base):
     __tablename__ = "recurring_transactions"
 
@@ -197,13 +164,14 @@ class Transaction(Base):
     counterparty_iban = Column(String(34), nullable=True)
     balance_after = Column(Numeric(12, 2), nullable=True)
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
-    parent_id = Column(Integer, nullable=True)
     parent_id = Column(Integer, ForeignKey("transactions.id", ondelete="CASCADE"), nullable=True)
     import_hash = Column(String(64), unique=True, nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     account = relationship("Account", back_populates="transactions")
     category = relationship("Category", back_populates="transactions")
+    tags = relationship("Tag", secondary=transaction_tags, back_populates="transactions")
+    parent = relationship("Transaction", remote_side="Transaction.id", backref="children")
 
 
 class SavingsPlan(Base):
@@ -281,6 +249,3 @@ class Budget(Base):
     __table_args__ = (
         UniqueConstraint("user_id", "category_id", "year", "month", name="uq_budget_user_cat_year_month"),
     )
-    category_rel = relationship("Category", back_populates="transactions")
-    tags = relationship("Tag", secondary=transaction_tags, back_populates="transactions")
-    parent = relationship("Transaction", remote_side="Transaction.id", backref="children")

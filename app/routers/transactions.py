@@ -5,8 +5,11 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session, joinedload
 
+from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
+
 from app.database import get_db
-from app.models import Account, Transaction, Category
+from app.models import Account, Transaction, Category, Tag, Rule
 from app.auth import require_login
 from app.parsers import abn_amro, bunq, ics
 from app.parsers.base import ParseError, ParsedTransaction
@@ -134,6 +137,24 @@ def transaction_list(
         .all()
     )
     total_pages = max(1, (total + PER_PAGE - 1) // PER_PAGE)
+
+    filter_params = {}
+    if account_id:
+        filter_params["account_id"] = account_id
+    if category_id:
+        filter_params["category_id"] = category_id
+    if tag_id:
+        filter_params["tag_id"] = tag_id
+    if search:
+        filter_params["search"] = search
+    if date_from:
+        filter_params["date_from"] = date_from
+    if date_to:
+        filter_params["date_to"] = date_to
+    if amount_min:
+        filter_params["amount_min"] = amount_min
+    if amount_max:
+        filter_params["amount_max"] = amount_max
 
     # Get categories grouped by account_id -> parent -> children
     all_cats = (
