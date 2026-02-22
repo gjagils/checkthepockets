@@ -56,7 +56,7 @@ def transaction_list(
         db.query(Transaction.parent_id)
         .filter(Transaction.parent_id.isnot(None))
         .distinct()
-        .subquery()
+        .scalar_subquery()
     )
     query = query.filter(Transaction.id.notin_(split_parent_ids))
 
