@@ -36,16 +36,19 @@
                 <option value="">Geen categorie</option>
                 {% for cat in categories %}
                 {% if not cat.parent_id %}
-                <optgroup label="{{ cat.name }}">
+                    {% if cat.children %}
+                    <optgroup label="{{ cat.name }}">
+                        {% for child in cat.children|sort(attribute='name') %}
+                        <option value="{{ child.id }}" {% if transaction.category_id == child.id %}selected{% endif %}>
+                            {{ child.name }}
+                        </option>
+                        {% endfor %}
+                    </optgroup>
+                    {% else %}
                     <option value="{{ cat.id }}" {% if transaction.category_id == cat.id %}selected{% endif %}>
                         {{ cat.name }}
                     </option>
-                    {% for child in cat.children|sort(attribute='name') %}
-                    <option value="{{ child.id }}" {% if transaction.category_id == child.id %}selected{% endif %}>
-                        {{ child.name }}
-                    </option>
-                    {% endfor %}
-                </optgroup>
+                    {% endif %}
                 {% endif %}
                 {% endfor %}
             </select>
