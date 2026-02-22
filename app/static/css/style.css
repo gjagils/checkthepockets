@@ -320,6 +320,20 @@ tr:hover { background: rgba(31, 111, 178, 0.03); }
 .amount-positive { color: var(--ctp-check); font-weight: 600; }
 .amount-negative { color: var(--ctp-danger); font-weight: 600; }
 
+.color-dot {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    vertical-align: middle;
+}
+
+.form-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
 /* ===== Cards ===== */
 .card {
     background: var(--ctp-surface);

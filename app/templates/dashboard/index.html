@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - Check The Pockets{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Dashboard {{ current_year }}</h1>
+</div>
+
+<!-- Filters -->
+<div class="card">
+    <form method="get" action="/dashboard" class="filter-bar">
+        <div class="form-group">
+            <label for="year">Jaar</label>
+            <select name="year" id="year" onchange="this.form.submit()">
+                {% for y in years %}
+                <option value="{{ y }}" {% if y == current_year %}selected{% endif %}>{{ y }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="account_id">Rekening</label>
+            <select name="account_id" id="account_id" onchange="this.form.submit()">
+                <option value="">Alle rekeningen</option>
+                {% for acc in accounts %}
+                <option value="{{ acc.id }}" {% if current_account_id == acc.id %}selected{% endif %}>
+                    {{ acc.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+    </form>
+</div>
+
+<!-- Summary cards -->
+<div class="accounts-grid">
+    <div class="card">
+        <p class="muted">Inkomen</p>
+        <h2 class="amount-positive">{{ "%.2f"|format(income) }} EUR</h2>
+    </div>
+    <div class="card">
+        <p class="muted">Uitgaven</p>
+        <h2 class="amount-negative">{{ "%.2f"|format(expenses) }} EUR</h2>
+    </div>
+    <div class="card">
+        <p class="muted">Resultaat</p>
+        <h2 class="{% if balance >= 0 %}amount-positive{% else %}amount-negative{% endif %}">{{ "%.2f"|format(balance) }} EUR</h2>
+    </div>
+    <div class="card">
+        <p class="muted">Transacties</p>
+        <h2>{{ tx_count }}</h2>
+    </div>
+</div>
+
+<!-- Monthly overview -->
+<div class="card">
+    <h2>Maandoverzicht</h2>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Maand</th>
+                    <th class="text-right">Inkomen</th>
+                    <th class="text-right">Uitgaven</th>
+                    <th class="text-right">Resultaat</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in range(1, 13) %}
+                {% set data = monthly_data.get(m, {}) %}
+                {% set inc = data.get('income', 0) %}
+                {% set exp = data.get('expenses', 0) %}
+                {% set res = inc + exp %}
+                <tr>
+                    <td>{{ months[m] }}</td>
+                    <td class="text-right nowrap amount-positive">{{ "%.2f"|format(inc) }}</td>
+                    <td class="text-right nowrap amount-negative">{{ "%.2f"|format(exp) }}</td>
+                    <td class="text-right nowrap {% if res >= 0 %}amount-positive{% else %}amount-negative{% endif %}">{{ "%.2f"|format(res) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td><strong>Totaal</strong></td>
+                    <td class="text-right nowrap amount-positive"><strong>{{ "%.2f"|format(income) }}</strong></td>
+                    <td class="text-right nowrap amount-negative"><strong>{{ "%.2f"|format(expenses) }}</strong></td>
+                    <td class="text-right nowrap {% if balance >= 0 %}amount-positive{% else %}amount-negative{% endif %}"><strong>{{ "%.2f"|format(balance) }}</strong></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+
+<!-- Top categories -->
+{% if top_categories %}
+<div class="card">
+    <h2>Top 10 uitgavecategorieën</h2>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Categorie</th>
+                    <th class="text-right">Bedrag</th>
+                    <th class="text-right">Transacties</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cat in top_categories %}
+                <tr>
+                    <td>{{ cat.name }}</td>
+                    <td class="text-right nowrap amount-negative">{{ "%.2f"|format(cat.total) }} EUR</td>
+                    <td class="text-right">{{ cat.tx_count }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
