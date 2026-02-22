@@ -36,6 +36,7 @@ class User(Base):
     categories = relationship("Category", back_populates="user", cascade="all, delete-orphan")
     tags = relationship("Tag", back_populates="user", cascade="all, delete-orphan")
     rules = relationship("Rule", back_populates="user", cascade="all, delete-orphan")
+    budgets = relationship("Budget", back_populates="user", cascade="all, delete-orphan")
 
 
 class Account(Base):
@@ -117,6 +118,23 @@ class Rule(Base):
     user = relationship("User", back_populates="rules")
     assign_category = relationship("Category")
     assign_tag = relationship("Tag")
+
+
+class Budget(Base):
+    __tablename__ = "budgets"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    category_id = Column(Integer, ForeignKey("categories.id", ondelete="CASCADE"), nullable=False)
+    amount = Column(Numeric(12, 2), nullable=False)  # monthly limit (positive number)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    user = relationship("User", back_populates="budgets")
+    category = relationship("Category")
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "category_id", name="uq_user_category_budget"),
+    )
 
 
 class Transaction(Base):
