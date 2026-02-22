@@ -33,4 +33,15 @@
     <a href="/import" class="btn btn-primary">CSV importeren</a>
 </div>
 {% endif %}
+
+{% if accounts %}
+<div class="card" style="margin-top:2rem; border-color:var(--ctp-danger);">
+    <h2>Testfuncties</h2>
+    <p class="muted" style="margin-bottom:0.75rem;">Verwijder alle transacties om opnieuw te testen met dezelfde bestanden.</p>
+    <form method="post" action="/accounts/delete-all-transactions"
+          onsubmit="return confirm('ALLE transacties verwijderen? Rekeningen blijven bestaan. Dit kan niet ongedaan worden.')">
+        <button type="submit" class="btn btn-danger">Alle transacties verwijderen</button>
+    </form>
+</div>
+{% endif %}
 {% endblock %}
