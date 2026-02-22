@@ -77,7 +77,7 @@ def create_category(
         if not account:
             return RedirectResponse("/categories", status_code=302)
 
-    # If parent is set, inherit account_id from parent
+    # If parent is set, inherit account_id and is_income from parent
     if par_id:
         parent = (
             db.query(Category)
@@ -87,6 +87,7 @@ def create_category(
         if not parent:
             return RedirectResponse("/categories", status_code=302)
         acc_id = parent.account_id
+        is_income = parent.is_income
 
     cat = Category(
         user_id=user.id,
@@ -109,7 +110,10 @@ def create_category(
 def edit_category(
     request: Request,
     category_id: int,
+    name: str = Form(...),
     account_id: int = Form(0),
+    color: str = Form(""),
+    is_income: int = Form(0),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
@@ -134,14 +138,24 @@ def edit_category(
         if not account:
             return RedirectResponse("/categories", status_code=302)
 
-    # Update parent and all children
-    cat.account_id = acc_id
-    for child in (
-        db.query(Category)
-        .filter(Category.parent_id == category_id, Category.user_id == user.id)
-        .all()
-    ):
-        child.account_id = acc_id
+    cat.name = name.strip()
+    cat.color = color.strip() or None
+
+    # Only main categories can change account and is_income
+    # Children inherit from parent
+    if cat.parent_id is None:
+        cat.account_id = acc_id
+        cat.is_income = is_income
+
+        # Cascade to children: update account_id and is_income
+        children = (
+            db.query(Category)
+            .filter(Category.parent_id == category_id, Category.user_id == user.id)
+            .all()
+        )
+        for child in children:
+            child.account_id = acc_id
+            child.is_income = is_income
 
     db.commit()
     return RedirectResponse("/categories", status_code=302)

@@ -40,21 +40,7 @@
                 {% for cat in top_level %}
                 <tr class="category-parent">
                     <td><strong>{{ cat.name }}</strong></td>
-                    <td class="nowrap">
-                        {% if cat.account %}
-                            {{ cat.account.name }}
-                        {% else %}
-                            <form method="post" action="/categories/{{ cat.id }}/edit" style="display:inline-flex; align-items:center; gap:0.5rem;">
-                                <select name="account_id" class="select-sm">
-                                    <option value="0">-- kies --</option>
-                                    {% for acc in accounts %}
-                                    <option value="{{ acc.id }}">{{ acc.name }}</option>
-                                    {% endfor %}
-                                </select>
-                                <button type="submit" class="btn btn-sm">Koppel</button>
-                            </form>
-                        {% endif %}
-                    </td>
+                    <td class="nowrap">{{ cat.account.name if cat.account else '-' }}</td>
                     <td>{{ 'Inkomen' if cat.is_income else 'Uitgave' }}</td>
                     <td>
                         {% if cat.color %}
@@ -62,9 +48,42 @@
                         {% else %}-{% endif %}
                     </td>
                     <td class="nowrap">
+                        <button type="button" class="btn btn-sm" onclick="toggleEdit('cat-{{ cat.id }}')">Bewerk</button>
                         <form method="post" action="/categories/{{ cat.id }}/delete" style="display:inline;"
                               onsubmit="return confirm('Hoofdcategorie en alle subcategorieën verwijderen?')">
-                            <button type="submit" class="btn btn-sm btn-danger">Verwijderen</button>
+                            <button type="submit" class="btn btn-sm btn-danger">X</button>
+                        </form>
+                    </td>
+                </tr>
+                <tr class="edit-row" id="cat-{{ cat.id }}" style="display:none;">
+                    <td colspan="5">
+                        <form method="post" action="/categories/{{ cat.id }}/edit" class="filter-bar" style="flex-wrap:wrap; padding:0.5rem 0;">
+                            <div class="form-group">
+                                <label>Naam</label>
+                                <input type="text" name="name" value="{{ cat.name }}" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Rekening</label>
+                                <select name="account_id">
+                                    <option value="0">Geen</option>
+                                    {% for acc in accounts %}
+                                    <option value="{{ acc.id }}" {% if cat.account_id == acc.id %}selected{% endif %}>{{ acc.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Kleur</label>
+                                <input type="color" name="color" value="{{ cat.color or '#89b4fa' }}">
+                            </div>
+                            <div class="form-group">
+                                <label>
+                                    <input type="checkbox" name="is_income" value="1" {% if cat.is_income %}checked{% endif %}> Inkomen
+                                </label>
+                            </div>
+                            <div class="form-group" style="align-self:flex-end;">
+                                <button type="submit" class="btn btn-primary btn-sm">Opslaan</button>
+                                <button type="button" class="btn btn-sm" onclick="toggleEdit('cat-{{ cat.id }}')">Annuleren</button>
+                            </div>
                         </form>
                     </td>
                 </tr>
@@ -79,9 +98,28 @@
                         {% else %}-{% endif %}
                     </td>
                     <td class="nowrap">
+                        <button type="button" class="btn btn-sm" onclick="toggleEdit('cat-{{ sub.id }}')">Bewerk</button>
                         <form method="post" action="/categories/{{ sub.id }}/delete" style="display:inline;"
                               onsubmit="return confirm('Subcategorie verwijderen?')">
-                            <button type="submit" class="btn btn-sm btn-danger">Verwijderen</button>
+                            <button type="submit" class="btn btn-sm btn-danger">X</button>
+                        </form>
+                    </td>
+                </tr>
+                <tr class="edit-row" id="cat-{{ sub.id }}" style="display:none;">
+                    <td colspan="5">
+                        <form method="post" action="/categories/{{ sub.id }}/edit" class="filter-bar" style="flex-wrap:wrap; padding:0.5rem 0;">
+                            <div class="form-group">
+                                <label>Naam</label>
+                                <input type="text" name="name" value="{{ sub.name }}" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Kleur</label>
+                                <input type="color" name="color" value="{{ sub.color or '#89b4fa' }}">
+                            </div>
+                            <div class="form-group" style="align-self:flex-end;">
+                                <button type="submit" class="btn btn-primary btn-sm">Opslaan</button>
+                                <button type="button" class="btn btn-sm" onclick="toggleEdit('cat-{{ sub.id }}')">Annuleren</button>
+                            </div>
                         </form>
                     </td>
                 </tr>
@@ -158,4 +196,11 @@
         </form>
     </div>
 </div>
+
+<script>
+function toggleEdit(id) {
+    var row = document.getElementById(id);
+    row.style.display = row.style.display === 'none' ? '' : 'none';
+}
+</script>
 {% endblock %}
