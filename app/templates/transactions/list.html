@@ -40,7 +40,7 @@
                 {% for tx in transactions %}
                 <tr>
                     <td class="nowrap">{{ tx.date.strftime('%d-%m-%Y') }}</td>
-                    <td class="desc-cell">{{ tx.description[:80] }}{% if tx.description|length > 80 %}...{% endif %}</td>
+                    <td class="desc-cell">{{ tx.description or '-' }}</td>
                     <td>{{ tx.counterparty or '-' }}</td>
                     <td class="nowrap">
                         <form method="post" action="/transactions/{{ tx.id }}/category" class="inline-cat-form">
