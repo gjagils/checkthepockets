@@ -4,7 +4,7 @@ from decimal import Decimal
 from fastapi import APIRouter, Depends, Request, Query
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import case, func
 
 from app.database import get_db
 from app.models import Account, Transaction, Category
@@ -49,10 +49,16 @@ def dashboard(
     totals = (
         db.query(
             func.sum(
-                func.case((Transaction.amount > 0, Transaction.amount), else_=Decimal("0"))
+                case(
+                    (Transaction.amount > 0, Transaction.amount),
+                    else_=Decimal("0"),
+                )
             ).label("income"),
             func.sum(
-                func.case((Transaction.amount < 0, Transaction.amount), else_=Decimal("0"))
+                case(
+                    (Transaction.amount < 0, Transaction.amount),
+                    else_=Decimal("0"),
+                )
             ).label("expenses"),
             func.count(Transaction.id).label("tx_count"),
         )
@@ -71,10 +77,16 @@ def dashboard(
         db.query(
             func.extract("month", Transaction.date).label("month"),
             func.sum(
-                func.case((Transaction.amount > 0, Transaction.amount), else_=Decimal("0"))
+                case(
+                    (Transaction.amount > 0, Transaction.amount),
+                    else_=Decimal("0"),
+                )
             ).label("income"),
             func.sum(
-                func.case((Transaction.amount < 0, Transaction.amount), else_=Decimal("0"))
+                case(
+                    (Transaction.amount < 0, Transaction.amount),
+                    else_=Decimal("0"),
+                )
             ).label("expenses"),
         )
         .join(Account)
