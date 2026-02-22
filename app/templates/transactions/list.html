@@ -2,23 +2,92 @@
 {% block title %}Transacties - Check The Pockets{% endblock %}
 {% block content %}
 <div class="page-header">
-    <h1>Transacties</h1>
+    <h1>Transacties <span class="muted" style="font-weight:400; font-size:0.9rem;">({{ total }})</span></h1>
     <a href="/import" class="btn btn-primary">CSV importeren</a>
 </div>
 
+<!-- Search & Filters -->
 <div class="card">
-    <form method="get" action="/" class="filter-bar">
-        <div class="form-group">
-            <label for="account_id">Rekening</label>
-            <select name="account_id" id="account_id" onchange="this.form.submit()">
-                <option value="">Alle rekeningen</option>
-                {% for acc in accounts %}
-                <option value="{{ acc.id }}" {% if current_account_id == acc.id %}selected{% endif %}>
-                    {{ acc.name }}{% if acc.iban %} ({{ acc.iban }}){% endif %}
-                </option>
-                {% endfor %}
-            </select>
+    <form method="get" action="/" id="filterForm">
+        <div class="search-row">
+            <div class="form-group" style="flex:1;">
+                <label for="search">Zoeken</label>
+                <input type="text" id="search" name="search" value="{{ search }}" placeholder="Zoek op omschrijving, tegenpartij of IBAN...">
+            </div>
+            <button type="submit" class="btn btn-primary" style="align-self:flex-end;">Zoeken</button>
+            {% if filter_params %}
+            <a href="/" class="btn" style="align-self:flex-end;">Wissen</a>
+            {% endif %}
         </div>
+
+        <div class="filter-bar">
+            <div class="form-group">
+                <label for="account_id">Rekening</label>
+                <select name="account_id" id="account_id" onchange="this.form.submit()">
+                    <option value="">Alle rekeningen</option>
+                    {% for acc in accounts %}
+                    <option value="{{ acc.id }}" {% if current_account_id == acc.id %}selected{% endif %}>
+                        {{ acc.name }}{% if acc.iban %} ({{ acc.iban }}){% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="category_id">Categorie</label>
+                <select name="category_id" id="category_id" onchange="this.form.submit()">
+                    <option value="">Alle categorieën</option>
+                    <option value="-1" {% if current_category_id == -1 %}selected{% endif %}>Zonder categorie</option>
+                    {% for cat in categories %}
+                    {% if not cat.parent_id %}
+                    <option value="{{ cat.id }}" {% if current_category_id == cat.id %}selected{% endif %}>
+                        {{ cat.name }}
+                    </option>
+                    {% for child in cat.children|sort(attribute='name') %}
+                    <option value="{{ child.id }}" {% if current_category_id == child.id %}selected{% endif %}>
+                        &nbsp;&nbsp;{{ child.name }}
+                    </option>
+                    {% endfor %}
+                    {% endif %}
+                    {% endfor %}
+                </select>
+            </div>
+            {% if tags %}
+            <div class="form-group">
+                <label for="tag_id">Tag</label>
+                <select name="tag_id" id="tag_id" onchange="this.form.submit()">
+                    <option value="">Alle tags</option>
+                    {% for tag in tags %}
+                    <option value="{{ tag.id }}" {% if current_tag_id == tag.id %}selected{% endif %}>
+                        {{ tag.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+        </div>
+
+        <details class="filter-details">
+            <summary>Meer filters</summary>
+            <div class="filter-bar" style="margin-top:0.75rem;">
+                <div class="form-group">
+                    <label for="date_from">Datum van</label>
+                    <input type="date" id="date_from" name="date_from" value="{{ date_from }}">
+                </div>
+                <div class="form-group">
+                    <label for="date_to">Datum t/m</label>
+                    <input type="date" id="date_to" name="date_to" value="{{ date_to }}">
+                </div>
+                <div class="form-group">
+                    <label for="amount_min">Bedrag min</label>
+                    <input type="number" step="0.01" id="amount_min" name="amount_min" value="{{ amount_min }}" placeholder="-100.00">
+                </div>
+                <div class="form-group">
+                    <label for="amount_max">Bedrag max</label>
+                    <input type="number" step="0.01" id="amount_max" name="amount_max" value="{{ amount_max }}" placeholder="100.00">
+                </div>
+                <button type="submit" class="btn btn-sm btn-primary" style="align-self:flex-end;">Toepassen</button>
+            </div>
+        </details>
     </form>
 </div>
 
@@ -31,20 +100,52 @@
                     <th>Datum</th>
                     <th>Omschrijving</th>
                     <th>Tegenpartij</th>
+                    <th>Categorie</th>
                     <th class="text-right">Bedrag</th>
                     <th>Rekening</th>
+                    <th></th>
                 </tr>
             </thead>
             <tbody>
                 {% for tx in transactions %}
                 <tr>
                     <td class="nowrap">{{ tx.date.strftime('%d-%m-%Y') }}</td>
-                    <td class="desc-cell">{{ tx.description[:80] }}{% if tx.description|length > 80 %}...{% endif %}</td>
-                    <td>{{ tx.counterparty or '-' }}</td>
+                    <td class="desc-cell" title="{{ tx.description or '' }}">{{ tx.description[:80] }}{% if tx.description and tx.description|length > 80 %}...{% endif %}</td>
+                    <td class="counterparty-cell" title="{{ tx.counterparty or '' }}">{{ tx.counterparty or '-' }}</td>
+                    <td class="nowrap">
+                        <form method="post" action="/transactions/{{ tx.id }}/category" class="inline-category-form">
+                            <select name="category_id" class="category-select {% if tx.category_rel %}has-category{% endif %}" style="{% if tx.category_rel %}--cat-color: {{ tx.category_rel.color or '#1F6FB2' }}{% endif %}" onchange="this.form.submit()">
+                                <option value="">— Geen —</option>
+                                {% for cat in categories %}
+                                {% if not cat.parent_id %}
+                                    {% if cat.children %}
+                                    <optgroup label="{{ cat.name }}">
+                                        {% for child in cat.children|sort(attribute='name') %}
+                                        <option value="{{ child.id }}" {% if tx.category_id == child.id %}selected{% endif %}>
+                                            {{ child.name }}
+                                        </option>
+                                        {% endfor %}
+                                    </optgroup>
+                                    {% else %}
+                                    <option value="{{ cat.id }}" {% if tx.category_id == cat.id %}selected{% endif %}>
+                                        {{ cat.name }}
+                                    </option>
+                                    {% endif %}
+                                {% endif %}
+                                {% endfor %}
+                            </select>
+                        </form>
+                        {% for tag in tx.tags %}
+                        <span class="tag-pill">{{ tag.name }}</span>
+                        {% endfor %}
+                    </td>
                     <td class="text-right nowrap {% if tx.amount >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
                         {{ "%.2f"|format(tx.amount) }} {{ tx.currency }}
                     </td>
                     <td class="nowrap">{{ tx.account.name }}</td>
+                    <td class="nowrap">
+                        <a href="/transactions/{{ tx.id }}/edit" class="btn btn-sm">Bewerken</a>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -54,30 +155,36 @@
 
 {% if total_pages > 1 %}
 <div class="pagination">
+    {% set fp = filter_params.copy() %}
     {% if page > 1 %}
-    <a href="?page={{ page - 1 }}{% if current_account_id %}&account_id={{ current_account_id }}{% endif %}">Vorige</a>
+    <a href="?page={{ page - 1 }}{% for k, v in fp.items() %}&{{ k }}={{ v }}{% endfor %}">Vorige</a>
     {% endif %}
 
     {% for p in range(1, total_pages + 1) %}
         {% if p == page %}
         <span class="current">{{ p }}</span>
         {% elif p <= 3 or p > total_pages - 3 or (p >= page - 1 and p <= page + 1) %}
-        <a href="?page={{ p }}{% if current_account_id %}&account_id={{ current_account_id }}{% endif %}">{{ p }}</a>
+        <a href="?page={{ p }}{% for k, v in fp.items() %}&{{ k }}={{ v }}{% endfor %}">{{ p }}</a>
         {% elif p == 4 or p == total_pages - 3 %}
         <span class="dots">...</span>
         {% endif %}
     {% endfor %}
 
     {% if page < total_pages %}
-    <a href="?page={{ page + 1 }}{% if current_account_id %}&account_id={{ current_account_id }}{% endif %}">Volgende</a>
+    <a href="?page={{ page + 1 }}{% for k, v in fp.items() %}&{{ k }}={{ v }}{% endfor %}">Volgende</a>
     {% endif %}
 </div>
 {% endif %}
 
 {% else %}
 <div class="card" style="text-align:center; padding:3rem;">
+    {% if filter_params %}
+    <p style="margin-bottom:1rem;">Geen transacties gevonden met deze filters.</p>
+    <a href="/" class="btn btn-primary">Filters wissen</a>
+    {% else %}
     <p style="margin-bottom:1rem;">Nog geen transacties geimporteerd.</p>
     <a href="/import" class="btn btn-primary">Eerste CSV importeren</a>
+    {% endif %}
 </div>
 {% endif %}
 {% endblock %}

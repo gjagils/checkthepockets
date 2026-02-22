@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+{% block title %}Budget {{ month_name }} {{ year }} - Check The Pockets{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Budget</h1>
+    <div class="month-nav">
+        <a href="/budgets?year={{ prev_year }}&month={{ prev_month }}" class="btn btn-sm">&laquo;</a>
+        <span class="month-label">{{ month_name }} {{ year }}</span>
+        <a href="/budgets?year={{ next_year }}&month={{ next_month }}" class="btn btn-sm">&raquo;</a>
+        {% if not is_current_month %}
+        <a href="/budgets" class="btn btn-sm">Vandaag</a>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Totals -->
+{% if budget_groups or standalone_lines %}
+<div class="budget-totals">
+    <div class="summary-card">
+        <div class="value">{{ "%.2f"|format(total_budgeted) }}</div>
+        <div class="label">Totaal budget</div>
+    </div>
+    <div class="summary-card">
+        <div class="value amount-negative">{{ "%.2f"|format(total_spent) }}</div>
+        <div class="label">Uitgegeven</div>
+    </div>
+    <div class="summary-card">
+        <div class="value {% if total_remaining < 0 %}amount-negative{% else %}amount-positive{% endif %}">
+            {{ "%.2f"|format(total_remaining) }}
+        </div>
+        <div class="label">Resterend</div>
+    </div>
+</div>
+{% endif %}
+
+<div class="budgets-layout">
+    <!-- Budget lines -->
+    <div>
+        {% if budget_groups or standalone_lines %}
+        <div class="budget-list">
+
+            {% for group in budget_groups %}
+            <div class="budget-group">
+                <!-- Group header -->
+                <div class="budget-group-header">
+                    <div class="budget-group-title">
+                        <span class="category-pill" style="--cat-color: {{ group.parent.color or '#1F6FB2' }}">
+                            {{ group.parent.name }}
+                        </span>
+                        {% if group.parent.is_income %}
+                        <span class="badge badge-income">Inkomsten</span>
+                        {% else %}
+                        <span class="badge badge-expense">Uitgaven</span>
+                        {% endif %}
+                    </div>
+                    <div class="budget-group-totals">
+                        <span class="budget-spent">{{ "%.2f"|format(group.total_spent) }}</span>
+                        <span class="muted"> / </span>
+                        <span class="budget-limit">{{ "%.2f"|format(group.total_budgeted) }}</span>
+                    </div>
+                </div>
+
+                <div class="progress-bar" style="margin-bottom: 0.75rem;">
+                    <div class="progress-fill {% if group.over %}progress-over{% elif group.pct > 80 %}progress-warn{% endif %}"
+                         style="width: {{ group.pct }}%"></div>
+                    {% if is_current_month and day_progress > 0 %}
+                    <div class="progress-marker" style="left: {{ (day_progress * 100)|round }}%"
+                         title="Dag {{ (day_progress * 100)|round|int }}% van de maand"></div>
+                    {% endif %}
+                </div>
+
+                <!-- Child category budget cards -->
+                {% for line in group.lines %}
+                <div class="card budget-card budget-card-child {% if line.over %}budget-over{% endif %}">
+                    <div class="budget-header">
+                        <div class="budget-cat-info">
+                            <span class="category-pill" style="--cat-color: {{ line.category.color or line.category.parent.color or '#1F6FB2' }}">
+                                {{ line.category.name }}
+                            </span>
+                        </div>
+                        <div class="budget-amounts">
+                            <span class="budget-spent">{{ "%.2f"|format(line.spent) }}</span>
+                            <span class="muted"> / </span>
+                            <span class="budget-limit">{{ "%.2f"|format(line.budget.amount) }}</span>
+                        </div>
+                    </div>
+
+                    <div class="progress-bar">
+                        <div class="progress-fill {% if line.over %}progress-over{% elif line.pct > 80 %}progress-warn{% endif %}"
+                             style="width: {{ line.pct }}%"></div>
+                        {% if is_current_month and day_progress > 0 %}
+                        <div class="progress-marker" style="left: {{ (day_progress * 100)|round }}%"
+                             title="Dag {{ (day_progress * 100)|round|int }}% van de maand"></div>
+                        {% endif %}
+                    </div>
+
+                    <div class="budget-footer">
+                        {% if line.over %}
+                        <span class="budget-status budget-status-over">{{ "%.2f"|format(line.over_amount) }} over budget</span>
+                        {% else %}
+                        <span class="budget-status">{{ "%.2f"|format(line.remaining) }} resterend</span>
+                        {% endif %}
+                        <div class="budget-actions">
+                            <button class="btn btn-sm" onclick="toggleBudgetEdit({{ line.budget.id }})">Bewerken</button>
+                            <form method="post" action="/budgets/{{ line.budget.id }}/delete" style="display:inline;"
+                                  onsubmit="return confirm('Budget verwijderen?')">
+                                <button type="submit" class="btn btn-sm btn-danger">Verwijderen</button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Edit form (hidden) -->
+                    <div class="budget-edit" id="budget-edit-{{ line.budget.id }}" style="display:none;">
+                        <form method="post" action="/budgets/{{ line.budget.id }}/edit" class="edit-form">
+                            <div class="form-group">
+                                <label>Maandbedrag</label>
+                                <input type="number" step="0.01" min="0.01" name="amount"
+                                       value="{{ '%.2f'|format(line.budget.amount) }}" required>
+                            </div>
+                            <button type="submit" class="btn btn-sm btn-primary">Opslaan</button>
+                            <button type="button" class="btn btn-sm" onclick="toggleBudgetEdit({{ line.budget.id }})">Annuleren</button>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endfor %}
+
+            {% for line in standalone_lines %}
+            <div class="card budget-card {% if line.over %}budget-over{% endif %}">
+                <div class="budget-header">
+                    <div class="budget-cat-info">
+                        <span class="category-pill" style="--cat-color: {{ line.category.color or '#1F6FB2' }}">
+                            {{ line.category.name }}
+                        </span>
+                    </div>
+                    <div class="budget-amounts">
+                        <span class="budget-spent">{{ "%.2f"|format(line.spent) }}</span>
+                        <span class="muted"> / </span>
+                        <span class="budget-limit">{{ "%.2f"|format(line.budget.amount) }}</span>
+                    </div>
+                </div>
+
+                <div class="progress-bar">
+                    <div class="progress-fill {% if line.over %}progress-over{% elif line.pct > 80 %}progress-warn{% endif %}"
+                         style="width: {{ line.pct }}%"></div>
+                    {% if is_current_month and day_progress > 0 %}
+                    <div class="progress-marker" style="left: {{ (day_progress * 100)|round }}%"
+                         title="Dag {{ (day_progress * 100)|round|int }}% van de maand"></div>
+                    {% endif %}
+                </div>
+
+                <div class="budget-footer">
+                    {% if line.over %}
+                    <span class="budget-status budget-status-over">{{ "%.2f"|format(line.over_amount) }} over budget</span>
+                    {% else %}
+                    <span class="budget-status">{{ "%.2f"|format(line.remaining) }} resterend</span>
+                    {% endif %}
+                    <div class="budget-actions">
+                        <button class="btn btn-sm" onclick="toggleBudgetEdit({{ line.budget.id }})">Bewerken</button>
+                        <form method="post" action="/budgets/{{ line.budget.id }}/delete" style="display:inline;"
+                              onsubmit="return confirm('Budget verwijderen?')">
+                            <button type="submit" class="btn btn-sm btn-danger">Verwijderen</button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Edit form (hidden) -->
+                <div class="budget-edit" id="budget-edit-{{ line.budget.id }}" style="display:none;">
+                    <form method="post" action="/budgets/{{ line.budget.id }}/edit" class="edit-form">
+                        <div class="form-group">
+                            <label>Maandbedrag</label>
+                            <input type="number" step="0.01" min="0.01" name="amount"
+                                   value="{{ '%.2f'|format(line.budget.amount) }}" required>
+                        </div>
+                        <button type="submit" class="btn btn-sm btn-primary">Opslaan</button>
+                        <button type="button" class="btn btn-sm" onclick="toggleBudgetEdit({{ line.budget.id }})">Annuleren</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+
+        </div>
+        {% else %}
+        <div class="card">
+            <p class="muted" style="text-align:center; padding:1rem;">Nog geen budgetten ingesteld. Voeg rechts je eerste budget toe.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Add budget form -->
+    <div>
+        <div class="card">
+            <h2>Budget toevoegen</h2>
+            {% if available_categories %}
+            <form method="post" action="/budgets">
+                <div class="form-group">
+                    <label for="category_id">Categorie</label>
+                    <select name="category_id" id="category_id" required>
+                        <option value="">Kies categorie...</option>
+                        {% for parent in all_parent_cats %}
+                            {% set ns = namespace(has_available=false) %}
+                            {% for child in parent.children|sort(attribute='name') %}
+                                {% if child in available_categories %}{% set ns.has_available = true %}{% endif %}
+                            {% endfor %}
+                            {% if ns.has_available %}
+                            <optgroup label="{{ parent.name }}">
+                                {% for child in parent.children|sort(attribute='name') %}
+                                    {% if child in available_categories %}
+                                    <option value="{{ child.id }}">{{ child.name }}</option>
+                                    {% endif %}
+                                {% endfor %}
+                            </optgroup>
+                            {% endif %}
+                        {% endfor %}
+                        {% for cat in available_categories %}
+                            {% if not cat.parent_id %}
+                            <option value="{{ cat.id }}">{{ cat.name }}</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="amount">Maandbedrag (&euro;)</label>
+                    <input type="number" step="0.01" min="0.01" id="amount" name="amount"
+                           required placeholder="bijv. 300.00">
+                </div>
+                <button type="submit" class="btn btn-primary">Toevoegen</button>
+            </form>
+            {% else %}
+            <p class="muted">Alle categorieën hebben al een budget.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleBudgetEdit(id) {
+    const el = document.getElementById('budget-edit-' + id);
+    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+</script>
+{% endblock %}
