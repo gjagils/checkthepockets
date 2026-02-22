@@ -14,7 +14,7 @@ templates = Jinja2Templates(directory="app/templates")
 @router.get("")
 def categories_list(
     request: Request,
-    account_id: int | None = Query(None),
+    account_id: int = Query(0),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
@@ -45,7 +45,7 @@ def categories_list(
             "request": request,
             "user": user,
             "accounts": accounts,
-            "current_account_id": account_id,
+            "current_account_id": account_id or None,
             "top_level": top_level,
             "children_map": children_map,
         },

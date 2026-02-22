@@ -11,7 +11,7 @@
         <div class="form-group">
             <label for="account_id">Rekening</label>
             <select name="account_id" id="account_id" onchange="this.form.submit()">
-                <option value="">Alle rekeningen</option>
+                <option value="0">Alle rekeningen</option>
                 {% for acc in accounts %}
                 <option value="{{ acc.id }}" {% if current_account_id == acc.id %}selected{% endif %}>
                     {{ acc.name }}{% if acc.iban %} ({{ acc.iban }}){% endif %}

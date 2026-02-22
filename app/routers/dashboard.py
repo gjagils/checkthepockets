@@ -22,13 +22,13 @@ MONTH_NAMES_NL = [
 @router.get("/dashboard")
 def dashboard(
     request: Request,
-    year: int | None = Query(None),
-    account_id: int | None = Query(None),
+    year: int = Query(0),
+    account_id: int = Query(0),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
     today = datetime.date.today()
-    current_year = year or today.year
+    current_year = year if year else today.year
 
     accounts = (
         db.query(Account)
@@ -126,7 +126,7 @@ def dashboard(
             "current_year": current_year,
             "years": years,
             "accounts": accounts,
-            "current_account_id": account_id,
+            "current_account_id": account_id or None,
             "income": income,
             "expenses": expenses,
             "balance": balance,
