@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Request, UploadFile, File, Form, Query
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
 from app.models import Account, Transaction
@@ -33,6 +33,7 @@ def transaction_list(
     query = (
         db.query(Transaction)
         .join(Account)
+        .options(joinedload(Transaction.category))
         .filter(Account.user_id == user.id)
     )
 

@@ -42,6 +42,9 @@ class Account(Base):
     transactions = relationship(
         "Transaction", back_populates="account", cascade="all, delete-orphan"
     )
+    categories = relationship(
+        "Category", back_populates="account", cascade="all, delete-orphan"
+    )
     savings_plans = relationship(
         "SavingsPlan", back_populates="account", cascade="all, delete-orphan"
     )
@@ -56,6 +59,7 @@ class Category(Base):
 
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    account_id = Column(Integer, ForeignKey("accounts.id"), nullable=True)
     name = Column(String(100), nullable=False)
     parent_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
     color = Column(String(7), nullable=True)
@@ -63,11 +67,12 @@ class Category(Base):
     is_income = Column(Integer, default=0)
 
     user = relationship("User", back_populates="categories")
+    account = relationship("Account", back_populates="categories")
     transactions = relationship("Transaction", back_populates="category")
     savings_lines = relationship("SavingsLine", back_populates="category")
 
     __table_args__ = (
-        UniqueConstraint("user_id", "name", name="uq_user_category"),
+        UniqueConstraint("user_id", "account_id", "name", name="uq_user_account_category"),
     )
 
 

@@ -325,10 +325,13 @@ def plan_detail(
     existing_category_ids = {line.category_id for line in plan.lines if line.category_id}
     category_suggestions = _build_category_suggestions(db, plan, existing_category_ids)
 
-    # All user categories for the dropdown
+    # Categories for this account's dropdown
     categories = (
         db.query(Category)
-        .filter(Category.user_id == user.id)
+        .filter(
+            Category.user_id == user.id,
+            Category.account_id == plan.account_id,
+        )
         .order_by(Category.name)
         .all()
     )

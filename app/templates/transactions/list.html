@@ -31,6 +31,7 @@
                     <th>Datum</th>
                     <th>Omschrijving</th>
                     <th>Tegenpartij</th>
+                    <th>Categorie</th>
                     <th class="text-right">Bedrag</th>
                     <th>Rekening</th>
                 </tr>
@@ -41,6 +42,7 @@
                     <td class="nowrap">{{ tx.date.strftime('%d-%m-%Y') }}</td>
                     <td class="desc-cell">{{ tx.description[:80] }}{% if tx.description|length > 80 %}...{% endif %}</td>
                     <td>{{ tx.counterparty or '-' }}</td>
+                    <td>{{ tx.category.name if tx.category else '-' }}</td>
                     <td class="text-right nowrap {% if tx.amount >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
                         {{ "%.2f"|format(tx.amount) }} {{ tx.currency }}
                     </td>
