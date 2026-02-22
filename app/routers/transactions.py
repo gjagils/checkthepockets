@@ -5,6 +5,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
 
 from app.database import get_db
 from app.models import Account, Transaction, Category, Tag, Rule
@@ -564,36 +565,55 @@ async def split_transaction(
     db.flush()
 
     # Create child transactions
-    created = 0
-    auto_categorized = 0
-    for idx, line in enumerate(parsed_lines):
-        # Make amount negative for debits (expenses), positive for credits (refunds)
-        amount = -line.amount_eur if line.is_debit else line.amount_eur
+    try:
+        created = 0
+        auto_categorized = 0
+        for idx, line in enumerate(parsed_lines):
+            # Make amount negative for debits (expenses), positive for credits (refunds)
+            amount = -line.amount_eur if line.is_debit else line.amount_eur
 
-        child = Transaction(
-            account_id=transaction.account_id,
-            date=line.transaction_date,
-            amount=amount,
-            currency="EUR",
-            description=line.description,
-            counterparty=line.description.split()[0] if line.description else None,
-            parent_id=transaction.id,
-            import_hash=ParsedTransaction(
+            child = Transaction(
+                account_id=transaction.account_id,
                 date=line.transaction_date,
                 amount=amount,
                 currency="EUR",
-                description=f"ICS-SPLIT-{transaction.id}-{idx}-{line.description}-{line.transaction_date}",
-            ).import_hash,
+                description=line.description,
+                counterparty=line.description.split()[0] if line.description else None,
+                parent_id=transaction.id,
+                import_hash=ParsedTransaction(
+                    date=line.transaction_date,
+                    amount=amount,
+                    currency="EUR",
+                    description=f"ICS-SPLIT-{transaction.id}-{idx}-{line.description}-{line.transaction_date}",
+                ).import_hash,
+            )
+            db.add(child)
+            db.flush()
+
+            if active_rules and apply_rules_to_transaction(active_rules, child, db):
+                auto_categorized += 1
+
+            created += 1
+
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        existing_children = (
+            db.query(Transaction)
+            .filter(Transaction.parent_id == transaction_id)
+            .all()
         )
-        db.add(child)
-        db.flush()
-
-        if active_rules and apply_rules_to_transaction(active_rules, child, db):
-            auto_categorized += 1
-
-        created += 1
-
-    db.commit()
+        return templates.TemplateResponse(
+            "transactions/split.html",
+            {
+                "request": request,
+                "user": user,
+                "transaction": transaction,
+                "existing_children": existing_children,
+                "error": "Splitsen mislukt: een of meer transacties bestaan al. Maak eerst de vorige split ongedaan en probeer opnieuw.",
+            },
+            status_code=400,
+        )
 
     return templates.TemplateResponse(
         "transactions/split_result.html",
