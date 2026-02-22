@@ -521,6 +521,53 @@ def update_entry(
     })
 
 
+@router.post("/lines/{line_id}/edit")
+def edit_line(
+    request: Request,
+    line_id: int,
+    name: str = Form(...),
+    category_id: int = Form(0),
+    frequency: str = Form("monthly"),
+    default_amount: str = Form("0"),
+    db: Session = Depends(get_db),
+):
+    user = require_login(request, db)
+
+    line = (
+        db.query(SavingsLine)
+        .join(SavingsPlan)
+        .filter(SavingsLine.id == line_id, SavingsPlan.user_id == user.id)
+        .first()
+    )
+    if not line:
+        return RedirectResponse("/savings", status_code=302)
+
+    cat_id = category_id if category_id else None
+
+    # Determine is_income from linked category
+    line_is_income = 0
+    if cat_id:
+        cat = db.query(Category).filter(Category.id == cat_id).first()
+        if cat:
+            line_is_income = cat.is_income
+
+    try:
+        amount = Decimal(default_amount.replace(",", "."))
+    except (InvalidOperation, ValueError):
+        amount = line.default_amount
+
+    line.name = name.strip()
+    line.category_id = cat_id
+    line.is_income = line_is_income
+    line.frequency = frequency
+    line.default_amount = amount
+    line.annual_budget = amount * len(FREQUENCY_MONTHS.get(frequency, list(range(1, 13))))
+
+    db.commit()
+
+    return RedirectResponse(f"/savings/{line.plan_id}", status_code=302)
+
+
 @router.post("/lines/{line_id}/delete")
 def delete_line(
     request: Request,

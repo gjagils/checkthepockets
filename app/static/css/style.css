@@ -558,6 +558,12 @@ tr:hover { background: rgba(31, 111, 178, 0.03); }
     border-bottom: 1px solid var(--ctp-navy);
 }
 
+/* Edit row */
+.edit-row td {
+    background: var(--ctp-card);
+    padding: 0.5rem 0.75rem;
+}
+
 /* Balance row */
 .balance-row td {
     border-top: 2px solid var(--ctp-navy);
