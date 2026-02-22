@@ -4,9 +4,9 @@ services:
     container_name: checkthepockets
     restart: unless-stopped
     ports:
-      - "8100:8000"
+      - "${APP_PORT:-8100}:8000"
     environment:
-      - DATABASE_URL=postgresql://checkthepockets:checkthepockets@db:5432/checkthepockets
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-checkthepockets}:${POSTGRES_PASSWORD:-checkthepockets}@db:5432/${POSTGRES_DB:-checkthepockets}
       - SECRET_KEY=${SECRET_KEY:-verander-dit-in-een-lang-willekeurig-wachtwoord}
     depends_on:
       db:
@@ -19,13 +19,13 @@ services:
     container_name: checkthepockets-db
     restart: unless-stopped
     environment:
-      - POSTGRES_USER=checkthepockets
-      - POSTGRES_PASSWORD=checkthepockets
-      - POSTGRES_DB=checkthepockets
+      - POSTGRES_USER=${POSTGRES_USER:-checkthepockets}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-checkthepockets}
+      - POSTGRES_DB=${POSTGRES_DB:-checkthepockets}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U checkthepockets"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-checkthepockets}"]
       interval: 5s
       timeout: 5s
       retries: 5
