@@ -126,6 +126,7 @@ class SavingsLine(Base):
     plan_id = Column(Integer, ForeignKey("savings_plans.id", ondelete="CASCADE"), nullable=False)
     name = Column(String(255), nullable=False)
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
+    is_income = Column(Integer, default=0)
     annual_budget = Column(Numeric(12, 2), default=0)
     frequency = Column(String(20), nullable=False, default="monthly")
     default_amount = Column(Numeric(12, 2), default=0)

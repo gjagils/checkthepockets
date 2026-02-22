@@ -549,9 +549,19 @@ tr:hover { background: rgba(31, 111, 178, 0.03); }
     color: var(--ctp-muted);
 }
 
+/* Section headers */
+.section-header td {
+    background: var(--ctp-card);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.85rem;
+    color: var(--ctp-muted);
+    border-bottom: 1px solid var(--ctp-navy);
+}
+
 /* Balance row */
 .balance-row td {
     border-top: 2px solid var(--ctp-navy);
+    border-bottom: 2px solid var(--ctp-navy);
     background: var(--ctp-bg);
 }
 .balance-row td.sticky-col {

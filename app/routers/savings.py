@@ -300,7 +300,12 @@ def plan_detail(
             )
             category_totals[line.id] = totals
 
+    # Split lines into income and expense
+    income_lines = [l for l in plan.lines if l.is_income]
+    expense_lines = [l for l in plan.lines if not l.is_income]
+
     # Calculate running balance per month
+    # Income adds, expense subtracts (amounts stored as positive)
     running_balance = {}
     balance = plan.starting_balance or Decimal("0")
     for m in range(1, 13):
@@ -308,15 +313,18 @@ def plan_detail(
         for line in plan.lines:
             entry = next((e for e in line.entries if e.month == m), None)
             if entry and entry.amount is not None:
-                month_total += entry.amount
+                if line.is_income:
+                    month_total += abs(entry.amount)
+                else:
+                    month_total -= abs(entry.amount)
         balance += month_total
         running_balance[m] = balance
 
-    # Calculate planned annual total per line
+    # Calculate planned annual total per line (always positive display)
     line_totals = {}
     for line in plan.lines:
         total = sum(
-            (e.amount for e in line.entries if e.amount is not None),
+            (abs(e.amount) for e in line.entries if e.amount is not None),
             Decimal("0"),
         )
         line_totals[line.id] = total
@@ -344,6 +352,8 @@ def plan_detail(
             "request": request,
             "user": user,
             "plan": plan,
+            "income_lines": income_lines,
+            "expense_lines": expense_lines,
             "months": MONTH_NAMES_NL,
             "running_balance": running_balance,
             "line_totals": line_totals,
@@ -391,10 +401,18 @@ def add_line(
 
     cat_id = category_id if category_id else None
 
+    # Determine is_income from linked category
+    line_is_income = 0
+    if cat_id:
+        cat = db.query(Category).filter(Category.id == cat_id).first()
+        if cat:
+            line_is_income = cat.is_income
+
     line = SavingsLine(
         plan_id=plan_id,
         name=name.strip(),
         category_id=cat_id,
+        is_income=line_is_income,
         frequency=frequency,
         default_amount=amount,
         annual_budget=amount * len(FREQUENCY_MONTHS.get(frequency, list(range(1, 13)))),
@@ -466,9 +484,9 @@ def update_entry(
 
     db.commit()
 
-    # Recalculate running balance and line total
+    # Recalculate line total (always positive display)
     line_total = sum(
-        (e.amount for e in entry.line.entries if e.amount is not None),
+        (abs(e.amount) for e in entry.line.entries if e.amount is not None),
         Decimal("0"),
     )
 
@@ -486,7 +504,10 @@ def update_entry(
         for ln in all_lines:
             e = next((x for x in ln.entries if x.month == m), None)
             if e and e.amount is not None:
-                month_total += e.amount
+                if ln.is_income:
+                    month_total += abs(e.amount)
+                else:
+                    month_total -= abs(e.amount)
         balance += month_total
         running_balances[m] = float(balance)
 
