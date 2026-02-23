@@ -111,38 +111,25 @@
 </div>
 {% endif %}
 
-<!-- Top categories -->
+<!-- Top categories with visual bars -->
 {% if top_categories %}
 <div class="card">
-    <h2>Top 10 uitgavecategorieën</h2>
-    <div class="table-wrap">
-        <table>
-            <thead>
-                <tr>
-                    <th>Categorie</th>
-                    <th class="text-right">Bedrag</th>
-                    <th class="text-right">Transacties</th>
-                    <th class="text-right">% van uitgaven</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for cat in top_categories %}
-                <tr>
-                    <td>{{ cat.name }}</td>
-                    <td class="text-right nowrap amount-negative">{{ "%.2f"|format(cat.total) }} EUR</td>
-                    <td class="text-right">{{ cat.tx_count }}</td>
-                    <td class="text-right nowrap">
-                        {% if expenses < 0 %}
-                        {{ "%.1f"|format((cat.total / expenses) * 100) }}%
-                        {% else %}
-                        -
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <h2>Uitgaven per categorie</h2>
+    {% set max_amount = top_categories[0].total|abs if top_categories else 1 %}
+    {% for cat in top_categories %}
+    {% set pct = ((cat.total / expenses) * 100)|round(1) if expenses < 0 else 0 %}
+    {% set bar_width = ((cat.total|abs / max_amount) * 100)|round(0)|int if max_amount else 0 %}
+    <div style="margin-bottom:0.75rem;">
+        <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:0.25rem;">
+            <span style="font-weight:600; font-size:0.9rem;">{{ cat.name }}</span>
+            <span class="amount-negative nowrap" style="font-size:0.9rem;">{{ "%.2f"|format(cat.total) }} EUR <span class="muted">({{ pct }}%)</span></span>
+        </div>
+        <div style="width:100%; height:10px; background:var(--ctp-border); border-radius:5px; overflow:hidden;">
+            <div style="width:{{ bar_width }}%; height:100%; background:var(--ctp-danger); border-radius:5px; transition:width 0.3s;"></div>
+        </div>
+        <span class="muted" style="font-size:0.75rem;">{{ cat.tx_count }} transactie{{ 's' if cat.tx_count != 1 else '' }}</span>
     </div>
+    {% endfor %}
 </div>
 {% endif %}
 {% endblock %}

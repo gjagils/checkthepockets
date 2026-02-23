@@ -10,6 +10,7 @@ from sqlalchemy import func
 from app.database import get_db
 from app.models import Account, Budget, Category, Transaction
 from app.auth import require_login
+from sqlalchemy import case
 
 router = APIRouter(prefix="/budgets")
 templates = Jinja2Templates(directory="app/templates")
@@ -130,6 +131,30 @@ def budget_overview(
             "parent_spent": parent_spent,
         })
 
+    # Get total income for this month (for zero-based budget view)
+    income_query = (
+        db.query(
+            func.sum(
+                case(
+                    (Transaction.amount > 0, Transaction.amount),
+                    else_=Decimal("0"),
+                )
+            ).label("income"),
+        )
+        .join(Account)
+        .filter(
+            Account.user_id == user.id,
+            func.extract("year", Transaction.date) == current_year,
+            func.extract("month", Transaction.date) == current_month,
+        )
+    )
+    if account_id:
+        income_query = income_query.filter(Transaction.account_id == account_id)
+
+    income_result = income_query.first()
+    total_income = income_result.income or Decimal("0")
+    unallocated = total_income - total_budgeted
+
     # Years with transactions
     tx_years = (
         db.query(func.extract("year", Transaction.date).label("yr"))
@@ -155,6 +180,8 @@ def budget_overview(
             "total_budgeted": total_budgeted,
             "total_spent": total_spent,
             "total_remaining": total_budgeted - total_spent,
+            "total_income": total_income,
+            "unallocated": unallocated,
         },
     )
 

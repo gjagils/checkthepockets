@@ -44,6 +44,10 @@
 <!-- Summary -->
 <div class="import-summary">
     <div class="summary-card">
+        <div class="value amount-positive">&euro;&nbsp;{{ "%.2f"|format(total_income)|replace(".", ",") }}</div>
+        <div class="label">Inkomen</div>
+    </div>
+    <div class="summary-card">
         <div class="value">&euro;&nbsp;{{ "%.2f"|format(total_budgeted)|replace(".", ",") }}</div>
         <div class="label">Gebudgetteerd</div>
     </div>
@@ -56,6 +60,12 @@
             &euro;&nbsp;{{ "%.2f"|format(total_remaining)|replace(".", ",") }}
         </div>
         <div class="label">Resterend</div>
+    </div>
+    <div class="summary-card">
+        <div class="value {% if unallocated >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
+            &euro;&nbsp;{{ "%.2f"|format(unallocated)|replace(".", ",") }}
+        </div>
+        <div class="label">Niet toegewezen</div>
     </div>
 </div>
 
