@@ -1,4 +1,4 @@
-"""Add nordigen_connections table for bank API integrations
+"""Add plaid_connections table for bank API integrations
 
 Revision ID: 014
 Revises: 013
@@ -17,21 +17,21 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     op.create_table(
-        "nordigen_connections",
+        "plaid_connections",
         sa.Column("id", sa.Integer(), primary_key=True),
         sa.Column("user_id", sa.Integer(), sa.ForeignKey("users.id"), nullable=False),
-        sa.Column("institution_id", sa.String(100), nullable=False),
+        sa.Column("institution_id", sa.String(100), nullable=True),
         sa.Column("institution_name", sa.String(255), nullable=False),
-        sa.Column("requisition_id", sa.String(100), nullable=False),
-        sa.Column("nordigen_account_id", sa.String(100), nullable=True),
+        sa.Column("access_token", sa.String(255), nullable=False),
+        sa.Column("item_id", sa.String(100), nullable=False),
+        sa.Column("plaid_account_id", sa.String(100), nullable=True),
         sa.Column("account_id", sa.Integer(), sa.ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("iban", sa.String(34), nullable=True),
-        sa.Column("status", sa.String(20), server_default="pending"),
+        sa.Column("cursor", sa.Text(), nullable=True),
+        sa.Column("status", sa.String(20), server_default="active"),
         sa.Column("last_synced_at", sa.DateTime(), nullable=True),
-        sa.Column("access_valid_until", sa.DateTime(), nullable=True),
         sa.Column("created_at", sa.DateTime(), server_default=sa.func.now()),
     )
 
 
 def downgrade() -> None:
-    op.drop_table("nordigen_connections")
+    op.drop_table("plaid_connections")

@@ -15,40 +15,40 @@ logger = logging.getLogger(__name__)
 scheduler = BackgroundScheduler()
 
 
-def _daily_nordigen_sync():
-    """Sync all active Nordigen bank connections."""
-    from app.routers.nordigen import sync_all_active_connections
+def _daily_plaid_sync():
+    """Sync all active Plaid bank connections."""
+    from app.routers.plaid import sync_all_active_connections
 
     db = SessionLocal()
     try:
         result = sync_all_active_connections(db)
         logger.info(
-            "Daily Nordigen sync: %d connections, %d imported, %d skipped, %d errors",
+            "Daily Plaid sync: %d connections, %d imported, %d skipped, %d errors",
             result["connections"],
             result["imported"],
             result["skipped"],
             result["errors"],
         )
     except Exception as e:
-        logger.error("Daily Nordigen sync failed: %s", e)
+        logger.error("Daily Plaid sync failed: %s", e)
     finally:
         db.close()
 
 
 def start_scheduler():
     """Start the background scheduler with all configured jobs."""
-    from app.config import NORDIGEN_SECRET_ID
+    from app.config import PLAID_CLIENT_ID
 
-    if NORDIGEN_SECRET_ID:
+    if PLAID_CLIENT_ID:
         scheduler.add_job(
-            _daily_nordigen_sync,
+            _daily_plaid_sync,
             "cron",
             hour=6,
             minute=0,
-            id="nordigen_daily_sync",
+            id="plaid_daily_sync",
             replace_existing=True,
         )
-        logger.info("Nordigen daily sync scheduled at 06:00")
+        logger.info("Plaid daily sync scheduled at 06:00")
 
     if scheduler.get_jobs():
         scheduler.start()

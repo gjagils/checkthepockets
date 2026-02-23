@@ -44,7 +44,7 @@ class User(Base):
     portfolio_holdings = relationship("PortfolioHolding", back_populates="user", cascade="all, delete-orphan")
     networth_accounts = relationship("NetWorthAccount", back_populates="user", cascade="all, delete-orphan")
     networth_snapshots = relationship("NetWorthSnapshot", back_populates="user", cascade="all, delete-orphan")
-    nordigen_connections = relationship("NordigenConnection", back_populates="user", cascade="all, delete-orphan")
+    plaid_connections = relationship("PlaidConnection", back_populates="user", cascade="all, delete-orphan")
 
 
 class Account(Base):
@@ -342,21 +342,21 @@ class NetWorthSnapshot(Base):
     )
 
 
-class NordigenConnection(Base):
-    __tablename__ = "nordigen_connections"
+class PlaidConnection(Base):
+    __tablename__ = "plaid_connections"
 
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    institution_id = Column(String(100), nullable=False)       # Nordigen institution ID (e.g. "ING_INGBNL2A")
+    institution_id = Column(String(100), nullable=True)        # Plaid institution ID (e.g. "ins_1")
     institution_name = Column(String(255), nullable=False)     # Human-readable name
-    requisition_id = Column(String(100), nullable=False)       # Nordigen requisition UUID
-    nordigen_account_id = Column(String(100), nullable=True)   # Nordigen account UUID
-    account_id = Column(Integer, ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True)  # Link to local Account
-    iban = Column(String(34), nullable=True)
-    status = Column(String(20), default="pending")             # "pending", "active", "expired", "error"
+    access_token = Column(String(255), nullable=False)         # Permanent Plaid access token
+    item_id = Column(String(100), nullable=False)              # Plaid item identifier
+    plaid_account_id = Column(String(100), nullable=True)      # Plaid account ID
+    account_id = Column(Integer, ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True)
+    cursor = Column(Text, nullable=True)                       # transactions/sync cursor
+    status = Column(String(20), default="active")              # "active", "error", "expired"
     last_synced_at = Column(DateTime, nullable=True)
-    access_valid_until = Column(DateTime, nullable=True)       # When bank consent expires
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
-    user = relationship("User", back_populates="nordigen_connections")
+    user = relationship("User", back_populates="plaid_connections")
     account = relationship("Account")
