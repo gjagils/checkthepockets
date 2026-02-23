@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Instellingen - Check The Pockets{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Instellingen</h1>
+</div>
+
+{% if success %}
+<div class="alert alert-success">{{ success }}</div>
+{% endif %}
+
+<div class="card">
+    <h2>Wachtwoord wijzigen</h2>
+    {% if errors %}
+    <div class="alert alert-error">
+        <ul>
+        {% for error in errors %}
+            <li>{{ error }}</li>
+        {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+    <form method="post" action="/settings/password">
+        <div class="form-group">
+            <label for="current_password">Huidig wachtwoord</label>
+            <input type="password" id="current_password" name="current_password" required>
+        </div>
+        <div class="form-group">
+            <label for="new_password">Nieuw wachtwoord</label>
+            <input type="password" id="new_password" name="new_password" required minlength="8">
+        </div>
+        <div class="form-group">
+            <label for="new_password_confirm">Bevestig nieuw wachtwoord</label>
+            <input type="password" id="new_password_confirm" name="new_password_confirm" required minlength="8">
+        </div>
+        <button type="submit" class="btn btn-primary">Wachtwoord wijzigen</button>
+    </form>
+</div>
+
+<div class="card">
+    <h2>Account verwijderen</h2>
+    <p class="muted" style="margin-bottom:1rem;">
+        Let op: dit verwijdert je account en alle bijbehorende data (rekeningen, transacties, categorieën, budgetten, regels en spaarplannen) permanent. Dit kan niet ongedaan worden gemaakt.
+    </p>
+    {% if delete_error %}
+    <div class="alert alert-error">{{ delete_error }}</div>
+    {% endif %}
+    <form method="post" action="/settings/delete-account" onsubmit="return confirm('Weet je zeker dat je je account en alle data permanent wilt verwijderen?');">
+        <div class="form-group">
+            <label for="confirm_password">Bevestig met je wachtwoord</label>
+            <input type="password" id="confirm_password" name="confirm_password" required>
+        </div>
+        <button type="submit" class="btn btn-danger">Account permanent verwijderen</button>
+    </form>
+</div>
+{% endblock %}
