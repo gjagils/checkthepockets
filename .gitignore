@@ -1,5 +1,6 @@
 # Check The Pockets
 .env
+stack.env
 *.sqlite3
 app/static/img/logo.png
 app/static/img/favicon.png
