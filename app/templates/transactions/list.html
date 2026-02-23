@@ -3,7 +3,10 @@
 {% block content %}
 <div class="page-header">
     <h1>Transacties <span class="muted" style="font-weight:400; font-size:0.9rem;">({{ total }})</span></h1>
-    <a href="/import" class="btn btn-primary">CSV importeren</a>
+    <div style="display:flex; gap:0.5rem;">
+        <a href="/transactions/create" class="btn btn-accent">Handmatig toevoegen</a>
+        <a href="/import" class="btn btn-primary">CSV importeren</a>
+    </div>
 </div>
 
 <!-- Search & Filters -->

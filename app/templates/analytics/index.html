@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}Analyse - Check The Pockets{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Analyse {{ current_year }}</h1>
+</div>
+
+<!-- Filters -->
+<div class="card">
+    <form method="get" action="/analytics" class="filter-bar">
+        <div class="form-group">
+            <label for="year">Jaar</label>
+            <select name="year" id="year" onchange="this.form.submit()">
+                {% for y in years %}
+                <option value="{{ y }}" {% if y == current_year %}selected{% endif %}>{{ y }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="account_id">Rekening</label>
+            <select name="account_id" id="account_id" onchange="this.form.submit()">
+                <option value="0">Alle rekeningen</option>
+                {% for acc in accounts %}
+                <option value="{{ acc.id }}" {% if current_account_id == acc.id %}selected{% endif %}>
+                    {{ acc.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+    </form>
+</div>
+
+<!-- Income vs Expenses trend -->
+<div class="card">
+    <h2>Inkomen vs. Uitgaven per maand</h2>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Maand</th>
+                    <th class="text-right">Inkomen</th>
+                    <th>Grafiek</th>
+                    <th class="text-right">Uitgaven</th>
+                    <th>Grafiek</th>
+                    <th class="text-right">Resultaat</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% set max_income = namespace(val=1) %}
+                {% set max_expense = namespace(val=1) %}
+                {% for m in range(1, 13) %}
+                    {% set data = trend_data.get(m, {}) %}
+                    {% set inc = data.get('income', 0) %}
+                    {% set exp = data.get('expenses', 0)|abs %}
+                    {% if inc > max_income.val %}{% set max_income.val = inc %}{% endif %}
+                    {% if exp > max_expense.val %}{% set max_expense.val = exp %}{% endif %}
+                {% endfor %}
+                {% for m in range(1, 13) %}
+                {% set data = trend_data.get(m, {}) %}
+                {% set inc = data.get('income', 0) %}
+                {% set exp = data.get('expenses', 0) %}
+                {% set bal = data.get('balance', 0) %}
+                {% set inc_width = ((inc / max_income.val) * 100)|round(0)|int if max_income.val > 0 and inc > 0 else 0 %}
+                {% set exp_width = ((exp|abs / max_expense.val) * 100)|round(0)|int if max_expense.val > 0 and exp < 0 else 0 %}
+                <tr>
+                    <td>{{ months[m] }}</td>
+                    <td class="text-right nowrap amount-positive">{{ "%.2f"|format(inc) }}</td>
+                    <td style="width:20%;">
+                        <div style="width:100%; height:10px; background:var(--ctp-border); border-radius:5px; overflow:hidden;">
+                            <div style="width:{{ inc_width }}%; height:100%; background:var(--ctp-check); border-radius:5px;"></div>
+                        </div>
+                    </td>
+                    <td class="text-right nowrap amount-negative">{{ "%.2f"|format(exp) }}</td>
+                    <td style="width:20%;">
+                        <div style="width:100%; height:10px; background:var(--ctp-border); border-radius:5px; overflow:hidden;">
+                            <div style="width:{{ exp_width }}%; height:100%; background:var(--ctp-danger); border-radius:5px;"></div>
+                        </div>
+                    </td>
+                    <td class="text-right nowrap {% if bal >= 0 %}amount-positive{% else %}amount-negative{% endif %}">{{ "%.2f"|format(bal) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Category trends -->
+{% if categories_trend %}
+<div class="card">
+    <h2>Top 10 categorieën per maand</h2>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Categorie</th>
+                    {% for m in range(1, 13) %}
+                    <th class="text-right" style="min-width:65px;">{{ months[m] }}</th>
+                    {% endfor %}
+                    <th class="text-right" style="border-left:2px solid var(--ctp-border);">Totaal</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cat in categories_trend %}
+                <tr>
+                    <td style="white-space:nowrap; font-weight:600;">{{ cat.name }}</td>
+                    {% for m in range(1, 13) %}
+                    {% set val = cat.monthly[m] %}
+                    {% set intensity = ((val / max_cat_monthly) * 0.6)|round(2) if max_cat_monthly > 0 and val > 0 else 0 %}
+                    <td class="text-right nowrap" style="background:rgba(229, 77, 77, {{ intensity }}); font-size:0.8rem;">
+                        {% if val > 0 %}{{ "%.0f"|format(val) }}{% else %}-{% endif %}
+                    </td>
+                    {% endfor %}
+                    <td class="text-right nowrap" style="border-left:2px solid var(--ctp-border); font-weight:700;">
+                        {{ "%.2f"|format(cat.total) }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

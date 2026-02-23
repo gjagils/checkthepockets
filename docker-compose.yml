@@ -8,6 +8,10 @@ services:
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-checkthepockets}:${POSTGRES_PASSWORD:-checkthepockets}@db:5432/${POSTGRES_DB:-checkthepockets}
       - SECRET_KEY=${SECRET_KEY:-verander-dit-in-een-lang-willekeurig-wachtwoord}
+      - PLAID_CLIENT_ID=${PLAID_CLIENT_ID:-}
+      - PLAID_SECRET=${PLAID_SECRET:-}
+      - PLAID_ENV=${PLAID_ENV:-sandbox}
+      - PLAID_REDIRECT_URI=${PLAID_REDIRECT_URI:-}
     depends_on:
       db:
         condition: service_healthy

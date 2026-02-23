@@ -10,6 +10,7 @@ from sqlalchemy import func
 from app.database import get_db
 from app.models import Account, Budget, Category, Transaction
 from app.auth import require_login
+from sqlalchemy import case
 
 router = APIRouter(prefix="/budgets")
 templates = Jinja2Templates(directory="app/templates")
@@ -65,6 +66,50 @@ def budget_overview(
     )
     budget_map = {b.category_id: b.amount for b in budgets}
 
+    # Previous month for rollover calculation
+    if current_month == 1:
+        prev_year, prev_month = current_year - 1, 12
+    else:
+        prev_year, prev_month = current_year, current_month - 1
+
+    # Get previous month's budgets
+    prev_budgets = (
+        db.query(Budget)
+        .filter(
+            Budget.user_id == user.id,
+            Budget.year == prev_year,
+            Budget.month == prev_month,
+        )
+        .all()
+    )
+    prev_budget_map = {b.category_id: b.amount for b in prev_budgets}
+
+    # Get previous month's spending
+    prev_spending_query = (
+        db.query(
+            Category.id,
+            func.sum(Transaction.amount).label("total"),
+        )
+        .join(Transaction, Transaction.category_id == Category.id)
+        .join(Account, Account.id == Transaction.account_id)
+        .filter(
+            Account.user_id == user.id,
+            func.extract("year", Transaction.date) == prev_year,
+            func.extract("month", Transaction.date) == prev_month,
+            Transaction.amount < 0,
+        )
+    )
+    if account_id:
+        prev_spending_query = prev_spending_query.filter(Transaction.account_id == account_id)
+    prev_spending = prev_spending_query.group_by(Category.id).all()
+    prev_spending_map = {row.id: abs(row.total) for row in prev_spending}
+
+    # Rollover per category: prev_budget - prev_spent (positive = surplus, negative = overspent)
+    rollover_map = {}
+    for cat_id, prev_bud in prev_budget_map.items():
+        prev_sp = prev_spending_map.get(cat_id, Decimal("0"))
+        rollover_map[cat_id] = prev_bud - prev_sp
+
     # Get actual spending per category for this month
     # Include both parent-level and subcategory transactions
     spending_query = (
@@ -91,23 +136,29 @@ def budget_overview(
     budget_data = []
     total_budgeted = Decimal("0")
     total_spent = Decimal("0")
+    total_rollover = Decimal("0")
 
     for parent in top_level:
         children = children_map.get(parent.id, [])
         parent_budget = budget_map.get(parent.id, Decimal("0"))
         parent_spent = spending_map.get(parent.id, Decimal("0"))
+        parent_rollover = rollover_map.get(parent.id, Decimal("0"))
 
         child_rows = []
         group_budget = parent_budget
         group_spent = parent_spent
+        group_rollover = parent_rollover
 
         for child in children:
             if child.is_income:
                 continue
             cb = budget_map.get(child.id, Decimal("0"))
             cs = spending_map.get(child.id, Decimal("0"))
+            cr = rollover_map.get(child.id, Decimal("0"))
+            cprev = prev_spending_map.get(child.id, Decimal("0"))
             group_budget += cb
             group_spent += cs
+            group_rollover += cr
             child_rows.append({
                 "id": child.id,
                 "name": child.name,
@@ -115,10 +166,15 @@ def budget_overview(
                 "budget": cb,
                 "spent": cs,
                 "remaining": cb - cs,
+                "rollover": cr,
+                "effective_budget": cb + cr,
+                "effective_remaining": cb + cr - cs,
+                "prev_spent": cprev,
             })
 
         total_budgeted += group_budget
         total_spent += group_spent
+        total_rollover += group_rollover
 
         budget_data.append({
             "parent": parent,
@@ -126,9 +182,37 @@ def budget_overview(
             "group_budget": group_budget,
             "group_spent": group_spent,
             "group_remaining": group_budget - group_spent,
+            "group_rollover": group_rollover,
+            "group_effective": group_budget + group_rollover,
+            "group_effective_remaining": group_budget + group_rollover - group_spent,
             "parent_budget": parent_budget,
             "parent_spent": parent_spent,
+            "parent_rollover": parent_rollover,
         })
+
+    # Get total income for this month (for zero-based budget view)
+    income_query = (
+        db.query(
+            func.sum(
+                case(
+                    (Transaction.amount > 0, Transaction.amount),
+                    else_=Decimal("0"),
+                )
+            ).label("income"),
+        )
+        .join(Account)
+        .filter(
+            Account.user_id == user.id,
+            func.extract("year", Transaction.date) == current_year,
+            func.extract("month", Transaction.date) == current_month,
+        )
+    )
+    if account_id:
+        income_query = income_query.filter(Transaction.account_id == account_id)
+
+    income_result = income_query.first()
+    total_income = income_result.income or Decimal("0")
+    unallocated = total_income - total_budgeted
 
     # Years with transactions
     tx_years = (
@@ -155,6 +239,11 @@ def budget_overview(
             "total_budgeted": total_budgeted,
             "total_spent": total_spent,
             "total_remaining": total_budgeted - total_spent,
+            "total_income": total_income,
+            "unallocated": unallocated,
+            "total_rollover": total_rollover,
+            "prev_year": prev_year,
+            "prev_month": prev_month,
         },
     )
 
@@ -251,6 +340,93 @@ def copy_budgets(
                 month=to_month,
                 amount=src.amount,
             ))
+
+    db.commit()
+
+    return RedirectResponse(f"/budgets?year={to_year}&month={to_month}", status_code=302)
+
+
+@router.post("/average")
+def budget_from_average(
+    request: Request,
+    to_year: int = Form(...),
+    to_month: int = Form(...),
+    num_months: int = Form(3),
+    db: Session = Depends(get_db),
+):
+    """Set budget per category based on average spending over the last N months."""
+    user = require_login(request, db)
+
+    # Calculate the N months before the target month
+    months_to_check = []
+    y, m = to_year, to_month
+    for _ in range(num_months):
+        m -= 1
+        if m == 0:
+            m = 12
+            y -= 1
+        months_to_check.append((y, m))
+
+    if not months_to_check:
+        return RedirectResponse(f"/budgets?year={to_year}&month={to_month}", status_code=302)
+
+    # Build OR conditions for the month ranges
+    from sqlalchemy import or_, and_, tuple_
+
+    month_conditions = or_(
+        *[
+            and_(
+                func.extract("year", Transaction.date) == yr,
+                func.extract("month", Transaction.date) == mn,
+            )
+            for yr, mn in months_to_check
+        ]
+    )
+
+    # Get average spending per category over those months
+    avg_spending = (
+        db.query(
+            Transaction.category_id,
+            func.sum(Transaction.amount).label("total"),
+        )
+        .join(Account)
+        .filter(
+            Account.user_id == user.id,
+            Transaction.category_id.isnot(None),
+            Transaction.amount < 0,
+            month_conditions,
+        )
+        .group_by(Transaction.category_id)
+        .all()
+    )
+
+    count = 0
+    for row in avg_spending:
+        avg_amount = abs(row.total) / num_months
+        # Round to nearest euro
+        avg_amount = avg_amount.quantize(Decimal("1"))
+
+        existing = (
+            db.query(Budget)
+            .filter(
+                Budget.user_id == user.id,
+                Budget.category_id == row.category_id,
+                Budget.year == to_year,
+                Budget.month == to_month,
+            )
+            .first()
+        )
+        if existing:
+            existing.amount = avg_amount
+        else:
+            db.add(Budget(
+                user_id=user.id,
+                category_id=row.category_id,
+                year=to_year,
+                month=to_month,
+                amount=avg_amount,
+            ))
+        count += 1
 
     db.commit()
 

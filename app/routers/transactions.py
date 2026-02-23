@@ -1,4 +1,7 @@
+import hashlib
+import uuid
 from datetime import date as date_type
+from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Depends, Request, UploadFile, File, Form, Query
 from fastapi.responses import RedirectResponse
@@ -11,7 +14,7 @@ from sqlalchemy.exc import IntegrityError
 from app.database import get_db
 from app.models import Account, Transaction, Category, Tag, Rule
 from app.auth import require_login
-from app.parsers import abn_amro, bunq, ics
+from app.parsers import abn_amro, bunq, ics, ing, rabobank
 from app.parsers.base import ParseError, ParsedTransaction
 from app.parsers.ics_pdf import parse_ics_pdf
 from app.rules_engine import apply_rules_to_transaction
@@ -23,6 +26,8 @@ PARSERS = {
     "abn_amro": ("ABN AMRO", abn_amro.parse),
     "bunq": ("Bunq", bunq.parse),
     "ics": ("ICS", ics.parse),
+    "ing": ("ING", ing.parse),
+    "rabobank": ("Rabobank", rabobank.parse),
 }
 
 PER_PAGE = 50
@@ -223,6 +228,178 @@ def set_category(
     db.commit()
 
     return RedirectResponse(redirect_to, status_code=302)
+
+
+@router.get("/transactions/{transaction_id}/edit")
+def edit_transaction_page(
+    transaction_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    user = require_login(request, db)
+    transaction = (
+        db.query(Transaction)
+        .join(Account)
+        .options(joinedload(Transaction.tags))
+        .filter(Transaction.id == transaction_id, Account.user_id == user.id)
+        .first()
+    )
+    if not transaction:
+        return RedirectResponse("/", status_code=302)
+
+    categories = (
+        db.query(Category)
+        .filter(Category.user_id == user.id)
+        .order_by(Category.name)
+        .all()
+    )
+    tags = (
+        db.query(Tag)
+        .filter(Tag.user_id == user.id)
+        .order_by(Tag.name)
+        .all()
+    )
+
+    return templates.TemplateResponse(
+        "transactions/edit.html",
+        {
+            "request": request,
+            "user": user,
+            "transaction": transaction,
+            "categories": categories,
+            "tags": tags,
+        },
+    )
+
+
+@router.post("/transactions/{transaction_id}/edit")
+async def edit_transaction(
+    transaction_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    user = require_login(request, db)
+    transaction = (
+        db.query(Transaction)
+        .join(Account)
+        .filter(Transaction.id == transaction_id, Account.user_id == user.id)
+        .first()
+    )
+    if not transaction:
+        return RedirectResponse("/", status_code=302)
+
+    form = await request.form()
+    transaction.description = (form.get("description") or "").strip() or None
+    transaction.counterparty = (form.get("counterparty") or "").strip() or None
+    cat_id = (form.get("category_id") or "").strip()
+    transaction.category_id = int(cat_id) if cat_id else None
+
+    # Handle tags
+    tag_ids = form.getlist("tag_ids")
+    selected_tags = []
+    for tid in tag_ids:
+        tag = db.query(Tag).filter(Tag.id == int(tid), Tag.user_id == user.id).first()
+        if tag:
+            selected_tags.append(tag)
+
+    # Create new tag if provided
+    new_tag_name = (form.get("new_tag") or "").strip()
+    if new_tag_name:
+        existing = db.query(Tag).filter(
+            Tag.user_id == user.id, Tag.name == new_tag_name
+        ).first()
+        if existing:
+            selected_tags.append(existing)
+        else:
+            tag_obj = Tag(user_id=user.id, name=new_tag_name)
+            db.add(tag_obj)
+            db.flush()
+            selected_tags.append(tag_obj)
+
+    transaction.tags = selected_tags
+    db.commit()
+
+    return RedirectResponse("/", status_code=302)
+
+
+@router.get("/transactions/create")
+def create_transaction_page(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    user = require_login(request, db)
+    accounts = db.query(Account).filter(Account.user_id == user.id).order_by(Account.name).all()
+    categories = (
+        db.query(Category)
+        .filter(Category.user_id == user.id)
+        .order_by(Category.name)
+        .all()
+    )
+
+    return templates.TemplateResponse(
+        "transactions/create.html",
+        {
+            "request": request,
+            "user": user,
+            "accounts": accounts,
+            "categories": categories,
+            "today": date_type.today().isoformat(),
+        },
+    )
+
+
+@router.post("/transactions/create")
+def create_transaction(
+    request: Request,
+    account_id: int = Form(...),
+    date: str = Form(...),
+    amount: str = Form(...),
+    description: str = Form(""),
+    counterparty: str = Form(""),
+    category_id: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    user = require_login(request, db)
+
+    # Validate account belongs to user
+    account = db.query(Account).filter(
+        Account.id == account_id, Account.user_id == user.id
+    ).first()
+    if not account:
+        return RedirectResponse("/", status_code=302)
+
+    # Parse amount
+    try:
+        parsed_amount = Decimal(amount.strip().replace(",", "."))
+    except (InvalidOperation, ValueError):
+        return RedirectResponse("/transactions/create", status_code=302)
+
+    # Parse date
+    try:
+        parsed_date = date_type.fromisoformat(date.strip())
+    except ValueError:
+        return RedirectResponse("/transactions/create", status_code=302)
+
+    cat_id = int(category_id) if category_id.strip() else None
+
+    # Generate unique hash for manual entries
+    unique_key = f"MANUAL-{user.id}-{uuid.uuid4()}"
+    import_hash = hashlib.sha256(unique_key.encode()).hexdigest()
+
+    tx = Transaction(
+        account_id=account.id,
+        date=parsed_date,
+        amount=parsed_amount,
+        currency="EUR",
+        description=description.strip() or None,
+        counterparty=counterparty.strip() or None,
+        category_id=cat_id,
+        import_hash=import_hash,
+    )
+    db.add(tx)
+    db.commit()
+
+    return RedirectResponse("/", status_code=302)
 
 
 @router.get("/import")

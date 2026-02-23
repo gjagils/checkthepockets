@@ -44,6 +44,10 @@
 <!-- Summary -->
 <div class="import-summary">
     <div class="summary-card">
+        <div class="value amount-positive">&euro;&nbsp;{{ "%.2f"|format(total_income)|replace(".", ",") }}</div>
+        <div class="label">Inkomen</div>
+    </div>
+    <div class="summary-card">
         <div class="value">&euro;&nbsp;{{ "%.2f"|format(total_budgeted)|replace(".", ",") }}</div>
         <div class="label">Gebudgetteerd</div>
     </div>
@@ -57,6 +61,20 @@
         </div>
         <div class="label">Resterend</div>
     </div>
+    <div class="summary-card">
+        <div class="value {% if unallocated >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
+            &euro;&nbsp;{{ "%.2f"|format(unallocated)|replace(".", ",") }}
+        </div>
+        <div class="label">Niet toegewezen</div>
+    </div>
+    {% if total_rollover != 0 %}
+    <div class="summary-card">
+        <div class="value {% if total_rollover >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
+            &euro;&nbsp;{{ "%.2f"|format(total_rollover)|replace(".", ",") }}
+        </div>
+        <div class="label">Rollover {{ months[prev_month] }}</div>
+    </div>
+    {% endif %}
 </div>
 
 <!-- Budget table -->
@@ -68,7 +86,10 @@
                 <tr>
                     <th>Categorie</th>
                     <th class="text-right">Budget</th>
+                    <th class="text-right">Rollover</th>
+                    <th class="text-right">Effectief</th>
                     <th class="text-right">Uitgegeven</th>
+                    <th class="text-right">Vorige mnd</th>
                     <th class="text-right">Resterend</th>
                     <th>Voortgang</th>
                 </tr>
@@ -78,15 +99,24 @@
                 <tr class="category-parent">
                     <td><strong>{{ group.parent.name }}</strong></td>
                     <td class="text-right nowrap"><strong>&euro;&nbsp;{{ "%.2f"|format(group.group_budget)|replace(".", ",") }}</strong></td>
-                    <td class="text-right nowrap"><strong>&euro;&nbsp;{{ "%.2f"|format(group.group_spent)|replace(".", ",") }}</strong></td>
                     <td class="text-right nowrap">
-                        <strong class="{% if group.group_remaining >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
-                            &euro;&nbsp;{{ "%.2f"|format(group.group_remaining)|replace(".", ",") }}
+                        {% if group.group_rollover != 0 %}
+                        <span class="{% if group.group_rollover >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
+                            {{ "%.2f"|format(group.group_rollover)|replace(".", ",") }}
+                        </span>
+                        {% else %}<span class="muted">-</span>{% endif %}
+                    </td>
+                    <td class="text-right nowrap"><strong>&euro;&nbsp;{{ "%.2f"|format(group.group_effective)|replace(".", ",") }}</strong></td>
+                    <td class="text-right nowrap"><strong>&euro;&nbsp;{{ "%.2f"|format(group.group_spent)|replace(".", ",") }}</strong></td>
+                    <td class="text-right nowrap muted">-</td>
+                    <td class="text-right nowrap">
+                        <strong class="{% if group.group_effective_remaining >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
+                            &euro;&nbsp;{{ "%.2f"|format(group.group_effective_remaining)|replace(".", ",") }}
                         </strong>
                     </td>
                     <td>
-                        {% if group.group_budget > 0 %}
-                        {% set pct = ((group.group_spent / group.group_budget) * 100)|int %}
+                        {% if group.group_effective > 0 %}
+                        {% set pct = ((group.group_spent / group.group_effective) * 100)|int %}
                         <div class="budget-bar">
                             <div class="budget-bar-fill {% if pct > 100 %}bar-over{% elif pct > 80 %}bar-warn{% endif %}" style="width:{{ [pct, 100]|min }}%"></div>
                         </div>
@@ -108,7 +138,7 @@
                                onblur="saveBudget(this)"
                                onkeydown="if(event.key==='Enter')this.blur()">
                     </td>
-                    <td colspan="3"></td>
+                    <td colspan="6"></td>
                 </tr>
                 {% endif %}
 
@@ -127,15 +157,28 @@
                                onblur="saveBudget(this)"
                                onkeydown="if(event.key==='Enter')this.blur()">
                     </td>
-                    <td class="text-right nowrap">&euro;&nbsp;{{ "%.2f"|format(child.spent)|replace(".", ",") }}</td>
                     <td class="text-right nowrap">
-                        <span class="{% if child.remaining >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
-                            &euro;&nbsp;{{ "%.2f"|format(child.remaining)|replace(".", ",") }}
+                        {% if child.rollover != 0 %}
+                        <span class="{% if child.rollover >= 0 %}amount-positive{% else %}amount-negative{% endif %}" style="font-size:0.85rem;">
+                            {{ "%.2f"|format(child.rollover)|replace(".", ",") }}
+                        </span>
+                        {% else %}<span class="muted">-</span>{% endif %}
+                    </td>
+                    <td class="text-right nowrap">&euro;&nbsp;{{ "%.2f"|format(child.effective_budget)|replace(".", ",") }}</td>
+                    <td class="text-right nowrap">&euro;&nbsp;{{ "%.2f"|format(child.spent)|replace(".", ",") }}</td>
+                    <td class="text-right nowrap muted" style="font-size:0.85rem;">
+                        {% if child.prev_spent > 0 %}
+                        &euro;&nbsp;{{ "%.2f"|format(child.prev_spent)|replace(".", ",") }}
+                        {% else %}-{% endif %}
+                    </td>
+                    <td class="text-right nowrap">
+                        <span class="{% if child.effective_remaining >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
+                            &euro;&nbsp;{{ "%.2f"|format(child.effective_remaining)|replace(".", ",") }}
                         </span>
                     </td>
                     <td>
-                        {% if child.budget > 0 %}
-                        {% set cpct = ((child.spent / child.budget) * 100)|int %}
+                        {% if child.effective_budget > 0 %}
+                        {% set cpct = ((child.spent / child.effective_budget) * 100)|int %}
                         <div class="budget-bar">
                             <div class="budget-bar-fill {% if cpct > 100 %}bar-over{% elif cpct > 80 %}bar-warn{% endif %}" style="width:{{ [cpct, 100]|min }}%"></div>
                         </div>
@@ -183,6 +226,30 @@
             <button type="submit" class="btn btn-primary btn-sm"
                     onclick="return confirm('Budgetten kopiëren? Bestaande waarden worden overschreven.')">
                 Kopiëren
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Budget from average spending -->
+<div class="card">
+    <h2>Budget op basis van gemiddelde</h2>
+    <p class="muted" style="margin-bottom:1rem;">Stel budgetten in op basis van het gemiddelde van de afgelopen maanden.</p>
+    <form method="post" action="/budgets/average" class="filter-bar" style="flex-wrap:wrap;">
+        <input type="hidden" name="to_year" value="{{ current_year }}">
+        <input type="hidden" name="to_month" value="{{ current_month }}">
+        <div class="form-group">
+            <label>Aantal maanden</label>
+            <select name="num_months">
+                <option value="3" selected>3 maanden</option>
+                <option value="6">6 maanden</option>
+                <option value="12">12 maanden</option>
+            </select>
+        </div>
+        <div class="form-group" style="align-self:flex-end;">
+            <button type="submit" class="btn btn-primary btn-sm"
+                    onclick="return confirm('Budgetten instellen op basis van gemiddelde uitgaven? Bestaande waarden worden overschreven.')">
+                Gemiddelde toepassen
             </button>
         </div>
     </form>

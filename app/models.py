@@ -39,6 +39,12 @@ class User(Base):
     tags = relationship("Tag", back_populates="user", cascade="all, delete-orphan")
     rules = relationship("Rule", back_populates="user", cascade="all, delete-orphan")
     recurring_transactions = relationship("RecurringTransaction", back_populates="user", cascade="all, delete-orphan")
+    portfolio_assets = relationship("PortfolioAsset", back_populates="user", cascade="all, delete-orphan")
+    portfolio_persons = relationship("PortfolioPerson", back_populates="user", cascade="all, delete-orphan")
+    portfolio_holdings = relationship("PortfolioHolding", back_populates="user", cascade="all, delete-orphan")
+    networth_accounts = relationship("NetWorthAccount", back_populates="user", cascade="all, delete-orphan")
+    networth_snapshots = relationship("NetWorthSnapshot", back_populates="user", cascade="all, delete-orphan")
+    plaid_connections = relationship("PlaidConnection", back_populates="user", cascade="all, delete-orphan")
 
 
 class Account(Base):
@@ -233,6 +239,54 @@ class SavingsEntry(Base):
     )
 
 
+class PortfolioAsset(Base):
+    __tablename__ = "portfolio_assets"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name = Column(String(100), nullable=False)       # "Goud", "Zilver", "Bitcoin"
+    symbol = Column(String(20), nullable=False)       # "XAU", "XAG", "bitcoin"
+    asset_class = Column(String(20), nullable=False)  # "metal", "crypto"
+    unit = Column(String(20), default="oz")           # "oz", "gram", "coin"
+    current_price_eur = Column(Numeric(16, 4), default=0)
+    price_updated_at = Column(DateTime, nullable=True)
+    monthly_growth_pct = Column(Numeric(6, 2), default=0)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    user = relationship("User", back_populates="portfolio_assets")
+    holdings = relationship("PortfolioHolding", back_populates="asset", cascade="all, delete-orphan")
+
+
+class PortfolioPerson(Base):
+    __tablename__ = "portfolio_persons"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name = Column(String(100), nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    user = relationship("User", back_populates="portfolio_persons")
+    holdings = relationship("PortfolioHolding", back_populates="person", cascade="all, delete-orphan")
+
+
+class PortfolioHolding(Base):
+    __tablename__ = "portfolio_holdings"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    asset_id = Column(Integer, ForeignKey("portfolio_assets.id", ondelete="CASCADE"), nullable=False)
+    person_id = Column(Integer, ForeignKey("portfolio_persons.id", ondelete="CASCADE"), nullable=False)
+    quantity = Column(Numeric(16, 8), default=0)
+
+    user = relationship("User", back_populates="portfolio_holdings")
+    asset = relationship("PortfolioAsset", back_populates="holdings")
+    person = relationship("PortfolioPerson", back_populates="holdings")
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "asset_id", "person_id", name="uq_holding_user_asset_person"),
+    )
+
+
 class Budget(Base):
     __tablename__ = "budgets"
 
@@ -249,3 +303,60 @@ class Budget(Base):
     __table_args__ = (
         UniqueConstraint("user_id", "category_id", "year", "month", name="uq_budget_user_cat_year_month"),
     )
+
+
+class NetWorthAccount(Base):
+    __tablename__ = "networth_accounts"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name = Column(String(150), nullable=False)
+    account_type = Column(String(20), nullable=False)  # "asset" or "liability"
+    category = Column(String(50), nullable=False)  # "savings", "investment", "property", "mortgage", "loan", "other"
+    balance = Column(Numeric(14, 2), default=0)
+    notes = Column(Text, nullable=True)
+    is_active = Column(Integer, default=1)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    user = relationship("User", back_populates="networth_accounts")
+    snapshots = relationship("NetWorthSnapshot", back_populates="account", cascade="all, delete-orphan")
+
+
+class NetWorthSnapshot(Base):
+    __tablename__ = "networth_snapshots"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    account_id = Column(Integer, ForeignKey("networth_accounts.id", ondelete="CASCADE"), nullable=False)
+    year = Column(Integer, nullable=False)
+    month = Column(Integer, nullable=False)
+    balance = Column(Numeric(14, 2), nullable=False, default=0)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    user = relationship("User", back_populates="networth_snapshots")
+    account = relationship("NetWorthAccount", back_populates="snapshots")
+
+    __table_args__ = (
+        UniqueConstraint("account_id", "year", "month", name="uq_networth_snapshot_account_year_month"),
+    )
+
+
+class PlaidConnection(Base):
+    __tablename__ = "plaid_connections"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    institution_id = Column(String(100), nullable=True)        # Plaid institution ID (e.g. "ins_1")
+    institution_name = Column(String(255), nullable=False)     # Human-readable name
+    access_token = Column(String(255), nullable=False)         # Permanent Plaid access token
+    item_id = Column(String(100), nullable=False)              # Plaid item identifier
+    plaid_account_id = Column(String(100), nullable=True)      # Plaid account ID
+    account_id = Column(Integer, ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True)
+    cursor = Column(Text, nullable=True)                       # transactions/sync cursor
+    status = Column(String(20), default="active")              # "active", "error", "expired"
+    last_synced_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    user = relationship("User", back_populates="plaid_connections")
+    account = relationship("Account")

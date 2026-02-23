@@ -2,7 +2,7 @@
 {% block title %}Dashboard - Check The Pockets{% endblock %}
 {% block content %}
 <div class="page-header">
-    <h1>Dashboard {{ current_year }}</h1>
+    <h1>Dashboard {% if current_month %}{{ months_full[current_month] }} {% endif %}{{ current_year }}</h1>
 </div>
 
 <!-- Filters -->
@@ -13,6 +13,14 @@
             <select name="year" id="year" onchange="this.form.submit()">
                 {% for y in years %}
                 <option value="{{ y }}" {% if y == current_year %}selected{% endif %}>{{ y }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="month">Periode</label>
+            <select name="month" id="month" onchange="this.form.submit()">
+                {% for m in range(0, 13) %}
+                <option value="{{ m }}" {% if m == current_month %}selected{% endif %}>{{ months_full[m] }}</option>
                 {% endfor %}
             </select>
         </div>
@@ -31,26 +39,31 @@
 </div>
 
 <!-- Summary cards -->
-<div class="accounts-grid">
-    <div class="card">
-        <p class="muted">Inkomen</p>
-        <h2 class="amount-positive">{{ "%.2f"|format(income) }} EUR</h2>
+<div class="import-summary">
+    <div class="summary-card">
+        <div class="label">Inkomen</div>
+        <div class="value amount-positive">{{ "%.2f"|format(income) }}</div>
     </div>
-    <div class="card">
-        <p class="muted">Uitgaven</p>
-        <h2 class="amount-negative">{{ "%.2f"|format(expenses) }} EUR</h2>
+    <div class="summary-card">
+        <div class="label">Uitgaven</div>
+        <div class="value amount-negative">{{ "%.2f"|format(expenses) }}</div>
     </div>
-    <div class="card">
-        <p class="muted">Resultaat</p>
-        <h2 class="{% if balance >= 0 %}amount-positive{% else %}amount-negative{% endif %}">{{ "%.2f"|format(balance) }} EUR</h2>
+    <div class="summary-card">
+        <div class="label">Resultaat</div>
+        <div class="value {% if balance >= 0 %}amount-positive{% else %}amount-negative{% endif %}">{{ "%.2f"|format(balance) }}</div>
     </div>
-    <div class="card">
-        <p class="muted">Transacties</p>
-        <h2>{{ tx_count }}</h2>
+    <div class="summary-card">
+        <div class="label">Spaarquote</div>
+        <div class="value {% if savings_rate >= 0 %}amount-positive{% else %}amount-negative{% endif %}">{{ savings_rate }}%</div>
+    </div>
+    <div class="summary-card">
+        <div class="label">Transacties</div>
+        <div class="value">{{ tx_count }}</div>
     </div>
 </div>
 
-<!-- Monthly overview -->
+<!-- Monthly overview (only for full year) -->
+{% if not current_month %}
 <div class="card">
     <h2>Maandoverzicht</h2>
     <div class="table-wrap">
@@ -61,6 +74,7 @@
                     <th class="text-right">Inkomen</th>
                     <th class="text-right">Uitgaven</th>
                     <th class="text-right">Resultaat</th>
+                    <th class="text-right">Spaarquote</th>
                 </tr>
             </thead>
             <tbody>
@@ -69,11 +83,17 @@
                 {% set inc = data.get('income', 0) %}
                 {% set exp = data.get('expenses', 0) %}
                 {% set res = inc + exp %}
+                {% if inc > 0 %}
+                    {% set rate = ((res / inc) * 100)|round(1) %}
+                {% else %}
+                    {% set rate = 0 %}
+                {% endif %}
                 <tr>
-                    <td>{{ months[m] }}</td>
+                    <td><a href="/dashboard?year={{ current_year }}&month={{ m }}{% if current_account_id %}&account_id={{ current_account_id }}{% endif %}" style="text-decoration:none;">{{ months[m] }}</a></td>
                     <td class="text-right nowrap amount-positive">{{ "%.2f"|format(inc) }}</td>
                     <td class="text-right nowrap amount-negative">{{ "%.2f"|format(exp) }}</td>
                     <td class="text-right nowrap {% if res >= 0 %}amount-positive{% else %}amount-negative{% endif %}">{{ "%.2f"|format(res) }}</td>
+                    <td class="text-right nowrap {% if rate >= 0 %}amount-positive{% else %}amount-negative{% endif %}">{{ "%.1f"|format(rate) }}%</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -83,36 +103,103 @@
                     <td class="text-right nowrap amount-positive"><strong>{{ "%.2f"|format(income) }}</strong></td>
                     <td class="text-right nowrap amount-negative"><strong>{{ "%.2f"|format(expenses) }}</strong></td>
                     <td class="text-right nowrap {% if balance >= 0 %}amount-positive{% else %}amount-negative{% endif %}"><strong>{{ "%.2f"|format(balance) }}</strong></td>
+                    <td class="text-right nowrap {% if savings_rate >= 0 %}amount-positive{% else %}amount-negative{% endif %}"><strong>{{ savings_rate }}%</strong></td>
                 </tr>
             </tfoot>
         </table>
     </div>
 </div>
+{% endif %}
 
-<!-- Top categories -->
-{% if top_categories %}
+<!-- Recurring projections -->
+{% if recurring_due or recurring_confirmed %}
 <div class="card">
-    <h2>Top 10 uitgavecategorieën</h2>
-    <div class="table-wrap">
+    <h2>Terugkerende posten</h2>
+    {% if recurring_due %}
+    <h3 style="font-size:0.95rem; margin-bottom:0.5rem; color:var(--ctp-warning, #e67e22);">Verwacht (nog niet geboekt)</h3>
+    <div class="table-wrap" style="margin-bottom:1.5rem;">
         <table>
             <thead>
                 <tr>
+                    <th>Naam</th>
                     <th>Categorie</th>
-                    <th class="text-right">Bedrag</th>
-                    <th class="text-right">Transacties</th>
+                    <th class="text-right">Verwacht bedrag</th>
                 </tr>
             </thead>
             <tbody>
-                {% for cat in top_categories %}
+                {% for item in recurring_due %}
                 <tr>
-                    <td>{{ cat.name }}</td>
-                    <td class="text-right nowrap amount-negative">{{ "%.2f"|format(cat.total) }} EUR</td>
-                    <td class="text-right">{{ cat.tx_count }}</td>
+                    <td>{{ item.name }}</td>
+                    <td class="muted">{{ item.category or '-' }}</td>
+                    <td class="text-right nowrap {% if item.amount >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
+                        &euro;&nbsp;{{ "%.2f"|format(item.amount)|replace(".", ",") }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="2"><strong>Verwachte uitgaven</strong></td>
+                    <td class="text-right nowrap amount-negative"><strong>&euro;&nbsp;{{ "%.2f"|format(projected_expenses)|replace(".", ",") }}</strong></td>
+                </tr>
+                {% if projected_income > 0 %}
+                <tr>
+                    <td colspan="2"><strong>Verwacht inkomen</strong></td>
+                    <td class="text-right nowrap amount-positive"><strong>&euro;&nbsp;{{ "%.2f"|format(projected_income)|replace(".", ",") }}</strong></td>
+                </tr>
+                {% endif %}
+                <tr>
+                    <td colspan="2"><strong>Verwacht resultaat na boeking</strong></td>
+                    {% set projected_balance = balance + projected_expenses + projected_income %}
+                    <td class="text-right nowrap {% if projected_balance >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
+                        <strong>&euro;&nbsp;{{ "%.2f"|format(projected_balance)|replace(".", ",") }}</strong>
+                    </td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+    {% endif %}
+
+    {% if recurring_confirmed %}
+    <h3 style="font-size:0.95rem; margin-bottom:0.5rem; color:var(--ctp-success, #27ae60);">Bevestigd (al geboekt)</h3>
+    <div class="table-wrap">
+        <table>
+            <tbody>
+                {% for item in recurring_confirmed %}
+                <tr>
+                    <td>{{ item.name }}</td>
+                    <td class="muted">{{ item.category or '-' }}</td>
+                    <td class="text-right nowrap {% if item.amount >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
+                        &euro;&nbsp;{{ "%.2f"|format(item.amount)|replace(".", ",") }}
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
+    {% endif %}
+</div>
+{% endif %}
+
+<!-- Top categories with visual bars -->
+{% if top_categories %}
+<div class="card">
+    <h2>Uitgaven per categorie</h2>
+    {% set max_amount = top_categories[0].total|abs if top_categories else 1 %}
+    {% for cat in top_categories %}
+    {% set pct = ((cat.total / expenses) * 100)|round(1) if expenses < 0 else 0 %}
+    {% set bar_width = ((cat.total|abs / max_amount) * 100)|round(0)|int if max_amount else 0 %}
+    <div style="margin-bottom:0.75rem;">
+        <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:0.25rem;">
+            <span style="font-weight:600; font-size:0.9rem;">{{ cat.name }}</span>
+            <span class="amount-negative nowrap" style="font-size:0.9rem;">{{ "%.2f"|format(cat.total) }} EUR <span class="muted">({{ pct }}%)</span></span>
+        </div>
+        <div style="width:100%; height:10px; background:var(--ctp-border); border-radius:5px; overflow:hidden;">
+            <div style="width:{{ bar_width }}%; height:100%; background:var(--ctp-danger); border-radius:5px; transition:width 0.3s;"></div>
+        </div>
+        <span class="muted" style="font-size:0.75rem;">{{ cat.tx_count }} transactie{{ 's' if cat.tx_count != 1 else '' }}</span>
+    </div>
+    {% endfor %}
 </div>
 {% endif %}
 {% endblock %}

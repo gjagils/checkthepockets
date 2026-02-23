@@ -1,0 +1,373 @@
+{% extends "base.html" %}
+{% block title %}Vermogen - Check The Pockets{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Vermogensoverzicht</h1>
+</div>
+
+<!-- Net Worth Summary -->
+<div class="import-summary">
+    <div class="summary-card">
+        <div class="value amount-positive">&euro;&nbsp;{{ "%.2f"|format(total_assets)|replace(".", ",") }}</div>
+        <div class="label">Bezittingen</div>
+    </div>
+    <div class="summary-card">
+        <div class="value amount-negative">&euro;&nbsp;{{ "%.2f"|format(total_liabilities)|replace(".", ",") }}</div>
+        <div class="label">Schulden</div>
+    </div>
+    <div class="summary-card">
+        <div class="value {% if net_worth >= 0 %}amount-positive{% else %}amount-negative{% endif %}" style="font-size:1.5rem;">
+            &euro;&nbsp;{{ "%.2f"|format(net_worth)|replace(".", ",") }}
+        </div>
+        <div class="label"><strong>Netto vermogen</strong></div>
+    </div>
+</div>
+
+<!-- Snapshot button -->
+<div style="display:flex; justify-content:flex-end; margin-bottom:1rem;">
+    <form method="post" action="/networth/snapshot">
+        <button type="submit" class="btn btn-primary btn-sm"
+                onclick="return confirm('Huidige balansen opslaan als snapshot voor {{ month_names[today.month] }} {{ today.year }}?')">
+            Snapshot opslaan ({{ month_names[today.month] }} {{ today.year }})
+        </button>
+    </form>
+</div>
+
+<!-- Assets -->
+{% if asset_groups %}
+<div class="card">
+    <h2>Bezittingen</h2>
+    {% for cat_label, group_accounts in asset_groups.items() %}
+    <h3 style="font-size:0.95rem; margin:1rem 0 0.5rem; color:var(--ctp-denim);">{{ cat_label }}</h3>
+    <div class="table-wrap" style="margin-bottom:1rem;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Naam</th>
+                    <th class="text-right">Balans</th>
+                    <th>Notities</th>
+                    <th>Bijgewerkt</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for acc in group_accounts %}
+                <tr>
+                    <td><strong>{{ acc.name }}</strong></td>
+                    <td class="text-right">
+                        <input type="text" class="budget-input"
+                               data-account-id="{{ acc.id }}"
+                               value="{{ "%.2f"|format(acc.balance)|replace(".", ",") }}"
+                               onblur="saveBalance(this)"
+                               onkeydown="if(event.key==='Enter')this.blur()">
+                    </td>
+                    <td class="muted" style="font-size:0.85rem;">{{ acc.notes or '-' }}</td>
+                    <td class="muted" style="font-size:0.85rem;">{{ acc.updated_at.strftime('%d-%m-%Y') if acc.updated_at else '-' }}</td>
+                    <td>
+                        <div style="display:flex; gap:0.25rem;">
+                            <button class="btn btn-sm" onclick="toggleEdit('nw-{{ acc.id }}')">Bewerken</button>
+                            <form method="post" action="/networth/accounts/{{ acc.id }}/toggle" style="display:inline;">
+                                <button type="submit" class="btn btn-sm">Deactiveren</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                <tr id="nw-{{ acc.id }}" style="display:none;">
+                    <td colspan="5">
+                        <form method="post" action="/networth/accounts/{{ acc.id }}/edit" class="filter-bar" style="flex-wrap:wrap; gap:0.5rem;">
+                            <div class="form-group">
+                                <label>Naam</label>
+                                <input type="text" name="name" value="{{ acc.name }}" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Balans</label>
+                                <input type="text" name="balance" value="{{ "%.2f"|format(acc.balance)|replace(".", ",") }}">
+                            </div>
+                            <div class="form-group">
+                                <label>Categorie</label>
+                                <select name="category">
+                                    {% for key, label in categories.items() %}
+                                    <option value="{{ key }}" {% if acc.category == key %}selected{% endif %}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group" style="flex:2;">
+                                <label>Notities</label>
+                                <input type="text" name="notes" value="{{ acc.notes or '' }}">
+                            </div>
+                            <div class="form-group" style="align-self:flex-end; display:flex; gap:0.25rem;">
+                                <button type="submit" class="btn btn-sm btn-primary">Opslaan</button>
+                                <form method="post" action="/networth/accounts/{{ acc.id }}/delete" style="display:inline;"
+                                      onsubmit="return confirm('Verwijderen?')">
+                                    <button type="submit" class="btn btn-sm btn-danger">Verwijderen</button>
+                                </form>
+                            </div>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td><strong>Subtotaal {{ cat_label }}</strong></td>
+                    <td class="text-right nowrap amount-positive">
+                        <strong>&euro;&nbsp;{{ "%.2f"|format(group_accounts|sum(attribute='balance'))|replace(".", ",") }}</strong>
+                    </td>
+                    <td colspan="3"></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Liabilities -->
+{% if liability_groups %}
+<div class="card">
+    <h2>Schulden</h2>
+    {% for cat_label, group_accounts in liability_groups.items() %}
+    <h3 style="font-size:0.95rem; margin:1rem 0 0.5rem; color:var(--ctp-danger);">{{ cat_label }}</h3>
+    <div class="table-wrap" style="margin-bottom:1rem;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Naam</th>
+                    <th class="text-right">Balans</th>
+                    <th>Notities</th>
+                    <th>Bijgewerkt</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for acc in group_accounts %}
+                <tr>
+                    <td><strong>{{ acc.name }}</strong></td>
+                    <td class="text-right">
+                        <input type="text" class="budget-input"
+                               data-account-id="{{ acc.id }}"
+                               value="{{ "%.2f"|format(acc.balance)|replace(".", ",") }}"
+                               onblur="saveBalance(this)"
+                               onkeydown="if(event.key==='Enter')this.blur()">
+                    </td>
+                    <td class="muted" style="font-size:0.85rem;">{{ acc.notes or '-' }}</td>
+                    <td class="muted" style="font-size:0.85rem;">{{ acc.updated_at.strftime('%d-%m-%Y') if acc.updated_at else '-' }}</td>
+                    <td>
+                        <div style="display:flex; gap:0.25rem;">
+                            <button class="btn btn-sm" onclick="toggleEdit('nw-{{ acc.id }}')">Bewerken</button>
+                            <form method="post" action="/networth/accounts/{{ acc.id }}/toggle" style="display:inline;">
+                                <button type="submit" class="btn btn-sm">Deactiveren</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                <tr id="nw-{{ acc.id }}" style="display:none;">
+                    <td colspan="5">
+                        <form method="post" action="/networth/accounts/{{ acc.id }}/edit" class="filter-bar" style="flex-wrap:wrap; gap:0.5rem;">
+                            <div class="form-group">
+                                <label>Naam</label>
+                                <input type="text" name="name" value="{{ acc.name }}" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Balans</label>
+                                <input type="text" name="balance" value="{{ "%.2f"|format(acc.balance)|replace(".", ",") }}">
+                            </div>
+                            <div class="form-group">
+                                <label>Categorie</label>
+                                <select name="category">
+                                    {% for key, label in categories.items() %}
+                                    <option value="{{ key }}" {% if acc.category == key %}selected{% endif %}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group" style="flex:2;">
+                                <label>Notities</label>
+                                <input type="text" name="notes" value="{{ acc.notes or '' }}">
+                            </div>
+                            <div class="form-group" style="align-self:flex-end; display:flex; gap:0.25rem;">
+                                <button type="submit" class="btn btn-sm btn-primary">Opslaan</button>
+                                <form method="post" action="/networth/accounts/{{ acc.id }}/delete" style="display:inline;"
+                                      onsubmit="return confirm('Verwijderen?')">
+                                    <button type="submit" class="btn btn-sm btn-danger">Verwijderen</button>
+                                </form>
+                            </div>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td><strong>Subtotaal {{ cat_label }}</strong></td>
+                    <td class="text-right nowrap amount-negative">
+                        <strong>&euro;&nbsp;{{ "%.2f"|format(group_accounts|sum(attribute='balance'))|replace(".", ",") }}</strong>
+                    </td>
+                    <td colspan="3"></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- History -->
+{% if history %}
+<div class="card">
+    <h2>Vermogen over tijd</h2>
+
+    <!-- Visual bar chart -->
+    {% set max_nw = history|map(attribute='net_worth')|map('abs')|max if history else 1 %}
+    <div style="margin-bottom:1.5rem;">
+        {% for entry in history %}
+        {% set bar_pct = ((entry.net_worth|abs / max_nw) * 100)|int if max_nw else 0 %}
+        <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.35rem;">
+            <span style="width:70px; font-size:0.85rem; text-align:right;" class="muted">{{ month_names[entry.month] }} {{ entry.year }}</span>
+            <div style="flex:1; height:16px; background:var(--ctp-border); border-radius:4px; overflow:hidden;">
+                <div style="width:{{ bar_pct }}%; height:100%; border-radius:4px; transition:width 0.3s;
+                            background:{% if entry.net_worth >= 0 %}var(--ctp-success, #27ae60){% else %}var(--ctp-danger){% endif %};">
+                </div>
+            </div>
+            <span style="width:120px; font-size:0.85rem; text-align:right;" class="{% if entry.net_worth >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
+                &euro;&nbsp;{{ "%.0f"|format(entry.net_worth)|replace(".", ",") }}
+            </span>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Periode</th>
+                    <th class="text-right">Bezittingen</th>
+                    <th class="text-right">Schulden</th>
+                    <th class="text-right">Netto vermogen</th>
+                    <th class="text-right">Verandering</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry in history %}
+                {% if loop.index > 1 %}
+                    {% set prev = history[loop.index0 - 1] %}
+                    {% set change = entry.net_worth - prev.net_worth %}
+                {% else %}
+                    {% set change = 0 %}
+                {% endif %}
+                <tr>
+                    <td>{{ month_names[entry.month] }} {{ entry.year }}</td>
+                    <td class="text-right nowrap amount-positive">&euro;&nbsp;{{ "%.2f"|format(entry.assets)|replace(".", ",") }}</td>
+                    <td class="text-right nowrap amount-negative">&euro;&nbsp;{{ "%.2f"|format(entry.liabilities)|replace(".", ",") }}</td>
+                    <td class="text-right nowrap {% if entry.net_worth >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
+                        <strong>&euro;&nbsp;{{ "%.2f"|format(entry.net_worth)|replace(".", ",") }}</strong>
+                    </td>
+                    <td class="text-right nowrap {% if change >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
+                        {% if loop.index > 1 %}
+                        {{ "%.2f"|format(change)|replace(".", ",") }}
+                        {% else %}-{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- Inactive accounts -->
+{% if inactive %}
+<div class="card">
+    <h2>Inactieve rekeningen</h2>
+    <div class="table-wrap">
+        <table>
+            <tbody>
+                {% for acc in inactive %}
+                <tr style="opacity:0.6;">
+                    <td>{{ acc.name }} <span class="muted">({{ account_types[acc.account_type] }})</span></td>
+                    <td class="text-right nowrap">&euro;&nbsp;{{ "%.2f"|format(acc.balance)|replace(".", ",") }}</td>
+                    <td>
+                        <form method="post" action="/networth/accounts/{{ acc.id }}/toggle" style="display:inline;">
+                            <button type="submit" class="btn btn-sm">Activeren</button>
+                        </form>
+                        <form method="post" action="/networth/accounts/{{ acc.id }}/delete" style="display:inline;"
+                              onsubmit="return confirm('Definitief verwijderen?')">
+                            <button type="submit" class="btn btn-sm btn-danger">Verwijderen</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- Add account form -->
+<div class="card">
+    <h2>Rekening toevoegen</h2>
+    <form method="post" action="/networth/accounts">
+        <div class="filter-bar" style="flex-wrap:wrap; gap:0.5rem;">
+            <div class="form-group">
+                <label for="nw_type">Type</label>
+                <select name="account_type" id="nw_type">
+                    <option value="asset">Bezitting</option>
+                    <option value="liability">Schuld</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="nw_cat">Categorie</label>
+                <select name="category" id="nw_cat">
+                    {% for key, label in categories.items() %}
+                    <option value="{{ key }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group" style="flex:2;">
+                <label for="nw_name">Naam</label>
+                <input type="text" id="nw_name" name="name" required placeholder="bijv. Spaarrekening ASN">
+            </div>
+            <div class="form-group">
+                <label for="nw_balance">Huidige balans</label>
+                <input type="text" id="nw_balance" name="balance" placeholder="0,00" value="0,00">
+            </div>
+            <div class="form-group" style="flex:2;">
+                <label for="nw_notes">Notities</label>
+                <input type="text" id="nw_notes" name="notes" placeholder="Optioneel">
+            </div>
+            <div class="form-group" style="align-self:flex-end;">
+                <button type="submit" class="btn btn-primary btn-sm">Toevoegen</button>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleEdit(id) {
+    var el = document.getElementById(id);
+    el.style.display = el.style.display === 'none' ? 'table-row' : 'none';
+}
+
+function saveBalance(input) {
+    var accountId = input.dataset.accountId;
+    var value = input.value.trim().replace(',', '.');
+
+    var formData = new FormData();
+    formData.append('balance', value);
+
+    fetch('/networth/accounts/' + accountId + '/balance', {
+        method: 'POST',
+        body: formData,
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.ok) {
+            input.value = data.balance.toFixed(2).replace('.', ',');
+            input.classList.add('budget-saved');
+            setTimeout(function() { input.classList.remove('budget-saved'); }, 600);
+        }
+    });
+}
+</script>
+{% endblock %}
