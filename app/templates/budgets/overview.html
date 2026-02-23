@@ -230,6 +230,30 @@
         </div>
     </form>
 </div>
+
+<!-- Budget from average spending -->
+<div class="card">
+    <h2>Budget op basis van gemiddelde</h2>
+    <p class="muted" style="margin-bottom:1rem;">Stel budgetten in op basis van het gemiddelde van de afgelopen maanden.</p>
+    <form method="post" action="/budgets/average" class="filter-bar" style="flex-wrap:wrap;">
+        <input type="hidden" name="to_year" value="{{ current_year }}">
+        <input type="hidden" name="to_month" value="{{ current_month }}">
+        <div class="form-group">
+            <label>Aantal maanden</label>
+            <select name="num_months">
+                <option value="3" selected>3 maanden</option>
+                <option value="6">6 maanden</option>
+                <option value="12">12 maanden</option>
+            </select>
+        </div>
+        <div class="form-group" style="align-self:flex-end;">
+            <button type="submit" class="btn btn-primary btn-sm"
+                    onclick="return confirm('Budgetten instellen op basis van gemiddelde uitgaven? Bestaande waarden worden overschreven.')">
+                Gemiddelde toepassen
+            </button>
+        </div>
+    </form>
+</div>
 {% endblock %}
 
 {% block scripts %}

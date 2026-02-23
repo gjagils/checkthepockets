@@ -344,3 +344,90 @@ def copy_budgets(
     db.commit()
 
     return RedirectResponse(f"/budgets?year={to_year}&month={to_month}", status_code=302)
+
+
+@router.post("/average")
+def budget_from_average(
+    request: Request,
+    to_year: int = Form(...),
+    to_month: int = Form(...),
+    num_months: int = Form(3),
+    db: Session = Depends(get_db),
+):
+    """Set budget per category based on average spending over the last N months."""
+    user = require_login(request, db)
+
+    # Calculate the N months before the target month
+    months_to_check = []
+    y, m = to_year, to_month
+    for _ in range(num_months):
+        m -= 1
+        if m == 0:
+            m = 12
+            y -= 1
+        months_to_check.append((y, m))
+
+    if not months_to_check:
+        return RedirectResponse(f"/budgets?year={to_year}&month={to_month}", status_code=302)
+
+    # Build OR conditions for the month ranges
+    from sqlalchemy import or_, and_, tuple_
+
+    month_conditions = or_(
+        *[
+            and_(
+                func.extract("year", Transaction.date) == yr,
+                func.extract("month", Transaction.date) == mn,
+            )
+            for yr, mn in months_to_check
+        ]
+    )
+
+    # Get average spending per category over those months
+    avg_spending = (
+        db.query(
+            Transaction.category_id,
+            func.sum(Transaction.amount).label("total"),
+        )
+        .join(Account)
+        .filter(
+            Account.user_id == user.id,
+            Transaction.category_id.isnot(None),
+            Transaction.amount < 0,
+            month_conditions,
+        )
+        .group_by(Transaction.category_id)
+        .all()
+    )
+
+    count = 0
+    for row in avg_spending:
+        avg_amount = abs(row.total) / num_months
+        # Round to nearest euro
+        avg_amount = avg_amount.quantize(Decimal("1"))
+
+        existing = (
+            db.query(Budget)
+            .filter(
+                Budget.user_id == user.id,
+                Budget.category_id == row.category_id,
+                Budget.year == to_year,
+                Budget.month == to_month,
+            )
+            .first()
+        )
+        if existing:
+            existing.amount = avg_amount
+        else:
+            db.add(Budget(
+                user_id=user.id,
+                category_id=row.category_id,
+                year=to_year,
+                month=to_month,
+                amount=avg_amount,
+            ))
+        count += 1
+
+    db.commit()
+
+    return RedirectResponse(f"/budgets?year={to_year}&month={to_month}", status_code=302)

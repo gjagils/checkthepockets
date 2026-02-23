@@ -42,6 +42,8 @@ class User(Base):
     portfolio_assets = relationship("PortfolioAsset", back_populates="user", cascade="all, delete-orphan")
     portfolio_persons = relationship("PortfolioPerson", back_populates="user", cascade="all, delete-orphan")
     portfolio_holdings = relationship("PortfolioHolding", back_populates="user", cascade="all, delete-orphan")
+    networth_accounts = relationship("NetWorthAccount", back_populates="user", cascade="all, delete-orphan")
+    networth_snapshots = relationship("NetWorthSnapshot", back_populates="user", cascade="all, delete-orphan")
 
 
 class Account(Base):
@@ -299,4 +301,41 @@ class Budget(Base):
 
     __table_args__ = (
         UniqueConstraint("user_id", "category_id", "year", "month", name="uq_budget_user_cat_year_month"),
+    )
+
+
+class NetWorthAccount(Base):
+    __tablename__ = "networth_accounts"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name = Column(String(150), nullable=False)
+    account_type = Column(String(20), nullable=False)  # "asset" or "liability"
+    category = Column(String(50), nullable=False)  # "savings", "investment", "property", "mortgage", "loan", "other"
+    balance = Column(Numeric(14, 2), default=0)
+    notes = Column(Text, nullable=True)
+    is_active = Column(Integer, default=1)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    user = relationship("User", back_populates="networth_accounts")
+    snapshots = relationship("NetWorthSnapshot", back_populates="account", cascade="all, delete-orphan")
+
+
+class NetWorthSnapshot(Base):
+    __tablename__ = "networth_snapshots"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    account_id = Column(Integer, ForeignKey("networth_accounts.id", ondelete="CASCADE"), nullable=False)
+    year = Column(Integer, nullable=False)
+    month = Column(Integer, nullable=False)
+    balance = Column(Numeric(14, 2), nullable=False, default=0)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    user = relationship("User", back_populates="networth_snapshots")
+    account = relationship("NetWorthAccount", back_populates="snapshots")
+
+    __table_args__ = (
+        UniqueConstraint("account_id", "year", "month", name="uq_networth_snapshot_account_year_month"),
     )
