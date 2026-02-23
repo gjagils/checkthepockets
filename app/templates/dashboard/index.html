@@ -111,6 +111,76 @@
 </div>
 {% endif %}
 
+<!-- Recurring projections -->
+{% if recurring_due or recurring_confirmed %}
+<div class="card">
+    <h2>Terugkerende posten</h2>
+    {% if recurring_due %}
+    <h3 style="font-size:0.95rem; margin-bottom:0.5rem; color:var(--ctp-warning, #e67e22);">Verwacht (nog niet geboekt)</h3>
+    <div class="table-wrap" style="margin-bottom:1.5rem;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Naam</th>
+                    <th>Categorie</th>
+                    <th class="text-right">Verwacht bedrag</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in recurring_due %}
+                <tr>
+                    <td>{{ item.name }}</td>
+                    <td class="muted">{{ item.category or '-' }}</td>
+                    <td class="text-right nowrap {% if item.amount >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
+                        &euro;&nbsp;{{ "%.2f"|format(item.amount)|replace(".", ",") }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="2"><strong>Verwachte uitgaven</strong></td>
+                    <td class="text-right nowrap amount-negative"><strong>&euro;&nbsp;{{ "%.2f"|format(projected_expenses)|replace(".", ",") }}</strong></td>
+                </tr>
+                {% if projected_income > 0 %}
+                <tr>
+                    <td colspan="2"><strong>Verwacht inkomen</strong></td>
+                    <td class="text-right nowrap amount-positive"><strong>&euro;&nbsp;{{ "%.2f"|format(projected_income)|replace(".", ",") }}</strong></td>
+                </tr>
+                {% endif %}
+                <tr>
+                    <td colspan="2"><strong>Verwacht resultaat na boeking</strong></td>
+                    {% set projected_balance = balance + projected_expenses + projected_income %}
+                    <td class="text-right nowrap {% if projected_balance >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
+                        <strong>&euro;&nbsp;{{ "%.2f"|format(projected_balance)|replace(".", ",") }}</strong>
+                    </td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+    {% endif %}
+
+    {% if recurring_confirmed %}
+    <h3 style="font-size:0.95rem; margin-bottom:0.5rem; color:var(--ctp-success, #27ae60);">Bevestigd (al geboekt)</h3>
+    <div class="table-wrap">
+        <table>
+            <tbody>
+                {% for item in recurring_confirmed %}
+                <tr>
+                    <td>{{ item.name }}</td>
+                    <td class="muted">{{ item.category or '-' }}</td>
+                    <td class="text-right nowrap {% if item.amount >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
+                        &euro;&nbsp;{{ "%.2f"|format(item.amount)|replace(".", ",") }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
 <!-- Top categories with visual bars -->
 {% if top_categories %}
 <div class="card">

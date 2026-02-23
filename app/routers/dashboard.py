@@ -1,13 +1,15 @@
+import calendar
 import datetime
+from datetime import date, timedelta
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Request, Query
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
-from sqlalchemy import case, func
+from sqlalchemy import case, func, or_
 
 from app.database import get_db
-from app.models import Account, Transaction, Category
+from app.models import Account, Transaction, Category, RecurringTransaction
 from app.auth import require_login
 
 router = APIRouter()
@@ -146,6 +148,89 @@ def dashboard(
         .all()
     )
 
+    # Recurring projections: upcoming expected items for rest of current period
+    recurring_items = (
+        db.query(RecurringTransaction)
+        .filter(
+            RecurringTransaction.user_id == user.id,
+            RecurringTransaction.is_active == 1,
+        )
+        .order_by(RecurringTransaction.name)
+        .all()
+    )
+
+    # For each recurring item, check if it's been matched this period
+    view_month = current_month if current_month else today.month
+    period_start = date(current_year, view_month, 1)
+    last_day = calendar.monthrange(current_year, view_month)[1]
+    period_end = date(current_year, view_month, last_day)
+
+    recurring_due = []
+    recurring_confirmed = []
+    projected_expenses = Decimal("0")
+    projected_income = Decimal("0")
+
+    for item in recurring_items:
+        # Only show monthly items (or items due this period)
+        if item.frequency == "monthly":
+            start, end = period_start, period_end
+        elif item.frequency == "weekly":
+            start = today - timedelta(days=today.weekday())
+            end = start + timedelta(days=6)
+        elif item.frequency == "quarterly":
+            q_month = ((view_month - 1) // 3) * 3 + 1
+            start = date(current_year, q_month, 1)
+            end_month = q_month + 2
+            end_year = current_year
+            if end_month > 12:
+                end_month -= 12
+                end_year += 1
+            qld = calendar.monthrange(end_year, end_month)[1]
+            end = date(end_year, end_month, qld)
+        elif item.frequency == "yearly":
+            start = date(current_year, 1, 1)
+            end = date(current_year, 12, 31)
+        else:
+            start, end = period_start, period_end
+
+        # Find matching transaction
+        match_query = (
+            db.query(Transaction)
+            .join(Account)
+            .filter(
+                Account.user_id == user.id,
+                Transaction.date >= start,
+                Transaction.date <= end,
+            )
+        )
+        conditions = []
+        if item.counterparty:
+            conditions.append(Transaction.counterparty.ilike(f"%{item.counterparty}%"))
+        if item.description_match:
+            conditions.append(Transaction.description.ilike(f"%{item.description_match}%"))
+        if conditions:
+            match_query = match_query.filter(or_(*conditions))
+        else:
+            continue
+
+        match = match_query.first()
+
+        entry = {
+            "name": item.name,
+            "amount": item.amount_expected,
+            "frequency": item.frequency,
+            "category": item.category.name if item.category else None,
+        }
+
+        if match:
+            recurring_confirmed.append(entry)
+        else:
+            recurring_due.append(entry)
+            if item.amount_expected < 0:
+                projected_expenses += item.amount_expected
+            else:
+                projected_income += item.amount_expected
+
     # Years with transactions for selector
     tx_years = (
         db.query(func.extract("year", Transaction.date).label("yr"))
@@ -175,5 +260,9 @@ def dashboard(
             "monthly_data": monthly_data,
             "months": MONTH_NAMES_NL,
             "top_categories": top_categories,
+            "recurring_due": recurring_due,
+            "recurring_confirmed": recurring_confirmed,
+            "projected_expenses": projected_expenses,
+            "projected_income": projected_income,
         },
     )

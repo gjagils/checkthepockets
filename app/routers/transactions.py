@@ -14,7 +14,7 @@ from sqlalchemy.exc import IntegrityError
 from app.database import get_db
 from app.models import Account, Transaction, Category, Tag, Rule
 from app.auth import require_login
-from app.parsers import abn_amro, bunq, ics
+from app.parsers import abn_amro, bunq, ics, ing, rabobank
 from app.parsers.base import ParseError, ParsedTransaction
 from app.parsers.ics_pdf import parse_ics_pdf
 from app.rules_engine import apply_rules_to_transaction
@@ -26,6 +26,8 @@ PARSERS = {
     "abn_amro": ("ABN AMRO", abn_amro.parse),
     "bunq": ("Bunq", bunq.parse),
     "ics": ("ICS", ics.parse),
+    "ing": ("ING", ing.parse),
+    "rabobank": ("Rabobank", rabobank.parse),
 }
 
 PER_PAGE = 50
