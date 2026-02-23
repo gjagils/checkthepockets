@@ -3,6 +3,9 @@ services:
     build: .
     container_name: checkthepockets
     restart: unless-stopped
+    env_file:
+      - path: ./stack.env
+        required: false
     ports:
       - "${APP_PORT:-8100}:8000"
     environment:
@@ -22,6 +25,9 @@ services:
     image: postgres:16-alpine
     container_name: checkthepockets-db
     restart: unless-stopped
+    env_file:
+      - path: ./stack.env
+        required: false
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-checkthepockets}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-checkthepockets}
