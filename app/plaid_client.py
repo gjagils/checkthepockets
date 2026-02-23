@@ -14,7 +14,7 @@ from typing import Any
 
 import requests
 
-from app.config import PLAID_CLIENT_ID, PLAID_SECRET, PLAID_ENV
+from app.config import PLAID_CLIENT_ID, PLAID_SECRET, PLAID_ENV, PLAID_REDIRECT_URI
 
 logger = logging.getLogger(__name__)
 
@@ -83,13 +83,17 @@ def create_link_token(
     if products is None:
         products = ["transactions"]
 
-    data = _post("/link/token/create", {
+    payload = {
         "user": {"client_user_id": str(user_id)},
         "client_name": "Check The Pockets",
         "products": products,
         "country_codes": country_codes,
         "language": language,
-    })
+    }
+    if PLAID_REDIRECT_URI:
+        payload["redirect_uri"] = PLAID_REDIRECT_URI
+
+    data = _post("/link/token/create", payload)
 
     return data["link_token"]
 

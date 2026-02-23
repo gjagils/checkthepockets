@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import PlaidConnection, Account, Transaction, Rule
 from app.auth import require_login
-from app.config import PLAID_CLIENT_ID, PLAID_ENV
+from app.config import PLAID_CLIENT_ID, PLAID_ENV, PLAID_REDIRECT_URI
 from app.plaid_client import (
     create_link_token,
     exchange_public_token,
@@ -69,6 +69,28 @@ def plaid_overview(
             "connections": connections,
             "configured": configured,
             "accounts": accounts,
+            "plaid_env": PLAID_ENV,
+        },
+    )
+
+
+@router.get("/oauth-callback")
+def plaid_oauth_callback(request: Request, db: Session = Depends(get_db)):
+    """
+    OAuth callback page for European banks.
+    After the user authenticates at their bank, Plaid redirects here
+    with an oauth_state_id. The page re-initializes Plaid Link to
+    complete the flow.
+    """
+    user = require_login(request, db)
+    oauth_state_id = request.query_params.get("oauth_state_id", "")
+
+    return templates.TemplateResponse(
+        "plaid/oauth_callback.html",
+        {
+            "request": request,
+            "user": user,
+            "oauth_state_id": oauth_state_id,
             "plaid_env": PLAID_ENV,
         },
     )

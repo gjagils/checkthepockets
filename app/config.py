@@ -14,3 +14,4 @@ SESSION_MAX_AGE = int(os.getenv("SESSION_MAX_AGE", "86400"))  # 24 hours
 PLAID_CLIENT_ID = os.getenv("PLAID_CLIENT_ID", "")
 PLAID_SECRET = os.getenv("PLAID_SECRET", "")
 PLAID_ENV = os.getenv("PLAID_ENV", "sandbox")  # "sandbox" or "production"
+PLAID_REDIRECT_URI = os.getenv("PLAID_REDIRECT_URI", "")  # Required for EU banks (OAuth)

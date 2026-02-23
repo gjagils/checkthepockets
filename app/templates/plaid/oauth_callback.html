@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Bankkoppeling voltooien - Check The Pockets{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Bankkoppeling voltooien</h1>
+    <p class="muted" id="status-text">Even geduld, de verbinding met je bank wordt afgerond...</p>
+</div>
+
+<div id="link-status" style="display:none; padding:0.75rem 1rem; border-radius:var(--ctp-radius-sm); margin-bottom:1rem;"></div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
+<script>
+(function() {
+    var oauthStateId = "{{ oauth_state_id }}";
+    if (!oauthStateId) {
+        document.getElementById('status-text').textContent =
+            'Geen OAuth state ontvangen. Ga terug naar Bankkoppeling om opnieuw te beginnen.';
+        return;
+    }
+
+    // Re-initialize Plaid Link with the receivedRedirectUri to complete OAuth
+    var handler = Plaid.create({
+        token: null,
+        receivedRedirectUri: window.location.href,
+        onSuccess: function(public_token, metadata) {
+            document.getElementById('status-text').textContent = 'Verbinding opslaan...';
+
+            fetch('/plaid/exchange-token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    public_token: public_token,
+                    institution_id: metadata.institution ? metadata.institution.institution_id : '',
+                    institution_name: metadata.institution ? metadata.institution.name : '',
+                }),
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(result) {
+                if (result.ok) {
+                    showStatus('Bank succesvol gekoppeld! Je wordt doorgestuurd...', false);
+                    setTimeout(function() { window.location.href = '/plaid'; }, 1500);
+                } else {
+                    showStatus('Fout bij opslaan: ' + (result.error || 'Onbekende fout'), true);
+                }
+            })
+            .catch(function(err) {
+                showStatus('Netwerkfout: ' + err, true);
+            });
+        },
+        onExit: function(err) {
+            if (err) {
+                showStatus('Bankkoppeling afgebroken: ' + (err.display_message || err.error_message || 'Onbekende fout'), true);
+            } else {
+                showStatus('Bankkoppeling geannuleerd. <a href="/plaid">Terug naar overzicht</a>', true);
+            }
+        },
+    });
+
+    handler.open();
+
+    function showStatus(message, isError) {
+        var el = document.getElementById('link-status');
+        el.style.display = 'block';
+        el.innerHTML = message;
+        document.getElementById('status-text').style.display = 'none';
+        if (isError) {
+            el.style.background = 'var(--ctp-danger-bg)';
+            el.style.border = '1px solid var(--ctp-danger)';
+        } else {
+            el.style.background = 'rgba(45,190,96,0.1)';
+            el.style.border = '1px solid var(--ctp-check)';
+        }
+    }
+})();
+</script>
+{% endblock %}
