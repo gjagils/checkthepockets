@@ -44,6 +44,7 @@ class User(Base):
     portfolio_holdings = relationship("PortfolioHolding", back_populates="user", cascade="all, delete-orphan")
     networth_accounts = relationship("NetWorthAccount", back_populates="user", cascade="all, delete-orphan")
     networth_snapshots = relationship("NetWorthSnapshot", back_populates="user", cascade="all, delete-orphan")
+    nordigen_connections = relationship("NordigenConnection", back_populates="user", cascade="all, delete-orphan")
 
 
 class Account(Base):
@@ -339,3 +340,23 @@ class NetWorthSnapshot(Base):
     __table_args__ = (
         UniqueConstraint("account_id", "year", "month", name="uq_networth_snapshot_account_year_month"),
     )
+
+
+class NordigenConnection(Base):
+    __tablename__ = "nordigen_connections"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    institution_id = Column(String(100), nullable=False)       # Nordigen institution ID (e.g. "ING_INGBNL2A")
+    institution_name = Column(String(255), nullable=False)     # Human-readable name
+    requisition_id = Column(String(100), nullable=False)       # Nordigen requisition UUID
+    nordigen_account_id = Column(String(100), nullable=True)   # Nordigen account UUID
+    account_id = Column(Integer, ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True)  # Link to local Account
+    iban = Column(String(34), nullable=True)
+    status = Column(String(20), default="pending")             # "pending", "active", "expired", "error"
+    last_synced_at = Column(DateTime, nullable=True)
+    access_valid_until = Column(DateTime, nullable=True)       # When bank consent expires
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    user = relationship("User", back_populates="nordigen_connections")
+    account = relationship("Account")

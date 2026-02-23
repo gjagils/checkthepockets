@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+{% block title %}Bankkoppeling - Check The Pockets{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Bankkoppeling</h1>
+    <p class="muted">Koppel je bankrekening via GoCardless om automatisch transacties op te halen.</p>
+</div>
+
+{% if not configured %}
+<div class="card" style="border-left:4px solid var(--ctp-coin);">
+    <h2>Configuratie vereist</h2>
+    <p>Stel de volgende omgevingsvariabelen in om de bankkoppeling te gebruiken:</p>
+    <ul style="margin:0.5rem 0 0 1.5rem;">
+        <li><code>NORDIGEN_SECRET_ID</code></li>
+        <li><code>NORDIGEN_SECRET_KEY</code></li>
+    </ul>
+    <p class="muted" style="margin-top:0.5rem;">
+        Maak een gratis account aan bij <strong>GoCardless Bank Account Data</strong> om API-sleutels te krijgen.
+    </p>
+</div>
+{% else %}
+
+<!-- Status messages -->
+{% if request.query_params.get('success') == 'linked' %}
+<div class="alert alert-success" style="background:rgba(45,190,96,0.1); border:1px solid var(--ctp-check); padding:0.75rem 1rem; border-radius:var(--ctp-radius-sm); margin-bottom:1rem;">
+    Bankrekening succesvol gekoppeld! Koppel hieronder een lokale rekening en synchroniseer je transacties.
+</div>
+{% endif %}
+{% if request.query_params.get('success') == 'synced' %}
+<div class="alert alert-success" style="background:rgba(45,190,96,0.1); border:1px solid var(--ctp-check); padding:0.75rem 1rem; border-radius:var(--ctp-radius-sm); margin-bottom:1rem;">
+    Synchronisatie voltooid: {{ request.query_params.get('imported', '0') }} nieuwe transacties ge&iuml;mporteerd,
+    {{ request.query_params.get('skipped', '0') }} duplicaten overgeslagen.
+</div>
+{% endif %}
+{% if request.query_params.get('error') %}
+<div class="alert alert-error" style="background:var(--ctp-danger-bg); border:1px solid var(--ctp-danger); padding:0.75rem 1rem; border-radius:var(--ctp-radius-sm); margin-bottom:1rem;">
+    {% set err = request.query_params.get('error') %}
+    {% if err == 'requisition_failed' %}Kan geen bankverbinding aanmaken. Probeer het later opnieuw.
+    {% elif err == 'no_link' %}Geen autorisatielink ontvangen van de bank.
+    {% elif err == 'no_pending' %}Geen openstaande koppeling gevonden. Begin opnieuw.
+    {% elif err == 'auth_incomplete' %}Bankautorisatie niet voltooid. Probeer het opnieuw.
+    {% elif err == 'link_failed' %}Bankkoppeling mislukt. Controleer of je de autorisatie hebt voltooid bij de bank.
+    {% elif err == 'requisition_fetch_failed' %}Kan de status van de bankkoppeling niet ophalen.
+    {% elif err == 'not_found' %}Verbinding niet gevonden.
+    {% elif err == 'no_local_account' %}Koppel eerst een lokale rekening voordat je synchroniseert.
+    {% elif err == 'expired' %}De banktoegang is verlopen. Maak een nieuwe koppeling aan.
+    {% elif err == 'sync_failed' %}Synchronisatie mislukt. Probeer het later opnieuw.
+    {% else %}Er is een fout opgetreden: {{ err }}
+    {% endif %}
+</div>
+{% endif %}
+
+<!-- Active Connections -->
+{% if connections %}
+<div class="card">
+    <h2>Actieve koppelingen</h2>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Bank</th>
+                    <th>IBAN</th>
+                    <th>Lokale rekening</th>
+                    <th>Status</th>
+                    <th>Laatst gesynchroniseerd</th>
+                    <th>Toegang tot</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for conn in connections %}
+                <tr>
+                    <td><strong>{{ conn.institution_name }}</strong></td>
+                    <td>{{ conn.iban or '-' }}</td>
+                    <td>
+                        {% if conn.account %}
+                            {{ conn.account.name }}
+                        {% else %}
+                            <span class="muted">Niet gekoppeld</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if conn.status == 'active' %}
+                            <span style="color:var(--ctp-check); font-weight:600;">Actief</span>
+                        {% elif conn.status == 'pending' %}
+                            <span style="color:var(--ctp-coin); font-weight:600;">In afwachting</span>
+                        {% elif conn.status == 'expired' %}
+                            <span style="color:var(--ctp-danger); font-weight:600;">Verlopen</span>
+                        {% else %}
+                            <span style="color:var(--ctp-danger); font-weight:600;">Fout</span>
+                        {% endif %}
+                    </td>
+                    <td class="muted" style="font-size:0.85rem;">
+                        {{ conn.last_synced_at.strftime('%d-%m-%Y %H:%M') if conn.last_synced_at else 'Nog niet' }}
+                    </td>
+                    <td class="muted" style="font-size:0.85rem;">
+                        {% if conn.access_valid_until %}
+                            {% if conn.access_valid_until < now %}
+                                <span style="color:var(--ctp-danger);">Verlopen</span>
+                            {% else %}
+                                {{ conn.access_valid_until.strftime('%d-%m-%Y') }}
+                            {% endif %}
+                        {% else %}-{% endif %}
+                    </td>
+                    <td>
+                        <div style="display:flex; gap:0.25rem; flex-wrap:wrap;">
+                            {% if conn.status == 'active' and conn.account_id %}
+                            <form method="post" action="/nordigen/connections/{{ conn.id }}/sync" style="display:inline;">
+                                <button type="submit" class="btn btn-sm btn-primary">Synchroniseren</button>
+                            </form>
+                            {% endif %}
+                            <button class="btn btn-sm" onclick="togglePanel('conn-{{ conn.id }}')">
+                                {% if conn.account_id %}Instellingen{% else %}Rekening koppelen{% endif %}
+                            </button>
+                            <form method="post" action="/nordigen/connections/{{ conn.id }}/delete" style="display:inline;"
+                                  onsubmit="return confirm('Weet je zeker dat je deze bankkoppeling wilt verwijderen?')">
+                                <button type="submit" class="btn btn-sm btn-danger">Verwijderen</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                <!-- Link/settings panel -->
+                <tr id="conn-{{ conn.id }}" style="display:none;">
+                    <td colspan="7">
+                        <form method="post" action="/nordigen/connections/{{ conn.id }}/link-account"
+                              class="filter-bar" style="flex-wrap:wrap; gap:0.5rem; padding:0.5rem 0;">
+                            <div class="form-group">
+                                <label>Bestaande rekening</label>
+                                <select name="account_id">
+                                    <option value="0">-- Selecteer --</option>
+                                    {% for acc in accounts %}
+                                    <option value="{{ acc.id }}" {% if conn.account_id == acc.id %}selected{% endif %}>
+                                        {{ acc.name }}{% if acc.iban %} ({{ acc.iban }}){% endif %}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Of maak nieuw</label>
+                                <input type="text" name="new_account_name" placeholder="Nieuwe rekeningnaam">
+                            </div>
+                            <div class="form-group" style="align-self:flex-end;">
+                                <button type="submit" class="btn btn-sm btn-primary">Opslaan</button>
+                            </div>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- Add new connection -->
+<div class="card">
+    <h2>Bank toevoegen</h2>
+    <p class="muted" style="margin-bottom:1rem;">
+        Selecteer je bank hieronder om een nieuwe koppeling aan te maken. Je wordt doorgestuurd naar je bank om toestemming te geven.
+    </p>
+
+    {% if institution_error %}
+    <p style="color:var(--ctp-danger); margin-bottom:1rem;">{{ institution_error }}</p>
+    {% endif %}
+
+    <!-- Country filter -->
+    <div class="filter-bar" style="margin-bottom:1rem;">
+        <div class="form-group">
+            <label for="country_select">Land</label>
+            <select id="country_select" onchange="window.location='/nordigen?country='+this.value">
+                <option value="NL" {% if country == 'NL' %}selected{% endif %}>Nederland</option>
+                <option value="BE" {% if country == 'BE' %}selected{% endif %}>Belgi&euml;</option>
+                <option value="DE" {% if country == 'DE' %}selected{% endif %}>Duitsland</option>
+                <option value="FR" {% if country == 'FR' %}selected{% endif %}>Frankrijk</option>
+                <option value="GB" {% if country == 'GB' %}selected{% endif %}>Verenigd Koninkrijk</option>
+            </select>
+        </div>
+        <div class="form-group" style="flex:2;">
+            <label for="bank_search">Zoek bank</label>
+            <input type="text" id="bank_search" placeholder="Typ om te filteren..." oninput="filterBanks(this.value)">
+        </div>
+    </div>
+
+    {% if institutions %}
+    <div id="bank-grid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:0.75rem;">
+        {% for inst in institutions %}
+        <form method="post" action="/nordigen/link" class="bank-card"
+              style="display:flex; align-items:center; gap:0.75rem; padding:0.75rem; border:1px solid var(--ctp-border);
+                     border-radius:var(--ctp-radius-sm); cursor:pointer; background:var(--ctp-surface); transition:box-shadow 0.15s;"
+              onmouseover="this.style.boxShadow='var(--ctp-shadow-sm)'" onmouseout="this.style.boxShadow='none'"
+              data-name="{{ inst.name|lower }}">
+            <input type="hidden" name="institution_id" value="{{ inst.id }}">
+            <input type="hidden" name="institution_name" value="{{ inst.name }}">
+            {% if inst.logo %}
+            <img src="{{ inst.logo }}" alt="{{ inst.name }}" style="width:36px; height:36px; object-fit:contain; border-radius:6px;">
+            {% else %}
+            <div style="width:36px; height:36px; background:var(--ctp-border); border-radius:6px; display:flex; align-items:center; justify-content:center; font-weight:700; color:var(--ctp-muted); font-size:0.8rem;">
+                {{ inst.name[:2]|upper }}
+            </div>
+            {% endif %}
+            <div style="flex:1; min-width:0;">
+                <div style="font-weight:600; font-size:0.9rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ inst.name }}</div>
+            </div>
+            <button type="submit" class="btn btn-sm btn-primary" style="flex-shrink:0;">Koppelen</button>
+        </form>
+        {% endfor %}
+    </div>
+    {% elif not institution_error %}
+    <p class="muted">Geen banken gevonden voor dit land.</p>
+    {% endif %}
+</div>
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function togglePanel(id) {
+    var el = document.getElementById(id);
+    el.style.display = el.style.display === 'none' ? 'table-row' : 'none';
+}
+
+function filterBanks(query) {
+    var q = query.toLowerCase().trim();
+    var cards = document.querySelectorAll('#bank-grid .bank-card');
+    cards.forEach(function(card) {
+        var name = card.getAttribute('data-name') || '';
+        card.style.display = (q === '' || name.indexOf(q) !== -1) ? 'flex' : 'none';
+    });
+}
+</script>
+{% endblock %}

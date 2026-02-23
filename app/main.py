@@ -3,7 +3,8 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.auth import LoginRequired
-from app.routers import auth, transactions, accounts, categories, tags, rules, budgets, recurring, dashboard, savings, analytics, portfolio, networth
+from app.routers import auth, transactions, accounts, categories, tags, rules, budgets, recurring, dashboard, savings, analytics, portfolio, networth, nordigen
+from app.scheduler import start_scheduler
 
 app = FastAPI(title="Check The Pockets", docs_url=None, redoc_url=None)
 
@@ -22,6 +23,12 @@ app.include_router(savings.router)
 app.include_router(analytics.router)
 app.include_router(portfolio.router)
 app.include_router(networth.router)
+app.include_router(nordigen.router)
+
+
+@app.on_event("startup")
+def on_startup():
+    start_scheduler()
 
 
 @app.exception_handler(LoginRequired)
