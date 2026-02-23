@@ -39,6 +39,9 @@ class User(Base):
     tags = relationship("Tag", back_populates="user", cascade="all, delete-orphan")
     rules = relationship("Rule", back_populates="user", cascade="all, delete-orphan")
     recurring_transactions = relationship("RecurringTransaction", back_populates="user", cascade="all, delete-orphan")
+    portfolio_assets = relationship("PortfolioAsset", back_populates="user", cascade="all, delete-orphan")
+    portfolio_persons = relationship("PortfolioPerson", back_populates="user", cascade="all, delete-orphan")
+    portfolio_holdings = relationship("PortfolioHolding", back_populates="user", cascade="all, delete-orphan")
 
 
 class Account(Base):
@@ -230,6 +233,54 @@ class SavingsEntry(Base):
 
     __table_args__ = (
         UniqueConstraint("line_id", "month", name="uq_savings_entry_line_month"),
+    )
+
+
+class PortfolioAsset(Base):
+    __tablename__ = "portfolio_assets"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name = Column(String(100), nullable=False)       # "Goud", "Zilver", "Bitcoin"
+    symbol = Column(String(20), nullable=False)       # "XAU", "XAG", "bitcoin"
+    asset_class = Column(String(20), nullable=False)  # "metal", "crypto"
+    unit = Column(String(20), default="oz")           # "oz", "gram", "coin"
+    current_price_eur = Column(Numeric(16, 4), default=0)
+    price_updated_at = Column(DateTime, nullable=True)
+    monthly_growth_pct = Column(Numeric(6, 2), default=0)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    user = relationship("User", back_populates="portfolio_assets")
+    holdings = relationship("PortfolioHolding", back_populates="asset", cascade="all, delete-orphan")
+
+
+class PortfolioPerson(Base):
+    __tablename__ = "portfolio_persons"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name = Column(String(100), nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    user = relationship("User", back_populates="portfolio_persons")
+    holdings = relationship("PortfolioHolding", back_populates="person", cascade="all, delete-orphan")
+
+
+class PortfolioHolding(Base):
+    __tablename__ = "portfolio_holdings"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    asset_id = Column(Integer, ForeignKey("portfolio_assets.id", ondelete="CASCADE"), nullable=False)
+    person_id = Column(Integer, ForeignKey("portfolio_persons.id", ondelete="CASCADE"), nullable=False)
+    quantity = Column(Numeric(16, 8), default=0)
+
+    user = relationship("User", back_populates="portfolio_holdings")
+    asset = relationship("PortfolioAsset", back_populates="holdings")
+    person = relationship("PortfolioPerson", back_populates="holdings")
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "asset_id", "person_id", name="uq_holding_user_asset_person"),
     )
 
 

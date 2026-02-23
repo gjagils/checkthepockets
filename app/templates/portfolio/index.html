@@ -1,0 +1,341 @@
+{% extends "base.html" %}
+{% block title %}Portfolio - Check The Pockets{% endblock %}
+{% block container_class %}container-wide{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Portfolio</h1>
+    <form method="post" action="/portfolio/refresh-prices" style="display:inline;">
+        <button type="submit" class="btn btn-primary">Prijzen verversen</button>
+    </form>
+</div>
+
+<!-- Setup: Persons & Assets -->
+<div class="accounts-grid" style="margin-bottom:1.5rem;">
+    <!-- Personen -->
+    <div class="card">
+        <h2>Personen</h2>
+        {% for person in persons %}
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:0.4rem 0; border-bottom:1px solid var(--ctp-border);">
+            <span>{{ person.name }}</span>
+            <form method="post" action="/portfolio/persons/{{ person.id }}/delete" style="display:inline;">
+                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('{{ person.name }} verwijderen?')">x</button>
+            </form>
+        </div>
+        {% endfor %}
+        <form method="post" action="/portfolio/persons" style="display:flex; gap:0.5rem; margin-top:0.75rem;">
+            <input type="text" name="name" placeholder="Naam" required class="budget-input" style="flex:1; text-align:left; width:auto;">
+            <button type="submit" class="btn btn-sm btn-primary">Toevoegen</button>
+        </form>
+    </div>
+
+    <!-- Asset toevoegen -->
+    <div class="card">
+        <h2>Asset toevoegen</h2>
+        <form method="post" action="/portfolio/assets" class="form-stack">
+            <div class="form-group" style="margin-bottom:0.5rem;">
+                <label>Vooringesteld</label>
+                <select id="preset-select" onchange="fillPreset(this.value)" style="width:100%; padding:0.5rem; border:2px solid var(--ctp-border); border-radius:var(--ctp-radius-sm);">
+                    <option value="">-- Kies of vul handmatig in --</option>
+                    {% for p in preset_assets %}
+                    <option value='{{ p.name }}|{{ p.symbol }}|{{ p.asset_class }}|{{ p.unit }}'>{{ p.name }} ({{ p.symbol }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem;">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Naam</label>
+                    <input type="text" name="name" id="asset-name" required placeholder="Goud">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Symbol / API-ID</label>
+                    <input type="text" name="symbol" id="asset-symbol" required placeholder="XAU of bitcoin">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Type</label>
+                    <select name="asset_class" id="asset-class">
+                        <option value="metal">Edelmetaal</option>
+                        <option value="crypto">Crypto</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Eenheid</label>
+                    <input type="text" name="unit" id="asset-unit" placeholder="troy oz">
+                </div>
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+                <label>Verwachte maandelijkse groei (%)</label>
+                <input type="text" name="monthly_growth_pct" placeholder="0,5" inputmode="decimal">
+            </div>
+            <button type="submit" class="btn btn-primary">Toevoegen</button>
+        </form>
+    </div>
+</div>
+
+{% if assets and persons %}
+<!-- Holdings Matrix -->
+<div class="card">
+    <h2>Bezittingen</h2>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Asset</th>
+                    <th class="text-right">Prijs/eenheid</th>
+                    <th class="text-right" style="font-size:0.7rem;">Laatst bijgewerkt</th>
+                    {% for person in persons %}
+                    <th class="text-right">{{ person.name }}<br><span class="muted" style="font-weight:400;">Aantal</span></th>
+                    <th class="text-right"><span class="muted" style="font-weight:400;">Waarde</span></th>
+                    {% endfor %}
+                    <th class="text-right" style="border-left:2px solid var(--ctp-border);">Totaal</th>
+                    <th class="text-right">Groei/mnd</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for asset in assets %}
+                <tr>
+                    <td>
+                        <strong>{{ asset.name }}</strong>
+                        <span class="badge" style="font-size:0.65rem;">{{ asset.unit }}</span>
+                    </td>
+                    <td class="text-right nowrap">&euro;&nbsp;{{ "%.2f"|format(asset.current_price_eur) }}</td>
+                    <td class="text-right nowrap muted" style="font-size:0.75rem;">
+                        {% if asset.price_updated_at %}
+                        {{ asset.price_updated_at.strftime('%d-%m %H:%M') }}
+                        {% else %}
+                        -
+                        {% endif %}
+                    </td>
+                    {% for person in persons %}
+                    {% set qty = holdings_map.get((asset.id, person.id), 0) %}
+                    {% set val = qty * asset.current_price_eur %}
+                    <td class="text-right">
+                        <input type="text" class="budget-input"
+                               data-asset-id="{{ asset.id }}"
+                               data-person-id="{{ person.id }}"
+                               value="{{ "%.8g"|format(qty) }}"
+                               onblur="saveHolding(this)"
+                               onkeydown="if(event.key==='Enter')this.blur()"
+                               style="width:90px;">
+                    </td>
+                    <td class="text-right nowrap muted">&euro;&nbsp;{{ "%.2f"|format(val) }}</td>
+                    {% endfor %}
+                    <td class="text-right nowrap" style="border-left:2px solid var(--ctp-border); font-weight:700;">
+                        &euro;&nbsp;{{ "%.2f"|format(asset_totals.get(asset.id, 0)) }}
+                    </td>
+                    <td class="text-right nowrap muted">{{ asset.monthly_growth_pct }}%</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr style="border-top:2px solid var(--ctp-navy);">
+                    <td colspan="3"><strong>Totaal</strong></td>
+                    {% for person in persons %}
+                    <td></td>
+                    <td class="text-right nowrap"><strong>&euro;&nbsp;{{ "%.2f"|format(person_totals.get(person.id, 0)) }}</strong></td>
+                    {% endfor %}
+                    <td class="text-right nowrap" style="border-left:2px solid var(--ctp-border);">
+                        <strong>&euro;&nbsp;{{ "%.2f"|format(grand_total) }}</strong>
+                    </td>
+                    <td></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+
+<!-- Opname waarde per asset type -->
+<div class="card">
+    <h2>Opnamewaarde per type</h2>
+    <p class="muted" style="margin-bottom:1rem;">Wat elke asset waard is bij opname, per persoon.</p>
+    {% for asset in assets %}
+    {% set atotal = asset_totals.get(asset.id, 0) %}
+    {% if atotal > 0 %}
+    <div style="margin-bottom:1.25rem; padding-bottom:1rem; border-bottom:1px solid var(--ctp-border);">
+        <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:0.5rem;">
+            <span style="font-weight:700; font-size:1rem;">{{ asset.name }} <span class="badge">{{ asset.unit }}</span></span>
+            <span style="font-weight:700; font-size:1.1rem;">&euro;&nbsp;{{ "%.2f"|format(atotal) }}</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:0.25rem;">
+            <span class="muted">Prijs per eenheid:</span>
+            <span>&euro;&nbsp;{{ "%.2f"|format(asset.current_price_eur) }}</span>
+        </div>
+        {% for person in persons %}
+        {% set qty = holdings_map.get((asset.id, person.id), 0) %}
+        {% set val = qty * asset.current_price_eur %}
+        {% if qty > 0 %}
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:0.3rem 0;">
+            <span>{{ person.name }} ({{ "%.8g"|format(qty) }} {{ asset.unit }})</span>
+            <span class="amount-positive nowrap" style="font-weight:600;">&euro;&nbsp;{{ "%.2f"|format(val) }}</span>
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endfor %}
+
+    {% if grand_total > 0 %}
+    <div style="display:flex; justify-content:space-between; align-items:baseline; padding-top:0.5rem;">
+        <span style="font-weight:800; font-size:1.1rem;">Totale opnamewaarde</span>
+        <span style="font-weight:800; font-size:1.25rem; color:var(--ctp-check);">&euro;&nbsp;{{ "%.2f"|format(grand_total) }}</span>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Asset Management (edit/delete) -->
+<div class="card">
+    <h2>Assets beheren</h2>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Asset</th>
+                    <th>Naam</th>
+                    <th>Eenheid</th>
+                    <th>Groei/mnd (%)</th>
+                    <th>Handmatige prijs</th>
+                    <th></th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for asset in assets %}
+                <tr>
+                    <td>{{ asset.name }} <span class="muted">({{ asset.symbol }})</span></td>
+                    <form method="post" action="/portfolio/assets/{{ asset.id }}/edit">
+                    <td><input type="text" name="name" value="{{ asset.name }}" class="budget-input" style="width:120px; text-align:left;"></td>
+                    <td><input type="text" name="unit" value="{{ asset.unit }}" class="budget-input" style="width:80px; text-align:left;"></td>
+                    <td><input type="text" name="monthly_growth_pct" value="{{ asset.monthly_growth_pct }}" class="budget-input" style="width:70px;"></td>
+                    <td><input type="text" name="manual_price" placeholder="{{ "%.2f"|format(asset.current_price_eur) }}" class="budget-input" style="width:100px;"></td>
+                    <td><button type="submit" class="btn btn-sm">Opslaan</button></td>
+                    </form>
+                    <td>
+                        <form method="post" action="/portfolio/assets/{{ asset.id }}/delete" style="display:inline;">
+                            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('{{ asset.name }} verwijderen?')">x</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Prognose -->
+{% if projections and grand_total > 0 %}
+<div class="card">
+    <h2>Prognose (12 maanden)</h2>
+    <p class="muted" style="margin-bottom:1rem;">Op basis van de ingestelde maandelijkse groeipercentages per asset.</p>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Maand</th>
+                    <th class="text-right">Verwachte waarde</th>
+                    <th class="text-right">Groei t.o.v. nu</th>
+                    <th>Grafiek</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% set max_val = projections[-1].total if projections else grand_total %}
+                {% set min_val = grand_total %}
+                {% set range_val = max_val - min_val if max_val > min_val else 1 %}
+                <tr style="background:rgba(242, 178, 51, 0.08);">
+                    <td><strong>Nu</strong></td>
+                    <td class="text-right nowrap"><strong>&euro;&nbsp;{{ "%.2f"|format(grand_total) }}</strong></td>
+                    <td class="text-right nowrap">-</td>
+                    <td style="width:30%;">
+                        <div style="width:100%; height:10px; background:var(--ctp-border); border-radius:5px;">
+                        </div>
+                    </td>
+                </tr>
+                {% for p in projections %}
+                {% set bar_pct = (((p.total - min_val) / range_val) * 100)|round(0)|int if range_val > 0 else 0 %}
+                <tr>
+                    <td>+{{ p.month }} mnd</td>
+                    <td class="text-right nowrap">&euro;&nbsp;{{ "%.2f"|format(p.total) }}</td>
+                    <td class="text-right nowrap {% if p.growth >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
+                        {% if p.growth >= 0 %}+{% endif %}&euro;&nbsp;{{ "%.2f"|format(p.growth) }}
+                    </td>
+                    <td style="width:30%;">
+                        <div style="width:100%; height:10px; background:var(--ctp-border); border-radius:5px; overflow:hidden;">
+                            <div style="width:{{ bar_pct }}%; height:100%; background:var(--ctp-check); border-radius:5px;"></div>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- Verdeling per persoon -->
+{% if persons|length > 1 and grand_total > 0 %}
+<div class="card">
+    <h2>Verdeling per persoon</h2>
+    {% for person in persons %}
+    {% set ptotal = person_totals.get(person.id, 0) %}
+    {% set ppct = ((ptotal / grand_total) * 100)|round(1) if grand_total > 0 else 0 %}
+    <div style="margin-bottom:0.75rem;">
+        <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:0.25rem;">
+            <span style="font-weight:600;">{{ person.name }}</span>
+            <span class="nowrap">&euro;&nbsp;{{ "%.2f"|format(ptotal) }} <span class="muted">({{ ppct }}%)</span></span>
+        </div>
+        <div style="width:100%; height:10px; background:var(--ctp-border); border-radius:5px; overflow:hidden;">
+            <div style="width:{{ ppct }}%; height:100%; background:var(--ctp-denim); border-radius:5px;"></div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% elif not assets %}
+<div class="card" style="text-align:center; padding:3rem;">
+    <p class="muted">Voeg hierboven assets toe om te beginnen met het bijhouden van je portfolio.</p>
+</div>
+{% elif not persons %}
+<div class="card" style="text-align:center; padding:3rem;">
+    <p class="muted">Voeg hierboven personen toe om bezittingen te verdelen.</p>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function fillPreset(val) {
+    if (!val) return;
+    var parts = val.split('|');
+    document.getElementById('asset-name').value = parts[0];
+    document.getElementById('asset-symbol').value = parts[1];
+    document.getElementById('asset-class').value = parts[2];
+    document.getElementById('asset-unit').value = parts[3];
+}
+
+function saveHolding(input) {
+    var assetId = input.dataset.assetId;
+    var personId = input.dataset.personId;
+    var value = input.value.trim().replace(',', '.');
+
+    var formData = new FormData();
+    formData.append('asset_id', assetId);
+    formData.append('person_id', personId);
+    formData.append('quantity', value);
+
+    fetch('/portfolio/holdings/save', {
+        method: 'POST',
+        body: formData,
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.ok) {
+            input.classList.add('budget-saved');
+            setTimeout(function() {
+                input.classList.remove('budget-saved');
+            }, 600);
+            // Reload to update totals
+            setTimeout(function() { location.reload(); }, 700);
+        }
+    });
+}
+</script>
+{% endblock %}
