@@ -1,9 +1,10 @@
-"""Fetch live prices for crypto and precious metals."""
+"""Fetch live and historical prices for crypto and precious metals."""
 
 import json
 import logging
 import urllib.request
 import urllib.error
+from datetime import date, timedelta
 from decimal import Decimal
 
 logger = logging.getLogger(__name__)
@@ -58,6 +59,88 @@ def _fetch_metal_price(symbol: str) -> Decimal | None:
     if eur_rate is not None:
         return Decimal(str(eur_rate))
     return None
+
+
+def fetch_historical_prices(symbol: str, asset_class: str, months: int = 12) -> dict:
+    """Fetch monthly historical prices for the past N months.
+
+    Returns dict: {(year, month): Decimal price_eur}
+    """
+    try:
+        if asset_class == "crypto":
+            return _fetch_crypto_history(symbol, months)
+        elif asset_class == "metal":
+            return _fetch_metal_history(symbol, months)
+    except Exception as e:
+        logger.warning(f"Historical price fetch failed for {symbol}: {e}")
+    return {}
+
+
+def _fetch_crypto_history(coingecko_id: str, months: int) -> dict:
+    """Fetch crypto historical prices from CoinGecko market_chart endpoint.
+
+    Returns monthly prices (1st of each month) for the past N months.
+    """
+    days = months * 31 + 10  # a bit extra to ensure coverage
+    url = (
+        f"https://api.coingecko.com/api/v3/coins/{coingecko_id}/market_chart"
+        f"?vs_currency=eur&days={days}&interval=daily"
+    )
+    req = urllib.request.Request(url, headers={"Accept": "application/json"})
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        data = json.loads(resp.read())
+
+    prices = data.get("prices", [])
+    if not prices:
+        return {}
+
+    # Group by (year, month) — pick the first data point of each month
+    monthly = {}
+    for timestamp_ms, price in prices:
+        d = date.fromtimestamp(timestamp_ms / 1000)
+        key = (d.year, d.month)
+        if key not in monthly:
+            monthly[key] = Decimal(str(round(price, 4)))
+
+    return monthly
+
+
+def _fetch_metal_history(symbol: str, months: int) -> dict:
+    """Fetch metal historical prices from fawazahmed0 date-based API.
+
+    Fetches the 1st of each month for the past N months.
+    """
+    sym = symbol.lower()
+    monthly = {}
+    today = date.today()
+
+    for i in range(months):
+        # Calculate 1st of each past month
+        target_month = today.month - i
+        target_year = today.year
+        while target_month <= 0:
+            target_month += 12
+            target_year -= 1
+        target_date = date(target_year, target_month, 1)
+
+        # Skip future dates
+        if target_date > today:
+            target_date = today
+
+        date_str = target_date.strftime("%Y-%m-%d")
+        url = f"https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@{date_str}/v1/currencies/{sym}.json"
+
+        try:
+            req = urllib.request.Request(url, headers={"Accept": "application/json"})
+            with urllib.request.urlopen(req, timeout=FETCH_TIMEOUT) as resp:
+                data = json.loads(resp.read())
+            eur_rate = data.get(sym, {}).get("eur")
+            if eur_rate is not None:
+                monthly[(target_year, target_month)] = Decimal(str(eur_rate))
+        except Exception as e:
+            logger.debug(f"Metal history fetch for {sym} on {date_str}: {e}")
+
+    return monthly
 
 
 # Common preset assets with their API symbols

@@ -339,3 +339,20 @@ class NetWorthSnapshot(Base):
     __table_args__ = (
         UniqueConstraint("account_id", "year", "month", name="uq_networth_snapshot_account_year_month"),
     )
+
+
+class PortfolioPriceSnapshot(Base):
+    __tablename__ = "portfolio_price_snapshots"
+
+    id = Column(Integer, primary_key=True)
+    asset_id = Column(Integer, ForeignKey("portfolio_assets.id", ondelete="CASCADE"), nullable=False)
+    year = Column(Integer, nullable=False)
+    month = Column(Integer, nullable=False)
+    price_eur = Column(Numeric(16, 4), nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    asset = relationship("PortfolioAsset")
+
+    __table_args__ = (
+        UniqueConstraint("asset_id", "year", "month", name="uq_price_snapshot_asset_year_month"),
+    )
