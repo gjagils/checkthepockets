@@ -62,5 +62,21 @@
         {% block content %}{% endblock %}
     </main>
     {% block scripts %}{% endblock %}
+    {% if user %}
+    <script>
+    /* Align sub-nav under the active main-nav item */
+    (function() {
+        var active = document.querySelector('.nav-main-links a.active');
+        var sub = document.querySelector('.nav-sub');
+        if (!active || !sub) return;
+        function align() {
+            var rect = active.getBoundingClientRect();
+            sub.style.paddingLeft = rect.left + 'px';
+        }
+        align();
+        window.addEventListener('resize', align);
+    })();
+    </script>
+    {% endif %}
 </body>
 </html>
