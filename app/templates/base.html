@@ -9,29 +9,54 @@
 </head>
 <body>
     {% if user %}
-    <nav class="navbar">
-        <a href="/" class="nav-brand">
-            <img src="/static/img/logo.png" alt="Logo">
-            CHECK <span class="brand-the">THE POCKETS</span>
-        </a>
-        <div class="nav-links">
-            <a href="/dashboard">Dashboard</a>
-            <a href="/">Transacties</a>
-            <a href="/categories">Categorieën</a>
-            <a href="/rules">Regels</a>
-            <a href="/budgets">Budgetten</a>
-            <a href="/recurring">Terugkerend</a>
-            <a href="/savings">Sparen</a>
-            <a href="/analytics">Analyse</a>
-            <a href="/portfolio">Portfolio</a>
-            <a href="/networth">Vermogen</a>
-            <a href="/accounts">Rekeningen</a>
-            <a href="/plaid">Bankkoppeling</a>
-            <a href="/import">Importeren</a>
-            <a href="/settings" class="nav-user" style="text-decoration:none;">{{ user.username }}</a>
-            <a href="/logout" class="btn btn-sm">Uitloggen</a>
-        </div>
-    </nav>
+    {% set path = request.url.path %}
+    {% set main_active =
+        'dashboard' if path == '/dashboard'
+        else 'financien' if path in ['/', '/categories', '/tags', '/rules', '/recurring'] or path.startswith('/transactions')
+        else 'budgetten' if path.startswith('/budgets') or path.startswith('/savings')
+        else 'analyse' if path.startswith('/analytics') or path.startswith('/portfolio') or path.startswith('/networth')
+        else 'rekeningen' if path.startswith('/accounts') or path.startswith('/import')
+        else '' %}
+    <div class="navbar-wrapper">
+        <nav class="nav-main">
+            <a href="/dashboard" class="nav-brand">
+                <img src="/static/img/logo.png" alt="Logo">
+                <span class="brand-text">CHECK <span class="brand-the">THE</span> POCKETS</span>
+            </a>
+            <div class="nav-main-links">
+                <a href="/dashboard" class="{{ 'active' if main_active == 'dashboard' }}">Dashboard</a>
+                <a href="/" class="{{ 'active' if main_active == 'financien' }}">Financiën</a>
+                <a href="/budgets" class="{{ 'active' if main_active == 'budgetten' }}">Budgetten</a>
+                <a href="/analytics" class="{{ 'active' if main_active == 'analyse' }}">Analyse</a>
+                <a href="/accounts" class="{{ 'active' if main_active == 'rekeningen' }}">Rekeningen</a>
+            </div>
+            <div class="nav-user-section">
+                <a href="/settings" class="nav-user-link">{{ user.username }}</a>
+                <a href="/logout" class="nav-logout-link">Uitloggen</a>
+            </div>
+        </nav>
+        {% if main_active and main_active != 'dashboard' %}
+        <nav class="nav-sub">
+            {% if main_active == 'financien' %}
+                <a href="/" class="{{ 'active' if path == '/' or path.startswith('/transactions') }}">Transacties</a>
+                <a href="/categories" class="{{ 'active' if path == '/categories' }}">Categorieën</a>
+                <a href="/tags" class="{{ 'active' if path == '/tags' }}">Tags</a>
+                <a href="/rules" class="{{ 'active' if path == '/rules' }}">Regels</a>
+                <a href="/recurring" class="{{ 'active' if path == '/recurring' }}">Terugkerend</a>
+            {% elif main_active == 'budgetten' %}
+                <a href="/budgets" class="{{ 'active' if path.startswith('/budgets') }}">Budgetten</a>
+                <a href="/savings" class="{{ 'active' if path.startswith('/savings') }}">Sparen</a>
+            {% elif main_active == 'analyse' %}
+                <a href="/analytics" class="{{ 'active' if path.startswith('/analytics') }}">Analyse</a>
+                <a href="/portfolio" class="{{ 'active' if path.startswith('/portfolio') }}">Portfolio</a>
+                <a href="/networth" class="{{ 'active' if path.startswith('/networth') }}">Vermogen</a>
+            {% elif main_active == 'rekeningen' %}
+                <a href="/accounts" class="{{ 'active' if path.startswith('/accounts') }}">Rekeningen</a>
+                <a href="/import" class="{{ 'active' if path.startswith('/import') }}">Importeren</a>
+            {% endif %}
+        </nav>
+        {% endif %}
+    </div>
     {% endif %}
     <main class="container {% block container_class %}{% endblock %}">
         {% block content %}{% endblock %}

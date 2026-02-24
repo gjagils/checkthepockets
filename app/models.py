@@ -44,7 +44,6 @@ class User(Base):
     portfolio_holdings = relationship("PortfolioHolding", back_populates="user", cascade="all, delete-orphan")
     networth_accounts = relationship("NetWorthAccount", back_populates="user", cascade="all, delete-orphan")
     networth_snapshots = relationship("NetWorthSnapshot", back_populates="user", cascade="all, delete-orphan")
-    plaid_connections = relationship("PlaidConnection", back_populates="user", cascade="all, delete-orphan")
 
 
 class Account(Base):
@@ -340,23 +339,3 @@ class NetWorthSnapshot(Base):
     __table_args__ = (
         UniqueConstraint("account_id", "year", "month", name="uq_networth_snapshot_account_year_month"),
     )
-
-
-class PlaidConnection(Base):
-    __tablename__ = "plaid_connections"
-
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    institution_id = Column(String(100), nullable=True)        # Plaid institution ID (e.g. "ins_1")
-    institution_name = Column(String(255), nullable=False)     # Human-readable name
-    access_token = Column(String(255), nullable=False)         # Permanent Plaid access token
-    item_id = Column(String(100), nullable=False)              # Plaid item identifier
-    plaid_account_id = Column(String(100), nullable=True)      # Plaid account ID
-    account_id = Column(Integer, ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True)
-    cursor = Column(Text, nullable=True)                       # transactions/sync cursor
-    status = Column(String(20), default="active")              # "active", "error", "expired"
-    last_synced_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-
-    user = relationship("User", back_populates="plaid_connections")
-    account = relationship("Account")
