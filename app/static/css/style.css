@@ -70,33 +70,53 @@ a:hover { color: var(--ctp-denim-dark); }
     align-items: center;
     gap: 2rem;
     height: 52px;
+    position: relative;
 }
 .nav-brand {
     display: flex;
     align-items: center;
-    gap: 0.6rem;
+    gap: 0.75rem;
     text-decoration: none;
     flex-shrink: 0;
+    /* Brand spans both bars: pull it down so it overlaps the sub-nav */
+    position: relative;
+    z-index: 101;
+}
+.navbar-wrapper:has(.nav-sub) .nav-brand {
+    /* When sub-nav is visible, let the brand visually span both rows */
+    margin-bottom: -40px; /* height of sub-nav */
+    padding-bottom: 40px;
 }
 .nav-brand img {
-    height: 36px;
+    height: 52px;
     width: auto;
+}
+.navbar-wrapper:has(.nav-sub) .nav-brand img {
+    height: 72px;
 }
 .brand-text {
     font-family: Poppins, sans-serif;
     font-weight: 800;
-    font-size: 1.05rem;
+    font-size: 1.3rem;
     color: #fff;
     letter-spacing: 0.01em;
+    line-height: 1.3;
+}
+.navbar-wrapper:has(.nav-sub) .brand-text {
+    font-size: 1.5rem;
 }
 .brand-the {
     background: var(--ctp-coin);
     color: var(--ctp-navy);
-    padding: 1px 6px;
+    padding: 2px 7px;
     border-radius: 8px;
-    font-size: 0.7rem;
+    font-size: 0.75rem;
     font-weight: 800;
     letter-spacing: 0.02em;
+}
+.navbar-wrapper:has(.nav-sub) .brand-the {
+    font-size: 0.85rem;
+    padding: 2px 8px;
 }
 .nav-main-links {
     display: flex;
@@ -814,6 +834,21 @@ tr:hover { background: rgba(31, 111, 178, 0.03); }
         padding: 0.5rem 1rem;
         gap: 0.5rem;
     }
+    /* Reset brand spanning on mobile */
+    .navbar-wrapper:has(.nav-sub) .nav-brand {
+        margin-bottom: 0;
+        padding-bottom: 0;
+    }
+    .navbar-wrapper:has(.nav-sub) .nav-brand img {
+        height: 36px;
+    }
+    .navbar-wrapper:has(.nav-sub) .brand-text {
+        font-size: 1.05rem;
+    }
+    .navbar-wrapper:has(.nav-sub) .brand-the {
+        font-size: 0.7rem;
+        padding: 1px 6px;
+    }
     .nav-main-links {
         flex-wrap: wrap;
         gap: 0.25rem;
@@ -827,7 +862,7 @@ tr:hover { background: rgba(31, 111, 178, 0.03); }
     .nav-sub {
         flex-wrap: wrap;
         height: auto;
-        padding: 0.4rem 1rem;
+        padding: 0.4rem 1rem !important;
         gap: 0.2rem;
         justify-content: center;
     }
