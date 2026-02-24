@@ -74,7 +74,10 @@ a:hover { color: var(--ctp-denim-dark); }
 }
 /* When sub-nav exists, reserve space for the absolutely-positioned brand column */
 .navbar-wrapper:has(.nav-sub) .nav-main {
-    padding-left: 220px;
+    padding-left: 270px;
+}
+.navbar-wrapper:has(.nav-sub) .nav-sub {
+    min-height: 40px;
 }
 
 /* === Brand (default: single bar / dashboard) === */
