@@ -43,9 +43,27 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-      - name: Deploy via Portainer webhook
-        if: env.PORTAINER_WEBHOOK_URL != ''
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          oauth-client-id: ""
+          oauth-secret: ""
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+
+      - name: Deploy via Portainer API
         env:
-          PORTAINER_WEBHOOK_URL: ${{ secrets.PORTAINER_WEBHOOK_URL }}
+          PORTAINER_URL: ${{ secrets.PORTAINER_URL }}
+          PORTAINER_API_TOKEN: ${{ secrets.PORTAINER_API_TOKEN }}
+          PORTAINER_STACK_ID: ${{ secrets.PORTAINER_STACK_ID }}
         run: |
-          curl -X POST "$PORTAINER_WEBHOOK_URL" || echo "Webhook call failed (non-critical)"
+          # Get current stack info
+          STACK_INFO=$(curl -s -H "X-API-Key: $PORTAINER_API_TOKEN" "$PORTAINER_URL/api/stacks/$PORTAINER_STACK_ID")
+          ENDPOINT_ID=$(echo "$STACK_INFO" | jq -r '.EndpointId')
+
+          # Trigger stack redeploy with pull
+          curl -s -X PUT \
+            -H "X-API-Key: $PORTAINER_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"pullImage\": true, \"prune\": false}" \
+            "$PORTAINER_URL/api/stacks/$PORTAINER_STACK_ID/git/redeploy?endpointId=$ENDPOINT_ID" \
+            || echo "Portainer redeploy call failed (non-critical)"
