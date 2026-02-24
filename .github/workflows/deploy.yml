@@ -59,11 +59,35 @@ jobs:
           # Get current stack info
           STACK_INFO=$(curl -s -H "X-API-Key: $PORTAINER_API_TOKEN" "$PORTAINER_URL/api/stacks/$PORTAINER_STACK_ID")
           ENDPOINT_ID=$(echo "$STACK_INFO" | jq -r '.EndpointId')
+          echo "Endpoint ID: $ENDPOINT_ID"
 
-          # Trigger stack redeploy with pull
-          curl -s -X PUT \
+          # Step 1: Git redeploy (pulls latest compose file + pulls image)
+          echo "Triggering git redeploy..."
+          REDEPLOY_RESULT=$(curl -s -X PUT \
             -H "X-API-Key: $PORTAINER_API_TOKEN" \
             -H "Content-Type: application/json" \
-            -d "{\"pullImage\": true, \"prune\": false}" \
-            "$PORTAINER_URL/api/stacks/$PORTAINER_STACK_ID/git/redeploy?endpointId=$ENDPOINT_ID" \
-            || echo "Portainer redeploy call failed (non-critical)"
+            -d '{"pullImage": true, "prune": false}' \
+            "$PORTAINER_URL/api/stacks/$PORTAINER_STACK_ID/git/redeploy?endpointId=$ENDPOINT_ID")
+          echo "Redeploy result: $REDEPLOY_RESULT"
+
+          # Step 2: Wait for redeploy to settle
+          sleep 10
+
+          # Step 3: Find the app container and recreate it with force pull
+          echo "Finding app container..."
+          CONTAINERS=$(curl -s -H "X-API-Key: $PORTAINER_API_TOKEN" \
+            "$PORTAINER_URL/api/endpoints/$ENDPOINT_ID/docker/containers/json?all=true")
+          CONTAINER_ID=$(echo "$CONTAINERS" | jq -r '.[] | select(.Names[] | contains("checkthepockets")) | select(.Names[] | contains("db") | not) | .Id')
+          echo "Container ID: $CONTAINER_ID"
+
+          if [ -n "$CONTAINER_ID" ] && [ "$CONTAINER_ID" != "null" ]; then
+            echo "Recreating container with image pull..."
+            RECREATE_RESULT=$(curl -s -X POST \
+              -H "X-API-Key: $PORTAINER_API_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d '{"pullImage": true}' \
+              "$PORTAINER_URL/api/endpoints/$ENDPOINT_ID/docker/containers/$CONTAINER_ID/recreate")
+            echo "Recreate result: $RECREATE_RESULT"
+          else
+            echo "WARNING: Could not find app container, skipping recreate"
+          fi
