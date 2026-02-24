@@ -1,13 +1,13 @@
 services:
   app:
-    build: .
+    image: ghcr.io/gjagils/checkthepockets:latest
     container_name: checkthepockets
     restart: unless-stopped
     env_file:
       - path: ./stack.env
         required: false
     ports:
-      - "${APP_PORT:-8100}:8000"
+      - "${APP_PORT:-8368}:8000"
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-checkthepockets}:${POSTGRES_PASSWORD:-checkthepockets}@db:5432/${POSTGRES_DB:-checkthepockets}
       - SECRET_KEY=${SECRET_KEY:-verander-dit-in-een-lang-willekeurig-wachtwoord}
