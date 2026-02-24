@@ -7,12 +7,14 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import PortfolioAsset, PortfolioPerson, PortfolioHolding
+from app.models import PortfolioAsset, PortfolioPerson, PortfolioHolding, PortfolioPriceSnapshot
 from app.auth import require_login
-from app.portfolio_prices import fetch_price, PRESET_ASSETS
+from app.portfolio_prices import fetch_price, fetch_historical_prices, PRESET_ASSETS
 
 router = APIRouter(prefix="/portfolio")
 templates = Jinja2Templates(directory="app/templates")
+
+MONTH_LABELS = ["Jan", "Feb", "Mrt", "Apr", "Mei", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dec"]
 
 
 @router.get("")
@@ -60,20 +62,65 @@ def portfolio_overview(
         asset_totals[asset.id] = asset_total
         grand_total += asset_total
 
-    # Build projection data (months ahead)
-    projection_months = 12
-    projections = []
-    for m in range(1, projection_months + 1):
-        month_total = Decimal("0")
+    # Build chart data for portfolio value over time
+    now = datetime.date.today()
+    current_year = now.year
+    current_month = now.month
+    chart_data = {"labels": MONTH_LABELS, "past": [], "future": []}
+
+    if assets and grand_total > 0:
+        # Get total quantity per asset
+        asset_quantities = {}
         for asset in assets:
-            growth = (1 + asset.monthly_growth_pct / 100) ** m
-            asset_value = asset_totals.get(asset.id, Decimal("0"))
-            month_total += asset_value * growth
-        projections.append({
-            "month": m,
-            "total": month_total,
-            "growth": month_total - grand_total,
-        })
+            total_qty = Decimal("0")
+            for person in persons:
+                total_qty += holdings_map.get((asset.id, person.id), Decimal("0"))
+            asset_quantities[asset.id] = total_qty
+
+        # Fetch price snapshots for this year
+        asset_ids = [a.id for a in assets]
+        snapshots = (
+            db.query(PortfolioPriceSnapshot)
+            .filter(
+                PortfolioPriceSnapshot.asset_id.in_(asset_ids),
+                PortfolioPriceSnapshot.year == current_year,
+            )
+            .all()
+        )
+        # Build lookup: {(asset_id, month): price}
+        snapshot_map = {}
+        for s in snapshots:
+            snapshot_map[(s.asset_id, s.month)] = s.price_eur
+
+        for month in range(1, 13):
+            if month <= current_month:
+                # Past/current: use historical prices from snapshots
+                month_total = Decimal("0")
+                has_data = False
+                for asset in assets:
+                    price = snapshot_map.get((asset.id, month))
+                    if price is not None:
+                        has_data = True
+                        month_total += asset_quantities[asset.id] * price
+                    else:
+                        # Fallback: use current price
+                        month_total += asset_quantities[asset.id] * asset.current_price_eur
+
+                chart_data["past"].append(float(round(month_total, 2)))
+                # Current month also goes to future for seamless connection
+                if month == current_month:
+                    chart_data["future"].append(float(round(month_total, 2)))
+                else:
+                    chart_data["future"].append(None)
+            else:
+                # Future: project from current value using growth
+                chart_data["past"].append(None)
+                months_ahead = month - current_month
+                month_total = Decimal("0")
+                for asset in assets:
+                    growth = (1 + asset.monthly_growth_pct / 100) ** months_ahead
+                    month_total += asset_totals.get(asset.id, Decimal("0")) * growth
+                chart_data["future"].append(float(round(month_total, 2)))
 
     return templates.TemplateResponse(
         "portfolio/index.html",
@@ -86,7 +133,8 @@ def portfolio_overview(
             "person_totals": person_totals,
             "asset_totals": asset_totals,
             "grand_total": grand_total,
-            "projections": projections,
+            "chart_data": chart_data,
+            "current_year": current_year,
             "preset_assets": PRESET_ASSETS,
         },
     )
@@ -264,7 +312,7 @@ def refresh_prices(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    """Fetch live prices for all assets."""
+    """Fetch live prices and historical prices for all assets."""
     user = require_login(request, db)
 
     assets = (
@@ -275,11 +323,31 @@ def refresh_prices(
 
     updated = 0
     for asset in assets:
+        # Fetch current price
         price = fetch_price(asset.symbol, asset.asset_class)
         if price is not None:
             asset.current_price_eur = price
             asset.price_updated_at = datetime.datetime.utcnow()
             updated += 1
+
+        # Fetch and store historical prices
+        history = fetch_historical_prices(asset.symbol, asset.asset_class, months=12)
+        for (year, month), hist_price in history.items():
+            existing = db.query(PortfolioPriceSnapshot).filter(
+                PortfolioPriceSnapshot.asset_id == asset.id,
+                PortfolioPriceSnapshot.year == year,
+                PortfolioPriceSnapshot.month == month,
+            ).first()
+            if existing:
+                existing.price_eur = hist_price
+            else:
+                snapshot = PortfolioPriceSnapshot(
+                    asset_id=asset.id,
+                    year=year,
+                    month=month,
+                    price_eur=hist_price,
+                )
+                db.add(snapshot)
 
     db.commit()
     return RedirectResponse("/portfolio", status_code=302)

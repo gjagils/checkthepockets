@@ -220,51 +220,13 @@
     </div>
 </div>
 
-<!-- Prognose -->
-{% if projections and grand_total > 0 %}
+<!-- Portfolio waardeverloop grafiek -->
+{% if chart_data and chart_data.past|length > 0 and grand_total > 0 %}
 <div class="card">
-    <h2>Prognose (12 maanden)</h2>
-    <p class="muted" style="margin-bottom:1rem;">Op basis van de ingestelde maandelijkse groeipercentages per asset.</p>
-    <div class="table-wrap">
-        <table>
-            <thead>
-                <tr>
-                    <th>Maand</th>
-                    <th class="text-right">Verwachte waarde</th>
-                    <th class="text-right">Groei t.o.v. nu</th>
-                    <th>Grafiek</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% set max_val = projections[-1].total if projections else grand_total %}
-                {% set min_val = grand_total %}
-                {% set range_val = max_val - min_val if max_val > min_val else 1 %}
-                <tr style="background:rgba(242, 178, 51, 0.08);">
-                    <td><strong>Nu</strong></td>
-                    <td class="text-right nowrap"><strong>&euro;&nbsp;{{ "%.2f"|format(grand_total) }}</strong></td>
-                    <td class="text-right nowrap">-</td>
-                    <td style="width:30%;">
-                        <div style="width:100%; height:10px; background:var(--ctp-border); border-radius:5px;">
-                        </div>
-                    </td>
-                </tr>
-                {% for p in projections %}
-                {% set bar_pct = (((p.total - min_val) / range_val) * 100)|round(0)|int if range_val > 0 else 0 %}
-                <tr>
-                    <td>+{{ p.month }} mnd</td>
-                    <td class="text-right nowrap">&euro;&nbsp;{{ "%.2f"|format(p.total) }}</td>
-                    <td class="text-right nowrap {% if p.growth >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
-                        {% if p.growth >= 0 %}+{% endif %}&euro;&nbsp;{{ "%.2f"|format(p.growth) }}
-                    </td>
-                    <td style="width:30%;">
-                        <div style="width:100%; height:10px; background:var(--ctp-border); border-radius:5px; overflow:hidden;">
-                            <div style="width:{{ bar_pct }}%; height:100%; background:var(--ctp-check); border-radius:5px;"></div>
-                        </div>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <h2>Waardeverloop {{ current_year }}</h2>
+    <p class="muted" style="margin-bottom:1rem;">Verleden op basis van historische prijzen, toekomst op basis van groeipercentage.</p>
+    <div style="position:relative; height:320px;">
+        <canvas id="portfolioChart"></canvas>
     </div>
 </div>
 {% endif %}
@@ -301,6 +263,7 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 function fillPreset(val) {
     if (!val) return;
@@ -337,5 +300,109 @@ function saveHolding(input) {
         }
     });
 }
+
+// Portfolio waardeverloop grafiek
+{% if chart_data and chart_data.past|length > 0 and grand_total > 0 %}
+(function() {
+    var chartData = {{ chart_data | tojson }};
+    var ctx = document.getElementById('portfolioChart');
+    if (!ctx) return;
+
+    // Kleuren uit CSS variabelen
+    var style = getComputedStyle(document.documentElement);
+    var colorDenim = style.getPropertyValue('--ctp-denim').trim() || '#2563eb';
+    var colorCoin = style.getPropertyValue('--ctp-coin').trim() || '#f2b233';
+
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: chartData.labels,
+            datasets: [
+                {
+                    label: 'Werkelijke waarde',
+                    data: chartData.past,
+                    borderColor: colorDenim,
+                    backgroundColor: colorDenim + '1a',
+                    borderWidth: 2.5,
+                    pointRadius: 4,
+                    pointBackgroundColor: colorDenim,
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                    fill: true,
+                    tension: 0.3,
+                    spanGaps: false,
+                },
+                {
+                    label: 'Prognose',
+                    data: chartData.future,
+                    borderColor: colorCoin,
+                    backgroundColor: colorCoin + '1a',
+                    borderWidth: 2.5,
+                    borderDash: [6, 4],
+                    pointRadius: 4,
+                    pointBackgroundColor: colorCoin,
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                    fill: true,
+                    tension: 0.3,
+                    spanGaps: false,
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top',
+                    labels: {
+                        usePointStyle: true,
+                        padding: 20,
+                        font: { size: 13 }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            if (context.parsed.y === null) return null;
+                            return context.dataset.label + ': \u20ac ' +
+                                context.parsed.y.toLocaleString('nl-NL', {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2
+                                });
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: false,
+                    ticks: {
+                        callback: function(value) {
+                            return '\u20ac ' + value.toLocaleString('nl-NL', {
+                                minimumFractionDigits: 0,
+                                maximumFractionDigits: 0
+                            });
+                        }
+                    },
+                    grid: {
+                        color: 'rgba(0,0,0,0.06)'
+                    }
+                },
+                x: {
+                    grid: {
+                        display: false
+                    }
+                }
+            }
+        }
+    });
+})();
+{% endif %}
 </script>
 {% endblock %}
