@@ -1,7 +1,7 @@
 """Add is_excluded column to transactions for soft-delete
 
-Revision ID: 015
-Revises: 014
+Revision ID: 017
+Revises: 016
 Create Date: 2026-02-25
 """
 from typing import Sequence, Union
@@ -9,8 +9,8 @@ from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
 
-revision: str = "015"
-down_revision: Union[str, None] = "014"
+revision: str = "017"
+down_revision: Union[str, None] = "016"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
