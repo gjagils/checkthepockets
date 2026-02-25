@@ -161,8 +161,8 @@
                             <strong>"{{ rule.match_value }}"</strong>
                             {% if rule.amount_min is not none or rule.amount_max is not none %}
                             <span class="muted">
-                                {% if rule.amount_min is not none %}van {{ "%.2f"|format(rule.amount_min) }}{% endif %}
-                                {% if rule.amount_max is not none %}t/m {{ "%.2f"|format(rule.amount_max) }}{% endif %}
+                                {% if rule.amount_min is not none %}van &euro;&nbsp;{{ "%.2f"|format(rule.amount_min)|replace(".", ",") }}{% endif %}
+                                {% if rule.amount_max is not none %}t/m &euro;&nbsp;{{ "%.2f"|format(rule.amount_max)|replace(".", ",") }}{% endif %}
                             </span>
                             {% endif %}
                             <span class="muted">→</span>
@@ -177,6 +177,10 @@
                         </div>
                     </div>
                     <div class="rule-actions">
+                        <form method="post" action="/rules/{{ rule.id }}/apply" style="display:inline;">
+                            <input type="hidden" name="only_uncategorized" value="1">
+                            <button type="submit" class="btn btn-sm btn-accent">Toepassen</button>
+                        </form>
                         <button class="btn btn-sm" onclick="toggleEdit({{ rule.id }})">Bewerken</button>
                         <form method="post" action="/rules/{{ rule.id }}/toggle" style="display:inline;">
                             <button type="submit" class="btn btn-sm">

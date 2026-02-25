@@ -64,19 +64,19 @@
                 {% set exp_width = ((exp|abs / max_expense.val) * 100)|round(0)|int if max_expense.val > 0 and exp < 0 else 0 %}
                 <tr>
                     <td>{{ months[m] }}</td>
-                    <td class="text-right nowrap amount-positive">{{ "%.2f"|format(inc) }}</td>
+                    <td class="text-right nowrap amount-positive">&euro;&nbsp;{{ "%.2f"|format(inc)|replace(".", ",") }}</td>
                     <td style="width:20%;">
                         <div style="width:100%; height:10px; background:var(--ctp-border); border-radius:5px; overflow:hidden;">
                             <div style="width:{{ inc_width }}%; height:100%; background:var(--ctp-check); border-radius:5px;"></div>
                         </div>
                     </td>
-                    <td class="text-right nowrap amount-negative">{{ "%.2f"|format(exp) }}</td>
+                    <td class="text-right nowrap amount-negative">&euro;&nbsp;{{ "%.2f"|format(exp)|replace(".", ",") }}</td>
                     <td style="width:20%;">
                         <div style="width:100%; height:10px; background:var(--ctp-border); border-radius:5px; overflow:hidden;">
                             <div style="width:{{ exp_width }}%; height:100%; background:var(--ctp-danger); border-radius:5px;"></div>
                         </div>
                     </td>
-                    <td class="text-right nowrap {% if bal >= 0 %}amount-positive{% else %}amount-negative{% endif %}">{{ "%.2f"|format(bal) }}</td>
+                    <td class="text-right nowrap {% if bal >= 0 %}amount-positive{% else %}amount-negative{% endif %}">&euro;&nbsp;{{ "%.2f"|format(bal)|replace(".", ",") }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -111,7 +111,7 @@
                     </td>
                     {% endfor %}
                     <td class="text-right nowrap" style="border-left:2px solid var(--ctp-border); font-weight:700;">
-                        {{ "%.2f"|format(cat.total) }}
+                        &euro;&nbsp;{{ "%.2f"|format(cat.total)|replace(".", ",") }}
                     </td>
                 </tr>
                 {% endfor %}

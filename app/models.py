@@ -173,6 +173,7 @@ class Transaction(Base):
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
     parent_id = Column(Integer, ForeignKey("transactions.id", ondelete="CASCADE"), nullable=True)
     import_hash = Column(String(64), unique=True, nullable=False)
+    is_excluded = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     account = relationship("Account", back_populates="transactions")

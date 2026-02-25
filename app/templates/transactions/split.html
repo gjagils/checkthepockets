@@ -16,7 +16,7 @@
         <tr>
             <th>Bedrag</th>
             <td class="{% if transaction.amount < 0 %}amount-negative{% else %}amount-positive{% endif %}">
-                {{ "%.2f"|format(transaction.amount) }} {{ transaction.currency }}
+                &euro;&nbsp;{{ "%.2f"|format(transaction.amount)|replace(".", ",") }}
             </td>
         </tr>
         <tr>
@@ -54,7 +54,7 @@
                     <td class="nowrap">{{ child.date.strftime('%d-%m-%Y') }}</td>
                     <td class="desc-cell">{{ child.description or '-' }}</td>
                     <td class="text-right nowrap {% if child.amount < 0 %}amount-negative{% else %}amount-positive{% endif %}">
-                        {{ "%.2f"|format(child.amount) }}
+                        &euro;&nbsp;{{ "%.2f"|format(child.amount)|replace(".", ",") }}
                     </td>
                     <td>
                         {% if child.category_rel %}
