@@ -4,16 +4,15 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Request, Query
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import case, func, or_
 
 from app.database import get_db
 from app.models import Account, Transaction, Category, RecurringTransaction, Budget
 from app.auth import require_login
+from app.template_config import templates
 
 router = APIRouter()
-templates = Jinja2Templates(directory="app/templates")
 
 MONTH_NAMES_NL = [
     "", "Jan", "Feb", "Mrt", "Apr", "Mei", "Jun",
@@ -278,6 +277,7 @@ def dashboard(
                 "is_income": 0,
                 "group_total": uncat_total,
                 "group_count": uncat_count,
+                "group_budget": Decimal("0"),
                 "children": [],
             })
 

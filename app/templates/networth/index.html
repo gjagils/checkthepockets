@@ -8,16 +8,16 @@
 <!-- Net Worth Summary -->
 <div class="import-summary">
     <div class="summary-card">
-        <div class="value amount-positive">&euro;&nbsp;{{ "%.2f"|format(total_assets)|replace(".", ",") }}</div>
+        <div class="value amount-positive">&euro;&nbsp;{{ total_assets|euro }}</div>
         <div class="label">Bezittingen</div>
     </div>
     <div class="summary-card">
-        <div class="value amount-negative">&euro;&nbsp;{{ "%.2f"|format(total_liabilities)|replace(".", ",") }}</div>
+        <div class="value amount-negative">&euro;&nbsp;{{ total_liabilities|euro }}</div>
         <div class="label">Schulden</div>
     </div>
     <div class="summary-card">
         <div class="value {% if net_worth >= 0 %}amount-positive{% else %}amount-negative{% endif %}" style="font-size:1.5rem;">
-            &euro;&nbsp;{{ "%.2f"|format(net_worth)|replace(".", ",") }}
+            &euro;&nbsp;{{ net_worth|euro }}
         </div>
         <div class="label"><strong>Netto vermogen</strong></div>
     </div>
@@ -57,7 +57,7 @@
                     <td class="text-right">
                         <input type="text" class="budget-input"
                                data-account-id="{{ acc.id }}"
-                               value="{{ "%.2f"|format(acc.balance)|replace(".", ",") }}"
+                               value="{{ acc.balance|euro }}"
                                onblur="saveBalance(this)"
                                onkeydown="if(event.key==='Enter')this.blur()">
                     </td>
@@ -81,7 +81,7 @@
                             </div>
                             <div class="form-group">
                                 <label>Balans</label>
-                                <input type="text" name="balance" value="{{ "%.2f"|format(acc.balance)|replace(".", ",") }}">
+                                <input type="text" name="balance" value="{{ acc.balance|euro }}">
                             </div>
                             <div class="form-group">
                                 <label>Categorie</label>
@@ -111,7 +111,7 @@
                 <tr>
                     <td><strong>Subtotaal {{ cat_label }}</strong></td>
                     <td class="text-right nowrap amount-positive">
-                        <strong>&euro;&nbsp;{{ "%.2f"|format(group_accounts|sum(attribute='balance'))|replace(".", ",") }}</strong>
+                        <strong>&euro;&nbsp;{{ group_accounts|sum(attribute='balance')|euro }}</strong>
                     </td>
                     <td colspan="3"></td>
                 </tr>
@@ -146,7 +146,7 @@
                     <td class="text-right">
                         <input type="text" class="budget-input"
                                data-account-id="{{ acc.id }}"
-                               value="{{ "%.2f"|format(acc.balance)|replace(".", ",") }}"
+                               value="{{ acc.balance|euro }}"
                                onblur="saveBalance(this)"
                                onkeydown="if(event.key==='Enter')this.blur()">
                     </td>
@@ -170,7 +170,7 @@
                             </div>
                             <div class="form-group">
                                 <label>Balans</label>
-                                <input type="text" name="balance" value="{{ "%.2f"|format(acc.balance)|replace(".", ",") }}">
+                                <input type="text" name="balance" value="{{ acc.balance|euro }}">
                             </div>
                             <div class="form-group">
                                 <label>Categorie</label>
@@ -200,7 +200,7 @@
                 <tr>
                     <td><strong>Subtotaal {{ cat_label }}</strong></td>
                     <td class="text-right nowrap amount-negative">
-                        <strong>&euro;&nbsp;{{ "%.2f"|format(group_accounts|sum(attribute='balance'))|replace(".", ",") }}</strong>
+                        <strong>&euro;&nbsp;{{ group_accounts|sum(attribute='balance')|euro }}</strong>
                     </td>
                     <td colspan="3"></td>
                 </tr>
@@ -229,7 +229,7 @@
                 </div>
             </div>
             <span style="width:120px; font-size:0.85rem; text-align:right;" class="{% if entry.net_worth >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
-                &euro;&nbsp;{{ "%.0f"|format(entry.net_worth)|replace(".", ",") }}
+                &euro;&nbsp;{{ entry.net_worth|euro0 }}
             </span>
         </div>
         {% endfor %}
@@ -256,14 +256,14 @@
                 {% endif %}
                 <tr>
                     <td>{{ month_names[entry.month] }} {{ entry.year }}</td>
-                    <td class="text-right nowrap amount-positive">&euro;&nbsp;{{ "%.2f"|format(entry.assets)|replace(".", ",") }}</td>
-                    <td class="text-right nowrap amount-negative">&euro;&nbsp;{{ "%.2f"|format(entry.liabilities)|replace(".", ",") }}</td>
+                    <td class="text-right nowrap amount-positive">&euro;&nbsp;{{ entry.assets|euro }}</td>
+                    <td class="text-right nowrap amount-negative">&euro;&nbsp;{{ entry.liabilities|euro }}</td>
                     <td class="text-right nowrap {% if entry.net_worth >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
-                        <strong>&euro;&nbsp;{{ "%.2f"|format(entry.net_worth)|replace(".", ",") }}</strong>
+                        <strong>&euro;&nbsp;{{ entry.net_worth|euro }}</strong>
                     </td>
                     <td class="text-right nowrap {% if change >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
                         {% if loop.index > 1 %}
-                        {{ "%.2f"|format(change)|replace(".", ",") }}
+                        {{ change|euro }}
                         {% else %}-{% endif %}
                     </td>
                 </tr>
@@ -284,7 +284,7 @@
                 {% for acc in inactive %}
                 <tr style="opacity:0.6;">
                     <td>{{ acc.name }} <span class="muted">({{ account_types[acc.account_type] }})</span></td>
-                    <td class="text-right nowrap">&euro;&nbsp;{{ "%.2f"|format(acc.balance)|replace(".", ",") }}</td>
+                    <td class="text-right nowrap">&euro;&nbsp;{{ acc.balance|euro }}</td>
                     <td>
                         <form method="post" action="/networth/accounts/{{ acc.id }}/toggle" style="display:inline;">
                             <button type="submit" class="btn btn-sm">Activeren</button>
@@ -351,7 +351,7 @@ function toggleEdit(id) {
 
 function saveBalance(input) {
     var accountId = input.dataset.accountId;
-    var value = input.value.trim().replace(',', '.');
+    var value = input.value.trim().replace(/\./g, '').replace(',', '.');
 
     var formData = new FormData();
     formData.append('balance', value);
@@ -363,7 +363,9 @@ function saveBalance(input) {
     .then(function(r) { return r.json(); })
     .then(function(data) {
         if (data.ok) {
-            input.value = data.balance.toFixed(2).replace('.', ',');
+            var parts = Math.abs(data.balance).toFixed(2).split('.');
+            var intPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+            input.value = (data.balance < 0 ? '-' : '') + intPart + ',' + parts[1];
             input.classList.add('budget-saved');
             setTimeout(function() { input.classList.remove('budget-saved'); }, 600);
         }

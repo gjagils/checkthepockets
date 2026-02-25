@@ -32,7 +32,7 @@
         {% if plan.account.iban %}
         <p class="muted">{{ plan.account.iban }}</p>
         {% endif %}
-        <p class="muted">Startsaldo: &euro;&nbsp;{{ "%.2f"|format(plan.starting_balance)|replace(".", ",") }}</p>
+        <p class="muted">Startsaldo: &euro;&nbsp;{{ plan.starting_balance|euro }}</p>
         <p class="muted">{{ plan.lines|length }} spaarregels</p>
         <div class="account-actions">
             <a href="/savings/{{ plan.id }}" class="btn btn-sm btn-primary">Openen</a>

@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, Request, Form, Query
 from fastapi.responses import JSONResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from typing import List
@@ -8,9 +7,9 @@ from typing import List
 from app.database import get_db
 from app.models import Account, Category
 from app.auth import require_login
+from app.template_config import templates
 
 router = APIRouter(prefix="/categories")
-templates = Jinja2Templates(directory="app/templates")
 
 
 @router.get("")

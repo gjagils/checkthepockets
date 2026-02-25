@@ -3,17 +3,15 @@ from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Request, Form, Query
 from fastapi.responses import JSONResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, case
 
 from app.database import get_db
 from app.models import Account, Budget, Category, Transaction
 from app.auth import require_login
-from sqlalchemy import case
+from app.template_config import templates
 
 router = APIRouter(prefix="/budgets")
-templates = Jinja2Templates(directory="app/templates")
 
 MONTH_NAMES_NL = {
     1: "Januari", 2: "Februari", 3: "Maart", 4: "April",

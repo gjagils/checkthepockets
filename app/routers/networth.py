@@ -3,16 +3,15 @@ from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Depends, Request, Form
 from fastapi.responses import RedirectResponse, JSONResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.database import get_db
 from app.models import NetWorthAccount, NetWorthSnapshot
 from app.auth import require_login
+from app.template_config import templates
 
 router = APIRouter(prefix="/networth")
-templates = Jinja2Templates(directory="app/templates")
 
 ACCOUNT_TYPES = {
     "asset": "Bezitting",

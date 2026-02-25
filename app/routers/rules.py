@@ -2,16 +2,15 @@ from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Depends, Request, Form
 from fastapi.responses import RedirectResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Rule, Category, Tag
 from app.auth import require_login
 from app.rules_engine import apply_rules_to_all, apply_single_rule, suggest_rules
+from app.template_config import templates
 
 router = APIRouter()
-templates = Jinja2Templates(directory="app/templates")
 
 MATCH_FIELDS = {
     "counterparty": "Tegenpartij",
