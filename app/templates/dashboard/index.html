@@ -181,8 +181,110 @@
 </div>
 {% endif %}
 
-<!-- Top categories with visual bars -->
-{% if top_categories %}
+<!-- Category breakdown (month view) -->
+{% if category_breakdown %}
+<div class="card">
+    <h2>Overzicht per categorie</h2>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Categorie</th>
+                    <th class="text-right">Bedrag</th>
+                    <th class="text-right">Budget</th>
+                    <th>Voortgang</th>
+                    <th class="text-right">Transacties</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for group in category_breakdown %}
+                <tr class="cat-parent-row" onclick="toggleChildren({{ group.parent_id }})" style="cursor:pointer;">
+                    <td>
+                        <strong>
+                            {% if group.parent_color %}<span class="color-dot" style="background:{{ group.parent_color }};"></span>{% endif %}
+                            {% if group.is_income %}<span style="color:var(--ctp-check);">&#9650;</span>{% endif %}
+                            {{ group.parent_name }}
+                        </strong>
+                        {% if group.children %}<span class="muted cat-toggle" id="toggle-{{ group.parent_id }}">&#9654;</span>{% endif %}
+                    </td>
+                    <td class="text-right nowrap">
+                        <strong class="{% if group.group_total >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
+                            &euro;&nbsp;{{ "%.2f"|format(group.group_total)|replace(".", ",") }}
+                        </strong>
+                    </td>
+                    <td class="text-right nowrap">
+                        {% if group.group_budget > 0 %}
+                        <span class="muted">&euro;&nbsp;{{ "%.2f"|format(group.group_budget)|replace(".", ",") }}</span>
+                        {% else %}-{% endif %}
+                    </td>
+                    <td>
+                        {% if group.group_budget > 0 %}
+                            {% if group.is_income %}
+                                {% set pct = ((group.group_total / group.group_budget) * 100)|int %}
+                                <div class="budget-bar" style="width:120px;">
+                                    <div class="budget-bar-fill {% if pct >= 100 %}bar-ok{% elif pct >= 80 %}{% else %}bar-warn{% endif %}" style="width:{{ [pct, 100]|min }}%"></div>
+                                </div>
+                                <span class="muted">{{ pct }}%</span>
+                            {% else %}
+                                {% set spent = group.group_total|abs %}
+                                {% set pct = ((spent / group.group_budget) * 100)|int %}
+                                <div class="budget-bar" style="width:120px;">
+                                    <div class="budget-bar-fill {% if pct > 100 %}bar-over{% elif pct > 80 %}bar-warn{% endif %}" style="width:{{ [pct, 100]|min }}%"></div>
+                                </div>
+                                <span class="muted">{{ pct }}%</span>
+                            {% endif %}
+                        {% else %}-{% endif %}
+                    </td>
+                    <td class="text-right nowrap">
+                        <a href="/?category_id={{ group.parent_id }}{% if current_account_id %}&account_id={{ current_account_id }}{% endif %}" class="muted" style="text-decoration:none;">
+                            {{ group.group_count }}
+                        </a>
+                    </td>
+                </tr>
+
+                {% for child in group.children %}
+                <tr class="cat-child-row cat-children-{{ group.parent_id }}" style="display:none;">
+                    <td style="padding-left:2rem;">
+                        {% if child.color %}<span class="color-dot" style="background:{{ child.color }};"></span>{% endif %}
+                        {{ child.name }}
+                    </td>
+                    <td class="text-right nowrap {% if child.total >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
+                        &euro;&nbsp;{{ "%.2f"|format(child.total)|replace(".", ",") }}
+                    </td>
+                    <td class="text-right nowrap">
+                        {% if child.budget > 0 %}
+                        <span class="muted">&euro;&nbsp;{{ "%.2f"|format(child.budget)|replace(".", ",") }}</span>
+                        {% else %}-{% endif %}
+                    </td>
+                    <td>
+                        {% if child.budget > 0 %}
+                            {% if group.is_income %}
+                                {% set cpct = ((child.total / child.budget) * 100)|int %}
+                            {% else %}
+                                {% set cpct = ((child.total|abs / child.budget) * 100)|int %}
+                            {% endif %}
+                            <div class="budget-bar" style="width:120px;">
+                                <div class="budget-bar-fill {% if group.is_income %}{% if cpct >= 100 %}bar-ok{% elif cpct < 50 %}bar-warn{% endif %}{% else %}{% if cpct > 100 %}bar-over{% elif cpct > 80 %}bar-warn{% endif %}{% endif %}" style="width:{{ [cpct, 100]|min }}%"></div>
+                            </div>
+                            <span class="muted">{{ cpct }}%</span>
+                        {% else %}-{% endif %}
+                    </td>
+                    <td class="text-right nowrap">
+                        <a href="/?category_id={{ child.id }}{% if current_account_id %}&account_id={{ current_account_id }}{% endif %}" class="muted" style="text-decoration:none;">
+                            {{ child.tx_count }}
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% elif top_categories %}
+<!-- Top categories with visual bars (full year view) -->
 <div class="card">
     <h2>Uitgaven per categorie</h2>
     {% set max_amount = top_categories[0].total|abs if top_categories else 1 %}
@@ -202,4 +304,18 @@
     {% endfor %}
 </div>
 {% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleChildren(parentId) {
+    var rows = document.querySelectorAll('.cat-children-' + parentId);
+    var toggle = document.getElementById('toggle-' + parentId);
+    if (!rows.length) return;
+    var show = rows[0].style.display === 'none';
+    rows.forEach(function(r) { r.style.display = show ? '' : 'none'; });
+    if (toggle) toggle.innerHTML = show ? '&#9660;' : '&#9654;';
+}
+</script>
 {% endblock %}
