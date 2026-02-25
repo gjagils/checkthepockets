@@ -736,6 +736,13 @@ tr:hover { background: rgba(31, 111, 178, 0.03); }
     background: var(--ctp-danger);
 }
 
+/* ===== Dashboard Category Breakdown ===== */
+.cat-parent-row:hover { background: rgba(31, 111, 178, 0.06) !important; }
+.cat-parent-row td { border-bottom: 2px solid var(--ctp-border); }
+.cat-toggle { margin-left: 0.4rem; font-size: 0.7rem; color: var(--ctp-muted); }
+.cat-child-row td { background: var(--ctp-bg); border-bottom: 1px solid var(--ctp-border); }
+.cat-child-row:hover td { background: rgba(31, 111, 178, 0.04) !important; }
+
 /* ===== Responsive ===== */
 @media (max-width: 640px) {
     .navbar {

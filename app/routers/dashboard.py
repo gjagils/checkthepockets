@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import case, func, or_
 
 from app.database import get_db
-from app.models import Account, Transaction, Category, RecurringTransaction
+from app.models import Account, Transaction, Category, RecurringTransaction, Budget
 from app.auth import require_login
 
 router = APIRouter()
@@ -133,7 +133,7 @@ def dashboard(
                 "expenses": row.expenses or Decimal("0"),
             }
 
-    # Top spending categories (subcategories)
+    # Top spending categories (subcategories) - kept for bar chart
     top_categories = (
         db.query(
             Category.name,
@@ -148,6 +148,138 @@ def dashboard(
         .limit(10)
         .all()
     )
+
+    # Category breakdown with parent/child hierarchy for month view
+    category_breakdown = []
+    budget_map = {}
+    if current_month:
+        # Get budgets for this month
+        budgets = (
+            db.query(Budget)
+            .filter(
+                Budget.user_id == user.id,
+                Budget.year == current_year,
+                Budget.month == current_month,
+            )
+            .all()
+        )
+        budget_map = {b.category_id: b.amount for b in budgets}
+
+        # Get all spending per category for this period
+        cat_spending = (
+            db.query(
+                Category.id,
+                Category.name,
+                Category.parent_id,
+                Category.is_income,
+                Category.color,
+                Category.sort_order,
+                func.sum(Transaction.amount).label("total"),
+                func.count(Transaction.id).label("tx_count"),
+            )
+            .join(Transaction, Transaction.category_id == Category.id)
+            .join(Account, Account.id == Transaction.account_id)
+            .filter(*tx_filter)
+            .group_by(Category.id, Category.name, Category.parent_id, Category.is_income, Category.color, Category.sort_order)
+            .all()
+        )
+
+        # Also count uncategorized
+        uncat = (
+            db.query(
+                func.sum(Transaction.amount).label("total"),
+                func.count(Transaction.id).label("tx_count"),
+            )
+            .join(Account)
+            .filter(*tx_filter, Transaction.category_id.is_(None))
+            .first()
+        )
+
+        # Build maps
+        spend_map = {}
+        for row in cat_spending:
+            spend_map[row.id] = {
+                "id": row.id,
+                "name": row.name,
+                "parent_id": row.parent_id,
+                "is_income": row.is_income,
+                "color": row.color,
+                "sort_order": row.sort_order or 0,
+                "total": row.total or Decimal("0"),
+                "tx_count": row.tx_count or 0,
+            }
+
+        # Get all categories for this user to build full hierarchy
+        all_cats = (
+            db.query(Category)
+            .filter(Category.user_id == user.id)
+            .order_by(Category.sort_order, Category.name)
+            .all()
+        )
+
+        parents = [c for c in all_cats if c.parent_id is None]
+        children_map = {}
+        for c in all_cats:
+            if c.parent_id is not None:
+                children_map.setdefault(c.parent_id, []).append(c)
+
+        # Build breakdown: income categories first, then expenses
+        for is_income_pass in [1, 0]:
+            for parent in parents:
+                if parent.is_income != is_income_pass:
+                    continue
+                children = children_map.get(parent.id, [])
+                parent_data = spend_map.get(parent.id, {"total": Decimal("0"), "tx_count": 0})
+
+                child_rows = []
+                group_total = Decimal("0") if children else parent_data["total"]
+                group_count = 0 if children else parent_data["tx_count"]
+                group_budget = Decimal("0") if children else budget_map.get(parent.id, Decimal("0"))
+
+                for child in children:
+                    cd = spend_map.get(child.id, {"total": Decimal("0"), "tx_count": 0})
+                    cb = budget_map.get(child.id, Decimal("0"))
+                    if cd["total"] == Decimal("0") and cd["tx_count"] == 0 and cb == Decimal("0"):
+                        continue
+                    group_total += cd["total"]
+                    group_count += cd["tx_count"]
+                    group_budget += cb
+                    child_rows.append({
+                        "id": child.id,
+                        "name": child.name,
+                        "color": child.color,
+                        "total": cd["total"],
+                        "tx_count": cd["tx_count"],
+                        "budget": cb,
+                    })
+
+                if group_total == Decimal("0") and group_count == 0:
+                    continue
+
+                category_breakdown.append({
+                    "parent_id": parent.id,
+                    "parent_name": parent.name,
+                    "parent_color": parent.color,
+                    "is_income": parent.is_income,
+                    "group_total": group_total,
+                    "group_count": group_count,
+                    "group_budget": group_budget,
+                    "children": child_rows,
+                })
+
+        # Add uncategorized if any
+        uncat_total = uncat.total or Decimal("0") if uncat else Decimal("0")
+        uncat_count = uncat.tx_count or 0 if uncat else 0
+        if uncat_total != Decimal("0") or uncat_count > 0:
+            category_breakdown.append({
+                "parent_id": -1,
+                "parent_name": "Zonder categorie",
+                "parent_color": None,
+                "is_income": 0,
+                "group_total": uncat_total,
+                "group_count": uncat_count,
+                "children": [],
+            })
 
     # Recurring projections: upcoming expected items for rest of current period
     recurring_items = (
@@ -261,6 +393,7 @@ def dashboard(
             "monthly_data": monthly_data,
             "months": MONTH_NAMES_NL,
             "top_categories": top_categories,
+            "category_breakdown": category_breakdown,
             "recurring_due": recurring_due,
             "recurring_confirmed": recurring_confirmed,
             "projected_expenses": projected_expenses,
