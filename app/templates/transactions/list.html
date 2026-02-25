@@ -133,11 +133,15 @@
                         </form>
                     </td>
                     <td class="text-right nowrap {% if tx.amount >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
-                        {{ "%.2f"|format(tx.amount) }} {{ tx.currency }}
+                        &euro;&nbsp;{{ "%.2f"|format(tx.amount)|replace(".", ",") }}
                     </td>
                     <td class="nowrap">{{ tx.account.name }}</td>
                     <td class="nowrap">
                         <a href="/transactions/{{ tx.id }}/edit" class="btn btn-sm">Bewerken</a>
+                        <form method="post" action="/transactions/{{ tx.id }}/exclude" style="display:inline;">
+                            <input type="hidden" name="redirect_to" value="/?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}">
+                            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Transactie uitsluiten? Deze verdwijnt uit overzichten maar wordt niet opnieuw geimporteerd.')">Uitsluiten</button>
+                        </form>
                     </td>
                 </tr>
                 {% endfor %}

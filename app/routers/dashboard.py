@@ -53,6 +53,7 @@ def dashboard(
     tx_filter = [
         Account.user_id == user.id,
         func.extract("year", Transaction.date) == current_year,
+        Transaction.is_excluded == 0,
     ]
     if current_month:
         tx_filter.append(func.extract("month", Transaction.date) == current_month)

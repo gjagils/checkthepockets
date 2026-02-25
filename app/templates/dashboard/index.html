@@ -42,15 +42,15 @@
 <div class="import-summary">
     <div class="summary-card">
         <div class="label">Inkomen</div>
-        <div class="value amount-positive">{{ "%.2f"|format(income) }}</div>
+        <div class="value amount-positive">&euro;&nbsp;{{ "%.2f"|format(income)|replace(".", ",") }}</div>
     </div>
     <div class="summary-card">
         <div class="label">Uitgaven</div>
-        <div class="value amount-negative">{{ "%.2f"|format(expenses) }}</div>
+        <div class="value amount-negative">&euro;&nbsp;{{ "%.2f"|format(expenses)|replace(".", ",") }}</div>
     </div>
     <div class="summary-card">
         <div class="label">Resultaat</div>
-        <div class="value {% if balance >= 0 %}amount-positive{% else %}amount-negative{% endif %}">{{ "%.2f"|format(balance) }}</div>
+        <div class="value {% if balance >= 0 %}amount-positive{% else %}amount-negative{% endif %}">&euro;&nbsp;{{ "%.2f"|format(balance)|replace(".", ",") }}</div>
     </div>
     <div class="summary-card">
         <div class="label">Spaarquote</div>
@@ -90,9 +90,9 @@
                 {% endif %}
                 <tr>
                     <td><a href="/dashboard?year={{ current_year }}&month={{ m }}{% if current_account_id %}&account_id={{ current_account_id }}{% endif %}" style="text-decoration:none;">{{ months[m] }}</a></td>
-                    <td class="text-right nowrap amount-positive">{{ "%.2f"|format(inc) }}</td>
-                    <td class="text-right nowrap amount-negative">{{ "%.2f"|format(exp) }}</td>
-                    <td class="text-right nowrap {% if res >= 0 %}amount-positive{% else %}amount-negative{% endif %}">{{ "%.2f"|format(res) }}</td>
+                    <td class="text-right nowrap amount-positive">&euro;&nbsp;{{ "%.2f"|format(inc)|replace(".", ",") }}</td>
+                    <td class="text-right nowrap amount-negative">&euro;&nbsp;{{ "%.2f"|format(exp)|replace(".", ",") }}</td>
+                    <td class="text-right nowrap {% if res >= 0 %}amount-positive{% else %}amount-negative{% endif %}">&euro;&nbsp;{{ "%.2f"|format(res)|replace(".", ",") }}</td>
                     <td class="text-right nowrap {% if rate >= 0 %}amount-positive{% else %}amount-negative{% endif %}">{{ "%.1f"|format(rate) }}%</td>
                 </tr>
                 {% endfor %}
@@ -100,9 +100,9 @@
             <tfoot>
                 <tr>
                     <td><strong>Totaal</strong></td>
-                    <td class="text-right nowrap amount-positive"><strong>{{ "%.2f"|format(income) }}</strong></td>
-                    <td class="text-right nowrap amount-negative"><strong>{{ "%.2f"|format(expenses) }}</strong></td>
-                    <td class="text-right nowrap {% if balance >= 0 %}amount-positive{% else %}amount-negative{% endif %}"><strong>{{ "%.2f"|format(balance) }}</strong></td>
+                    <td class="text-right nowrap amount-positive"><strong>&euro;&nbsp;{{ "%.2f"|format(income)|replace(".", ",") }}</strong></td>
+                    <td class="text-right nowrap amount-negative"><strong>&euro;&nbsp;{{ "%.2f"|format(expenses)|replace(".", ",") }}</strong></td>
+                    <td class="text-right nowrap {% if balance >= 0 %}amount-positive{% else %}amount-negative{% endif %}"><strong>&euro;&nbsp;{{ "%.2f"|format(balance)|replace(".", ",") }}</strong></td>
                     <td class="text-right nowrap {% if savings_rate >= 0 %}amount-positive{% else %}amount-negative{% endif %}"><strong>{{ savings_rate }}%</strong></td>
                 </tr>
             </tfoot>
@@ -192,7 +192,7 @@
     <div style="margin-bottom:0.75rem;">
         <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:0.25rem;">
             <span style="font-weight:600; font-size:0.9rem;">{{ cat.name }}</span>
-            <span class="amount-negative nowrap" style="font-size:0.9rem;">{{ "%.2f"|format(cat.total) }} EUR <span class="muted">({{ pct }}%)</span></span>
+            <span class="amount-negative nowrap" style="font-size:0.9rem;">&euro;&nbsp;{{ "%.2f"|format(cat.total)|replace(".", ",") }} <span class="muted">({{ pct }}%)</span></span>
         </div>
         <div style="width:100%; height:10px; background:var(--ctp-border); border-radius:5px; overflow:hidden;">
             <div style="width:{{ bar_width }}%; height:100%; background:var(--ctp-danger); border-radius:5px; transition:width 0.3s;"></div>

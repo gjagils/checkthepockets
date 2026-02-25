@@ -70,6 +70,9 @@ def transaction_list(
     )
     query = query.filter(Transaction.id.notin_(split_parent_ids))
 
+    # Hide excluded (soft-deleted) transactions
+    query = query.filter(Transaction.is_excluded == 0)
+
     # Filters
     if account_id:
         query = query.filter(Transaction.account_id == account_id)
@@ -230,6 +233,30 @@ def set_category(
         return RedirectResponse(redirect_to, status_code=302)
 
     tx.category_id = category_id if category_id else None
+    db.commit()
+
+    return RedirectResponse(redirect_to, status_code=302)
+
+
+@router.post("/transactions/{transaction_id}/exclude")
+def exclude_transaction(
+    request: Request,
+    transaction_id: int,
+    redirect_to: str = Form("/"),
+    db: Session = Depends(get_db),
+):
+    user = require_login(request, db)
+
+    tx = (
+        db.query(Transaction)
+        .join(Account)
+        .filter(Transaction.id == transaction_id, Account.user_id == user.id)
+        .first()
+    )
+    if not tx:
+        return RedirectResponse(redirect_to, status_code=302)
+
+    tx.is_excluded = 1 if not tx.is_excluded else 0
     db.commit()
 
     return RedirectResponse(redirect_to, status_code=302)

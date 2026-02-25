@@ -103,6 +103,38 @@ def apply_rules_to_all(db: Session, user_id: int, only_uncategorized: bool = Fal
     return affected
 
 
+def apply_single_rule(db: Session, user_id: int, rule_id: int, only_uncategorized: bool = False) -> int:
+    """Apply a single rule to existing transactions. Returns count of affected transactions."""
+    from app.models import Account
+
+    rule = (
+        db.query(Rule)
+        .filter(Rule.id == rule_id, Rule.user_id == user_id)
+        .first()
+    )
+    if not rule:
+        return 0
+
+    query = (
+        db.query(Transaction)
+        .join(Account)
+        .filter(Account.user_id == user_id)
+    )
+    if only_uncategorized:
+        query = query.filter(Transaction.category_id.is_(None))
+
+    transactions = query.all()
+    affected = 0
+
+    for tx in transactions:
+        if rule_matches_transaction(rule, tx):
+            if apply_rule_to_transaction(rule, tx, db):
+                affected += 1
+
+    db.commit()
+    return affected
+
+
 def suggest_rules(db: Session, user_id: int) -> list[dict]:
     """Suggest rules based on categorized transactions with recurring counterparties."""
     from app.models import Account

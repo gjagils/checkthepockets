@@ -13,7 +13,7 @@
             <span class="pill">{{ transaction.account.name }}</span>
         </div>
         <span class="{% if transaction.amount >= 0 %}amount-positive{% else %}amount-negative{% endif %}" style="font-size:1.25rem; font-weight:700;">
-            {{ "%.2f"|format(transaction.amount) }} {{ transaction.currency }}
+            &euro;&nbsp;{{ "%.2f"|format(transaction.amount)|replace(".", ",") }}
         </span>
     </div>
 </div>
@@ -83,7 +83,7 @@
     <table class="detail-table">
         <tr><th>Tegenpartij IBAN</th><td>{{ transaction.counterparty_iban }}</td></tr>
         {% if transaction.balance_after is not none %}
-        <tr><th>Saldo na transactie</th><td>{{ "%.2f"|format(transaction.balance_after) }} {{ transaction.currency }}</td></tr>
+        <tr><th>Saldo na transactie</th><td>&euro;&nbsp;{{ "%.2f"|format(transaction.balance_after)|replace(".", ",") }}</td></tr>
         {% endif %}
         <tr><th>Import hash</th><td class="muted" style="font-size:0.8rem;">{{ transaction.import_hash }}</td></tr>
     </table>

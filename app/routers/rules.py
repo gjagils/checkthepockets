@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Rule, Category, Tag
 from app.auth import require_login
-from app.rules_engine import apply_rules_to_all, suggest_rules
+from app.rules_engine import apply_rules_to_all, apply_single_rule, suggest_rules
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -235,6 +235,18 @@ def delete_rule(
         db.delete(rule)
         db.commit()
     return RedirectResponse("/rules", status_code=302)
+
+
+@router.post("/rules/{rule_id}/apply")
+def apply_one_rule(
+    rule_id: int,
+    request: Request,
+    only_uncategorized: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    user = require_login(request, db)
+    affected = apply_single_rule(db, user.id, rule_id, only_uncategorized=bool(only_uncategorized))
+    return RedirectResponse(f"/rules?applied={affected}", status_code=302)
 
 
 @router.post("/rules/apply")

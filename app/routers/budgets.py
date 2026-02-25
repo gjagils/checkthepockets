@@ -98,6 +98,7 @@ def budget_overview(
             func.extract("year", Transaction.date) == prev_year,
             func.extract("month", Transaction.date) == prev_month,
             Transaction.amount < 0,
+            Transaction.is_excluded == 0,
         )
     )
     if account_id:
@@ -125,6 +126,7 @@ def budget_overview(
             func.extract("year", Transaction.date) == current_year,
             func.extract("month", Transaction.date) == current_month,
             Transaction.amount < 0,
+            Transaction.is_excluded == 0,
         )
     )
     if account_id:
@@ -140,19 +142,24 @@ def budget_overview(
     total_rollover = Decimal("0")
 
     for parent in top_level:
-        children = children_map.get(parent.id, [])
+        children = [c for c in children_map.get(parent.id, []) if not c.is_income]
         parent_budget = budget_map.get(parent.id, Decimal("0"))
         parent_spent = spending_map.get(parent.id, Decimal("0"))
         parent_rollover = rollover_map.get(parent.id, Decimal("0"))
 
         child_rows = []
-        group_budget = parent_budget
-        group_spent = parent_spent
-        group_rollover = parent_rollover
+        # If parent has children, only sum children (parent budget is display-only)
+        # If parent has no children, use parent's own budget
+        if children:
+            group_budget = Decimal("0")
+            group_spent = Decimal("0")
+            group_rollover = Decimal("0")
+        else:
+            group_budget = parent_budget
+            group_spent = parent_spent
+            group_rollover = parent_rollover
 
         for child in children:
-            if child.is_income:
-                continue
             cb = budget_map.get(child.id, Decimal("0"))
             cs = spending_map.get(child.id, Decimal("0"))
             cr = rollover_map.get(child.id, Decimal("0"))
@@ -205,6 +212,7 @@ def budget_overview(
             func.extract("year", Transaction.date) == current_year,
             func.extract("month", Transaction.date) == current_month,
             Transaction.amount > 0,
+            Transaction.is_excluded == 0,
         )
     )
     if account_id:
@@ -222,8 +230,12 @@ def budget_overview(
         parent_actual = income_actual_map.get(parent.id, Decimal("0"))
 
         child_rows = []
-        group_budget = parent_budget
-        group_actual = parent_actual
+        if children:
+            group_budget = Decimal("0")
+            group_actual = Decimal("0")
+        else:
+            group_budget = parent_budget
+            group_actual = parent_actual
 
         for child in children:
             cb = budget_map.get(child.id, Decimal("0"))
@@ -267,6 +279,7 @@ def budget_overview(
             Account.user_id == user.id,
             func.extract("year", Transaction.date) == current_year,
             func.extract("month", Transaction.date) == current_month,
+            Transaction.is_excluded == 0,
         )
     )
     if account_id:
