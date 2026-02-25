@@ -77,9 +77,102 @@
     {% endif %}
 </div>
 
+<!-- Income budget table -->
+{% if income_budget_data %}
+<div class="card">
+    <h2>Inkomen</h2>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Categorie</th>
+                    <th class="text-right">Budget</th>
+                    <th class="text-right">Ontvangen</th>
+                    <th class="text-right">Verschil</th>
+                    <th>Voortgang</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for group in income_budget_data %}
+                <tr class="category-parent">
+                    <td><strong>{{ group.parent.name }}</strong></td>
+                    <td class="text-right nowrap"><strong>&euro;&nbsp;{{ "%.2f"|format(group.group_budget)|replace(".", ",") }}</strong></td>
+                    <td class="text-right nowrap"><strong>&euro;&nbsp;{{ "%.2f"|format(group.group_actual)|replace(".", ",") }}</strong></td>
+                    <td class="text-right nowrap">
+                        <strong class="{% if group.group_difference >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
+                            &euro;&nbsp;{{ "%.2f"|format(group.group_difference)|replace(".", ",") }}
+                        </strong>
+                    </td>
+                    <td>
+                        {% if group.group_budget > 0 %}
+                        {% set pct = ((group.group_actual / group.group_budget) * 100)|int %}
+                        <div class="budget-bar">
+                            <div class="budget-bar-fill {% if pct >= 100 %}bar-ok{% elif pct < 50 %}bar-warn{% endif %}" style="width:{{ [pct, 100]|min }}%"></div>
+                        </div>
+                        <span class="muted">{{ pct }}%</span>
+                        {% else %}-{% endif %}
+                    </td>
+                </tr>
+
+                {% if not group.children %}
+                <tr class="category-child">
+                    <td style="padding-left:2rem;">
+                        <span class="muted">Budget instellen:</span>
+                    </td>
+                    <td class="text-right">
+                        <input type="text" class="budget-input"
+                               data-category-id="{{ group.parent.id }}"
+                               value="{{ "%.2f"|format(group.parent_budget)|replace(".", ",") }}"
+                               onblur="saveBudget(this)"
+                               onkeydown="if(event.key==='Enter')this.blur()">
+                    </td>
+                    <td colspan="3"></td>
+                </tr>
+                {% endif %}
+
+                {% for child in group.children %}
+                <tr class="category-child">
+                    <td style="padding-left: 2rem;">
+                        {% if child.color %}
+                        <span class="color-dot" style="background:{{ child.color }};"></span>
+                        {% endif %}
+                        {{ child.name }}
+                    </td>
+                    <td class="text-right">
+                        <input type="text" class="budget-input"
+                               data-category-id="{{ child.id }}"
+                               value="{{ "%.2f"|format(child.budget)|replace(".", ",") }}"
+                               onblur="saveBudget(this)"
+                               onkeydown="if(event.key==='Enter')this.blur()">
+                    </td>
+                    <td class="text-right nowrap">&euro;&nbsp;{{ "%.2f"|format(child.actual)|replace(".", ",") }}</td>
+                    <td class="text-right nowrap">
+                        <span class="{% if child.difference >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
+                            &euro;&nbsp;{{ "%.2f"|format(child.difference)|replace(".", ",") }}
+                        </span>
+                    </td>
+                    <td>
+                        {% if child.budget > 0 %}
+                        {% set cpct = ((child.actual / child.budget) * 100)|int %}
+                        <div class="budget-bar">
+                            <div class="budget-bar-fill {% if cpct >= 100 %}bar-ok{% elif cpct < 50 %}bar-warn{% endif %}" style="width:{{ [cpct, 100]|min }}%"></div>
+                        </div>
+                        <span class="muted">{{ cpct }}%</span>
+                        {% else %}-{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
 <!-- Budget table -->
 {% if budget_data %}
 <div class="card">
+    <h2>Uitgaven</h2>
     <div class="table-wrap">
         <table>
             <thead>
@@ -258,6 +351,39 @@
 
 {% block scripts %}
 <script>
+function formatEuro(val) {
+    return '\u00a0' + Math.abs(val).toFixed(2).replace('.', ',');
+}
+
+function recalcParentRow(input) {
+    // Find the parent <tr class="category-parent"> for this input
+    var row = input.closest('tr');
+    if (!row) return;
+    // Walk backwards to find the parent row
+    var parentRow = row.previousElementSibling;
+    while (parentRow && !parentRow.classList.contains('category-parent')) {
+        parentRow = parentRow.previousElementSibling;
+    }
+    if (!parentRow) return;
+
+    // Sum all child budget inputs between this parent row and the next parent row
+    var total = 0;
+    var sibling = parentRow.nextElementSibling;
+    while (sibling && !sibling.classList.contains('category-parent')) {
+        var inp = sibling.querySelector('.budget-input');
+        if (inp) {
+            total += parseFloat(inp.value.replace(',', '.')) || 0;
+        }
+        sibling = sibling.nextElementSibling;
+    }
+
+    // Update the parent row budget cell (2nd <td>)
+    var cells = parentRow.querySelectorAll('td');
+    if (cells.length >= 2) {
+        cells[1].innerHTML = '<strong>\u20ac' + formatEuro(total) + '</strong>';
+    }
+}
+
 function saveBudget(input) {
     var catId = input.dataset.categoryId;
     var value = input.value.trim().replace(',', '.');
@@ -278,6 +404,7 @@ function saveBudget(input) {
             input.value = Math.abs(data.amount).toFixed(2).replace('.', ',');
             input.classList.add('budget-saved');
             setTimeout(function() { input.classList.remove('budget-saved'); }, 600);
+            recalcParentRow(input);
         }
     });
 }

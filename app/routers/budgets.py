@@ -49,6 +49,7 @@ def budget_overview(
     all_categories = cat_query.order_by(Category.sort_order, Category.name).all()
 
     top_level = [c for c in all_categories if c.parent_id is None and not c.is_income]
+    income_top_level = [c for c in all_categories if c.parent_id is None and c.is_income]
     children_map = {}
     for c in all_categories:
         if c.parent_id is not None:
@@ -190,6 +191,67 @@ def budget_overview(
             "parent_rollover": parent_rollover,
         })
 
+    # Build income budget data (same structure as expense budget_data)
+    # Get actual income per category for this month
+    income_spending_query = (
+        db.query(
+            Category.id,
+            func.sum(Transaction.amount).label("total"),
+        )
+        .join(Transaction, Transaction.category_id == Category.id)
+        .join(Account, Account.id == Transaction.account_id)
+        .filter(
+            Account.user_id == user.id,
+            func.extract("year", Transaction.date) == current_year,
+            func.extract("month", Transaction.date) == current_month,
+            Transaction.amount > 0,
+        )
+    )
+    if account_id:
+        income_spending_query = income_spending_query.filter(Transaction.account_id == account_id)
+    income_spending = income_spending_query.group_by(Category.id).all()
+    income_actual_map = {row.id: row.total for row in income_spending}
+
+    income_budget_data = []
+    total_income_budgeted = Decimal("0")
+    total_income_actual = Decimal("0")
+
+    for parent in income_top_level:
+        children = children_map.get(parent.id, [])
+        parent_budget = budget_map.get(parent.id, Decimal("0"))
+        parent_actual = income_actual_map.get(parent.id, Decimal("0"))
+
+        child_rows = []
+        group_budget = parent_budget
+        group_actual = parent_actual
+
+        for child in children:
+            cb = budget_map.get(child.id, Decimal("0"))
+            ca = income_actual_map.get(child.id, Decimal("0"))
+            group_budget += cb
+            group_actual += ca
+            child_rows.append({
+                "id": child.id,
+                "name": child.name,
+                "color": child.color,
+                "budget": cb,
+                "actual": ca,
+                "difference": ca - cb,
+            })
+
+        total_income_budgeted += group_budget
+        total_income_actual += group_actual
+
+        income_budget_data.append({
+            "parent": parent,
+            "children": child_rows,
+            "group_budget": group_budget,
+            "group_actual": group_actual,
+            "group_difference": group_actual - group_budget,
+            "parent_budget": parent_budget,
+            "parent_actual": parent_actual,
+        })
+
     # Get total income for this month (for zero-based budget view)
     income_query = (
         db.query(
@@ -240,6 +302,9 @@ def budget_overview(
             "total_spent": total_spent,
             "total_remaining": total_budgeted - total_spent,
             "total_income": total_income,
+            "income_budget_data": income_budget_data,
+            "total_income_budgeted": total_income_budgeted,
+            "total_income_actual": total_income_actual,
             "unallocated": unallocated,
             "total_rollover": total_rollover,
             "prev_year": prev_year,

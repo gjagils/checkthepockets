@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Transacties - Check The Pockets{% endblock %}
+{% block container_class %}container-wide{% endblock %}
 {% block content %}
 <div class="page-header">
     <h1>Transacties <span class="muted" style="font-weight:400; font-size:0.9rem;">({{ total }})</span></h1>
@@ -118,7 +119,7 @@
                     <td class="nowrap">
                         {% set acct_cats = cats_by_account.get(tx.account_id, {"parents": [], "children": {}}) %}
                         <form method="post" action="/transactions/{{ tx.id }}/category" class="inline-cat-form">
-                            <input type="hidden" name="redirect_to" value="/?page={{ page }}{% if current_account_id %}&account_id={{ current_account_id }}{% endif %}">
+                            <input type="hidden" name="redirect_to" value="/?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}">
                             <select name="category_id" class="select-sm" onchange="this.form.submit()">
                                 <option value="0">-</option>
                                 {% for parent in acct_cats["parents"] %}

@@ -37,9 +37,9 @@ PER_PAGE = 50
 def transaction_list(
     request: Request,
     page: int = Query(1, ge=1),
-    account_id: int | None = Query(None),
-    category_id: int | None = Query(None),
-    tag_id: int | None = Query(None),
+    account_id: str = Query(""),
+    category_id: str = Query(""),
+    tag_id: str = Query(""),
     search: str | None = Query(None),
     date_from: str | None = Query(None),
     date_to: str | None = Query(None),
@@ -48,6 +48,11 @@ def transaction_list(
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
+
+    # Parse optional int query params (HTML forms send "" for empty selects)
+    account_id = int(account_id) if account_id.strip() else None
+    category_id = int(category_id) if category_id.strip() else None
+    tag_id = int(tag_id) if tag_id.strip() else None
 
     query = (
         db.query(Transaction)
