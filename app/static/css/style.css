@@ -338,7 +338,7 @@ tr:hover { background: rgba(31, 111, 178, 0.03); }
 
 .text-right { text-align: right; }
 .nowrap { white-space: nowrap; }
-.desc-cell { min-width: 250px; word-break: break-word; white-space: normal; }
+.desc-cell { min-width: 300px; width: 40%; word-break: break-word; white-space: normal; }
 .muted { color: var(--ctp-muted); font-size: 0.85rem; }
 
 .amount-positive { color: var(--ctp-check); font-weight: 600; }
