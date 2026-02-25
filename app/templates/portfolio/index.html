@@ -97,7 +97,7 @@
                         <strong>{{ asset.name }}</strong>
                         <span class="badge" style="font-size:0.65rem;">{{ asset.unit }}</span>
                     </td>
-                    <td class="text-right nowrap">&euro;&nbsp;{{ "%.2f"|format(asset.current_price_eur) }}</td>
+                    <td class="text-right nowrap">&euro;&nbsp;{{ asset.current_price_eur|euro }}</td>
                     <td class="text-right nowrap muted" style="font-size:0.75rem;">
                         {% if asset.price_updated_at %}
                         {{ asset.price_updated_at.strftime('%d-%m %H:%M') }}
@@ -117,10 +117,10 @@
                                onkeydown="if(event.key==='Enter')this.blur()"
                                style="width:90px;">
                     </td>
-                    <td class="text-right nowrap muted">&euro;&nbsp;{{ "%.2f"|format(val) }}</td>
+                    <td class="text-right nowrap muted">&euro;&nbsp;{{ val|euro }}</td>
                     {% endfor %}
                     <td class="text-right nowrap" style="border-left:2px solid var(--ctp-border); font-weight:700;">
-                        &euro;&nbsp;{{ "%.2f"|format(asset_totals.get(asset.id, 0)) }}
+                        &euro;&nbsp;{{ asset_totals.get(asset.id, 0)|euro }}
                     </td>
                     <td class="text-right nowrap muted">{{ asset.monthly_growth_pct }}%</td>
                 </tr>
@@ -131,10 +131,10 @@
                     <td colspan="3"><strong>Totaal</strong></td>
                     {% for person in persons %}
                     <td></td>
-                    <td class="text-right nowrap"><strong>&euro;&nbsp;{{ "%.2f"|format(person_totals.get(person.id, 0)) }}</strong></td>
+                    <td class="text-right nowrap"><strong>&euro;&nbsp;{{ person_totals.get(person.id, 0)|euro }}</strong></td>
                     {% endfor %}
                     <td class="text-right nowrap" style="border-left:2px solid var(--ctp-border);">
-                        <strong>&euro;&nbsp;{{ "%.2f"|format(grand_total) }}</strong>
+                        <strong>&euro;&nbsp;{{ grand_total|euro }}</strong>
                     </td>
                     <td></td>
                 </tr>
@@ -153,11 +153,11 @@
     <div style="margin-bottom:1.25rem; padding-bottom:1rem; border-bottom:1px solid var(--ctp-border);">
         <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:0.5rem;">
             <span style="font-weight:700; font-size:1rem;">{{ asset.name }} <span class="badge">{{ asset.unit }}</span></span>
-            <span style="font-weight:700; font-size:1.1rem;">&euro;&nbsp;{{ "%.2f"|format(atotal) }}</span>
+            <span style="font-weight:700; font-size:1.1rem;">&euro;&nbsp;{{ atotal|euro }}</span>
         </div>
         <div style="display:flex; justify-content:space-between; margin-bottom:0.25rem;">
             <span class="muted">Prijs per eenheid:</span>
-            <span>&euro;&nbsp;{{ "%.2f"|format(asset.current_price_eur) }}</span>
+            <span>&euro;&nbsp;{{ asset.current_price_eur|euro }}</span>
         </div>
         {% for person in persons %}
         {% set qty = holdings_map.get((asset.id, person.id), 0) %}
@@ -165,7 +165,7 @@
         {% if qty > 0 %}
         <div style="display:flex; justify-content:space-between; align-items:center; padding:0.3rem 0;">
             <span>{{ person.name }} ({{ "%.8g"|format(qty) }} {{ asset.unit }})</span>
-            <span class="amount-positive nowrap" style="font-weight:600;">&euro;&nbsp;{{ "%.2f"|format(val) }}</span>
+            <span class="amount-positive nowrap" style="font-weight:600;">&euro;&nbsp;{{ val|euro }}</span>
         </div>
         {% endif %}
         {% endfor %}
@@ -176,7 +176,7 @@
     {% if grand_total > 0 %}
     <div style="display:flex; justify-content:space-between; align-items:baseline; padding-top:0.5rem;">
         <span style="font-weight:800; font-size:1.1rem;">Totale opnamewaarde</span>
-        <span style="font-weight:800; font-size:1.25rem; color:var(--ctp-check);">&euro;&nbsp;{{ "%.2f"|format(grand_total) }}</span>
+        <span style="font-weight:800; font-size:1.25rem; color:var(--ctp-check);">&euro;&nbsp;{{ grand_total|euro }}</span>
     </div>
     {% endif %}
 </div>
@@ -241,7 +241,7 @@
     <div style="margin-bottom:0.75rem;">
         <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:0.25rem;">
             <span style="font-weight:600;">{{ person.name }}</span>
-            <span class="nowrap">&euro;&nbsp;{{ "%.2f"|format(ptotal) }} <span class="muted">({{ ppct }}%)</span></span>
+            <span class="nowrap">&euro;&nbsp;{{ ptotal|euro }} <span class="muted">({{ ppct }}%)</span></span>
         </div>
         <div style="width:100%; height:10px; background:var(--ctp-border); border-radius:5px; overflow:hidden;">
             <div style="width:{{ ppct }}%; height:100%; background:var(--ctp-denim); border-radius:5px;"></div>

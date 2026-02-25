@@ -42,15 +42,15 @@
 <div class="import-summary">
     <div class="summary-card">
         <div class="label">Inkomen</div>
-        <div class="value amount-positive">&euro;&nbsp;{{ "%.2f"|format(income)|replace(".", ",") }}</div>
+        <div class="value amount-positive">&euro;&nbsp;{{ income|euro }}</div>
     </div>
     <div class="summary-card">
         <div class="label">Uitgaven</div>
-        <div class="value amount-negative">&euro;&nbsp;{{ "%.2f"|format(expenses)|replace(".", ",") }}</div>
+        <div class="value amount-negative">&euro;&nbsp;{{ expenses|euro }}</div>
     </div>
     <div class="summary-card">
         <div class="label">Resultaat</div>
-        <div class="value {% if balance >= 0 %}amount-positive{% else %}amount-negative{% endif %}">&euro;&nbsp;{{ "%.2f"|format(balance)|replace(".", ",") }}</div>
+        <div class="value {% if balance >= 0 %}amount-positive{% else %}amount-negative{% endif %}">&euro;&nbsp;{{ balance|euro }}</div>
     </div>
     <div class="summary-card">
         <div class="label">Spaarquote</div>
@@ -90,9 +90,9 @@
                 {% endif %}
                 <tr>
                     <td><a href="/dashboard?year={{ current_year }}&month={{ m }}{% if current_account_id %}&account_id={{ current_account_id }}{% endif %}" style="text-decoration:none;">{{ months[m] }}</a></td>
-                    <td class="text-right nowrap amount-positive">&euro;&nbsp;{{ "%.2f"|format(inc)|replace(".", ",") }}</td>
-                    <td class="text-right nowrap amount-negative">&euro;&nbsp;{{ "%.2f"|format(exp)|replace(".", ",") }}</td>
-                    <td class="text-right nowrap {% if res >= 0 %}amount-positive{% else %}amount-negative{% endif %}">&euro;&nbsp;{{ "%.2f"|format(res)|replace(".", ",") }}</td>
+                    <td class="text-right nowrap amount-positive">&euro;&nbsp;{{ inc|euro }}</td>
+                    <td class="text-right nowrap amount-negative">&euro;&nbsp;{{ exp|euro }}</td>
+                    <td class="text-right nowrap {% if res >= 0 %}amount-positive{% else %}amount-negative{% endif %}">&euro;&nbsp;{{ res|euro }}</td>
                     <td class="text-right nowrap {% if rate >= 0 %}amount-positive{% else %}amount-negative{% endif %}">{{ "%.1f"|format(rate) }}%</td>
                 </tr>
                 {% endfor %}
@@ -100,9 +100,9 @@
             <tfoot>
                 <tr>
                     <td><strong>Totaal</strong></td>
-                    <td class="text-right nowrap amount-positive"><strong>&euro;&nbsp;{{ "%.2f"|format(income)|replace(".", ",") }}</strong></td>
-                    <td class="text-right nowrap amount-negative"><strong>&euro;&nbsp;{{ "%.2f"|format(expenses)|replace(".", ",") }}</strong></td>
-                    <td class="text-right nowrap {% if balance >= 0 %}amount-positive{% else %}amount-negative{% endif %}"><strong>&euro;&nbsp;{{ "%.2f"|format(balance)|replace(".", ",") }}</strong></td>
+                    <td class="text-right nowrap amount-positive"><strong>&euro;&nbsp;{{ income|euro }}</strong></td>
+                    <td class="text-right nowrap amount-negative"><strong>&euro;&nbsp;{{ expenses|euro }}</strong></td>
+                    <td class="text-right nowrap {% if balance >= 0 %}amount-positive{% else %}amount-negative{% endif %}"><strong>&euro;&nbsp;{{ balance|euro }}</strong></td>
                     <td class="text-right nowrap {% if savings_rate >= 0 %}amount-positive{% else %}amount-negative{% endif %}"><strong>{{ savings_rate }}%</strong></td>
                 </tr>
             </tfoot>
@@ -132,7 +132,7 @@
                     <td>{{ item.name }}</td>
                     <td class="muted">{{ item.category or '-' }}</td>
                     <td class="text-right nowrap {% if item.amount >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
-                        &euro;&nbsp;{{ "%.2f"|format(item.amount)|replace(".", ",") }}
+                        &euro;&nbsp;{{ item.amount|euro }}
                     </td>
                 </tr>
                 {% endfor %}
@@ -140,19 +140,19 @@
             <tfoot>
                 <tr>
                     <td colspan="2"><strong>Verwachte uitgaven</strong></td>
-                    <td class="text-right nowrap amount-negative"><strong>&euro;&nbsp;{{ "%.2f"|format(projected_expenses)|replace(".", ",") }}</strong></td>
+                    <td class="text-right nowrap amount-negative"><strong>&euro;&nbsp;{{ projected_expenses|euro }}</strong></td>
                 </tr>
                 {% if projected_income > 0 %}
                 <tr>
                     <td colspan="2"><strong>Verwacht inkomen</strong></td>
-                    <td class="text-right nowrap amount-positive"><strong>&euro;&nbsp;{{ "%.2f"|format(projected_income)|replace(".", ",") }}</strong></td>
+                    <td class="text-right nowrap amount-positive"><strong>&euro;&nbsp;{{ projected_income|euro }}</strong></td>
                 </tr>
                 {% endif %}
                 <tr>
                     <td colspan="2"><strong>Verwacht resultaat na boeking</strong></td>
                     {% set projected_balance = balance + projected_expenses + projected_income %}
                     <td class="text-right nowrap {% if projected_balance >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
-                        <strong>&euro;&nbsp;{{ "%.2f"|format(projected_balance)|replace(".", ",") }}</strong>
+                        <strong>&euro;&nbsp;{{ projected_balance|euro }}</strong>
                     </td>
                 </tr>
             </tfoot>
@@ -170,7 +170,7 @@
                     <td>{{ item.name }}</td>
                     <td class="muted">{{ item.category or '-' }}</td>
                     <td class="text-right nowrap {% if item.amount >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
-                        &euro;&nbsp;{{ "%.2f"|format(item.amount)|replace(".", ",") }}
+                        &euro;&nbsp;{{ item.amount|euro }}
                     </td>
                 </tr>
                 {% endfor %}
@@ -209,12 +209,12 @@
                     </td>
                     <td class="text-right nowrap">
                         <strong class="{% if group.group_total >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
-                            &euro;&nbsp;{{ "%.2f"|format(group.group_total)|replace(".", ",") }}
+                            &euro;&nbsp;{{ group.group_total|euro }}
                         </strong>
                     </td>
                     <td class="text-right nowrap">
                         {% if group.group_budget > 0 %}
-                        <span class="muted">&euro;&nbsp;{{ "%.2f"|format(group.group_budget)|replace(".", ",") }}</span>
+                        <span class="muted">&euro;&nbsp;{{ group.group_budget|euro }}</span>
                         {% else %}-{% endif %}
                     </td>
                     <td>
@@ -249,11 +249,11 @@
                         {{ child.name }}
                     </td>
                     <td class="text-right nowrap {% if child.total >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
-                        &euro;&nbsp;{{ "%.2f"|format(child.total)|replace(".", ",") }}
+                        &euro;&nbsp;{{ child.total|euro }}
                     </td>
                     <td class="text-right nowrap">
                         {% if child.budget > 0 %}
-                        <span class="muted">&euro;&nbsp;{{ "%.2f"|format(child.budget)|replace(".", ",") }}</span>
+                        <span class="muted">&euro;&nbsp;{{ child.budget|euro }}</span>
                         {% else %}-{% endif %}
                     </td>
                     <td>
@@ -294,7 +294,7 @@
     <div style="margin-bottom:0.75rem;">
         <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:0.25rem;">
             <span style="font-weight:600; font-size:0.9rem;">{{ cat.name }}</span>
-            <span class="amount-negative nowrap" style="font-size:0.9rem;">&euro;&nbsp;{{ "%.2f"|format(cat.total)|replace(".", ",") }} <span class="muted">({{ pct }}%)</span></span>
+            <span class="amount-negative nowrap" style="font-size:0.9rem;">&euro;&nbsp;{{ cat.total|euro }} <span class="muted">({{ pct }}%)</span></span>
         </div>
         <div style="width:100%; height:10px; background:var(--ctp-border); border-radius:5px; overflow:hidden;">
             <div style="width:{{ bar_width }}%; height:100%; background:var(--ctp-danger); border-radius:5px; transition:width 0.3s;"></div>

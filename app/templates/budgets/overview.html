@@ -44,33 +44,33 @@
 <!-- Summary -->
 <div class="import-summary">
     <div class="summary-card">
-        <div class="value amount-positive">&euro;&nbsp;{{ "%.2f"|format(total_income)|replace(".", ",") }}</div>
+        <div class="value amount-positive">&euro;&nbsp;{{ total_income|euro }}</div>
         <div class="label">Inkomen</div>
     </div>
     <div class="summary-card">
-        <div class="value">&euro;&nbsp;{{ "%.2f"|format(total_budgeted)|replace(".", ",") }}</div>
+        <div class="value">&euro;&nbsp;{{ total_budgeted|euro }}</div>
         <div class="label">Gebudgetteerd</div>
     </div>
     <div class="summary-card">
-        <div class="value">&euro;&nbsp;{{ "%.2f"|format(total_spent)|replace(".", ",") }}</div>
+        <div class="value">&euro;&nbsp;{{ total_spent|euro }}</div>
         <div class="label">Uitgegeven</div>
     </div>
     <div class="summary-card">
         <div class="value {% if total_remaining >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
-            &euro;&nbsp;{{ "%.2f"|format(total_remaining)|replace(".", ",") }}
+            &euro;&nbsp;{{ total_remaining|euro }}
         </div>
         <div class="label">Resterend</div>
     </div>
     <div class="summary-card">
         <div class="value {% if unallocated >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
-            &euro;&nbsp;{{ "%.2f"|format(unallocated)|replace(".", ",") }}
+            &euro;&nbsp;{{ unallocated|euro }}
         </div>
         <div class="label">Niet toegewezen</div>
     </div>
     {% if total_rollover != 0 %}
     <div class="summary-card">
         <div class="value {% if total_rollover >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
-            &euro;&nbsp;{{ "%.2f"|format(total_rollover)|replace(".", ",") }}
+            &euro;&nbsp;{{ total_rollover|euro }}
         </div>
         <div class="label">Rollover {{ months[prev_month] }}</div>
     </div>
@@ -96,11 +96,11 @@
                 {% for group in income_budget_data %}
                 <tr class="category-parent">
                     <td><strong>{{ group.parent.name }}</strong></td>
-                    <td class="text-right nowrap"><strong>&euro;&nbsp;{{ "%.2f"|format(group.group_budget)|replace(".", ",") }}</strong></td>
-                    <td class="text-right nowrap"><strong>&euro;&nbsp;{{ "%.2f"|format(group.group_actual)|replace(".", ",") }}</strong></td>
+                    <td class="text-right nowrap"><strong>&euro;&nbsp;{{ group.group_budget|euro }}</strong></td>
+                    <td class="text-right nowrap"><strong>&euro;&nbsp;{{ group.group_actual|euro }}</strong></td>
                     <td class="text-right nowrap">
                         <strong class="{% if group.group_difference >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
-                            &euro;&nbsp;{{ "%.2f"|format(group.group_difference)|replace(".", ",") }}
+                            &euro;&nbsp;{{ group.group_difference|euro }}
                         </strong>
                     </td>
                     <td>
@@ -122,7 +122,7 @@
                     <td class="text-right">
                         <input type="text" class="budget-input"
                                data-category-id="{{ group.parent.id }}"
-                               value="{{ "%.2f"|format(group.parent_budget)|replace(".", ",") }}"
+                               value="{{ group.parent_budget|euro }}"
                                onblur="saveBudget(this)"
                                onkeydown="if(event.key==='Enter')this.blur()">
                     </td>
@@ -141,14 +141,14 @@
                     <td class="text-right">
                         <input type="text" class="budget-input"
                                data-category-id="{{ child.id }}"
-                               value="{{ "%.2f"|format(child.budget)|replace(".", ",") }}"
+                               value="{{ child.budget|euro }}"
                                onblur="saveBudget(this)"
                                onkeydown="if(event.key==='Enter')this.blur()">
                     </td>
-                    <td class="text-right nowrap">&euro;&nbsp;{{ "%.2f"|format(child.actual)|replace(".", ",") }}</td>
+                    <td class="text-right nowrap">&euro;&nbsp;{{ child.actual|euro }}</td>
                     <td class="text-right nowrap">
                         <span class="{% if child.difference >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
-                            &euro;&nbsp;{{ "%.2f"|format(child.difference)|replace(".", ",") }}
+                            &euro;&nbsp;{{ child.difference|euro }}
                         </span>
                     </td>
                     <td>
@@ -191,20 +191,20 @@
                 {% for group in budget_data %}
                 <tr class="category-parent">
                     <td><strong>{{ group.parent.name }}</strong></td>
-                    <td class="text-right nowrap"><strong>&euro;&nbsp;{{ "%.2f"|format(group.group_budget)|replace(".", ",") }}</strong></td>
+                    <td class="text-right nowrap"><strong>&euro;&nbsp;{{ group.group_budget|euro }}</strong></td>
                     <td class="text-right nowrap">
                         {% if group.group_rollover != 0 %}
                         <span class="{% if group.group_rollover >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
-                            {{ "%.2f"|format(group.group_rollover)|replace(".", ",") }}
+                            {{ group.group_rollover|euro }}
                         </span>
                         {% else %}<span class="muted">-</span>{% endif %}
                     </td>
-                    <td class="text-right nowrap"><strong>&euro;&nbsp;{{ "%.2f"|format(group.group_effective)|replace(".", ",") }}</strong></td>
-                    <td class="text-right nowrap"><strong>&euro;&nbsp;{{ "%.2f"|format(group.group_spent)|replace(".", ",") }}</strong></td>
+                    <td class="text-right nowrap"><strong>&euro;&nbsp;{{ group.group_effective|euro }}</strong></td>
+                    <td class="text-right nowrap"><strong>&euro;&nbsp;{{ group.group_spent|euro }}</strong></td>
                     <td class="text-right nowrap muted">-</td>
                     <td class="text-right nowrap">
                         <strong class="{% if group.group_effective_remaining >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
-                            &euro;&nbsp;{{ "%.2f"|format(group.group_effective_remaining)|replace(".", ",") }}
+                            &euro;&nbsp;{{ group.group_effective_remaining|euro }}
                         </strong>
                     </td>
                     <td>
@@ -227,7 +227,7 @@
                     <td class="text-right">
                         <input type="text" class="budget-input"
                                data-category-id="{{ group.parent.id }}"
-                               value="{{ "%.2f"|format(group.parent_budget)|replace(".", ",") }}"
+                               value="{{ group.parent_budget|euro }}"
                                onblur="saveBudget(this)"
                                onkeydown="if(event.key==='Enter')this.blur()">
                     </td>
@@ -246,27 +246,27 @@
                     <td class="text-right">
                         <input type="text" class="budget-input"
                                data-category-id="{{ child.id }}"
-                               value="{{ "%.2f"|format(child.budget)|replace(".", ",") }}"
+                               value="{{ child.budget|euro }}"
                                onblur="saveBudget(this)"
                                onkeydown="if(event.key==='Enter')this.blur()">
                     </td>
                     <td class="text-right nowrap">
                         {% if child.rollover != 0 %}
                         <span class="{% if child.rollover >= 0 %}amount-positive{% else %}amount-negative{% endif %}" style="font-size:0.85rem;">
-                            {{ "%.2f"|format(child.rollover)|replace(".", ",") }}
+                            {{ child.rollover|euro }}
                         </span>
                         {% else %}<span class="muted">-</span>{% endif %}
                     </td>
-                    <td class="text-right nowrap">&euro;&nbsp;{{ "%.2f"|format(child.effective_budget)|replace(".", ",") }}</td>
-                    <td class="text-right nowrap">&euro;&nbsp;{{ "%.2f"|format(child.spent)|replace(".", ",") }}</td>
+                    <td class="text-right nowrap">&euro;&nbsp;{{ child.effective_budget|euro }}</td>
+                    <td class="text-right nowrap">&euro;&nbsp;{{ child.spent|euro }}</td>
                     <td class="text-right nowrap muted" style="font-size:0.85rem;">
                         {% if child.prev_spent > 0 %}
-                        &euro;&nbsp;{{ "%.2f"|format(child.prev_spent)|replace(".", ",") }}
+                        &euro;&nbsp;{{ child.prev_spent|euro }}
                         {% else %}-{% endif %}
                     </td>
                     <td class="text-right nowrap">
                         <span class="{% if child.effective_remaining >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
-                            &euro;&nbsp;{{ "%.2f"|format(child.effective_remaining)|replace(".", ",") }}
+                            &euro;&nbsp;{{ child.effective_remaining|euro }}
                         </span>
                     </td>
                     <td>
@@ -352,7 +352,9 @@
 {% block scripts %}
 <script>
 function formatEuro(val) {
-    return '\u00a0' + Math.abs(val).toFixed(2).replace('.', ',');
+    var parts = Math.abs(val).toFixed(2).split('.');
+    var intPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return '\u00a0' + intPart + ',' + parts[1];
 }
 
 function recalcParentRow(input) {
@@ -372,7 +374,7 @@ function recalcParentRow(input) {
     while (sibling && !sibling.classList.contains('category-parent')) {
         var inp = sibling.querySelector('.budget-input');
         if (inp) {
-            total += parseFloat(inp.value.replace(',', '.')) || 0;
+            total += parseFloat(inp.value.replace(/\./g, '').replace(',', '.')) || 0;
         }
         sibling = sibling.nextElementSibling;
     }
@@ -386,7 +388,7 @@ function recalcParentRow(input) {
 
 function saveBudget(input) {
     var catId = input.dataset.categoryId;
-    var value = input.value.trim().replace(',', '.');
+    var value = input.value.trim().replace(/\./g, '').replace(',', '.');
 
     var formData = new FormData();
     formData.append('category_id', catId);
@@ -401,7 +403,9 @@ function saveBudget(input) {
     .then(function(r) { return r.json(); })
     .then(function(data) {
         if (data.ok) {
-            input.value = Math.abs(data.amount).toFixed(2).replace('.', ',');
+            var parts = Math.abs(data.amount).toFixed(2).split('.');
+            var intPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+            input.value = intPart + ',' + parts[1];
             input.classList.add('budget-saved');
             setTimeout(function() { input.classList.remove('budget-saved'); }, 600);
             recalcParentRow(input);

@@ -133,7 +133,7 @@
                         </form>
                     </td>
                     <td class="text-right nowrap {% if tx.amount >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
-                        &euro;&nbsp;{{ "%.2f"|format(tx.amount)|replace(".", ",") }}
+                        &euro;&nbsp;{{ tx.amount|euro }}
                     </td>
                     <td class="nowrap">{{ tx.account.name }}</td>
                     <td class="nowrap">

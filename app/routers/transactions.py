@@ -5,7 +5,6 @@ from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Depends, Request, UploadFile, File, Form, Query
 from fastapi.responses import RedirectResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session, joinedload
 
 from sqlalchemy import or_
@@ -18,9 +17,9 @@ from app.parsers import abn_amro, bunq, ics, ing, rabobank
 from app.parsers.base import ParseError, ParsedTransaction
 from app.parsers.ics_pdf import parse_ics_pdf
 from app.rules_engine import apply_rules_to_transaction
+from app.template_config import templates
 
 router = APIRouter()
-templates = Jinja2Templates(directory="app/templates")
 
 PARSERS = {
     "abn_amro": ("ABN AMRO", abn_amro.parse),

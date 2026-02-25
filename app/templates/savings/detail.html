@@ -40,7 +40,7 @@
         data-entry-id="{{ entry.id }}"
         data-month="{{ m }}">
         <span class="cell-display" onclick="startEdit(this)">
-            {% if entry.val is not none %}&euro;&nbsp;{{ "%.2f"|format(entry.val|abs)|replace(".", ",") }}{% else %}-{% endif %}
+            {% if entry.val is not none %}&euro;&nbsp;{{ entry.val|abs|euro }}{% else %}-{% endif %}
         </span>
         <input type="text" class="cell-input" style="display:none;"
                value="{% if entry.val is not none %}{{ "%.2f"|format(entry.val|abs) }}{% endif %}"
@@ -49,7 +49,7 @@
     </td>
     {% endfor %}
     <td class="text-right nowrap line-total" data-line-id="{{ line.id }}">
-        <strong>&euro;&nbsp;{{ "%.2f"|format(line_totals.get(line.id, 0))|replace(".", ",") }}</strong>
+        <strong>&euro;&nbsp;{{ line_totals.get(line.id, 0)|euro }}</strong>
     </td>
 </tr>
 <tr class="edit-row" id="edit-row-{{ line.id }}" style="display:none;">
@@ -93,7 +93,7 @@
 <div class="page-header">
     <div>
         <h1>{{ plan.account.name }} - {{ plan.year }}</h1>
-        <p class="muted">Startsaldo: &euro;&nbsp;{{ "%.2f"|format(plan.starting_balance)|replace(".", ",") }}{% if plan.account.iban %} &middot; {{ plan.account.iban }}{% endif %}</p>
+        <p class="muted">Startsaldo: &euro;&nbsp;{{ plan.starting_balance|euro }}{% if plan.account.iban %} &middot; {{ plan.account.iban }}{% endif %}</p>
     </div>
     <a href="/savings?year={{ plan.year }}" class="btn btn-sm">Terug naar overzicht</a>
 </div>
@@ -129,7 +129,7 @@
                     <td class="text-right nowrap balance-cell" data-month="{{ m }}">
                         {% set bal = running_balance.get(m, 0) %}
                         <strong class="{% if bal >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
-                            &euro;&nbsp;{{ "%.2f"|format(bal)|replace(".", ",") }}
+                            &euro;&nbsp;{{ bal|euro }}
                         </strong>
                     </td>
                     {% endfor %}
@@ -205,7 +205,7 @@
         {% for sug in category_suggestions %}
         <div class="card" style="margin-bottom: 0;">
             <h3>{{ sug.category_name }}</h3>
-            <p class="muted">{{ sug.tx_count }} transacties &middot; Totaal: &euro;&nbsp;{{ "%.2f"|format(sug.total)|replace(".", ",") }}</p>
+            <p class="muted">{{ sug.tx_count }} transacties &middot; Totaal: &euro;&nbsp;{{ sug.total|euro }}</p>
             <form method="post" action="/savings/lines" style="margin-top: 0.75rem;">
                 <input type="hidden" name="plan_id" value="{{ plan.id }}">
                 <input type="hidden" name="name" value="{{ sug.category_name }}">

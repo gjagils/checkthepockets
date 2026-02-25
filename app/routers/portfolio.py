@@ -3,16 +3,15 @@ from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Depends, Request, Form, Query
 from fastapi.responses import RedirectResponse, JSONResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import PortfolioAsset, PortfolioPerson, PortfolioHolding, PortfolioPriceSnapshot
 from app.auth import require_login
 from app.portfolio_prices import fetch_price, fetch_historical_prices, PRESET_ASSETS
+from app.template_config import templates
 
 router = APIRouter(prefix="/portfolio")
-templates = Jinja2Templates(directory="app/templates")
 
 MONTH_LABELS = ["Jan", "Feb", "Mrt", "Apr", "Mei", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dec"]
 

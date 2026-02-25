@@ -3,7 +3,6 @@ from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Depends, Request, Form, Query
 from fastapi.responses import RedirectResponse, JSONResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 
@@ -13,9 +12,9 @@ from app.models import (
     SavingsPlan, SavingsLine, SavingsEntry,
 )
 from app.auth import require_login
+from app.template_config import templates
 
 router = APIRouter(prefix="/savings")
-templates = Jinja2Templates(directory="app/templates")
 
 MONTH_NAMES_NL = [
     "", "Jan", "Feb", "Mrt", "Apr", "Mei", "Jun",

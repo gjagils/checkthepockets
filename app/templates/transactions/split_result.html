@@ -19,7 +19,7 @@
 </div>
 
 <div class="card">
-    <p>De transactie van <strong>&euro;&nbsp;{{ "%.2f"|format(transaction.amount)|replace(".", ",") }}</strong>
+    <p>De transactie van <strong>&euro;&nbsp;{{ transaction.amount|euro }}</strong>
        op {{ transaction.date.strftime('%d-%m-%Y') }} is opgesplitst in {{ created }} losse boekingen.</p>
     <p class="muted" style="margin-top:0.5rem;">De originele transactie is verborgen in het overzicht en vervangen door de individuele boekingen.</p>
 </div>

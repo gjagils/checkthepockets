@@ -43,7 +43,7 @@
                         {% endif %}
                     </div>
                     <div class="recurring-amount {% if item.amount_expected < 0 %}amount-negative{% else %}amount-positive{% endif %}">
-                        &euro;&nbsp;{{ "%.2f"|format(item.amount_expected)|replace(".", ",") }}
+                        &euro;&nbsp;{{ item.amount_expected|euro }}
                     </div>
                 </div>
 
@@ -64,7 +64,7 @@
                     {% if entry.matched_transaction %}
                     <span class="recurring-badge recurring-badge-ok">
                         Gevonden: {{ entry.matched_transaction.date.strftime('%d-%m') }}
-                        (&euro;&nbsp;{{ "%.2f"|format(entry.matched_transaction.amount)|replace(".", ",") }})
+                        (&euro;&nbsp;{{ entry.matched_transaction.amount|euro }})
                     </span>
                     {% elif entry.is_due %}
                     <span class="recurring-badge recurring-badge-due">Nog niet gevonden</span>

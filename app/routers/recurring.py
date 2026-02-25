@@ -4,16 +4,15 @@ from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Depends, Request, Form, Query
 from fastapi.responses import RedirectResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
 
 from app.database import get_db
 from app.models import Account, Transaction, Category, RecurringTransaction
 from app.auth import require_login
+from app.template_config import templates
 
 router = APIRouter()
-templates = Jinja2Templates(directory="app/templates")
 
 FREQUENCIES = {
     "weekly": "Wekelijks",

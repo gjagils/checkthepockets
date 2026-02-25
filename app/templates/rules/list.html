@@ -161,8 +161,8 @@
                             <strong>"{{ rule.match_value }}"</strong>
                             {% if rule.amount_min is not none or rule.amount_max is not none %}
                             <span class="muted">
-                                {% if rule.amount_min is not none %}van &euro;&nbsp;{{ "%.2f"|format(rule.amount_min)|replace(".", ",") }}{% endif %}
-                                {% if rule.amount_max is not none %}t/m &euro;&nbsp;{{ "%.2f"|format(rule.amount_max)|replace(".", ",") }}{% endif %}
+                                {% if rule.amount_min is not none %}van &euro;&nbsp;{{ rule.amount_min|euro }}{% endif %}
+                                {% if rule.amount_max is not none %}t/m &euro;&nbsp;{{ rule.amount_max|euro }}{% endif %}
                             </span>
                             {% endif %}
                             <span class="muted">→</span>
