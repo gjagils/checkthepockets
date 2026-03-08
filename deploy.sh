@@ -9,9 +9,9 @@
 #   1. Kopieer dit hele project naar je Synology, bijv:
 #      /volume1/docker/checkthepockets/
 #
-#   2. Plaats je logo bestanden in:
-#      /volume1/docker/checkthepockets/app/static/img/logo.png
-#      /volume1/docker/checkthepockets/app/static/img/favicon.png
+#   2. Zorg dat de logo bestanden aanwezig zijn:
+#      /volume1/docker/checkthepockets/app/static/logo.png
+#      /volume1/docker/checkthepockets/app/static/favicon.png
 #
 #   3. Maak het script uitvoerbaar en draai het:
 #      chmod +x deploy.sh
@@ -40,16 +40,12 @@ else
     echo "[OK] .env bestaat al"
 fi
 
-# --- Maak image directories aan ---
-mkdir -p app/static/img
-echo "[OK] Directories aangemaakt"
-
 # --- Check of logo bestanden aanwezig zijn ---
-if [ ! -f app/static/img/logo.png ]; then
-    echo "[!!] Logo ontbreekt: plaats logo.png in app/static/img/"
+if [ ! -f app/static/logo.png ]; then
+    echo "[!!] Logo ontbreekt: plaats logo.png in app/static/"
 fi
-if [ ! -f app/static/img/favicon.png ]; then
-    echo "[!!] Favicon ontbreekt: plaats favicon.png in app/static/img/"
+if [ ! -f app/static/favicon.png ]; then
+    echo "[!!] Favicon ontbreekt: plaats favicon.png in app/static/"
 fi
 
 # --- Build en start ---
