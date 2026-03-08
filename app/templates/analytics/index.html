@@ -105,7 +105,7 @@
                     <td style="white-space:nowrap; font-weight:600;">{{ cat.name }}</td>
                     {% for m in range(1, 13) %}
                     {% set val = cat.monthly[m] %}
-                    {% set intensity = ((val / max_cat_monthly) * 0.6)|round(2) if max_cat_monthly > 0 and val > 0 else 0 %}
+                    {% set intensity = ((val / max_cat_monthly) * 6 / 10)|round(2) if max_cat_monthly > 0 and val > 0 else 0 %}
                     <td class="text-right nowrap" style="background:rgba(229, 77, 77, {{ intensity }}); font-size:0.8rem;">
                         {% if val > 0 %}{{ "%.0f"|format(val) }}{% else %}-{% endif %}
                     </td>

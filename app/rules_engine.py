@@ -103,8 +103,53 @@ def apply_rules_to_all(db: Session, user_id: int, only_uncategorized: bool = Fal
     return affected
 
 
-def apply_single_rule(db: Session, user_id: int, rule_id: int, only_uncategorized: bool = False) -> int:
-    """Apply a single rule to existing transactions. Returns count of affected transactions."""
+def preview_single_rule(db: Session, user_id: int, rule_id: int) -> list[dict]:
+    """Return transactions that match a rule, without applying it."""
+    from app.models import Account
+
+    rule = (
+        db.query(Rule)
+        .filter(Rule.id == rule_id, Rule.user_id == user_id)
+        .first()
+    )
+    if not rule:
+        return []
+
+    transactions = (
+        db.query(Transaction)
+        .join(Account)
+        .filter(Account.user_id == user_id)
+        .order_by(Transaction.date.desc())
+        .all()
+    )
+
+    matching = []
+    for tx in transactions:
+        if rule_matches_transaction(rule, tx):
+            matching.append({
+                "id": tx.id,
+                "date": str(tx.date),
+                "counterparty": tx.counterparty or "",
+                "description": tx.description or "",
+                "amount": float(tx.amount),
+                "category": tx.category.name if tx.category else None,
+            })
+
+    return matching
+
+
+def apply_single_rule(
+    db: Session,
+    user_id: int,
+    rule_id: int,
+    only_uncategorized: bool = False,
+    transaction_ids: list[int] | None = None,
+) -> int:
+    """Apply a single rule to existing transactions. Returns count of affected transactions.
+
+    If transaction_ids is provided, only those transactions are targeted.
+    Otherwise all matching transactions are targeted (optionally filtered by only_uncategorized).
+    """
     from app.models import Account
 
     rule = (
@@ -120,7 +165,10 @@ def apply_single_rule(db: Session, user_id: int, rule_id: int, only_uncategorize
         .join(Account)
         .filter(Account.user_id == user_id)
     )
-    if only_uncategorized:
+
+    if transaction_ids is not None:
+        query = query.filter(Transaction.id.in_(transaction_ids))
+    elif only_uncategorized:
         query = query.filter(Transaction.category_id.is_(None))
 
     transactions = query.all()
