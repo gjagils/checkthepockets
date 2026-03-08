@@ -177,10 +177,10 @@
                         </div>
                     </div>
                     <div class="rule-actions">
-                        <form method="post" action="/rules/{{ rule.id }}/apply" style="display:inline;">
-                            <input type="hidden" name="only_uncategorized" value="1">
-                            <button type="submit" class="btn btn-sm btn-accent">Toepassen</button>
-                        </form>
+                        <button class="btn btn-sm btn-accent"
+                                onclick="openPreview({{ rule.id }}, {{ rule.name|tojson }})">
+                            Toepassen
+                        </button>
                         <button class="btn btn-sm" onclick="toggleEdit({{ rule.id }})">Bewerken</button>
                         <form method="post" action="/rules/{{ rule.id }}/toggle" style="display:inline;">
                             <button type="submit" class="btn btn-sm">
@@ -279,11 +279,104 @@
 </div>
 {% endblock %}
 
+<!-- Preview Modal -->
+<div id="rule-preview-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeModal()">
+    <div class="modal-box">
+        <div class="modal-header">
+            <h3 id="modal-rule-name"></h3>
+            <button class="btn btn-sm" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-toolbar">
+            <span id="modal-count" class="muted"></span>
+            <div style="display:flex; gap:0.5rem; margin-left:auto;">
+                <button class="btn btn-sm" onclick="deselectAll()">Alles uitvinken</button>
+                <button class="btn btn-sm" onclick="selectAll()">Alles aanvinken</button>
+            </div>
+        </div>
+        <div class="modal-tx-list" id="modal-tx-list"></div>
+        <div class="modal-footer">
+            <form id="modal-apply-form" method="post" style="display:flex; gap:0.5rem; margin-left:auto;">
+                <input type="hidden" name="transaction_ids" id="modal-tx-ids">
+                <button type="button" class="btn btn-sm" onclick="closeModal()">Annuleren</button>
+                <button type="submit" class="btn btn-sm btn-primary">Toepassen op geselecteerde</button>
+            </form>
+        </div>
+    </div>
+</div>
+
 {% block scripts %}
 <script>
 function toggleEdit(id) {
     const el = document.getElementById('edit-' + id);
     el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
+
+let _allTransactions = [];
+
+function openPreview(ruleId, ruleName) {
+    document.getElementById('modal-rule-name').textContent = ruleName;
+    document.getElementById('modal-tx-list').innerHTML = '<p class="muted" style="text-align:center;padding:2rem;">Laden\u2026</p>';
+    document.getElementById('rule-preview-modal').style.display = 'flex';
+    fetch('/rules/' + ruleId + '/preview')
+        .then(r => r.json())
+        .then(data => {
+            _allTransactions = data.transactions;
+            renderTransactions(_allTransactions);
+            document.getElementById('modal-apply-form').action = '/rules/' + ruleId + '/apply';
+        });
+}
+
+function renderTransactions(txList) {
+    const container = document.getElementById('modal-tx-list');
+    if (!txList.length) {
+        container.innerHTML = '<p class="muted" style="text-align:center;padding:2rem;">Geen overeenkomende transacties.</p>';
+        updateCount();
+        return;
+    }
+    container.innerHTML = txList.map(tx => {
+        const name = escapeHtml(tx.counterparty || tx.description || '—');
+        const cat = tx.category ? escapeHtml(tx.category) : '—';
+        const amt = (tx.amount >= 0 ? '+' : '') + '\u20ac\u00a0' + tx.amount.toFixed(2).replace('.', ',');
+        const cls = tx.amount >= 0 ? 'amount-positive' : 'amount-negative';
+        return `<label class="modal-tx-row">
+            <input type="checkbox" class="modal-tx-check" value="${tx.id}" checked onchange="updateCount()">
+            <span class="modal-tx-date">${tx.date}</span>
+            <span class="modal-tx-name">${name}</span>
+            <span class="modal-tx-cat muted">${cat}</span>
+            <span class="modal-tx-amount ${cls}">${amt}</span>
+        </label>`;
+    }).join('');
+    updateCount();
+}
+
+function selectAll() {
+    document.querySelectorAll('.modal-tx-check').forEach(cb => cb.checked = true);
+    updateCount();
+}
+
+function deselectAll() {
+    document.querySelectorAll('.modal-tx-check').forEach(cb => cb.checked = false);
+    updateCount();
+}
+
+function updateCount() {
+    const all = document.querySelectorAll('.modal-tx-check');
+    const checked = document.querySelectorAll('.modal-tx-check:checked');
+    document.getElementById('modal-count').textContent = checked.length + ' van ' + all.length + ' geselecteerd';
+    document.getElementById('modal-tx-ids').value = Array.from(checked).map(cb => cb.value).join(',');
+}
+
+function closeModal() {
+    document.getElementById('rule-preview-modal').style.display = 'none';
+    _allTransactions = [];
+}
+
+function escapeHtml(str) {
+    const d = document.createElement('div');
+    d.appendChild(document.createTextNode(str));
+    return d.innerHTML;
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 </script>
 {% endblock %}

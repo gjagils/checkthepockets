@@ -35,7 +35,6 @@
                 <a href="/logout" class="nav-logout-link">Uitloggen</a>
             </div>
         </nav>
-        {% if main_active and main_active != 'dashboard' %}
         <nav class="nav-sub">
             {% if main_active == 'financien' %}
                 <a href="/" class="{{ 'active' if path == '/' or path.startswith('/transactions') }}">Transacties</a>
@@ -55,7 +54,6 @@
                 <a href="/import" class="{{ 'active' if path.startswith('/import') }}">Importeren</a>
             {% endif %}
         </nav>
-        {% endif %}
     </div>
     {% endif %}
 

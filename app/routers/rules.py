@@ -1,13 +1,13 @@
 from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Depends, Request, Form
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Rule, Category, Tag
 from app.auth import require_login
-from app.rules_engine import apply_rules_to_all, apply_single_rule, suggest_rules
+from app.rules_engine import apply_rules_to_all, apply_single_rule, preview_single_rule, suggest_rules
 from app.template_config import templates
 
 router = APIRouter()
@@ -236,15 +236,37 @@ def delete_rule(
     return RedirectResponse("/rules", status_code=302)
 
 
+@router.get("/rules/{rule_id}/preview")
+def preview_rule(
+    rule_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    user = require_login(request, db)
+    transactions = preview_single_rule(db, user.id, rule_id)
+    return JSONResponse({"transactions": transactions})
+
+
 @router.post("/rules/{rule_id}/apply")
 def apply_one_rule(
     rule_id: int,
     request: Request,
     only_uncategorized: str = Form(""),
+    transaction_ids: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
-    affected = apply_single_rule(db, user.id, rule_id, only_uncategorized=bool(only_uncategorized))
+
+    # If specific transaction IDs were provided (from preview modal), use those
+    parsed_ids = None
+    if transaction_ids.strip():
+        parsed_ids = [int(x) for x in transaction_ids.split(",") if x.strip().isdigit()]
+
+    affected = apply_single_rule(
+        db, user.id, rule_id,
+        only_uncategorized=bool(only_uncategorized),
+        transaction_ids=parsed_ids,
+    )
     return RedirectResponse(f"/rules?applied={affected}", status_code=302)
 
 
