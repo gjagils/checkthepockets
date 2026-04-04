@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
 
 from app.database import get_db
-from app.models import Account, Transaction, Category, RecurringTransaction
+from app.models import Account, Transaction, Category, RecurringTransaction, RecurringSuggestion
 from app.auth import require_login
 from app.template_config import templates
 
@@ -349,20 +349,32 @@ def analyze_recurring(request: Request, db: Session = Depends(get_db)):
             "amount": c["avg_amount"],
             "category_id": c["category_id"],
             "category_name": c["category_name"],
-            "count": c["count"],
             "reasoning": f"{c['count']}x gevonden, gem. elke {c['avg_days']} dagen",
         }
         for c in filtered[:15]
     ]
 
-    # Render the recurring page directly with suggestions (avoids session size limits)
-    return _render_recurring_page(request, db, user, recurring_suggestions=suggestions, analyze_status="done")
+    # Clear old suggestions and write new ones to DB
+    db.query(RecurringSuggestion).filter(RecurringSuggestion.user_id == user.id).delete()
+    for s in suggestions:
+        db.add(RecurringSuggestion(
+            user_id=user.id,
+            name=s.get("name") or s.get("counterparty_match") or "?",
+            amount=Decimal(str(s["amount"])),
+            frequency=s["frequency"],
+            counterparty_match=s.get("counterparty_match") or s.get("name"),
+            category_id=s.get("category_id"),
+            category_name=s.get("category_name"),
+            reasoning=s.get("reasoning"),
+        ))
+    db.commit()
+
+    return RedirectResponse("/recurring?analyze=done", status_code=302)
 
 
 def _render_recurring_page(
     request: Request, db: Session, user, *,
     from_tx: int | None = None,
-    recurring_suggestions: list | None = None,
     analyze_status: str = "",
 ):
     """Shared rendering logic for the recurring page (used by GET and POST analyze)."""
@@ -446,7 +458,10 @@ def _render_recurring_page(
             "total_active": len(items_active), "total_due": len(items_due),
             "total_missed": len(items_missed), "today": today,
             "prefill": prefill,
-            "recurring_suggestions": recurring_suggestions or [],
+            "recurring_suggestions": db.query(RecurringSuggestion)
+                .filter(RecurringSuggestion.user_id == user.id)
+                .order_by(RecurringSuggestion.id)
+                .all(),
             "analyze_status": analyze_status,
             "show_analyze_btn": True,
         },
@@ -461,9 +476,42 @@ def recurring_list(
 ):
     user = require_login(request, db)
     analyze_status = request.query_params.get("analyze", "")
-    return _render_recurring_page(
-        request, db, user, from_tx=from_tx, analyze_status=analyze_status,
-    )
+    return _render_recurring_page(request, db, user, from_tx=from_tx, analyze_status=analyze_status)
+
+
+@router.post("/recurring/suggestion/{suggestion_id}/accept")
+def accept_suggestion(suggestion_id: int, request: Request, db: Session = Depends(get_db)):
+    """Accept an AI suggestion — creates a RecurringTransaction and deletes the suggestion."""
+    user = require_login(request, db)
+    s = db.query(RecurringSuggestion).filter(
+        RecurringSuggestion.id == suggestion_id, RecurringSuggestion.user_id == user.id
+    ).first()
+    if s:
+        item = RecurringTransaction(
+            user_id=user.id,
+            name=s.name,
+            amount_expected=s.amount,
+            frequency=s.frequency,
+            counterparty=s.counterparty_match,
+            category_id=s.category_id,
+        )
+        db.add(item)
+        db.delete(s)
+        db.commit()
+    return RedirectResponse("/recurring", status_code=302)
+
+
+@router.post("/recurring/suggestion/{suggestion_id}/dismiss")
+def dismiss_suggestion(suggestion_id: int, request: Request, db: Session = Depends(get_db)):
+    """Dismiss an AI suggestion — deletes it without creating a recurring item."""
+    user = require_login(request, db)
+    s = db.query(RecurringSuggestion).filter(
+        RecurringSuggestion.id == suggestion_id, RecurringSuggestion.user_id == user.id
+    ).first()
+    if s:
+        db.delete(s)
+        db.commit()
+    return RedirectResponse("/recurring", status_code=302)
 
 
 @router.post("/recurring")

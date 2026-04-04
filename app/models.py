@@ -192,6 +192,24 @@ class RecurringTransaction(Base):
     category = relationship("Category")
 
 
+class RecurringSuggestion(Base):
+    __tablename__ = "recurring_suggestions"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    name = Column(String(150), nullable=False)
+    amount = Column(Numeric(12, 2), nullable=False)
+    frequency = Column(String(20), nullable=False)
+    counterparty_match = Column(String(255), nullable=True)
+    category_id = Column(Integer, ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)
+    category_name = Column(String(100), nullable=True)
+    reasoning = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    user = relationship("User")
+    category = relationship("Category")
+
+
 class Transaction(Base):
     __tablename__ = "transactions"
 
