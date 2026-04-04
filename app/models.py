@@ -189,7 +189,7 @@ class Transaction(Base):
     account = relationship("Account", back_populates="transactions")
     category = relationship("Category", back_populates="transactions")
     tags = relationship("Tag", secondary=transaction_tags, back_populates="transactions")
-    parent = relationship("Transaction", remote_side="Transaction.id", backref="children")
+    parent = relationship("Transaction", remote_side="Transaction.id", foreign_keys="[Transaction.parent_id]", backref="children")
 
 
 class SavingsPlan(Base):
