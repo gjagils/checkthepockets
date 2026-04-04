@@ -65,6 +65,7 @@
             {% elif main_active == 'analyse' %}
                 <a href="/analytics" class="{{ 'active' if path == '/analytics' }}">Analyse</a>
                 <a href="/analytics/stats" class="{{ 'active' if path == '/analytics/stats' }}">Statistieken</a>
+                <a href="/analytics/query" class="{{ 'active' if path == '/analytics/query' }}">Query</a>
                 <a href="/portfolio" class="{{ 'active' if path.startswith('/portfolio') }}">Portfolio</a>
                 <a href="/networth" class="{{ 'active' if path.startswith('/networth') }}">Vermogen</a>
             {% elif main_active == 'rekeningen' %}

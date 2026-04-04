@@ -1,11 +1,14 @@
+import base64
 import csv
 import hashlib
 import io
+import json
 import uuid
 import calendar as _calendar
-from datetime import date as date_type, timedelta
+from datetime import date as date_type, timedelta, datetime as _datetime
 from decimal import Decimal, InvalidOperation
 from typing import List
+from urllib.parse import quote_plus
 
 from fastapi import APIRouter, Depends, Request, UploadFile, File, Form, Query
 from fastapi.responses import RedirectResponse, StreamingResponse
@@ -31,6 +34,132 @@ PARSERS = {
     "ing": ("ING", ing.parse),
     "rabobank": ("Rabobank", rabobank.parse),
 }
+
+# Fields available for custom CSV column mapping
+CUSTOM_CSV_FIELDS = [
+    ("date",              "Datum *"),
+    ("amount",            "Bedrag *"),
+    ("description",       "Omschrijving"),
+    ("counterparty",      "Tegenpartij"),
+    ("counterparty_iban", "IBAN tegenpartij"),
+    ("balance_after",     "Saldo na"),
+    ("category",          "Categorie (naam)"),
+]
+
+
+def _get_csv_headers_and_preview(content: bytes) -> tuple[list[str], list[list[str]]]:
+    """Return (headers, first_5_data_rows) from raw CSV bytes."""
+    text = content.decode("utf-8-sig", errors="replace")
+    reader = csv.reader(io.StringIO(text))
+    try:
+        headers = next(reader)
+    except StopIteration:
+        return [], []
+    preview = []
+    for i, row in enumerate(reader):
+        if i >= 5:
+            break
+        preview.append(row)
+    return headers, preview
+
+
+def _parse_custom_csv(content: bytes, col_mapping: dict) -> list[ParsedTransaction]:
+    """Parse a generic CSV using a user-defined column mapping."""
+    text = content.decode("utf-8-sig", errors="replace")
+    reader = csv.DictReader(io.StringIO(text))
+
+    date_col   = col_mapping.get("date", "")
+    amount_col = col_mapping.get("amount", "")
+    desc_col   = col_mapping.get("description", "")
+    cp_col     = col_mapping.get("counterparty", "")
+    iban_col   = col_mapping.get("counterparty_iban", "")
+    bal_col    = col_mapping.get("balance_after", "")
+    cat_col    = col_mapping.get("category", "")
+
+    DATE_FMTS = ["%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%m/%d/%Y", "%d.%m.%Y", "%Y%m%d"]
+
+    parsed = []
+    for row in reader:
+        # --- date ---
+        date_str = row.get(date_col, "").strip() if date_col else ""
+        parsed_date = None
+        for fmt in DATE_FMTS:
+            try:
+                parsed_date = _datetime.strptime(date_str, fmt).date()
+                break
+            except ValueError:
+                pass
+        if not parsed_date:
+            continue
+
+        # --- amount ---
+        raw_amt = row.get(amount_col, "").strip().replace("\xa0", "").replace(" ", "") if amount_col else ""
+        # Handle European format  1.234,56  or  1,234.56
+        if "," in raw_amt and "." in raw_amt:
+            if raw_amt.rindex(",") > raw_amt.rindex("."):  # 1.234,56
+                raw_amt = raw_amt.replace(".", "").replace(",", ".")
+            else:
+                raw_amt = raw_amt.replace(",", "")
+        elif "," in raw_amt:
+            raw_amt = raw_amt.replace(",", ".")
+        try:
+            amount = Decimal(raw_amt)
+        except InvalidOperation:
+            continue
+
+        description   = row.get(desc_col, "").strip() if desc_col else ""
+        counterparty  = row.get(cp_col, "").strip()   if cp_col   else ""
+        iban          = row.get(iban_col, "").strip()  if iban_col else ""
+        category_name = row.get(cat_col, "").strip()   if cat_col  else ""
+
+        balance = None
+        if bal_col:
+            bal_raw = row.get(bal_col, "").strip().replace(",", ".").replace(" ", "")
+            try:
+                balance = Decimal(bal_raw)
+            except InvalidOperation:
+                pass
+
+        ptx = ParsedTransaction(
+            date=parsed_date,
+            amount=amount,
+            currency="EUR",
+            description=description or None,
+            counterparty=counterparty or None,
+            counterparty_iban=iban or None,
+            balance_after=balance,
+        )
+        ptx._category_name = category_name  # type: ignore[attr-defined]
+        parsed.append(ptx)
+    return parsed
+
+
+def _build_preview(parsed: list[ParsedTransaction], existing_hashes: set) -> tuple[list[dict], str]:
+    """Return (preview_rows for template, base64 tx_data for hidden form field)."""
+    preview_rows = []
+    tx_data_list = []
+    for p in parsed:
+        is_dup = p.import_hash in existing_hashes
+        preview_rows.append({
+            "date": p.date.isoformat(),
+            "amount": str(p.amount),
+            "description": p.description or "",
+            "counterparty": p.counterparty or "",
+            "is_duplicate": is_dup,
+        })
+        tx_data_list.append({
+            "date": p.date.isoformat(),
+            "amount": str(p.amount),
+            "currency": p.currency,
+            "description": p.description,
+            "counterparty": p.counterparty,
+            "counterparty_iban": p.counterparty_iban,
+            "balance_after": str(p.balance_after) if p.balance_after is not None else None,
+            "import_hash": p.import_hash,
+            "category_name": getattr(p, "_category_name", "") or "",
+        })
+    tx_data = base64.b64encode(json.dumps(tx_data_list).encode()).decode()
+    return preview_rows, tx_data
 
 PER_PAGE = 50
 
@@ -310,6 +439,11 @@ def set_category(
 
     tx.category_id = category_id if category_id else None
     db.commit()
+
+    # Suggest creating a rule if a category was assigned and tx has a counterparty
+    if category_id and tx.counterparty and redirect_to:
+        sep = "&" if "?" in redirect_to else "?"
+        redirect_to = f"{redirect_to}{sep}suggest_rule_tx={transaction_id}"
 
     return RedirectResponse(redirect_to, status_code=302)
 
@@ -745,141 +879,250 @@ async def import_csv(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ):
+    """Step 1: parse → show preview (or column-mapper for custom CSV)."""
     user = require_login(request, db)
-
-    if bank not in PARSERS:
-        return templates.TemplateResponse(
-            "transactions/import.html",
-            {
-                "request": request,
-                "user": user,
-                "banks": {k: v[0] for k, v in PARSERS.items()},
-                "error": "Onbekende bank geselecteerd",
-            },
-            status_code=400,
-        )
 
     content = await file.read()
     if not content:
         return templates.TemplateResponse(
             "transactions/import.html",
+            {"request": request, "user": user, "banks": {k: v[0] for k, v in PARSERS.items()}, "error": "Leeg bestand"},
+            status_code=400,
+        )
+
+    # ── Custom CSV: show column mapper ───────────────────────────────────────
+    if bank == "custom":
+        headers, csv_preview = _get_csv_headers_and_preview(content)
+        if not headers:
+            return templates.TemplateResponse(
+                "transactions/import.html",
+                {"request": request, "user": user, "banks": {k: v[0] for k, v in PARSERS.items()},
+                 "error": "Kon geen kolomkoppen vinden in het CSV-bestand"},
+                status_code=400,
+            )
+        return templates.TemplateResponse(
+            "transactions/import_map.html",
             {
-                "request": request,
-                "user": user,
-                "banks": {k: v[0] for k, v in PARSERS.items()},
-                "error": "Leeg bestand",
+                "request": request, "user": user,
+                "headers": headers,
+                "csv_preview": csv_preview,
+                "csv_data": base64.b64encode(content).decode(),
+                "account_name": account_name.strip(),
+                "field_options": CUSTOM_CSV_FIELDS,
             },
+        )
+
+    # ── Known bank ───────────────────────────────────────────────────────────
+    if bank not in PARSERS:
+        return templates.TemplateResponse(
+            "transactions/import.html",
+            {"request": request, "user": user, "banks": {k: v[0] for k, v in PARSERS.items()}, "error": "Onbekende bank geselecteerd"},
             status_code=400,
         )
 
     bank_label, parser = PARSERS[bank]
-
     try:
         detected_iban, parsed = parser(content)
     except ParseError as e:
         return templates.TemplateResponse(
             "transactions/import.html",
-            {
-                "request": request,
-                "user": user,
-                "banks": {k: v[0] for k, v in PARSERS.items()},
-                "error": f"Fout bij verwerken: {e}",
-            },
+            {"request": request, "user": user, "banks": {k: v[0] for k, v in PARSERS.items()}, "error": f"Fout bij verwerken: {e}"},
             status_code=400,
         )
 
     if not parsed:
         return templates.TemplateResponse(
             "transactions/import.html",
-            {
-                "request": request,
-                "user": user,
-                "banks": {k: v[0] for k, v in PARSERS.items()},
-                "error": "Geen transacties gevonden in het bestand",
-            },
+            {"request": request, "user": user, "banks": {k: v[0] for k, v in PARSERS.items()}, "error": "Geen transacties gevonden in het bestand"},
             status_code=400,
         )
 
-    # Find or create account
-    iban = detected_iban
-    name = account_name.strip() or f"{bank_label} - {iban or 'creditcard'}"
+    existing_hashes = {row[0] for row in db.query(Transaction.import_hash).filter(
+        Transaction.import_hash.in_([p.import_hash for p in parsed])
+    ).all()}
+    preview_rows, tx_data = _build_preview(parsed, existing_hashes)
 
-    account = (
-        db.query(Account)
-        .filter(
-            Account.user_id == user.id,
-            Account.bank == bank,
-            Account.iban == iban,
-        )
-        .first()
+    return templates.TemplateResponse(
+        "transactions/import_preview.html",
+        {
+            "request": request, "user": user,
+            "preview_rows": preview_rows,
+            "tx_data": tx_data,
+            "bank": bank,
+            "bank_label": bank_label,
+            "account_iban": detected_iban or "",
+            "account_name": account_name.strip() or f"{bank_label} - {detected_iban or 'account'}",
+            "new_count": sum(1 for r in preview_rows if not r["is_duplicate"]),
+            "dup_count": sum(1 for r in preview_rows if r["is_duplicate"]),
+        },
     )
 
+
+@router.post("/import/map")
+async def import_map(request: Request, db: Session = Depends(get_db)):
+    """Step 1b (custom CSV): receive column mapping → parse → show preview."""
+    user = require_login(request, db)
+    form = await request.form()
+
+    csv_data_b64 = form.get("csv_data", "")
+    account_name = form.get("account_name", "").strip()
+
+    try:
+        content = base64.b64decode(csv_data_b64.encode())
+    except Exception:
+        return RedirectResponse("/import", status_code=302)
+
+    col_mapping = {}
+    for field, _ in CUSTOM_CSV_FIELDS:
+        val = (form.get(f"col_{field}") or "").strip()
+        if val:
+            col_mapping[field] = val
+
+    if "date" not in col_mapping or "amount" not in col_mapping:
+        headers, csv_preview = _get_csv_headers_and_preview(content)
+        return templates.TemplateResponse(
+            "transactions/import_map.html",
+            {
+                "request": request, "user": user,
+                "headers": headers, "csv_preview": csv_preview,
+                "csv_data": csv_data_b64, "account_name": account_name,
+                "field_options": CUSTOM_CSV_FIELDS,
+                "prev_mapping": col_mapping,
+                "error": "Datum en Bedrag zijn verplichte velden",
+            },
+        )
+
+    parsed = _parse_custom_csv(content, col_mapping)
+    if not parsed:
+        headers, csv_preview = _get_csv_headers_and_preview(content)
+        return templates.TemplateResponse(
+            "transactions/import_map.html",
+            {
+                "request": request, "user": user,
+                "headers": headers, "csv_preview": csv_preview,
+                "csv_data": csv_data_b64, "account_name": account_name,
+                "field_options": CUSTOM_CSV_FIELDS,
+                "prev_mapping": col_mapping,
+                "error": "Geen transacties gevonden. Controleer of de Datum- en Bedragkolommen correct zijn.",
+            },
+        )
+
+    existing_hashes = {row[0] for row in db.query(Transaction.import_hash).filter(
+        Transaction.import_hash.in_([p.import_hash for p in parsed])
+    ).all()}
+    preview_rows, tx_data = _build_preview(parsed, existing_hashes)
+
+    return templates.TemplateResponse(
+        "transactions/import_preview.html",
+        {
+            "request": request, "user": user,
+            "preview_rows": preview_rows,
+            "tx_data": tx_data,
+            "bank": "custom",
+            "bank_label": "Aangepast CSV",
+            "account_iban": "",
+            "account_name": account_name or "Aangepast account",
+            "new_count": sum(1 for r in preview_rows if not r["is_duplicate"]),
+            "dup_count": sum(1 for r in preview_rows if r["is_duplicate"]),
+        },
+    )
+
+
+@router.post("/import/confirm")
+async def import_confirm(request: Request, db: Session = Depends(get_db)):
+    """Step 2: save confirmed transactions from preview."""
+    user = require_login(request, db)
+    form = await request.form()
+
+    tx_data_b64 = form.get("tx_data", "")
+    bank        = form.get("bank", "custom")
+    account_iban = (form.get("account_iban") or "").strip() or None
+    account_name = (form.get("account_name") or "").strip()
+
+    try:
+        tx_data = json.loads(base64.b64decode(tx_data_b64.encode()).decode())
+    except Exception:
+        return RedirectResponse("/import", status_code=302)
+
+    # Find or create account
+    account = db.query(Account).filter(
+        Account.user_id == user.id,
+        Account.bank == bank,
+        Account.iban == account_iban,
+    ).first()
     if not account:
         account = Account(
             user_id=user.id,
-            name=name,
-            iban=iban,
-            bank=bank,
+            name=account_name or f"{bank} account",
+            iban=account_iban,
+            bank=bank if bank in PARSERS else "custom",
         )
         db.add(account)
         db.flush()
 
-    # Load active rules for auto-categorization
-    active_rules = (
-        db.query(Rule)
-        .filter(Rule.user_id == user.id, Rule.is_active == 1)
-        .all()
-    )
+    # Category lookup by name (for custom CSV with category column)
+    categories_by_name = {
+        c.name.lower(): c
+        for c in db.query(Category).filter(Category.user_id == user.id).all()
+    }
 
-    # Import transactions, skip duplicates
-    imported = 0
-    skipped = 0
-    auto_categorized = 0
-    for tx in parsed:
-        exists = (
-            db.query(Transaction)
-            .filter(Transaction.import_hash == tx.import_hash)
-            .first()
-        )
+    active_rules = db.query(Rule).filter(Rule.user_id == user.id, Rule.is_active == 1).all()
+
+    imported = skipped = auto_categorized = 0
+
+    for item in tx_data:
+        exists = db.query(Transaction).filter(Transaction.import_hash == item["import_hash"]).first()
         if exists:
             skipped += 1
             continue
 
+        try:
+            tx_date   = date_type.fromisoformat(item["date"])
+            tx_amount = Decimal(item["amount"])
+        except (ValueError, InvalidOperation):
+            skipped += 1
+            continue
+
+        # Category from name
+        cat_id = None
+        cat_name = (item.get("category_name") or "").strip().lower()
+        if cat_name and cat_name in categories_by_name:
+            cat_id = categories_by_name[cat_name].id
+
         db_tx = Transaction(
             account_id=account.id,
-            date=tx.date,
-            amount=tx.amount,
-            currency=tx.currency,
-            description=tx.description,
-            counterparty=tx.counterparty,
-            counterparty_iban=tx.counterparty_iban,
-            balance_after=tx.balance_after,
-            import_hash=tx.import_hash,
+            date=tx_date,
+            amount=tx_amount,
+            currency=item.get("currency", "EUR"),
+            description=item.get("description"),
+            counterparty=item.get("counterparty"),
+            counterparty_iban=item.get("counterparty_iban"),
+            balance_after=Decimal(item["balance_after"]) if item.get("balance_after") else None,
+            import_hash=item["import_hash"],
+            category_id=cat_id,
         )
         db.add(db_tx)
         db.flush()
 
-        # Apply rules to new transaction
-        if active_rules and apply_rules_to_transaction(active_rules, db_tx, db):
+        if cat_id:
+            auto_categorized += 1
+        elif active_rules and apply_rules_to_transaction(active_rules, db_tx, db):
             auto_categorized += 1
 
         imported += 1
 
     db.commit()
 
-    # Remove projected placeholders that now have a real matching transaction
     from app.routers.recurring import cleanup_matched_projected
     cleanup_matched_projected(user.id, db)
 
     return templates.TemplateResponse(
         "transactions/import_result.html",
         {
-            "request": request,
-            "user": user,
-            "imported": imported,
-            "skipped": skipped,
+            "request": request, "user": user,
+            "imported": imported, "skipped": skipped,
             "auto_categorized": auto_categorized,
-            "total": len(parsed),
+            "total": len(tx_data),
             "account": account,
         },
     )

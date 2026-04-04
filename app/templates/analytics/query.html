@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Query-builder — Analyse{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Query-builder</h1>
+    {% if has_results %}
+    <a href="{{ request.url }}&fmt=csv" class="btn">↓ CSV download</a>
+    {% endif %}
+</div>
+
+<div class="card" style="margin-bottom:1.5rem;">
+    <form method="get" action="/analytics/query" style="padding:1rem;">
+        <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:1rem; align-items:end;">
+            <div class="form-group" style="margin:0;">
+                <label>Datum van</label>
+                <input type="date" name="date_from" value="{{ date_from }}">
+            </div>
+            <div class="form-group" style="margin:0;">
+                <label>Datum t/m</label>
+                <input type="date" name="date_to" value="{{ date_to }}">
+            </div>
+            <div class="form-group" style="margin:0;">
+                <label>Groepeer op</label>
+                <select name="group_by">
+                    <option value="category"     {% if group_by == 'category'     %}selected{% endif %}>Categorie</option>
+                    <option value="counterparty" {% if group_by == 'counterparty' %}selected{% endif %}>Tegenpartij</option>
+                    <option value="month"        {% if group_by == 'month'        %}selected{% endif %}>Maand</option>
+                    <option value="tag"          {% if group_by == 'tag'          %}selected{% endif %}>Tag</option>
+                </select>
+            </div>
+            <div class="form-group" style="margin:0;">
+                <label>Richting</label>
+                <select name="direction">
+                    <option value="expense" {% if direction == 'expense' %}selected{% endif %}>Uitgaven</option>
+                    <option value="income"  {% if direction == 'income'  %}selected{% endif %}>Inkomsten</option>
+                    <option value="all"     {% if direction == 'all'     %}selected{% endif %}>Alles</option>
+                </select>
+            </div>
+            <div class="form-group" style="margin:0;">
+                <label>Rekening</label>
+                <select name="account_id">
+                    <option value="">Alle rekeningen</option>
+                    {% for acc in accounts %}
+                    <option value="{{ acc.id }}" {% if current_account_id == acc.id %}selected{% endif %}>{{ acc.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div style="display:flex; gap:.5rem;">
+                <button type="submit" class="btn btn-primary" style="flex:1;">Uitvoeren</button>
+                <a href="/analytics/query" class="btn">Wissen</a>
+            </div>
+        </div>
+    </form>
+</div>
+
+{% if has_results %}
+<div class="card">
+    <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+        <h3>
+            {% if group_by == 'category' %}Per categorie
+            {% elif group_by == 'counterparty' %}Per tegenpartij
+            {% elif group_by == 'month' %}Per maand
+            {% else %}Per tag{% endif %}
+            — {{ results|length }} groepen
+        </h3>
+        <span class="muted" style="font-size:.9rem;">Totaal: € {{ grand_total|round(2) }}</span>
+    </div>
+    <div class="table-wrapper">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Groep</th>
+                    <th class="text-right">Bedrag</th>
+                    <th class="text-right">Transacties</th>
+                    <th style="width:200px;">Aandeel</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for r in results %}
+            {% set pct = (r.total|abs / grand_total * 100)|round(1) if grand_total else 0 %}
+            <tr>
+                <td>
+                    {% if r.color and r.color != '#888' and r.color != '#ccc' %}
+                    <span style="display:inline-block; width:.7rem; height:.7rem; border-radius:50%; background:{{ r.color }}; margin-right:.4rem;"></span>
+                    {% endif %}
+                    {{ r.label }}
+                </td>
+                <td class="text-right nowrap {% if r.total < 0 %}amount-negative{% else %}amount-positive{% endif %}">
+                    {{ r.total|abs|round(2) }}
+                </td>
+                <td class="text-right muted">{{ r.tx_count }}</td>
+                <td>
+                    <div style="display:flex; align-items:center; gap:.5rem;">
+                        <div style="flex:1; height:6px; background:var(--muted-border); border-radius:3px; overflow:hidden;">
+                            <div style="width:{{ pct }}%; height:100%; background:var(--gold); border-radius:3px;"></div>
+                        </div>
+                        <span class="muted" style="font-size:.8rem; min-width:3rem; text-align:right;">{{ pct }}%</span>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr style="font-weight:700; border-top:2px solid var(--muted-border);">
+                    <td>Totaal</td>
+                    <td class="text-right">{{ grand_total|round(2) }}</td>
+                    <td class="text-right muted">{{ results|sum(attribute='tx_count') }}</td>
+                    <td></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+{% elif date_from or date_to %}
+<div class="alert alert-info">Geen resultaten gevonden voor de opgegeven filters.</div>
+{% else %}
+<div class="card" style="padding:2rem; text-align:center; color:var(--muted);">
+    Stel een datumreeks in en klik op <strong>Uitvoeren</strong> om te beginnen.
+</div>
+{% endif %}
+{% endblock %}

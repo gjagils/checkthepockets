@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Kolomtoewijzing — Importeren{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Kolomtoewijzing</h1>
+    <a href="/import" class="btn">← Terug</a>
+</div>
+
+{% if error %}
+<div class="alert alert-error">{{ error }}</div>
+{% endif %}
+
+<div class="card" style="margin-bottom:1.5rem;">
+    <div class="card-header"><h3>Uitleg</h3></div>
+    <div style="padding:1rem; color:var(--muted); font-size:.9rem;">
+        Wijs de kolommen uit je CSV-bestand toe aan de velden van Check Your Pockets.
+        <strong>Datum</strong> en <strong>Bedrag</strong> zijn verplicht.
+        Ondersteunde datumformaten: <code>YYYY-MM-DD</code>, <code>DD-MM-YYYY</code>, <code>DD/MM/YYYY</code>.
+        Bedragen mogen Europees formaat gebruiken (<code>1.234,56</code>).
+    </div>
+</div>
+
+{% if csv_preview %}
+<div class="card" style="margin-bottom:1.5rem;">
+    <div class="card-header"><h3>Voorbeeld (eerste {{ csv_preview|length }} rijen)</h3></div>
+    <div class="table-wrapper" style="overflow-x:auto;">
+        <table class="data-table" style="font-size:.8rem;">
+            <thead>
+                <tr>
+                    {% for h in headers %}
+                    <th>{{ h }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in csv_preview %}
+                <tr>
+                    {% for cell in row %}
+                    <td>{{ cell }}</td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<div class="card">
+    <div class="card-header"><h3>Kolomtoewijzing</h3></div>
+    <form method="post" action="/import/map" style="padding:1rem;">
+        <input type="hidden" name="csv_data" value="{{ csv_data }}">
+        <input type="hidden" name="account_name" value="{{ account_name }}">
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; max-width:600px;">
+            {% for field, label in field_options %}
+            <div class="form-group" style="margin:0;">
+                <label for="col_{{ field }}">{{ label }}</label>
+                <select name="col_{{ field }}" id="col_{{ field }}">
+                    <option value="">— Niet gebruiken —</option>
+                    {% for h in headers %}
+                    <option value="{{ h }}" {% if prev_mapping and prev_mapping.get(field) == h %}selected{% elif not prev_mapping and h|lower == field|replace('_', ' ')|lower %}selected{% endif %}>{{ h }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div style="margin-top:1.5rem; display:flex; gap:.75rem;">
+            <button type="submit" class="btn btn-primary">Voorbeeld tonen →</button>
+            <a href="/import" class="btn">Annuleren</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

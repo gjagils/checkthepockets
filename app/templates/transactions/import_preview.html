@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Import voorvertoning — Importeren{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Import voorvertoning</h1>
+    <a href="/import" class="btn">← Nieuw bestand</a>
+</div>
+
+<div style="display:flex; gap:1rem; margin-bottom:1.5rem; flex-wrap:wrap;">
+    <div class="summary-card" style="border-left:3px solid var(--green);">
+        <div class="label">Nieuw</div>
+        <div class="value">{{ new_count }}</div>
+    </div>
+    <div class="summary-card" style="border-left:3px solid var(--muted-border);">
+        <div class="label">Al aanwezig</div>
+        <div class="value">{{ dup_count }}</div>
+    </div>
+    <div class="summary-card">
+        <div class="label">Rekening</div>
+        <div class="value" style="font-size:1rem;">{{ account_name }}</div>
+        {% if account_iban %}<div class="muted" style="font-size:.8rem;">{{ account_iban }}</div>{% endif %}
+    </div>
+</div>
+
+{% if new_count == 0 %}
+<div class="alert alert-info">
+    Alle {{ dup_count }} transacties zijn al aanwezig in de database. Er is niets nieuws om te importeren.
+</div>
+<p><a href="/import" class="btn">← Terug naar importeren</a></p>
+{% else %}
+
+<form method="post" action="/import/confirm">
+    <input type="hidden" name="tx_data" value="{{ tx_data }}">
+    <input type="hidden" name="bank" value="{{ bank }}">
+    <input type="hidden" name="account_iban" value="{{ account_iban }}">
+    <input type="hidden" name="account_name" value="{{ account_name }}">
+
+    <div class="card">
+        <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+            <h3>{{ preview_rows|length }} transacties</h3>
+            <div style="display:flex; gap:.75rem;">
+                <button type="submit" class="btn btn-primary">✓ Importeer {{ new_count }} nieuwe transacties</button>
+                <a href="/import" class="btn">Annuleren</a>
+            </div>
+        </div>
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Status</th>
+                        <th>Datum</th>
+                        <th>Bedrag</th>
+                        <th>Tegenpartij</th>
+                        <th>Omschrijving</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for row in preview_rows %}
+                <tr {% if row.is_duplicate %}style="opacity:.4;"{% endif %}>
+                    <td>
+                        {% if row.is_duplicate %}
+                        <span class="pill" style="background:var(--muted-border); color:var(--muted); font-size:.7rem;">Duplicaat</span>
+                        {% else %}
+                        <span class="pill pill-green" style="font-size:.7rem;">Nieuw</span>
+                        {% endif %}
+                    </td>
+                    <td class="nowrap">{{ row.date }}</td>
+                    <td class="nowrap {% if row.amount|float < 0 %}amount-negative{% else %}amount-positive{% endif %}">
+                        {{ row.amount }}
+                    </td>
+                    <td>{{ row.counterparty or '—' }}</td>
+                    <td class="muted" style="font-size:.85rem; max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                        {{ row.description or '—' }}
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div style="padding:1rem; border-top:1px solid var(--muted-border); display:flex; gap:.75rem;">
+            <button type="submit" class="btn btn-primary">✓ Importeer {{ new_count }} nieuwe transacties</button>
+            <a href="/import" class="btn">Annuleren</a>
+        </div>
+    </div>
+</form>
+{% endif %}
+{% endblock %}

@@ -1,12 +1,15 @@
+import csv
 import datetime
+import io
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Request, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import case, func, or_, and_
 
 from app.database import get_db
-from app.models import Account, Transaction, Category
+from app.models import Account, Transaction, Category, Tag, transaction_tags
 from app.auth import require_login
 from app.template_config import templates
 
@@ -345,5 +348,169 @@ def analytics_stats(
             "total_income": totals.income or Decimal("0"),
             "total_expenses": totals.expenses or Decimal("0"),
             "total_tx_count": totals.tx_count or 0,
+        },
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Flexibele query-builder
+# ──────────────────────────────────────────────────────────────────────────────
+
+@router.get("/analytics/query")
+def analytics_query(
+    request: Request,
+    date_from: str = Query(""),
+    date_to: str = Query(""),
+    group_by: str = Query("category"),
+    direction: str = Query("expense"),
+    account_id: int = Query(0),
+    fmt: str = Query(""),
+    db: Session = Depends(get_db),
+):
+    from datetime import date as _date_type
+    user = require_login(request, db)
+
+    accounts = db.query(Account).filter(Account.user_id == user.id).order_by(Account.name).all()
+
+    has_filter = bool(date_from or date_to or account_id)
+    results = []
+    grand_total = Decimal("0")
+
+    if has_filter or True:  # always show form + results if submitted
+        base_filter = [
+            Account.user_id == user.id,
+            Transaction.is_excluded == 0,
+            Transaction.transfer_id.is_(None),
+            Transaction.is_projected == 0,
+        ]
+        if date_from:
+            try:
+                base_filter.append(Transaction.date >= _date_type.fromisoformat(date_from))
+            except ValueError:
+                pass
+        if date_to:
+            try:
+                base_filter.append(Transaction.date <= _date_type.fromisoformat(date_to))
+            except ValueError:
+                pass
+        if account_id:
+            base_filter.append(Transaction.account_id == account_id)
+        if direction == "expense":
+            base_filter.append(Transaction.amount < 0)
+        elif direction == "income":
+            base_filter.append(Transaction.amount > 0)
+
+        NL_MONTHS_SHORT = ["", "Jan", "Feb", "Mrt", "Apr", "Mei", "Jun",
+                           "Jul", "Aug", "Sep", "Okt", "Nov", "Dec"]
+
+        if group_by == "category":
+            rows = (
+                db.query(
+                    Category.name.label("label"),
+                    Category.color.label("color"),
+                    func.sum(Transaction.amount).label("total"),
+                    func.count(Transaction.id).label("tx_count"),
+                )
+                .join(Transaction, Transaction.category_id == Category.id)
+                .join(Account, Account.id == Transaction.account_id)
+                .filter(*base_filter, Category.exclude_from_totals == 0)
+                .group_by(Category.id, Category.name, Category.color)
+                .order_by(func.sum(Transaction.amount))
+                .all()
+            )
+            results = [{"label": r.label, "color": r.color or "#888",
+                        "total": r.total or Decimal("0"), "tx_count": r.tx_count} for r in rows]
+            # Uncategorized
+            uncat = db.query(
+                func.sum(Transaction.amount), func.count(Transaction.id)
+            ).join(Account).filter(*base_filter, Transaction.category_id.is_(None)).first()
+            if uncat and uncat[0]:
+                results.append({"label": "Zonder categorie", "color": "#ccc",
+                                 "total": uncat[0], "tx_count": uncat[1] or 0})
+
+        elif group_by == "counterparty":
+            rows = (
+                db.query(
+                    Transaction.counterparty.label("label"),
+                    func.sum(Transaction.amount).label("total"),
+                    func.count(Transaction.id).label("tx_count"),
+                )
+                .join(Account)
+                .filter(*base_filter, Transaction.counterparty.isnot(None), Transaction.counterparty != "")
+                .group_by(Transaction.counterparty)
+                .order_by(func.sum(Transaction.amount))
+                .limit(100)
+                .all()
+            )
+            results = [{"label": r.label or "—", "color": "#888",
+                        "total": r.total or Decimal("0"), "tx_count": r.tx_count} for r in rows]
+
+        elif group_by == "month":
+            rows = (
+                db.query(
+                    func.extract("year", Transaction.date).label("yr"),
+                    func.extract("month", Transaction.date).label("mo"),
+                    func.sum(Transaction.amount).label("total"),
+                    func.count(Transaction.id).label("tx_count"),
+                )
+                .join(Account)
+                .filter(*base_filter)
+                .group_by(func.extract("year", Transaction.date), func.extract("month", Transaction.date))
+                .order_by(func.extract("year", Transaction.date), func.extract("month", Transaction.date))
+                .all()
+            )
+            results = [{"label": f"{NL_MONTHS_SHORT[int(r.mo)]} {int(r.yr)}",
+                        "color": "#888", "total": r.total or Decimal("0"), "tx_count": r.tx_count}
+                       for r in rows]
+
+        elif group_by == "tag":
+            rows = (
+                db.query(
+                    Tag.name.label("label"),
+                    Tag.color.label("color"),
+                    func.sum(Transaction.amount).label("total"),
+                    func.count(Transaction.id).label("tx_count"),
+                )
+                .join(transaction_tags, transaction_tags.c.tag_id == Tag.id)
+                .join(Transaction, Transaction.id == transaction_tags.c.transaction_id)
+                .join(Account, Account.id == Transaction.account_id)
+                .filter(*base_filter, Tag.user_id == user.id)
+                .group_by(Tag.id, Tag.name, Tag.color)
+                .order_by(func.sum(Transaction.amount))
+                .all()
+            )
+            results = [{"label": r.label, "color": r.color or "#888",
+                        "total": r.total or Decimal("0"), "tx_count": r.tx_count} for r in rows]
+
+        grand_total = sum(abs(r["total"]) for r in results)
+
+    # CSV download
+    if fmt == "csv" and results:
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["Groep", "Totaal (€)", "Transacties", "% van totaal"])
+        for r in results:
+            pct = round(abs(r["total"]) / grand_total * 100, 1) if grand_total else 0
+            writer.writerow([r["label"], str(abs(r["total"])), r["tx_count"], pct])
+        output.seek(0)
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": 'attachment; filename="query-export.csv"'},
+        )
+
+    return templates.TemplateResponse(
+        "analytics/query.html",
+        {
+            "request": request, "user": user,
+            "accounts": accounts,
+            "current_account_id": account_id or None,
+            "date_from": date_from,
+            "date_to": date_to,
+            "group_by": group_by,
+            "direction": direction,
+            "results": results,
+            "grand_total": grand_total,
+            "has_results": bool(results),
         },
     )

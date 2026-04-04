@@ -70,6 +70,8 @@
                     <th>Admin</th>
                     <th>Actief</th>
                     <th>Geverifieerd</th>
+                    <th class="text-right">Rekeningen</th>
+                    <th class="text-right">Transacties</th>
                     <th>Laatste login</th>
                     <th>Aangemaakt</th>
                     <th>Acties</th>
@@ -105,6 +107,8 @@
                     <span style="color:var(--orange);">Nee</span>
                     {% endif %}
                 </td>
+                <td class="text-right muted">{{ user_stats[u.id].account_count if user_stats else '—' }}</td>
+                <td class="text-right muted">{{ user_stats[u.id].tx_count if user_stats else '—' }}</td>
                 <td>{{ u.last_login_at.strftime('%d-%m-%Y %H:%M') if u.last_login_at else '—' }}</td>
                 <td>{{ u.created_at.strftime('%d-%m-%Y') if u.created_at else '—' }}</td>
                 <td>

@@ -12,6 +12,17 @@
     </div>
 </div>
 
+{% set _suggest_tx = request.query_params.get('suggest_rule_tx') %}
+{% if _suggest_tx %}
+<div class="alert alert-info" id="rule-suggestion-banner" style="display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap;">
+    <span>💡 Wil je een automatische regel aanmaken op basis van deze tegenpartij?</span>
+    <div style="display:flex; gap:.5rem; align-items:center;">
+        <a href="/rules?from_tx={{ _suggest_tx }}" class="btn btn-sm btn-secondary">Maak regel →</a>
+        <button onclick="document.getElementById('rule-suggestion-banner').remove()" class="btn btn-sm" style="padding:.25rem .6rem;">×</button>
+    </div>
+</div>
+{% endif %}
+
 <!-- Slim transaction toolbar -->
 <div class="tx-toolbar">
     <!-- Period navigation -->
