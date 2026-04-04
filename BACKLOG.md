@@ -97,44 +97,14 @@ Sprints zijn gegroepeerd op gedeelde bestanden voor maximale efficiëntie per se
 
 ---
 
-## Sprint 10 — Projected Transactions (potlood-planning)
+## Sprint 10 — Projected Transactions ✅ (2026-04-04)
 
-*Bouwt op Sprint 9 ("Maak terugkerend" vanuit transactie) en het bestaande RecurringTransaction model.*
-
-**Bestanden:** `app/models.py`, `app/routers/transactions.py`, `app/routers/recurring.py`, `app/templates/transactions/list.html`, `app/templates/budgets/month.html`
-
-**Context voor nieuwe sessie:**
-- `RecurringTransaction` heeft: `name`, `amount_expected`, `frequency`, `counterparty`, `category_id`, `account_id`, `start_date`, `end_date`, `is_active`
-- `Transaction.recurring_id` FK bestaat al (Sprint 7) — koppelt echte transactie aan recurring item
-- Budgetpagina toont per categorie: budgetteerd, uitgegeven, resterend
-- Import-flow: `POST /import/confirm` slaat transacties op en past rules toe
-
-**Idee:** Terugkerende items genereren automatisch een *verwachte transactie* (`is_projected=True`) voor de lopende maand. Deze staat in de transactielijst, visueel onderscheiden. Bij import matcht de echte transactie de placeholder en vervangt die.
-
-**Datamodel:**
-```python
-Transaction
-  + is_projected: bool = False   # nieuw veld + migratie
-  # is_projected=True entries tellen niet mee in export, CSV, bulk-acties
-  # wel mee in budget-prognose berekeningen
-```
-
-**Taken:**
-
-### Fase 1 — Genereren & tonen
-- [ ] **Migratie**: `is_projected INTEGER DEFAULT 0` op `transactions`
-- [ ] **Generator-functie** in `recurring.py`: `generate_projected_for_month(user, year, month, db)` — maakt voor elk actief recurring item een `Transaction(is_projected=True)` aan als die er nog niet is voor die periode
-- [ ] **Aanroep**: generator draaien bij laden van transactiepagina (lazy) en bij aanmaken/bewerken recurring item
-- [ ] **Transactielijst**: projected entries bovenaan, visueel anders — stippelborder of grijze rij, label "Verwacht", bedrag in `var(--muted)` i.p.v. rood/groen
-- [ ] **Filteren**: projected entries standaard zichtbaar, maar weglaatbaar via toggle "Toon verwacht"
-
-### Fase 2 — Matching bij import
-- [ ] **Match-logica**: bij `POST /import/confirm`, na opslaan echte transactie, zoek passende projected entry (zelfde recurring_id, zelfde maand) → verwijder de placeholder of markeer als gematcht
-- [ ] **Handmatige match**: als er geen automatische match is, kan gebruiker via "›" paneel de projected entry koppelen aan een echte transactie
-
-### Fase 3 — Budget-prognose
-- [ ] **Budgetpagina**: naast "Uitgegeven €X" ook "Verwacht nog €Y" (som van projected entries in die categorie die nog niet gematcht zijn)
-- [ ] **Resterende ruimte**: `budget - uitgegeven - verwacht` → "Vrij te besteden: €Z"
+- [x] `is_projected` veld op Transaction + migratie 022
+- [x] `sync_projected_transactions(user_id, year, month, db)` — genereert/ruimt placeholders op per maand
+- [x] `cleanup_matched_projected()` — ruimt projected op na import
+- [x] Transactielijst: projected rijen bovenaan bij maandweergave (gestreept, "Verwacht" badge)
+- [x] `_build_tx_query` filtert altijd `is_projected == 0`
+- [ ] **Fase 3 (nog te doen)**: budget-prognose — "Verwacht nog €Y" per categorie op budgetpagina
 
 ---
 
@@ -195,29 +165,11 @@ Transaction
 
 ---
 
-## Sprint 11 — Terugkerende items verfijnen
+## Sprint 11 — Terugkerende items verfijnen ✅ (2026-04-04)
 
-*Uitbreiding op het bestaande RecurringTransaction model (Sprint 7).*
-
-**Bestanden:** `app/models.py`, `app/routers/recurring.py`, `app/templates/recurring/list.html`, `app/templates/recurring/_edit_form.html`
-
-**Context voor nieuwe sessie:**
-- `RecurringTransaction` heeft al: `name`, `amount_expected`, `frequency`, `counterparty`, `category_id`, `account_id`, `start_date`, `end_date`, `is_active`
-- Recurring items zijn nu altijd "elke maand" actief binnen de start/end periode
-- Sprint 10 (projected transactions) bouwt hierop — maandfilter bepaalt of er een placeholder gegenereerd wordt
-
-**Taken:**
-
-### Maandfilter per recurring item
-- [ ] **Datamodel**: nieuw veld `active_months: str` op `RecurringTransaction` — kommagescheiden lijst van maandnummers bijv. `"3,4,5,6,7,8,9,10,11,12"`. Leeg = alle maanden. Migratie toevoegen.
-- [ ] **UI in formulier**: 12 checkboxes (Jan t/m Dec), standaard allemaal aangevinkt. Groepeer per kwartaal voor overzicht.
-- [ ] **Generator-logica** (Sprint 10 aansluiting): `generate_projected_for_month()` controleert of de huidige maand in `active_months` valt voordat een placeholder aangemaakt wordt
-- [ ] **Weergave in lijst**: toon de actieve maanden als pill-rij onder de naam, bijv. `Mrt Apr Mei ... Dec` (gekleurde pills, inactieve maanden grijs)
-
-### Handmatig aanmaken recurring items
-- [ ] **"Nieuw terugkerend item" knop** op de recurring pagina — opent hetzelfde formulier als "Maak terugkerend" vanuit een transactie (Sprint 9), maar zonder pre-fill
-- [ ] **Formuliervelden**: naam, verwacht bedrag, richting (uitgave/inkomst), tegenpartij, categorie, rekening, frequentie, start/einddatum, actieve maanden
-- [ ] Dit bestaat deels al via `POST /recurring/new` — controleer of dat formulier compleet is en voeg ontbrekende velden toe
+- [x] `active_months` veld op RecurringTransaction (kommagescheiden maandnummers, NULL = alle)
+- [x] Maand-checkbox picker in add/edit formulier, actieve maand-pills per item
+- [x] `_is_in_active_period()` en `_is_active_in_month()` respecteren `active_months`
 
 ---
 
