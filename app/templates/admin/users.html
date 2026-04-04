@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}Admin — Gebruikers - Check Your Pockets{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Gebruikersbeheer</h1>
+</div>
+
+{% if invite_link %}
+<div class="alert alert-success">
+    Uitnodigingslink aangemaakt:<br>
+    <code style="word-break:break-all;">{{ request.url.scheme }}://{{ request.url.netloc }}{{ invite_link }}</code>
+</div>
+{% endif %}
+
+{% if encrypt_result is defined %}
+<div class="alert alert-success">
+    {% if encrypt_result == 0 %}
+        Alle transacties zijn al versleuteld (of encryptie staat uit).
+    {% else %}
+        {{ encrypt_result }} veld(en) opnieuw opgeslagen met encryptie.
+    {% endif %}
+</div>
+{% endif %}
+
+<!-- Encryptie status -->
+<div class="card" style="margin-bottom:1.5rem;">
+    <div class="card-header">
+        <h3>Encryptie at-rest</h3>
+    </div>
+    <div style="padding:1rem;">
+        {% if encryption_enabled %}
+        <p style="color:var(--green);">✓ Veldencryptie is actief (FIELD_ENCRYPTION_KEY is ingesteld).</p>
+        <form method="post" action="/admin/encrypt-data" onsubmit="return confirm('Versleutel alle bestaande transactiedata? Dit kan even duren.')">
+            <button type="submit" class="btn btn-secondary">Versleutel bestaande transacties</button>
+        </form>
+        {% else %}
+        <p style="color:var(--muted);">Veldencryptie staat uit. Stel <code>FIELD_ENCRYPTION_KEY</code> in om te activeren.</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Uitnodigen -->
+<div class="card" style="margin-bottom:1.5rem;">
+    <div class="card-header">
+        <h3>Gebruiker uitnodigen</h3>
+    </div>
+    <div style="padding:1rem;">
+        <form method="post" action="/admin/invite" style="display:flex; gap:.75rem; align-items:flex-end; flex-wrap:wrap;">
+            <div class="form-group" style="margin:0; flex:1; min-width:200px;">
+                <label for="invite_email">E-mailadres (optioneel — stuur uitnodiging per mail)</label>
+                <input type="email" id="invite_email" name="invite_email" placeholder="iemand@email.nl">
+            </div>
+            <button type="submit" class="btn btn-primary">Link genereren</button>
+        </form>
+    </div>
+</div>
+
+<!-- Gebruikerslijst -->
+<div class="card">
+    <div class="card-header">
+        <h3>Gebruikers ({{ users|length }})</h3>
+    </div>
+    <div class="table-wrapper">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Gebruikersnaam</th>
+                    <th>E-mail</th>
+                    <th>Admin</th>
+                    <th>Actief</th>
+                    <th>Geverifieerd</th>
+                    <th>Laatste login</th>
+                    <th>Aangemaakt</th>
+                    <th>Acties</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for u in users %}
+            <tr>
+                <td>{{ u.id }}</td>
+                <td>
+                    <strong>{{ u.username }}</strong>
+                    {% if u.id == user.id %}<span class="pill pill-sky" style="font-size:.7rem;">jij</span>{% endif %}
+                </td>
+                <td>{{ u.email or '—' }}</td>
+                <td>
+                    {% if u.is_admin %}
+                    <span class="pill pill-gold">Admin</span>
+                    {% else %}
+                    <span style="color:var(--muted);">—</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if u.is_active %}
+                    <span class="pill pill-green">Actief</span>
+                    {% else %}
+                    <span class="pill pill-red">Inactief</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if u.is_verified %}
+                    <span style="color:var(--green);">✓</span>
+                    {% else %}
+                    <span style="color:var(--orange);">Nee</span>
+                    {% endif %}
+                </td>
+                <td>{{ u.last_login_at.strftime('%d-%m-%Y %H:%M') if u.last_login_at else '—' }}</td>
+                <td>{{ u.created_at.strftime('%d-%m-%Y') if u.created_at else '—' }}</td>
+                <td>
+                    {% if u.id != user.id %}
+                    <div style="display:flex; gap:.4rem; flex-wrap:wrap;">
+                        <form method="post" action="/admin/users/{{ u.id }}/toggle-active" style="display:inline;">
+                            <button type="submit" class="btn btn-sm btn-secondary" title="{{ 'Deactiveren' if u.is_active else 'Activeren' }}">
+                                {{ 'Deactiveer' if u.is_active else 'Activeer' }}
+                            </button>
+                        </form>
+                        <form method="post" action="/admin/users/{{ u.id }}/toggle-admin" style="display:inline;">
+                            <button type="submit" class="btn btn-sm btn-secondary">
+                                {{ 'Admin af' if u.is_admin else 'Maak admin' }}
+                            </button>
+                        </form>
+                        <form method="post" action="/admin/users/{{ u.id }}/delete" style="display:inline;"
+                              onsubmit="return confirm('Gebruiker {{ u.username }} en alle bijbehorende data permanent verwijderen?')">
+                            <button type="submit" class="btn btn-sm btn-danger">Verwijder</button>
+                        </form>
+                    </div>
+                    {% else %}
+                    <span style="color:var(--muted); font-size:.85rem;">—</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

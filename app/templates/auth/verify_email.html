@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}E-mail verificatie - Check Your Pockets{% endblock %}
+{% block content %}
+<div class="auth-container">
+    <div class="auth-logo"><img src="/static/img/logo.png" alt="Check Your Pockets"></div>
+    {% if mode == "sent" %}
+    <h1>Verificatiemail verstuurd</h1>
+    <div class="alert alert-success">
+        We hebben een verificatiemail gestuurd naar <strong>{{ email }}</strong>.<br>
+        Klik op de link in de e-mail om je account te activeren.
+    </div>
+    <p style="color:var(--muted); font-size:0.9rem; margin-top:1rem;">
+        Geen e-mail ontvangen? Controleer je spammap of probeer opnieuw te registreren.
+    </p>
+    <p class="auth-link"><a href="/login">← Naar inloggen</a></p>
+    {% elif mode == "confirmed" %}
+    <h1>E-mail bevestigd</h1>
+    <div class="alert alert-success">
+        Je e-mailadres is succesvol bevestigd. Je kunt nu inloggen.
+    </div>
+    <p class="auth-link"><a href="/login">Inloggen</a></p>
+    {% else %}
+    <h1>Ongeldige link</h1>
+    <div class="alert alert-error">
+        Deze verificatielink is ongeldig of verlopen.
+    </div>
+    <p class="auth-link"><a href="/login">← Naar inloggen</a></p>
+    {% endif %}
+</div>
+{% endblock %}

@@ -45,6 +45,9 @@
             </div>
             <div class="nav-user-section">
                 <button class="theme-toggle" id="theme-toggle-btn" onclick="toggleTheme()" title="Thema wisselen">🌙</button>
+                {% if user.is_admin %}
+                <a href="/admin/users" class="nav-link-subtle {{ 'active' if path.startswith('/admin') }}" title="Admin">⚙ Admin</a>
+                {% endif %}
                 <a href="/settings" class="nav-avatar" title="Instellingen">{{ user.username[0] | upper }}</a>
                 <a href="/logout" class="nav-logout-link">Uitloggen</a>
             </div>

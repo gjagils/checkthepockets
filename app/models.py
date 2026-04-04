@@ -14,6 +14,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 
 from app.database import Base
+from app.crypto import EncryptedText
 
 
 transaction_tags = Table(
@@ -30,6 +31,11 @@ class User(Base):
     id = Column(Integer, primary_key=True)
     username = Column(String(150), unique=True, nullable=False)
     password_hash = Column(String(255), nullable=False)
+    email = Column(String(255), nullable=True)
+    is_verified = Column(Integer, default=1)   # 1 = verified, 0 = pending email verification
+    is_admin = Column(Integer, default=0)       # 1 = admin
+    is_active = Column(Integer, default=1)      # 0 = deactivated by admin
+    last_login_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     accounts = relationship("Account", back_populates="user", cascade="all, delete-orphan")
@@ -45,6 +51,22 @@ class User(Base):
     networth_accounts = relationship("NetWorthAccount", back_populates="user", cascade="all, delete-orphan")
     networth_snapshots = relationship("NetWorthSnapshot", back_populates="user", cascade="all, delete-orphan")
     budget_presets = relationship("BudgetPreset", back_populates="user", cascade="all, delete-orphan")
+    auth_tokens = relationship("AuthToken", back_populates="user", cascade="all, delete-orphan")
+
+
+class AuthToken(Base):
+    __tablename__ = "auth_tokens"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
+    token = Column(String(128), unique=True, nullable=False)
+    token_type = Column(String(20), nullable=False)  # verify_email | reset_password | invite
+    email = Column(String(255), nullable=True)        # stored on invite tokens
+    expires_at = Column(DateTime, nullable=False)
+    used_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    user = relationship("User", back_populates="auth_tokens")
 
 
 class Account(Base):
@@ -178,9 +200,9 @@ class Transaction(Base):
     date = Column(Date, nullable=False)
     amount = Column(Numeric(12, 2), nullable=False)
     currency = Column(String(3), default="EUR")
-    description = Column(Text, nullable=True)
-    counterparty = Column(String(255), nullable=True)
-    counterparty_iban = Column(String(34), nullable=True)
+    description = Column(EncryptedText, nullable=True)        # encrypted when FIELD_ENCRYPTION_KEY is set
+    counterparty = Column(EncryptedText, nullable=True)        # encrypted when FIELD_ENCRYPTION_KEY is set
+    counterparty_iban = Column(EncryptedText, nullable=True)   # encrypted when FIELD_ENCRYPTION_KEY is set
     balance_after = Column(Numeric(12, 2), nullable=True)
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
     parent_id = Column(Integer, ForeignKey("transactions.id", ondelete="CASCADE"), nullable=True)
