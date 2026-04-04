@@ -123,22 +123,16 @@ Sprints zijn gegroepeerd op gedeelde bestanden voor maximale efficiëntie per se
 
 ---
 
-## Sprint 8 — Categorieën & Tags opruimen
+## Sprint 8 — Categorieën & Tags opruimen ✅ (2026-04-04)
 *Onafhankelijk van andere sprints.*
 
-**Bestanden:** `app/routers/categories.py`, `app/routers/tags.py`, `app/templates/categories/list.html`, `app/templates/tags/list.html`, `app/models.py`
+- [x] **Categorieën archiveren**: `is_archived` + migratie 021 + 🗄 toggle-knop + show_archived filter + cascade naar children
+- [x] **Categorieën samenvoegen**: POST `/categories/merge` — verplaatst transacties + herparents children + verwijdert bron
+- [x] **Transfer-transacties**: `transfer_id` FK op Transaction + migratie + POST `/transactions/{id}/link-transfer` + unlink — bidirectioneel; ⇄ knop in transactielijst
+- [x] **Tag kleuren**: `color` veld op Tag + migratie + kleurkiezer + gekleurde pill weergave
+- [x] **Tags archiveren**: `is_archived` op Tag + toggle + show_archived filter
 
-**Context voor nieuwe sessie:**
-- Category model heeft `is_income`, `exclude_from_budget`, `exclude_from_totals`, `sort_order`, `parent_id`
-- Archiveren = nieuw veld `is_archived` (0/1) + filter in lijstweergaven
-- Mergen = alle transacties van categorie A overzetten naar categorie B, daarna A verwijderen
-
-**Taken:**
-- [ ] **Categorieën archiveren**: veld `is_archived` + migratie + toggle-knop + standaard verbergen in lijsten (toon toggle "toon gearchiveerd")
-- [ ] **Categorieën samenvoegen**: form om twee categorieën te mergen — UPDATE transactions SET category_id=B WHERE category_id=A, daarna A verwijderen
-- [ ] **Transfer-transacties**: twee transacties koppelen als "transfer" (debet op rekening A + credit op rekening B) — nieuw veld `transfer_id` op Transaction + UI om te koppelen + uitsluiten van totalen
-- [ ] **Tag kleuren**: `color` veld op Tag model + migratie + kleurkiezer in tag-beheer + toon als gekleurde pill op transactiepagina
-- [ ] **Tags archiveren**: veld `is_archived` op Tag + toggle + verbergen in dropdowns
+> **Nog te doen (follow-up):** transfers uitsluiten van dashboard/analytics-totalen (`Transaction.transfer_id.is_(None)` filter toevoegen in `dashboard.py` + `analytics.py`)
 
 ---
 
