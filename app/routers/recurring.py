@@ -452,24 +452,27 @@ def _render_recurring_page(
                 "tx_display": f"{suggestion.name} · AI-suggestie",
             }
             # Find matching transactions to show as evidence
+            # Note: ILIKE doesn't work on encrypted fields, so we filter in Python
             if suggestion.counterparty_match:
-                term = f"%{suggestion.counterparty_match}%"
-                suggestion_transactions = (
+                search_term = suggestion.counterparty_match.lower()
+                cutoff = date.today() - timedelta(days=548)
+                all_txs = (
                     db.query(Transaction)
                     .join(Account)
                     .filter(
                         Account.user_id == user.id,
                         Transaction.is_excluded == 0,
                         Transaction.is_projected == 0,
-                        or_(
-                            Transaction.counterparty.ilike(term),
-                            Transaction.description.ilike(term),
-                        ),
+                        Transaction.date >= cutoff,
                     )
                     .order_by(Transaction.date.desc())
-                    .limit(20)
                     .all()
                 )
+                suggestion_transactions = [
+                    tx for tx in all_txs
+                    if (tx.counterparty and search_term in tx.counterparty.lower())
+                    or (tx.description and search_term in tx.description.lower())
+                ][:20]
 
     if not prefill and from_tx:
         tx = (
