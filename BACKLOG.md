@@ -8,7 +8,12 @@ Sprints zijn gegroepeerd op gedeelde bestanden voor maximale efficiëntie per se
 
 ---
 
-## Sprint Design 3 — Font & grootte pariteit tussen themes
+## Sprint Design 3 — Font & grootte pariteit tussen themes + logo verificatie
+
+> **Logo-fix (commit `2ab4609`)**: brand-panel gewijzigd naar `flex-direction: row` zodat icon links en CHECK/THE/POCKETS rechts staat. Als na deploy nog steeds column-layout zichtbaar is, controleer dan:
+> - CSS cache busten (asset_version verhogen of hard refresh)
+> - Of `.navbar-wrapper:has(.nav-sub)` selector correct matcht in de browser
+> - Brand-panel breedte (244px) — eventueel vergroten naar 260px als tekst afgekapt wordt
 
 *Alleen kleuren mogen verschillen bij het wisselen van thema — lettertype, lettergroottes en spacing zijn identiek.*
 
