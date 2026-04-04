@@ -355,18 +355,17 @@ def analyze_recurring(request: Request, db: Session = Depends(get_db)):
         for c in filtered[:15]
     ]
 
-    # Store suggestions in session for display (redirect-safe)
-    request.session["recurring_suggestions"] = suggestions
-    return RedirectResponse("/recurring?analyze=done", status_code=302)
+    # Render the recurring page directly with suggestions (avoids session size limits)
+    return _render_recurring_page(request, db, user, recurring_suggestions=suggestions, analyze_status="done")
 
 
-@router.get("/recurring")
-def recurring_list(
-    request: Request,
-    from_tx: int = Query(None),
-    db: Session = Depends(get_db),
+def _render_recurring_page(
+    request: Request, db: Session, user, *,
+    from_tx: int | None = None,
+    recurring_suggestions: list | None = None,
+    analyze_status: str = "",
 ):
-    user = require_login(request, db)
+    """Shared rendering logic for the recurring page (used by GET and POST analyze)."""
     today = date.today()
 
     recurring_items = (
@@ -383,10 +382,10 @@ def recurring_list(
         .all()
     )
 
-    items_active = []    # active period, matched this period
-    items_due = []       # active period, not matched yet (current period still ongoing)
-    items_missed = []    # active period, previous period was NOT matched (overdue)
-    items_inactive = []  # is_active=0 or outside active period
+    items_active = []
+    items_due = []
+    items_missed = []
+    items_inactive = []
 
     for item in recurring_items:
         in_period = _is_in_active_period(item, today)
@@ -395,31 +394,22 @@ def recurring_list(
             cur_start, cur_end = _get_period_range(item.frequency, today)
             match = _find_matching_transaction(db, user.id, item, cur_start, cur_end)
             items_inactive.append({
-                "item": item,
-                "period_start": cur_start,
-                "period_end": cur_end,
-                "matched_transaction": match,
-                "is_due": False,
-                "in_active_period": in_period,
+                "item": item, "period_start": cur_start, "period_end": cur_end,
+                "matched_transaction": match, "is_due": False, "in_active_period": in_period,
             })
             continue
 
         cur_start, cur_end = _get_period_range(item.frequency, today)
         cur_match = _find_matching_transaction(db, user.id, item, cur_start, cur_end)
-
         prev_start, prev_end = _get_previous_period_range(item.frequency, today)
         prev_match = _find_matching_transaction(db, user.id, item, prev_start, prev_end)
 
         entry = {
-            "item": item,
-            "period_start": cur_start,
-            "period_end": cur_end,
+            "item": item, "period_start": cur_start, "period_end": cur_end,
             "matched_transaction": cur_match,
-            "prev_period_start": prev_start,
-            "prev_period_end": prev_end,
+            "prev_period_start": prev_start, "prev_period_end": prev_end,
             "prev_matched_transaction": prev_match,
-            "is_due": cur_match is None,
-            "in_active_period": True,
+            "is_due": cur_match is None, "in_active_period": True,
         }
 
         if cur_match:
@@ -429,26 +419,10 @@ def recurring_list(
         else:
             items_due.append(entry)
 
-    total_active = len(items_active)
-    total_due = len(items_due)
-    total_missed = len(items_missed)
-
-    # AI suggestions from session
-    analyze_status = request.query_params.get("analyze", "")
-    recurring_suggestions = []
-    if analyze_status == "done":
-        recurring_suggestions = request.session.pop("recurring_suggestions", [])
-    elif analyze_status == "empty":
-        recurring_suggestions = []  # explicitly empty
-
-    from app.ai_suggest import ai_available
-    show_analyze_btn = ai_available()
-
     prefill = None
     if from_tx:
         tx = (
-            db.query(Transaction)
-            .join(Account)
+            db.query(Transaction).join(Account)
             .filter(Transaction.id == from_tx, Account.user_id == user.id)
             .first()
         )
@@ -464,24 +438,31 @@ def recurring_list(
     return templates.TemplateResponse(
         "recurring/list.html",
         {
-            "request": request,
-            "user": user,
-            "items_active": items_active,
-            "items_due": items_due,
-            "items_missed": items_missed,
-            "items_inactive": items_inactive,
-            "categories": categories,
-            "frequencies": FREQUENCIES,
+            "request": request, "user": user,
+            "items_active": items_active, "items_due": items_due,
+            "items_missed": items_missed, "items_inactive": items_inactive,
+            "categories": categories, "frequencies": FREQUENCIES,
             "nl_month_abbrevs": NL_MONTH_ABBREVS,
-            "total_active": total_active,
-            "total_due": total_due,
-            "total_missed": total_missed,
-            "today": today,
+            "total_active": len(items_active), "total_due": len(items_due),
+            "total_missed": len(items_missed), "today": today,
             "prefill": prefill,
-            "recurring_suggestions": recurring_suggestions,
+            "recurring_suggestions": recurring_suggestions or [],
             "analyze_status": analyze_status,
-            "show_analyze_btn": show_analyze_btn,
+            "show_analyze_btn": True,
         },
+    )
+
+
+@router.get("/recurring")
+def recurring_list(
+    request: Request,
+    from_tx: int = Query(None),
+    db: Session = Depends(get_db),
+):
+    user = require_login(request, db)
+    analyze_status = request.query_params.get("analyze", "")
+    return _render_recurring_page(
+        request, db, user, from_tx=from_tx, analyze_status=analyze_status,
     )
 
 
