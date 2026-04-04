@@ -47,22 +47,13 @@ Sprints zijn gegroepeerd op gedeelde bestanden voor maximale efficiëntie per se
 
 ---
 
-## Sprint 3 — Budget verbeteringen
+## Sprint 3 — Budget verbeteringen ✅ (2026-04-04)
 *Betere planning en inzicht op de budgetpagina. Bouwt op Sprint 1 (exclude_from_budget).*
 
-**Bestanden:** `app/routers/budgets.py`, `app/templates/budgets/overview.html`
-
-**Context voor nieuwe sessie:**
-- Budget router berekent `total_budgeted`, `total_spent`, `total_rollover` per categorie
-- Template heeft een tabel met parent/child categorieën en budget-inputs
-- Inkomen staat in `income_top_level`, uitgaven in `top_level`
-- "Left to budget" = totaal inkomen − totaal gebudgetteerd (uitgaven)
-
-**Taken:**
-- [ ] **"Left to budget" balk**: toon bovenaan budgetpagina hoeveel inkomen nog niet is toegewezen; kleur: groen (surplus), rood (overbudgeted) — berekening in router, tonen in template
-- [ ] **Overbudgeted indicator**: badge/waarschuwing als `total_budgeted > total_income`
-- [ ] **Budget kopiëren van vorige maand**: knop "Kopieer vorige maand" — POST `/budgets/copy-previous` — kopieert alle budget-entries van vorige maand naar huidige maand (overslaat als al ingevuld)
-- [ ] **Budget presets**: sla huidig budget op als named template — model `BudgetPreset` + `BudgetPresetLine`, laad via dropdown in budget-header
+- [x] **"Left to budget" balk**: progress bar bovenaan met groen/goud/rood kleur-coding
+- [x] **Overbudgeted indicator**: alert banner als `total_budgeted > total_income`
+- [x] **Budget kopiëren van vorige maand**: quick-copy knop in page header
+- [x] **Budget presets**: `BudgetPreset` + `BudgetPresetLine` models, migratie 019, save/load/delete routes, UI met modal + dropdown
 
 ---
 
