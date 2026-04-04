@@ -114,20 +114,12 @@ Sprints zijn gegroepeerd op gedeelde bestanden voor maximale efficiëntie per se
 
 ---
 
-## Sprint 7 — Terugkerende transacties uitbreiden
+## Sprint 7 — Terugkerende transacties uitbreiden ✅ (2026-04-04)
 *Onafhankelijk van andere sprints.*
 
-**Bestanden:** `app/routers/recurring.py`, `app/templates/recurring/list.html`, `app/models.py` (RecurringTransaction)
-
-**Context voor nieuwe sessie:**
-- RecurringTransaction model heeft: `name`, `amount_expected`, `frequency`, `category_id`, `counterparty`, `description_match`, `is_active`
-- Matching-logica in recurring router
-- Migratie 019 of 020 nodig voor nieuwe velden
-
-**Taken:**
-- [ ] **Actieve periode**: voeg `start_date` en `end_date` toe aan RecurringTransaction + migratie + UI datepickers — filter recurring items op actieve periode bij matching en dashboardweergave
-- [ ] **Handmatig koppelen**: knop op transactiepagina of recurring-pagina om bestaande transactie te linken aan recurring item — sla op via `recurring_id` FK op Transaction model
-- [ ] **Gemiste betalingen sectie**: op recurring-pagina, aparte sectie "Gemist" voor items die al hadden moeten betaald zijn maar geen overeenkomende transactie hebben — prominenter dan nu
+- [x] **Actieve periode**: `start_date` + `end_date` op RecurringTransaction + migratie 020 + UI datepickers
+- [x] **Handmatig koppelen**: `recurring_id` FK op Transaction + POST `/recurring/{id}/link` + unlink
+- [x] **Gemiste betalingen sectie**: prominente rode sectie bovenaan voor items die ook vorige periode niet gematcht waren; pagina opgesplitst in Gemist / Verwacht / Ontvangen / Inactief
 
 ---
 
