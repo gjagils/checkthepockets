@@ -229,8 +229,8 @@ a:hover { color: var(--sky-dark); }
     border-right: 1px solid var(--nav-border);
     flex-direction: row;
     align-items: center;
-    justify-content: flex-start;
-    gap: 0.05rem;
+    justify-content: center;
+    gap: 0.5rem;
 }
 .navbar-wrapper:has(.nav-sub) .nav-brand img {
     height: 80px;
