@@ -159,6 +159,38 @@ Font: Plus Jakarta Sans 400/500/600/700/800
 
 ---
 
+## Sprint 9 — Transaction Review & Actiemenu
+
+*Bouwt op het bestaande `is_reviewed` veld (Sprint 1). Voegt Lunchmoney-stijl review-workflow toe.*
+
+**Bestanden:** `app/templates/transactions/list.html`, `app/routers/transactions.py`, `app/routers/rules.py`
+
+**Context voor nieuwe sessie:**
+- `Transaction.is_reviewed` (bool) + toggle route bestaan al (Sprint 1)
+- Vinkje staat al in de transactielijst als klikbare knop
+- Rule model heeft: `match_field`, `match_type`, `match_value`, `action_category_id`, `action_tag_id`
+- Import zet `is_reviewed = False`; regel-verwerking zet `is_reviewed = False` ook al
+
+**Taken:**
+
+### Fase 1 — Actieknop per rij (MVP)
+- [ ] **">" chevron-knop** helemaal rechts in elke rij — opent inline dropdown (geen pagina-reload)
+- [ ] **Dropdown-acties:**
+  - ✅ Markeer als beoordeeld / Zet terug op onbeoordeeld (toggle)
+  - 📋 Maak regel van deze transactie → redirect naar `/rules/new` met pre-filled form (tegenpartij + bedrag-richting)
+  - 🔗 Koppel als transfer (bestaande functionaliteit, verplaatst naar dropdown)
+  - 🗑 Verwijder transactie (bestaande functionaliteit)
+- [ ] **"Maak regel" pre-fill**: `GET /rules/new?from_tx={id}` — vult `match_field=counterparty`, `match_value={tegenpartij}`, `amount_min/max` voor op
+- [ ] **Styling**: dropdown als absolute-positioned card, sluit bij click-buiten (JS)
+
+### Fase 2 — Verbeterde review-workflow
+- [ ] **Badge in nav/sub-nav**: "(N)" achter "Transacties" als er onbeoordeelde transacties zijn — query count in router, meegeven aan template
+- [ ] **Filter "Onbeoordeeld"**: snelkoppeling-knop naast de zoekbalk (`?reviewed=0`)
+- [ ] **Bulk review**: "Alles markeren als beoordeeld" knop bij bulk-selectie (bestaande bulk-actie uitbreiden)
+- [ ] **Auto-review bij handmatig categoriseren**: als gebruiker inline categorie wijzigt via de dropdown in de rij, zet `is_reviewed = True` automatisch
+
+---
+
 ## Sprint 4 — Analyse & Rapportage
 *Nieuwe rapportage-pagina's. Onafhankelijk van andere sprints.*
 
