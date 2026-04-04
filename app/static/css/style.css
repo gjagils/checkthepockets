@@ -183,10 +183,10 @@ a:hover { color: var(--sky-dark); }
 
 /* When sub-nav exists, brand column spans both bars */
 .navbar-wrapper:has(.nav-sub) .nav-main {
-    padding-left: 240px;
+    padding-left: 254px;
 }
 .navbar-wrapper:has(.nav-sub) .nav-sub {
-    padding-left: 240px;
+    padding-left: 254px;
     min-height: 40px;
 }
 
@@ -225,23 +225,27 @@ a:hover { color: var(--sky-dark); }
     position: absolute;
     top: 0;
     left: 0;
-    width: 230px;
+    width: 244px;
     height: 92px; /* 52px + 40px */
-    padding: 0 1.25rem;
+    padding: 0 1.1rem;
     z-index: 101;
     background: var(--nav-bg);
     border-right: 1px solid var(--nav-border);
-    flex-direction: column;
-    align-items: flex-start;
-    justify-content: center;
-    gap: 0.3rem;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.7rem;
 }
 .navbar-wrapper:has(.nav-sub) .nav-brand img {
-    height: 48px;
+    height: 56px;
+    flex-shrink: 0;
+}
+.navbar-wrapper:has(.nav-sub) .brand-text {
+    line-height: 1.08;
 }
 .navbar-wrapper:has(.nav-sub) .brand-line {
-    font-size: 0.92rem;
-    letter-spacing: 0.08em;
+    font-size: 1.05rem;
+    letter-spacing: 0.07em;
 }
 
 /* Primary nav links */
