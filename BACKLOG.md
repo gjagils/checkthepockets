@@ -307,6 +307,32 @@ Transaction
 
 ---
 
+## Sprint 11 — Terugkerende items verfijnen
+
+*Uitbreiding op het bestaande RecurringTransaction model (Sprint 7).*
+
+**Bestanden:** `app/models.py`, `app/routers/recurring.py`, `app/templates/recurring/list.html`, `app/templates/recurring/_edit_form.html`
+
+**Context voor nieuwe sessie:**
+- `RecurringTransaction` heeft al: `name`, `amount_expected`, `frequency`, `counterparty`, `category_id`, `account_id`, `start_date`, `end_date`, `is_active`
+- Recurring items zijn nu altijd "elke maand" actief binnen de start/end periode
+- Sprint 10 (projected transactions) bouwt hierop — maandfilter bepaalt of er een placeholder gegenereerd wordt
+
+**Taken:**
+
+### Maandfilter per recurring item
+- [ ] **Datamodel**: nieuw veld `active_months: str` op `RecurringTransaction` — kommagescheiden lijst van maandnummers bijv. `"3,4,5,6,7,8,9,10,11,12"`. Leeg = alle maanden. Migratie toevoegen.
+- [ ] **UI in formulier**: 12 checkboxes (Jan t/m Dec), standaard allemaal aangevinkt. Groepeer per kwartaal voor overzicht.
+- [ ] **Generator-logica** (Sprint 10 aansluiting): `generate_projected_for_month()` controleert of de huidige maand in `active_months` valt voordat een placeholder aangemaakt wordt
+- [ ] **Weergave in lijst**: toon de actieve maanden als pill-rij onder de naam, bijv. `Mrt Apr Mei ... Dec` (gekleurde pills, inactieve maanden grijs)
+
+### Handmatig aanmaken recurring items
+- [ ] **"Nieuw terugkerend item" knop** op de recurring pagina — opent hetzelfde formulier als "Maak terugkerend" vanuit een transactie (Sprint 9), maar zonder pre-fill
+- [ ] **Formuliervelden**: naam, verwacht bedrag, richting (uitgave/inkomst), tegenpartij, categorie, rekening, frequentie, start/einddatum, actieve maanden
+- [ ] Dit bestaat deels al via `POST /recurring/new` — controleer of dat formulier compleet is en voeg ontbrekende velden toe
+
+---
+
 ## Sprint 7 — Terugkerende transacties uitbreiden ✅ (2026-04-04)
 *Onafhankelijk van andere sprints.*
 
