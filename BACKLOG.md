@@ -8,6 +8,28 @@ Sprints zijn gegroepeerd op gedeelde bestanden voor maximale efficiëntie per se
 
 ---
 
+## Sprint Design 3 — Font & grootte pariteit tussen themes
+
+*Alleen kleuren mogen verschillen bij het wisselen van thema — lettertype, lettergroottes en spacing zijn identiek.*
+
+**Bestanden:** `app/static/css/style.css`
+
+**Probleem:** In `[data-theme="light"]` worden nu `--font-heading` en `--font-body` overschreven naar Plus Jakarta Sans, terwijl dark Heebo + Lato gebruikt. Dit zorgt voor zichtbare layout-verschuivingen bij het wisselen.
+
+**Oplossing:** Kies één font-stack voor beide thema's en verwijder de font-variabelen uit het `[data-theme="light"]` blok.
+
+**Keuze (te maken bij uitvoering):**
+- Optie A: **Plus Jakarta Sans voor beide** — modernste look, één font laden
+- Optie B: **Heebo + Lato voor beide** — huidige dark-font, bewezen leesbaar
+
+**Taken:**
+- [ ] Verwijder `--font-heading` en `--font-body` uit het `[data-theme="light"]` blok in `style.css`
+- [ ] Kies één font-stack en zet die alleen in `:root` (geldt dan voor beide thema's)
+- [ ] Controleer dat alle font-groottes, `letter-spacing` en `line-height` identiek zijn in beide thema's — geen overrides in het theme-blok behalve kleurvariabelen
+- [ ] Doorloop visueel alle pagina's na het switchen om te verifiëren dat layout niet verschuift
+
+---
+
 ## Sprint Design 2 — Layout redesign + dark/light thema-switcher
 
 *Tweefasige aanpak:*
