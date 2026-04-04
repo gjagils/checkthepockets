@@ -108,7 +108,7 @@ Sprints zijn gegroepeerd op gedeelde bestanden voor maximale efficiëntie per se
 
 ---
 
-## Sprint 12 — Database migratie naar Neon
+## Sprint 12 — Database migratie naar Neon ✅ (2026-04-04)
 *Eenmalige migratie. Onafhankelijk van andere sprints.*
 
 **Context voor nieuwe sessie:**

@@ -55,8 +55,9 @@ jobs:
           PORTAINER_URL: ${{ secrets.PORTAINER_URL }}
           PORTAINER_API_TOKEN: ${{ secrets.PORTAINER_API_TOKEN }}
           PORTAINER_STACK_ID: ${{ secrets.PORTAINER_STACK_ID }}
+          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
         run: |
-          # Get stack info (endpoint ID + current compose file)
+          # Get stack info (endpoint ID)
           STACK_INFO=$(curl -s -H "X-API-Key: $PORTAINER_API_TOKEN" \
             "$PORTAINER_URL/api/stacks/$PORTAINER_STACK_ID")
           ENDPOINT_ID=$(echo "$STACK_INFO" | jq -r '.EndpointId')
@@ -69,17 +70,22 @@ jobs:
             "$PORTAINER_URL/api/endpoints/$ENDPOINT_ID/docker/images/create?fromImage=ghcr.io%2Fgjagils%2Fcheckthepockets&tag=latest"
           echo "Image pulled."
 
-          # Step 2: Get current compose file from Portainer
-          STACK_FILE=$(curl -s -H "X-API-Key: $PORTAINER_API_TOKEN" \
-            "$PORTAINER_URL/api/stacks/$PORTAINER_STACK_ID/file" | jq -r '.StackFileContent')
-          echo "Compose file retrieved."
+          # Step 2: Read new compose file from repo
+          STACK_FILE=$(cat docker-compose.yml)
+          echo "Compose file read from repo."
 
-          # Step 3: Redeploy stack via PUT — triggers docker-compose up -d with new image
+          # Step 3: Redeploy stack via PUT — inject Neon DATABASE_URL, prune removed services (db + pgdata)
           echo "Redeploying stack..."
           REDEPLOY_RESULT=$(curl -s -X PUT \
             -H "X-API-Key: $PORTAINER_API_TOKEN" \
             -H "Content-Type: application/json" \
-            -d "{\"StackFileContent\": $(echo "$STACK_FILE" | jq -Rs .), \"Env\": [], \"Prune\": false}" \
+            -d "{
+              \"StackFileContent\": $(echo "$STACK_FILE" | jq -Rs .),
+              \"Env\": [
+                {\"name\": \"DATABASE_URL\", \"value\": \"$NEON_DATABASE_URL\"}
+              ],
+              \"Prune\": true
+            }" \
             "$PORTAINER_URL/api/stacks/$PORTAINER_STACK_ID?endpointId=$ENDPOINT_ID")
           echo "Redeploy result: $REDEPLOY_RESULT"
           echo "Deploy complete."
