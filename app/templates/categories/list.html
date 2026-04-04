@@ -25,7 +25,15 @@
 <!-- Category list -->
 {% if top_level %}
 <div class="card">
-    <p class="muted" style="margin-bottom:0.75rem;">Sleep categorieën om de volgorde aan te passen.</p>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+        <p class="muted" style="margin:0;">Sleep categorieën om de volgorde aan te passen.</p>
+        {% if archived_count > 0 or show_archived %}
+        <a href="/categories?show_archived={{ 0 if show_archived else 1 }}{% if current_account_id %}&account_id={{ current_account_id }}{% endif %}"
+           class="btn btn-sm" style="font-size:0.75rem;">
+            {% if show_archived %}Verberg gearchiveerd{% else %}Toon gearchiveerd ({{ archived_count }}){% endif %}
+        </a>
+        {% endif %}
+    </div>
     <div class="table-wrap">
         <table>
             <thead>
@@ -34,6 +42,8 @@
                     <th>Categorie</th>
                     <th>Rekening</th>
                     <th>Type</th>
+                    <th title="Wordt niet meegeteld in budget">Budget</th>
+                    <th title="Wordt niet meegeteld in totalen">Totalen</th>
                     <th>Kleur</th>
                     <th></th>
                 </tr>
@@ -45,6 +55,8 @@
                     <td><strong>{{ cat.name }}</strong></td>
                     <td class="nowrap">{{ cat.account.name if cat.account else '-' }}</td>
                     <td>{{ 'Inkomen' if cat.is_income else 'Uitgave' }}</td>
+                    <td class="text-center">{% if cat.exclude_from_budget %}<span class="badge-flag" title="Uitgesloten van budget">✗</span>{% endif %}</td>
+                    <td class="text-center">{% if cat.exclude_from_totals %}<span class="badge-flag" title="Uitgesloten van totalen">✗</span>{% endif %}</td>
                     <td>
                         {% if cat.color %}
                         <span class="color-dot" style="background:{{ cat.color }};"></span> {{ cat.color }}
@@ -52,6 +64,11 @@
                     </td>
                     <td class="nowrap">
                         <button type="button" class="btn btn-sm" onclick="toggleEdit('cat-{{ cat.id }}')">Bewerk</button>
+                        <form method="post" action="/categories/{{ cat.id }}/archive" style="display:inline;">
+                            <button type="submit" class="btn btn-sm" title="{{ 'Dearchiveren' if cat.is_archived else 'Archiveren' }}">
+                                {{ '↩' if cat.is_archived else '🗄' }}
+                            </button>
+                        </form>
                         <form method="post" action="/categories/{{ cat.id }}/delete" style="display:inline;"
                               onsubmit="return confirm('Hoofdcategorie en alle subcategorieën verwijderen?')">
                             <button type="submit" class="btn btn-sm btn-danger">X</button>
@@ -59,7 +76,7 @@
                     </td>
                 </tr>
                 <tr class="edit-row" id="cat-{{ cat.id }}" style="display:none;">
-                    <td colspan="6">
+                    <td colspan="8">
                         <form method="post" action="/categories/{{ cat.id }}/edit" class="filter-bar" style="flex-wrap:wrap; padding:0.5rem 0;">
                             <div class="form-group">
                                 <label>Naam</label>
@@ -79,9 +96,13 @@
                                 <input type="color" name="color" value="{{ cat.color or '#89b4fa' }}">
                             </div>
                             <div class="form-group">
-                                <label>
-                                    <input type="checkbox" name="is_income" value="1" {% if cat.is_income %}checked{% endif %}> Inkomen
-                                </label>
+                                <label><input type="checkbox" name="is_income" value="1" {% if cat.is_income %}checked{% endif %}> Inkomen</label>
+                            </div>
+                            <div class="form-group">
+                                <label><input type="checkbox" name="exclude_from_budget" value="1" {% if cat.exclude_from_budget %}checked{% endif %}> Uitsluiten van budget</label>
+                            </div>
+                            <div class="form-group">
+                                <label><input type="checkbox" name="exclude_from_totals" value="1" {% if cat.exclude_from_totals %}checked{% endif %}> Uitsluiten van totalen</label>
                             </div>
                             <div class="form-group" style="align-self:flex-end;">
                                 <button type="submit" class="btn btn-primary btn-sm">Opslaan</button>
@@ -96,6 +117,8 @@
                     <td style="padding-left: 2rem;">↳ {{ sub.name }}</td>
                     <td class="nowrap">{{ sub.account.name if sub.account else '-' }}</td>
                     <td>{{ 'Inkomen' if sub.is_income else 'Uitgave' }}</td>
+                    <td class="text-center">{% if sub.exclude_from_budget %}<span class="badge-flag" title="Uitgesloten van budget">✗</span>{% endif %}</td>
+                    <td class="text-center">{% if sub.exclude_from_totals %}<span class="badge-flag" title="Uitgesloten van totalen">✗</span>{% endif %}</td>
                     <td>
                         {% if sub.color %}
                         <span class="color-dot" style="background:{{ sub.color }};"></span> {{ sub.color }}
@@ -103,6 +126,11 @@
                     </td>
                     <td class="nowrap">
                         <button type="button" class="btn btn-sm" onclick="toggleEdit('cat-{{ sub.id }}')">Bewerk</button>
+                        <form method="post" action="/categories/{{ sub.id }}/archive" style="display:inline;">
+                            <button type="submit" class="btn btn-sm" title="{{ 'Dearchiveren' if sub.is_archived else 'Archiveren' }}">
+                                {{ '↩' if sub.is_archived else '🗄' }}
+                            </button>
+                        </form>
                         <form method="post" action="/categories/{{ sub.id }}/delete" style="display:inline;"
                               onsubmit="return confirm('Subcategorie verwijderen?')">
                             <button type="submit" class="btn btn-sm btn-danger">X</button>
@@ -110,7 +138,7 @@
                     </td>
                 </tr>
                 <tr class="edit-row" id="cat-{{ sub.id }}" style="display:none;">
-                    <td colspan="6">
+                    <td colspan="8">
                         <form method="post" action="/categories/{{ sub.id }}/edit" class="filter-bar" style="flex-wrap:wrap; padding:0.5rem 0;">
                             <div class="form-group">
                                 <label>Naam</label>
@@ -119,6 +147,12 @@
                             <div class="form-group">
                                 <label>Kleur</label>
                                 <input type="color" name="color" value="{{ sub.color or '#89b4fa' }}">
+                            </div>
+                            <div class="form-group">
+                                <label><input type="checkbox" name="exclude_from_budget" value="1" {% if sub.exclude_from_budget %}checked{% endif %}> Uitsluiten van budget</label>
+                            </div>
+                            <div class="form-group">
+                                <label><input type="checkbox" name="exclude_from_totals" value="1" {% if sub.exclude_from_totals %}checked{% endif %}> Uitsluiten van totalen</label>
                             </div>
                             <div class="form-group" style="align-self:flex-end;">
                                 <button type="submit" class="btn btn-primary btn-sm">Opslaan</button>
@@ -200,6 +234,42 @@
         </form>
     </div>
 </div>
+
+<!-- Merge categories -->
+{% if all_active|length > 1 %}
+<div class="card">
+    <h2>Categorieën samenvoegen</h2>
+    <p class="muted" style="margin-bottom:0.75rem; font-size:0.85rem;">
+        Alle transacties van de broncategorie worden verplaatst naar de doelcategorie. De bron wordt daarna verwijderd.
+    </p>
+    <form method="post" action="/categories/merge" class="filter-bar" style="flex-wrap:wrap;">
+        <div class="form-group">
+            <label>Van (bron)</label>
+            <select name="from_id" required>
+                <option value="">Kies broncategorie...</option>
+                {% for cat in all_active %}
+                <option value="{{ cat.id }}">{{ cat.name }}{% if cat.parent_id %} (sub){% endif %}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Naar (doel)</label>
+            <select name="to_id" required>
+                <option value="">Kies doelcategorie...</option>
+                {% for cat in all_active %}
+                <option value="{{ cat.id }}">{{ cat.name }}{% if cat.parent_id %} (sub){% endif %}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group" style="align-self:flex-end;">
+            <button type="submit" class="btn btn-primary btn-sm"
+                    onclick="return confirm('Categorieën samenvoegen? De broncategorie wordt verwijderd na het verplaatsen van alle transacties.')">
+                Samenvoegen
+            </button>
+        </div>
+    </form>
+</div>
+{% endif %}
 
 <script>
 function toggleEdit(id) {

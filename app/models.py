@@ -87,6 +87,7 @@ class Category(Base):
     sort_order = Column(Integer, default=0)
     exclude_from_budget = Column(Integer, default=0)
     exclude_from_totals = Column(Integer, default=0)
+    is_archived = Column(Integer, default=0)
 
     user = relationship("User", back_populates="categories")
     account = relationship("Account", back_populates="categories")
@@ -106,6 +107,8 @@ class Tag(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     name = Column(String(50), nullable=False)
+    color = Column(String(7), nullable=True)
+    is_archived = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     user = relationship("User", back_populates="tags")
@@ -180,6 +183,7 @@ class Transaction(Base):
     is_excluded = Column(Integer, default=0)
     is_reviewed = Column(Integer, default=0)
     recurring_id = Column(Integer, ForeignKey("recurring_transactions.id", ondelete="SET NULL"), nullable=True)
+    transfer_id = Column(Integer, ForeignKey("transactions.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     account = relationship("Account", back_populates="transactions")

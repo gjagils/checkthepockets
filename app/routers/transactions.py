@@ -968,6 +968,66 @@ async def split_transaction(
     )
 
 
+@router.post("/transactions/{transaction_id}/link-transfer")
+def link_transfer(
+    transaction_id: int,
+    request: Request,
+    partner_id: int = Form(...),
+    redirect_to: str = Form("/"),
+    db: Session = Depends(get_db),
+):
+    """Link two transactions as a transfer pair (bidirectional)."""
+    user = require_login(request, db)
+
+    tx_a = (
+        db.query(Transaction).join(Account)
+        .filter(Transaction.id == transaction_id, Account.user_id == user.id)
+        .first()
+    )
+    tx_b = (
+        db.query(Transaction).join(Account)
+        .filter(Transaction.id == partner_id, Account.user_id == user.id)
+        .first()
+    )
+
+    if tx_a and tx_b and tx_a.id != tx_b.id:
+        tx_a.transfer_id = tx_b.id
+        tx_b.transfer_id = tx_a.id
+        db.commit()
+
+    return RedirectResponse(redirect_to, status_code=302)
+
+
+@router.post("/transactions/{transaction_id}/unlink-transfer")
+def unlink_transfer(
+    transaction_id: int,
+    request: Request,
+    redirect_to: str = Form("/"),
+    db: Session = Depends(get_db),
+):
+    """Remove the transfer link from both sides of a transfer pair."""
+    user = require_login(request, db)
+
+    tx = (
+        db.query(Transaction).join(Account)
+        .filter(Transaction.id == transaction_id, Account.user_id == user.id)
+        .first()
+    )
+
+    if tx and tx.transfer_id:
+        partner = (
+            db.query(Transaction).join(Account)
+            .filter(Transaction.id == tx.transfer_id, Account.user_id == user.id)
+            .first()
+        )
+        if partner:
+            partner.transfer_id = None
+        tx.transfer_id = None
+        db.commit()
+
+    return RedirectResponse(redirect_to, status_code=302)
+
+
 @router.post("/transactions/{transaction_id}/unsplit")
 def unsplit_transaction(
     transaction_id: int,

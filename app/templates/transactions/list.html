@@ -154,6 +154,22 @@
                     <td class="nowrap col-account">{{ tx.account.name }}</td>
                     <td class="nowrap">
                         <a href="/transactions/{{ tx.id }}/edit" class="btn btn-sm">Bewerken</a>
+                        {% if tx.transfer_id %}
+                        <form method="post" action="/transactions/{{ tx.id }}/unlink-transfer" style="display:inline;">
+                            <input type="hidden" name="redirect_to" value="/?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}">
+                            <button type="submit" class="btn btn-sm" title="Transfer — klik om te ontkoppelen" onclick="return confirm('Transfer koppeling verwijderen?')" style="color:var(--navy-mid);">⇄</button>
+                        </form>
+                        {% else %}
+                        <button type="button" class="btn btn-sm" title="Koppelen als transfer"
+                                onclick="document.getElementById('tf-{{ tx.id }}').style.display='inline-flex'">⇄</button>
+                        <span id="tf-{{ tx.id }}" style="display:none; gap:0.3rem; align-items:center;">
+                            <form method="post" action="/transactions/{{ tx.id }}/link-transfer" style="display:inline-flex; gap:0.3rem; align-items:center;">
+                                <input type="hidden" name="redirect_to" value="/?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}">
+                                <input type="number" name="partner_id" placeholder="ID" style="width:65px; padding:0.2rem 0.4rem;" title="ID van de tegenpartij-transactie (te vinden in de URL van Bewerken)">
+                                <button type="submit" class="btn btn-sm btn-accent">OK</button>
+                            </form>
+                        </span>
+                        {% endif %}
                         <form method="post" action="/transactions/{{ tx.id }}/exclude" style="display:inline;">
                             <input type="hidden" name="redirect_to" value="/?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}">
                             <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Transactie uitsluiten?')">Uitsluiten</button>
