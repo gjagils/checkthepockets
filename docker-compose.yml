@@ -3,11 +3,23 @@ services:
     image: ghcr.io/gjagils/checkthepockets:latest
     container_name: checkthepockets
     restart: unless-stopped
-    env_file:
-      - path: ./stack.env
-        required: false
     ports:
       - "${APP_PORT:-8368}:8000"
     environment:
+      # Database
       - DATABASE_URL=${DATABASE_URL}
+      # Auth & sessies
       - SECRET_KEY=${SECRET_KEY:-verander-dit-in-een-lang-willekeurig-wachtwoord}
+      - APP_URL=${APP_URL:-http://localhost:8000}
+      - REGISTRATION_OPEN=${REGISTRATION_OPEN:-true}
+      - REQUIRE_EMAIL_VERIFICATION=${REQUIRE_EMAIL_VERIFICATION:-false}
+      # E-mail (Resend)
+      - RESEND_API_KEY=${RESEND_API_KEY:-}
+      - RESEND_FROM_EMAIL=${RESEND_FROM_EMAIL:-noreply@check-your-pockets.com}
+      # Google OAuth
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      # AI suggesties (Claude)
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      # Encryptie at-rest
+      - FIELD_ENCRYPTION_KEY=${FIELD_ENCRYPTION_KEY:-}
