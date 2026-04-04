@@ -3,7 +3,53 @@
 {% block content %}
 <div class="page-header">
     <h1>Terugkerende transacties</h1>
+    <form method="post" action="/recurring/analyze" style="margin:0;">
+        <button type="submit" class="btn btn-accent">✨ Analyseer transacties</button>
+    </form>
 </div>
+
+{% if analyze_status == 'empty' %}
+<div class="alert alert-info">Geen nieuwe terugkerende patronen gevonden in je transacties.</div>
+{% endif %}
+
+{% if recurring_suggestions %}
+<div class="card" style="border-left: 4px solid var(--gold); margin-bottom:1.25rem;">
+    <div style="display:flex; align-items:center; gap:0.6rem; margin-bottom:1rem;">
+        <span style="font-size:1.2rem;">✨</span>
+        <h2 style="margin:0; color:var(--orange);">AI-suggesties ({{ recurring_suggestions|length }})</h2>
+    </div>
+    <p class="muted" style="margin-bottom:1rem; font-size:0.85rem;">
+        Op basis van je transactiehistorie. Klik op "Toevoegen" om een item als terugkerend te markeren.
+    </p>
+    {% for s in recurring_suggestions %}
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:0.75rem 0; border-top:1px solid var(--border); flex-wrap:wrap;">
+        <div style="flex:1; min-width:200px;">
+            <strong>{{ s.name or s.counterparty_match or '?' }}</strong>
+            <div class="muted" style="font-size:.82rem;">
+                {{ s.reasoning or '' }}
+                {% if s.category_name %} · <span class="pill pill-gold" style="font-size:.7rem;">{{ s.category_name }}</span>{% endif %}
+            </div>
+        </div>
+        <div style="min-width:100px; text-align:right;">
+            <span class="{% if s.amount < 0 %}amount-negative{% else %}amount-positive{% endif %}" style="font-weight:700;">
+                &euro;&nbsp;{{ '%.2f'|format(s.amount) }}
+            </span>
+            <div class="muted" style="font-size:.75rem;">
+                {% if s.frequency == 'weekly' %}Wekelijks{% elif s.frequency == 'monthly' %}Maandelijks{% elif s.frequency == 'quarterly' %}Per kwartaal{% elif s.frequency == 'yearly' %}Jaarlijks{% else %}{{ s.frequency }}{% endif %}
+            </div>
+        </div>
+        <form method="post" action="/recurring" style="margin:0;">
+            <input type="hidden" name="name" value="{{ s.name or s.counterparty_match or '' }}">
+            <input type="hidden" name="amount_expected" value="{{ s.amount }}">
+            <input type="hidden" name="frequency" value="{{ s.frequency }}">
+            <input type="hidden" name="counterparty" value="{{ s.counterparty_match or s.name or '' }}">
+            <input type="hidden" name="category_id" value="{{ s.category_id or '' }}">
+            <button type="submit" class="btn btn-sm btn-primary">Toevoegen</button>
+        </form>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
 
 <!-- Summary -->
 <div class="recurring-summary">

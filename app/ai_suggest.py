@@ -170,3 +170,197 @@ def suggest_rule(
 def ai_available() -> bool:
     """True when the Anthropic API key is configured."""
     return bool(ANTHROPIC_API_KEY)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Recurring transaction pattern detection
+# ──────────────────────────────────────────────────────────────────────────────
+
+def detect_recurring_patterns(transactions: list[dict]) -> list[dict]:
+    """
+    Detect recurring patterns from a list of transactions.
+
+    Input: [{"counterparty": str, "description": str, "amount": Decimal, "date": date,
+             "category_id": int|None, "category_name": str|None}, ...]
+
+    Returns list of candidates:
+    [{"counterparty": str, "avg_amount": float, "frequency": str,
+      "avg_days": float, "count": int, "amount_std": float,
+      "category_id": int|None, "category_name": str|None,
+      "first_date": str, "last_date": str, "dates": [str, ...]}, ...]
+    """
+    from collections import defaultdict
+    from statistics import mean, stdev
+
+    # Group by counterparty (lowercased, stripped)
+    groups = defaultdict(list)
+    for tx in transactions:
+        cp = (tx.get("counterparty") or tx.get("description") or "").strip()
+        if not cp:
+            continue
+        key = cp.lower()
+        groups[key].append(tx)
+
+    candidates = []
+
+    for key, txs in groups.items():
+        if len(txs) < 3:
+            continue
+
+        # Sort by date
+        txs.sort(key=lambda t: t["date"])
+
+        # Calculate intervals between consecutive transactions
+        dates = [t["date"] for t in txs]
+        amounts = [abs(float(t["amount"])) for t in txs]
+
+        intervals = []
+        for i in range(1, len(dates)):
+            delta = (dates[i] - dates[i - 1]).days
+            if delta > 0:
+                intervals.append(delta)
+
+        if not intervals:
+            continue
+
+        avg_days = mean(intervals)
+        avg_amount = mean(amounts)
+        amount_variation = stdev(amounts) if len(amounts) > 1 else 0.0
+
+        # Skip if amount varies too wildly (> 50% of avg)
+        if avg_amount > 0 and amount_variation / avg_amount > 0.5:
+            continue
+
+        # Determine frequency
+        if 4 <= avg_days <= 10:
+            frequency = "weekly"
+        elif 25 <= avg_days <= 38:
+            frequency = "monthly"
+        elif 80 <= avg_days <= 110:
+            frequency = "quarterly"
+        elif 340 <= avg_days <= 400:
+            frequency = "yearly"
+        else:
+            continue  # irregular, skip
+
+        # Use the most common sign (positive = income, negative = expense)
+        raw_amounts = [float(t["amount"]) for t in txs]
+        neg_count = sum(1 for a in raw_amounts if a < 0)
+        typical_amount = -avg_amount if neg_count > len(raw_amounts) / 2 else avg_amount
+
+        # Most common category
+        cat_counts = defaultdict(int)
+        cat_names = {}
+        for t in txs:
+            cid = t.get("category_id")
+            if cid:
+                cat_counts[cid] += 1
+                cat_names[cid] = t.get("category_name", "")
+        top_cat_id = max(cat_counts, key=cat_counts.get) if cat_counts else None
+
+        candidates.append({
+            "counterparty": txs[0].get("counterparty") or txs[0].get("description") or key,
+            "avg_amount": round(typical_amount, 2),
+            "frequency": frequency,
+            "avg_days": round(avg_days, 1),
+            "count": len(txs),
+            "amount_std": round(amount_variation, 2),
+            "category_id": top_cat_id,
+            "category_name": cat_names.get(top_cat_id, ""),
+            "first_date": dates[0].isoformat(),
+            "last_date": dates[-1].isoformat(),
+        })
+
+    # Sort by count (most frequent first)
+    candidates.sort(key=lambda c: c["count"], reverse=True)
+    return candidates
+
+
+def enrich_recurring_with_ai(
+    candidates: list[dict],
+    categories: list[dict],
+    existing_recurring: list[str],
+) -> list[dict] | None:
+    """
+    Use Claude to enrich and filter recurring candidates.
+
+    Args:
+        candidates: Output from detect_recurring_patterns()
+        categories: [{"id": int, "name": str}, ...]
+        existing_recurring: List of existing recurring item names (to avoid duplicates)
+
+    Returns enriched list with clean names and AI reasoning, or None on failure.
+    """
+    if not ANTHROPIC_API_KEY or not candidates:
+        return None
+
+    cat_list = ", ".join(c["name"] for c in categories) or "(geen)"
+    existing_list = ", ".join(existing_recurring) or "(geen)"
+
+    # Limit to top 15 candidates to keep the prompt manageable
+    top = candidates[:15]
+    candidates_text = "\n".join(
+        f"- {c['counterparty']} | {c['count']}x | gem. €{c['avg_amount']} | "
+        f"elke ~{c['avg_days']} dagen ({c['frequency']}) | "
+        f"categorie: {c['category_name'] or 'geen'}"
+        for c in top
+    )
+
+    try:
+        import anthropic
+
+        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        resp = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=1000,
+            messages=[
+                {
+                    "role": "user",
+                    "content": (
+                        "Analyseer deze kandidaat-terugkerende transacties uit een persoonlijke "
+                        "financiele app. Filter op echte terugkerende betalingen (abonnementen, "
+                        "vaste lasten, salaris, etc.) en verwijder eenmalige patronen.\n\n"
+                        f"Kandidaten:\n{candidates_text}\n\n"
+                        f"Al bestaande terugkerende items: {existing_list}\n"
+                        f"Beschikbare categorieen: {cat_list}\n\n"
+                        "Antwoord UITSLUITEND als JSON array (geen markdown).\n"
+                        "Filter kandidaten die al bestaan als terugkerend item.\n"
+                        "Per item:\n"
+                        "[\n"
+                        "  {\n"
+                        '    "counterparty_original": "originele naam",\n'
+                        '    "name": "schone naam voor weergave",\n'
+                        '    "frequency": "weekly|monthly|quarterly|yearly",\n'
+                        '    "amount": bedrag als nummer (negatief = uitgave),\n'
+                        '    "category_name": "best passende categorie of null",\n'
+                        '    "counterparty_match": "zoekterm voor auto-matching",\n'
+                        '    "is_recurring": true of false,\n'
+                        '    "reasoning": "korte uitleg in het Nederlands"\n'
+                        "  }\n"
+                        "]\n"
+                        "Geef alleen items terug waar is_recurring=true."
+                    ),
+                }
+            ],
+        )
+
+        text = resp.content[0].text.strip()
+        if text.startswith("```"):
+            text = text.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+
+        results = json.loads(text)
+
+        # Resolve category names to IDs
+        for item in results:
+            item["category_id"] = None
+            if item.get("category_name"):
+                for cat in categories:
+                    if cat["name"].lower() == item["category_name"].lower():
+                        item["category_id"] = cat["id"]
+                        break
+
+        return [r for r in results if r.get("is_recurring")]
+
+    except Exception as exc:
+        logger.error("AI recurring analysis failed: %s", exc)
+        return None

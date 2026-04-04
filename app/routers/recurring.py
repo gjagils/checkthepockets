@@ -264,6 +264,102 @@ def cleanup_matched_projected(user_id: int, db: Session) -> None:
         db.commit()
 
 
+@router.post("/recurring/analyze")
+def analyze_recurring(request: Request, db: Session = Depends(get_db)):
+    """AI-powered detection of recurring transaction patterns."""
+    user = require_login(request, db)
+
+    # Fetch all non-excluded, non-projected transactions from last 18 months
+    cutoff = date.today() - timedelta(days=548)
+    transactions = (
+        db.query(Transaction)
+        .join(Account)
+        .filter(
+            Account.user_id == user.id,
+            Transaction.is_excluded == 0,
+            Transaction.is_projected == 0,
+            Transaction.date >= cutoff,
+        )
+        .all()
+    )
+
+    tx_data = [
+        {
+            "counterparty": tx.counterparty,
+            "description": tx.description,
+            "amount": tx.amount,
+            "date": tx.date,
+            "category_id": tx.category_id,
+            "category_name": tx.category.name if tx.category else None,
+        }
+        for tx in transactions
+    ]
+
+    from app.ai_suggest import detect_recurring_patterns, enrich_recurring_with_ai, ai_available
+
+    # Step 1: Python pattern detection
+    candidates = detect_recurring_patterns(tx_data)
+
+    if not candidates:
+        return RedirectResponse("/recurring?analyze=empty", status_code=302)
+
+    # Existing recurring names (to filter duplicates)
+    existing = [
+        r.name.lower()
+        for r in db.query(RecurringTransaction)
+        .filter(RecurringTransaction.user_id == user.id)
+        .all()
+    ]
+    # Also add existing counterparty matches
+    existing_cp = [
+        r.counterparty.lower()
+        for r in db.query(RecurringTransaction)
+        .filter(RecurringTransaction.user_id == user.id, RecurringTransaction.counterparty.isnot(None))
+        .all()
+    ]
+
+    # Filter out candidates that are already tracked
+    filtered = [
+        c for c in candidates
+        if c["counterparty"].lower() not in existing
+        and c["counterparty"].lower() not in existing_cp
+    ]
+
+    if not filtered:
+        return RedirectResponse("/recurring?analyze=empty", status_code=302)
+
+    # Step 2: AI enrichment (if available)
+    categories = [
+        {"id": c.id, "name": c.name}
+        for c in db.query(Category).filter(Category.user_id == user.id).all()
+    ]
+
+    ai_results = None
+    if ai_available():
+        existing_names = [r.name for r in db.query(RecurringTransaction)
+                          .filter(RecurringTransaction.user_id == user.id).all()]
+        ai_results = enrich_recurring_with_ai(filtered, categories, existing_names)
+
+    # Use AI results if available, otherwise use raw candidates
+    suggestions = ai_results if ai_results else [
+        {
+            "name": c["counterparty"],
+            "counterparty_match": c["counterparty"],
+            "frequency": c["frequency"],
+            "amount": c["avg_amount"],
+            "category_id": c["category_id"],
+            "category_name": c["category_name"],
+            "count": c["count"],
+            "reasoning": f"{c['count']}x gevonden, gem. elke {c['avg_days']} dagen",
+        }
+        for c in filtered[:15]
+    ]
+
+    # Store suggestions in session for display (redirect-safe)
+    request.session["recurring_suggestions"] = suggestions
+    return RedirectResponse("/recurring?analyze=done", status_code=302)
+
+
 @router.get("/recurring")
 def recurring_list(
     request: Request,
@@ -337,6 +433,17 @@ def recurring_list(
     total_due = len(items_due)
     total_missed = len(items_missed)
 
+    # AI suggestions from session
+    analyze_status = request.query_params.get("analyze", "")
+    recurring_suggestions = []
+    if analyze_status == "done":
+        recurring_suggestions = request.session.pop("recurring_suggestions", [])
+    elif analyze_status == "empty":
+        recurring_suggestions = []  # explicitly empty
+
+    from app.ai_suggest import ai_available
+    show_analyze_btn = ai_available()
+
     prefill = None
     if from_tx:
         tx = (
@@ -371,6 +478,9 @@ def recurring_list(
             "total_missed": total_missed,
             "today": today,
             "prefill": prefill,
+            "recurring_suggestions": recurring_suggestions,
+            "analyze_status": analyze_status,
+            "show_analyze_btn": show_analyze_btn,
         },
     )
 
