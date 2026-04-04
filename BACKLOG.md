@@ -159,35 +159,94 @@ Font: Plus Jakarta Sans 400/500/600/700/800
 
 ---
 
-## Sprint 9 — Transaction Review & Actiemenu
+## Sprint 9 — Actieknop per transactie (">" paneel)
 
-*Bouwt op het bestaande `is_reviewed` veld (Sprint 1). Voegt Lunchmoney-stijl review-workflow toe.*
+*Bouwt op het bestaande `is_reviewed` veld (Sprint 1) en koppelt aan Sprint 10 (terugkerende placeholder-transacties).*
 
-**Bestanden:** `app/templates/transactions/list.html`, `app/routers/transactions.py`, `app/routers/rules.py`
+**Bestanden:** `app/templates/transactions/list.html`, `app/routers/transactions.py`, `app/routers/rules.py`, `app/routers/recurring.py`
 
 **Context voor nieuwe sessie:**
 - `Transaction.is_reviewed` (bool) + toggle route bestaan al (Sprint 1)
-- Vinkje staat al in de transactielijst als klikbare knop
-- Rule model heeft: `match_field`, `match_type`, `match_value`, `action_category_id`, `action_tag_id`
-- Import zet `is_reviewed = False`; regel-verwerking zet `is_reviewed = False` ook al
+- Rule model: `match_field`, `match_type`, `match_value`, `action_category_id`, `action_tag_id`
+- RecurringTransaction model: `name`, `amount_expected`, `frequency`, `counterparty`, `category_id`, `account_id`
+- `GET /rules/new` bestaat al — moet `?from_tx={id}` query-param krijgen voor pre-fill
+- `GET /recurring/new` bestaat al — moet `?from_tx={id}` query-param krijgen voor pre-fill
+
+**Concept van het paneel:**
+
+Klikken op "›" opent een smal slide-in paneel (of inline uitklapbare rij) met:
+
+```
+┌─────────────────────────────────────┐
+│  Albert Heijn                       │
+│  Wed 31-12  ·  Boodschappen         │
+│  -€64,08  ·  ING Betaalrekening     │
+├─────────────────────────────────────┤
+│  [ Maak een regel ]                 │
+│    Automatisch categoriseren voor   │
+│    alle toekomstige transacties     │
+│    van deze tegenpartij             │
+│                                     │
+│  [ Maak terugkerend ]               │
+│    Verwacht deze transactie iedere  │
+│    maand en zet hem alvast in de    │
+│    planning                         │
+└─────────────────────────────────────┘
+```
 
 **Taken:**
 
-### Fase 1 — Actieknop per rij (MVP)
-- [ ] **">" chevron-knop** helemaal rechts in elke rij — opent inline dropdown (geen pagina-reload)
-- [ ] **Dropdown-acties:**
-  - ✅ Markeer als beoordeeld / Zet terug op onbeoordeeld (toggle)
-  - 📋 Maak regel van deze transactie → redirect naar `/rules/new` met pre-filled form (tegenpartij + bedrag-richting)
-  - 🔗 Koppel als transfer (bestaande functionaliteit, verplaatst naar dropdown)
-  - 🗑 Verwijder transactie (bestaande functionaliteit)
-- [ ] **"Maak regel" pre-fill**: `GET /rules/new?from_tx={id}` — vult `match_field=counterparty`, `match_value={tegenpartij}`, `amount_min/max` voor op
-- [ ] **Styling**: dropdown als absolute-positioned card, sluit bij click-buiten (JS)
+- [ ] **"›" knop** helemaal rechts in elke rij — toggled een uitklapbare rij eronder (geen aparte pagina, geen modal)
+- [ ] **Paneel toont transactiegegevens**: tegenpartij, datum, categorie, bedrag, rekening
+- [ ] **"Maak een regel"** → `GET /rules/new?from_tx={id}`:
+  - Pre-fill: `match_field=counterparty`, `match_value={tx.counterparty}`, richting (debet/credit) als `amount_max=0` of `amount_min=0`
+  - Gebruiker kan direct opslaan of aanpassen
+- [ ] **"Maak terugkerend"** → `GET /recurring/new?from_tx={id}`:
+  - Pre-fill: `name={tx.counterparty}`, `amount_expected={tx.amount}`, `category_id={tx.category_id}`, `account_id={tx.account_id}`
+  - Frequentie standaard "Maandelijks"
+  - Na opslaan → genereert direct een placeholder voor volgende maand (zie Sprint 10)
+- [ ] **Styling**: uitklapbare rij met lichte achtergrond (`var(--surface-2)`), twee grote knoppen naast elkaar, sluit bij tweede klik op "›"
 
-### Fase 2 — Verbeterde review-workflow
-- [ ] **Badge in nav/sub-nav**: "(N)" achter "Transacties" als er onbeoordeelde transacties zijn — query count in router, meegeven aan template
-- [ ] **Filter "Onbeoordeeld"**: snelkoppeling-knop naast de zoekbalk (`?reviewed=0`)
-- [ ] **Bulk review**: "Alles markeren als beoordeeld" knop bij bulk-selectie (bestaande bulk-actie uitbreiden)
-- [ ] **Auto-review bij handmatig categoriseren**: als gebruiker inline categorie wijzigt via de dropdown in de rij, zet `is_reviewed = True` automatisch
+---
+
+## Sprint 10 — Projected Transactions (potlood-planning)
+
+*Bouwt op Sprint 9 ("Maak terugkerend" vanuit transactie) en het bestaande RecurringTransaction model.*
+
+**Bestanden:** `app/models.py`, `app/routers/transactions.py`, `app/routers/recurring.py`, `app/templates/transactions/list.html`, `app/templates/budgets/month.html`
+
+**Context voor nieuwe sessie:**
+- `RecurringTransaction` heeft: `name`, `amount_expected`, `frequency`, `counterparty`, `category_id`, `account_id`, `start_date`, `end_date`, `is_active`
+- `Transaction.recurring_id` FK bestaat al (Sprint 7) — koppelt echte transactie aan recurring item
+- Budgetpagina toont per categorie: budgetteerd, uitgegeven, resterend
+- Import-flow: `POST /import/confirm` slaat transacties op en past rules toe
+
+**Idee:** Terugkerende items genereren automatisch een *verwachte transactie* (`is_projected=True`) voor de lopende maand. Deze staat in de transactielijst, visueel onderscheiden. Bij import matcht de echte transactie de placeholder en vervangt die.
+
+**Datamodel:**
+```python
+Transaction
+  + is_projected: bool = False   # nieuw veld + migratie
+  # is_projected=True entries tellen niet mee in export, CSV, bulk-acties
+  # wel mee in budget-prognose berekeningen
+```
+
+**Taken:**
+
+### Fase 1 — Genereren & tonen
+- [ ] **Migratie**: `is_projected INTEGER DEFAULT 0` op `transactions`
+- [ ] **Generator-functie** in `recurring.py`: `generate_projected_for_month(user, year, month, db)` — maakt voor elk actief recurring item een `Transaction(is_projected=True)` aan als die er nog niet is voor die periode
+- [ ] **Aanroep**: generator draaien bij laden van transactiepagina (lazy) en bij aanmaken/bewerken recurring item
+- [ ] **Transactielijst**: projected entries bovenaan, visueel anders — stippelborder of grijze rij, label "Verwacht", bedrag in `var(--muted)` i.p.v. rood/groen
+- [ ] **Filteren**: projected entries standaard zichtbaar, maar weglaatbaar via toggle "Toon verwacht"
+
+### Fase 2 — Matching bij import
+- [ ] **Match-logica**: bij `POST /import/confirm`, na opslaan echte transactie, zoek passende projected entry (zelfde recurring_id, zelfde maand) → verwijder de placeholder of markeer als gematcht
+- [ ] **Handmatige match**: als er geen automatische match is, kan gebruiker via "›" paneel de projected entry koppelen aan een echte transactie
+
+### Fase 3 — Budget-prognose
+- [ ] **Budgetpagina**: naast "Uitgegeven €X" ook "Verwacht nog €Y" (som van projected entries in die categorie die nog niet gematcht zijn)
+- [ ] **Resterende ruimte**: `budget - uitgegeven - verwacht` → "Vrij te besteden: €Z"
 
 ---
 
