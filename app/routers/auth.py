@@ -3,7 +3,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import User
+from app.models import User, Transaction, Account
 from app.auth import (
     hash_password,
     verify_password,
@@ -149,6 +149,32 @@ def delete_account(
     response = RedirectResponse("/login", status_code=302)
     response.delete_cookie(COOKIE_NAME)
     return response
+
+
+@router.post("/settings/delete-transactions")
+def delete_all_transactions(
+    request: Request,
+    confirm_password: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    user = require_login(request, db)
+
+    if not verify_password(confirm_password, user.password_hash):
+        return templates.TemplateResponse(
+            "auth/settings.html",
+            {"request": request, "user": user, "tx_delete_error": "Wachtwoord is onjuist"},
+            status_code=400,
+        )
+
+    # Delete all transactions belonging to this user (via account)
+    account_ids = db.query(Account.id).filter(Account.user_id == user.id).subquery()
+    deleted = db.query(Transaction).filter(Transaction.account_id.in_(account_ids)).delete(synchronize_session=False)
+    db.commit()
+
+    return templates.TemplateResponse(
+        "auth/settings.html",
+        {"request": request, "user": user, "success": f"{deleted} transactie(s) verwijderd."},
+    )
 
 
 @router.get("/logout")

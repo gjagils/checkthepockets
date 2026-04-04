@@ -37,6 +37,25 @@
     </form>
 </div>
 
+<div class="card" style="border-left: 4px solid var(--gold);">
+    <h2>Transacties wissen</h2>
+    <p class="muted" style="margin-bottom:1rem;">
+        Verwijdert alle transacties van alle rekeningen. Rekeningen, categorieën, budgetten en regels blijven intact.
+        Dit kan <strong>niet</strong> ongedaan worden gemaakt.
+    </p>
+    {% if tx_delete_error %}
+    <div class="alert alert-error">{{ tx_delete_error }}</div>
+    {% endif %}
+    <form method="post" action="/settings/delete-transactions"
+          onsubmit="return confirm('Alle transacties permanent verwijderen? Dit kan niet ongedaan worden gemaakt.');">
+        <div class="form-group">
+            <label for="tx_confirm_password">Bevestig met je wachtwoord</label>
+            <input type="password" id="tx_confirm_password" name="confirm_password" required>
+        </div>
+        <button type="submit" class="btn btn-danger">Alle transacties verwijderen</button>
+    </form>
+</div>
+
 <div class="card">
     <h2>Account verwijderen</h2>
     <p class="muted" style="margin-bottom:1rem;">
