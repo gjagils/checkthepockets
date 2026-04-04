@@ -431,8 +431,47 @@ def _render_recurring_page(
         else:
             items_due.append(entry)
 
+    # Pre-fill from AI suggestion
+    from_suggestion_id = request.query_params.get("from_suggestion")
+    suggestion_transactions = []
+
     prefill = None
-    if from_tx:
+    if from_suggestion_id:
+        suggestion = db.query(RecurringSuggestion).filter(
+            RecurringSuggestion.id == int(from_suggestion_id),
+            RecurringSuggestion.user_id == user.id,
+        ).first()
+        if suggestion:
+            prefill = {
+                "name": suggestion.name,
+                "amount_expected": float(suggestion.amount),
+                "category_id": suggestion.category_id or "",
+                "counterparty": suggestion.counterparty_match or "",
+                "frequency": suggestion.frequency,
+                "suggestion_id": suggestion.id,
+                "tx_display": f"{suggestion.name} · AI-suggestie",
+            }
+            # Find matching transactions to show as evidence
+            if suggestion.counterparty_match:
+                term = f"%{suggestion.counterparty_match}%"
+                suggestion_transactions = (
+                    db.query(Transaction)
+                    .join(Account)
+                    .filter(
+                        Account.user_id == user.id,
+                        Transaction.is_excluded == 0,
+                        Transaction.is_projected == 0,
+                        or_(
+                            Transaction.counterparty.ilike(term),
+                            Transaction.description.ilike(term),
+                        ),
+                    )
+                    .order_by(Transaction.date.desc())
+                    .limit(20)
+                    .all()
+                )
+
+    if not prefill and from_tx:
         tx = (
             db.query(Transaction).join(Account)
             .filter(Transaction.id == from_tx, Account.user_id == user.id)
@@ -458,6 +497,7 @@ def _render_recurring_page(
             "total_active": len(items_active), "total_due": len(items_due),
             "total_missed": len(items_missed), "today": today,
             "prefill": prefill,
+            "suggestion_transactions": suggestion_transactions,
             "recurring_suggestions": db.query(RecurringSuggestion)
                 .filter(RecurringSuggestion.user_id == user.id)
                 .order_by(RecurringSuggestion.id)

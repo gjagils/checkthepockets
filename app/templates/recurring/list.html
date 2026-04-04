@@ -39,9 +39,7 @@
             </div>
         </div>
         <div style="display:flex; gap:.4rem;">
-            <form method="post" action="/recurring/suggestion/{{ s.id }}/accept" style="margin:0;">
-                <button type="submit" class="btn btn-sm btn-primary">✓ Toevoegen</button>
-            </form>
+            <a href="/recurring?from_suggestion={{ s.id }}" class="btn btn-sm btn-primary">✓ Toevoegen</a>
             <form method="post" action="/recurring/suggestion/{{ s.id }}/dismiss" style="margin:0;">
                 <button type="submit" class="btn btn-sm" title="Verwijder suggestie">✕</button>
             </form>
@@ -297,8 +295,39 @@
             <h2>Toevoegen</h2>
             {% if prefill %}
             <div class="alert alert-success" style="margin-bottom:1rem;">
-                Ingevuld vanuit transactie: <strong>{{ prefill.tx_display }}</strong>
+                Ingevuld vanuit: <strong>{{ prefill.tx_display }}</strong>
+                {% if prefill.suggestion_id %}
+                <form method="post" action="/recurring/suggestion/{{ prefill.suggestion_id }}/dismiss" style="display:inline; margin-left:.5rem;">
+                    <button type="submit" class="btn btn-sm" style="padding:.15rem .5rem; font-size:.75rem;">Suggestie verwijderen</button>
+                </form>
+                {% endif %}
             </div>
+            {% endif %}
+            {% if suggestion_transactions %}
+            <details open style="margin-bottom:1rem;">
+                <summary style="font-size:0.85rem; cursor:pointer; font-weight:600; margin-bottom:0.5rem;">
+                    Gebaseerd op {{ suggestion_transactions|length }} transacties
+                </summary>
+                <div class="table-wrapper" style="max-height:250px; overflow-y:auto;">
+                    <table class="data-table" style="font-size:.8rem;">
+                        <thead>
+                            <tr><th>Datum</th><th>Tegenpartij</th><th>Omschrijving</th><th class="text-right">Bedrag</th></tr>
+                        </thead>
+                        <tbody>
+                        {% for tx in suggestion_transactions %}
+                        <tr>
+                            <td class="nowrap">{{ tx.date.strftime('%d-%m-%Y') }}</td>
+                            <td>{{ tx.counterparty or '—' }}</td>
+                            <td class="muted" style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ tx.description or '—' }}</td>
+                            <td class="text-right nowrap {% if tx.amount < 0 %}amount-negative{% else %}amount-positive{% endif %}">
+                                &euro;&nbsp;{{ tx.amount|euro }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </details>
             {% endif %}
             <form method="post" action="/recurring">
                 <div class="form-group">
@@ -317,7 +346,7 @@
                     <label for="frequency">Frequentie</label>
                     <select name="frequency" id="frequency">
                         {% for key, label in frequencies.items() %}
-                        <option value="{{ key }}" {% if key == 'monthly' %}selected{% endif %}>{{ label }}</option>
+                        <option value="{{ key }}" {% if prefill and prefill.frequency == key %}selected{% elif not prefill and key == 'monthly' %}selected{% endif %}>{{ label }}</option>
                         {% endfor %}
                     </select>
                 </div>
