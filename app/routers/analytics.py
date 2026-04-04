@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Request, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import case, func
+from sqlalchemy import case, func, or_
 
 from app.database import get_db
 from app.models import Account, Transaction, Category
@@ -45,7 +45,7 @@ def analytics(
     if account_id:
         tx_filter.append(Transaction.account_id == account_id)
 
-    # Monthly income vs expenses trend
+    # Monthly income vs expenses trend (exclude_from_totals categories excluded)
     monthly_trend = (
         db.query(
             func.extract("month", Transaction.date).label("month"),
@@ -63,7 +63,9 @@ def analytics(
             ).label("expenses"),
         )
         .join(Account)
+        .outerjoin(Category, Transaction.category_id == Category.id)
         .filter(*tx_filter)
+        .filter(or_(Category.id.is_(None), Category.exclude_from_totals == 0))
         .group_by(func.extract("month", Transaction.date))
         .order_by(func.extract("month", Transaction.date))
         .all()
@@ -90,7 +92,7 @@ def analytics(
         )
         .join(Transaction, Transaction.category_id == Category.id)
         .join(Account, Account.id == Transaction.account_id)
-        .filter(*tx_filter, Transaction.amount < 0)
+        .filter(*tx_filter, Transaction.amount < 0, Category.exclude_from_totals == 0)
         .group_by(Category.id, Category.name, func.extract("month", Transaction.date))
         .all()
     )

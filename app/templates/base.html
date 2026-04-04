@@ -1,11 +1,18 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html lang="nl" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Check The Pockets{% endblock %}</title>
     <link rel="icon" type="image/png" href="/static/favicon.png">
     <link rel="stylesheet" href="/static/css/style.css?v={{ request.state.asset_version }}">
+    <script>
+        /* Apply saved theme before render to prevent flash */
+        (function() {
+            var t = localStorage.getItem('ctp-theme') || 'light';
+            document.documentElement.setAttribute('data-theme', t);
+        })();
+    </script>
 </head>
 <body>
     {% if user %}
@@ -31,7 +38,8 @@
                 <a href="/accounts" class="{{ 'active' if main_active == 'rekeningen' }}">Rekeningen</a>
             </div>
             <div class="nav-user-section">
-                <a href="/settings" class="nav-user-link">{{ user.username }}</a>
+                <button class="theme-toggle" id="theme-toggle-btn" onclick="toggleTheme()" title="Thema wisselen">🌙</button>
+                <a href="/settings" class="nav-avatar" title="Instellingen">{{ user.username[0] | upper }}</a>
                 <a href="/logout" class="nav-logout-link">Uitloggen</a>
             </div>
         </nav>
@@ -61,5 +69,20 @@
         {% block content %}{% endblock %}
     </main>
     {% block scripts %}{% endblock %}
+    <script>
+        function toggleTheme() {
+            var html = document.documentElement;
+            var current = html.getAttribute('data-theme') || 'light';
+            var next = current === 'light' ? 'dark' : 'light';
+            html.setAttribute('data-theme', next);
+            localStorage.setItem('ctp-theme', next);
+            updateThemeIcon(next);
+        }
+        function updateThemeIcon(theme) {
+            var btn = document.getElementById('theme-toggle-btn');
+            if (btn) btn.textContent = theme === 'dark' ? '☀' : '🌙';
+        }
+        updateThemeIcon(document.documentElement.getAttribute('data-theme') || 'light');
+    </script>
 </body>
 </html>

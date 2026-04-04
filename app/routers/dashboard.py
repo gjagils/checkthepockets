@@ -59,7 +59,7 @@ def dashboard(
     if account_id:
         tx_filter.append(Transaction.account_id == account_id)
 
-    # Total income / expenses
+    # Total income / expenses (exclude categories marked as exclude_from_totals)
     totals = (
         db.query(
             func.sum(
@@ -77,7 +77,9 @@ def dashboard(
             func.count(Transaction.id).label("tx_count"),
         )
         .join(Account)
+        .outerjoin(Category, Transaction.category_id == Category.id)
         .filter(*tx_filter)
+        .filter(or_(Category.id.is_(None), Category.exclude_from_totals == 0))
         .first()
     )
 
@@ -141,7 +143,7 @@ def dashboard(
         )
         .join(Transaction, Transaction.category_id == Category.id)
         .join(Account, Account.id == Transaction.account_id)
-        .filter(*tx_filter, Transaction.amount < 0)
+        .filter(*tx_filter, Transaction.amount < 0, Category.exclude_from_totals == 0)
         .group_by(Category.name)
         .order_by(func.sum(Transaction.amount))
         .limit(10)
@@ -178,7 +180,7 @@ def dashboard(
             )
             .join(Transaction, Transaction.category_id == Category.id)
             .join(Account, Account.id == Transaction.account_id)
-            .filter(*tx_filter)
+            .filter(*tx_filter, Category.exclude_from_totals == 0)
             .group_by(Category.id, Category.name, Category.parent_id, Category.is_income, Category.color, Category.sort_order)
             .all()
         )
