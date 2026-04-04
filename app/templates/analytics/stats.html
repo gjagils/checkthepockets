@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% block title %}Statistieken - Check Your Pockets{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Statistieken {% if current_month %}{{ months_full[current_month] }} {% endif %}{{ current_year }}</h1>
+</div>
+
+<!-- Filters -->
+<div class="card">
+    <form method="get" action="/analytics/stats" class="filter-bar" style="flex-wrap:wrap;">
+        <div class="form-group">
+            <label for="year">Jaar</label>
+            <select name="year" id="year" onchange="this.form.submit()">
+                {% for y in years %}
+                <option value="{{ y }}" {% if y == current_year %}selected{% endif %}>{{ y }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="month">Maand</label>
+            <select name="month" id="month" onchange="this.form.submit()">
+                {% for m, name in months_full.items() %}
+                <option value="{{ m }}" {% if m == current_month %}selected{% endif %}>{{ name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="account_id">Rekening</label>
+            <select name="account_id" id="account_id" onchange="this.form.submit()">
+                <option value="0">Alle rekeningen</option>
+                {% for acc in accounts %}
+                <option value="{{ acc.id }}" {% if current_account_id == acc.id %}selected{% endif %}>{{ acc.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </form>
+</div>
+
+<!-- Summary -->
+<div class="import-summary">
+    <div class="summary-card">
+        <div class="value amount-positive">&euro;&nbsp;{{ total_income|euro }}</div>
+        <div class="label">Inkomen</div>
+    </div>
+    <div class="summary-card">
+        <div class="value amount-negative">&euro;&nbsp;{{ total_expenses|euro }}</div>
+        <div class="label">Uitgaven</div>
+    </div>
+    <div class="summary-card">
+        <div class="value">{{ total_tx_count }}</div>
+        <div class="label">Transacties</div>
+    </div>
+</div>
+
+<div style="display:grid; grid-template-columns: 1fr 1fr; gap:1.5rem;">
+
+<!-- Top merchants -->
+<div class="card">
+    <h2>Top uitgaven per tegenpartij</h2>
+    {% if top_merchants %}
+    {% set max_amount = top_merchants[0].total|abs %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Tegenpartij</th>
+                    <th></th>
+                    <th class="text-right">Totaal</th>
+                    <th class="text-right">Aantal</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in top_merchants %}
+                {% set bar_w = ((m.total|abs / max_amount) * 100)|int if max_amount else 0 %}
+                <tr>
+                    <td style="max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ m.counterparty }}">
+                        {{ m.counterparty }}
+                    </td>
+                    <td style="width:35%;">
+                        <div style="height:8px; background:var(--bg); border-radius:4px; overflow:hidden;">
+                            <div style="width:{{ bar_w }}%; height:100%; background:var(--red); border-radius:4px;"></div>
+                        </div>
+                    </td>
+                    <td class="text-right nowrap amount-negative">&euro;&nbsp;{{ m.total|euro }}</td>
+                    <td class="text-right nowrap muted">{{ m.tx_count }}×</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="muted" style="text-align:center; padding:2rem;">Geen gegevens beschikbaar.</p>
+    {% endif %}
+</div>
+
+<!-- Top categories -->
+<div class="card">
+    <h2>Top 10 uitgavecategorieën</h2>
+    {% if top_categories %}
+    {% set max_cat = top_categories[0].total|abs %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Categorie</th>
+                    <th></th>
+                    <th class="text-right">Totaal</th>
+                    <th class="text-right">Aantal</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cat in top_categories %}
+                {% set bar_w = ((cat.total|abs / max_cat) * 100)|int if max_cat else 0 %}
+                <tr>
+                    <td style="white-space:nowrap;">
+                        {% if cat.color %}<span class="color-dot" style="background:{{ cat.color }};"></span>{% endif %}
+                        {{ cat.name }}
+                    </td>
+                    <td style="width:35%;">
+                        <div style="height:8px; background:var(--bg); border-radius:4px; overflow:hidden;">
+                            <div style="width:{{ bar_w }}%; height:100%; background:var(--orange); border-radius:4px;"></div>
+                        </div>
+                    </td>
+                    <td class="text-right nowrap amount-negative">&euro;&nbsp;{{ cat.total|euro }}</td>
+                    <td class="text-right nowrap muted">{{ cat.tx_count }}×</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="muted" style="text-align:center; padding:2rem;">Geen gegevens beschikbaar.</p>
+    {% endif %}
+</div>
+
+</div>
+
+<!-- New counterparties -->
+{% if new_counterparties %}
+<div class="card">
+    <h2>Nieuwe tegenpartijen <span class="muted" style="font-weight:400; font-size:0.85rem;">— nog niet eerder gezien {% if current_month %}dit jaar vóór deze maand{% else %}vóór {{ current_year }}{% endif %}</span></h2>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Tegenpartij</th>
+                    <th class="text-right">Totaal bedrag</th>
+                    <th class="text-right">Transacties</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cp in new_counterparties %}
+                <tr>
+                    <td>{{ cp.counterparty }}</td>
+                    <td class="text-right nowrap {% if cp.total >= 0 %}amount-positive{% else %}amount-negative{% endif %}">&euro;&nbsp;{{ cp.total|euro }}</td>
+                    <td class="text-right nowrap muted">{{ cp.tx_count }}×</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

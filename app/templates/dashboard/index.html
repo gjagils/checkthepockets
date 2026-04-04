@@ -52,10 +52,21 @@
         <div class="label">Resultaat</div>
         <div class="value {% if balance >= 0 %}amount-positive{% else %}amount-negative{% endif %}">&euro;&nbsp;{{ balance|euro }}</div>
     </div>
-    <div class="summary-card">
+    <div class="summary-card" style="border-left: 3px solid {% if savings_rate >= 20 %}var(--green){% elif savings_rate >= 0 %}var(--gold){% else %}var(--red){% endif %};">
         <div class="label">Spaarquote</div>
-        <div class="value {% if savings_rate >= 0 %}amount-positive{% else %}amount-negative{% endif %}">{{ savings_rate }}%</div>
+        <div class="value {% if savings_rate >= 0 %}amount-positive{% else %}amount-negative{% endif %}" style="font-size:1.6rem;">{{ savings_rate }}%</div>
+        <div style="margin-top:0.3rem; height:4px; background:var(--bg); border-radius:2px; overflow:hidden;">
+            <div style="width:{{ [savings_rate|abs, 100]|min }}%; height:100%; border-radius:2px; background:{% if savings_rate >= 20 %}var(--green){% elif savings_rate >= 0 %}var(--gold){% else %}var(--red){% endif %};"></div>
+        </div>
     </div>
+    {% if recurring_due %}
+    {% set projected_balance = balance + projected_expenses + projected_income %}
+    <div class="summary-card" style="border-left: 3px solid var(--sky);">
+        <div class="label">Verwacht resultaat</div>
+        <div class="value {% if projected_balance >= 0 %}amount-positive{% else %}amount-negative{% endif %}">&euro;&nbsp;{{ projected_balance|euro }}</div>
+        <div class="muted" style="font-size:0.75rem; margin-top:0.2rem;">na {{ recurring_due|length }} terugkerend</div>
+    </div>
+    {% endif %}
     <div class="summary-card">
         <div class="label">Transacties</div>
         <div class="value">{{ tx_count }}</div>
@@ -236,7 +247,7 @@
                         {% else %}-{% endif %}
                     </td>
                     <td class="text-right nowrap">
-                        <a href="/?category_id={{ group.parent_id }}{% if current_account_id %}&account_id={{ current_account_id }}{% endif %}" class="muted" style="text-decoration:none;">
+                        <a href="/transactions?category_id={{ group.parent_id }}{% if current_account_id %}&account_id={{ current_account_id }}{% endif %}" class="muted" style="text-decoration:none;">
                             {{ group.group_count }}
                         </a>
                     </td>
@@ -270,7 +281,7 @@
                         {% else %}-{% endif %}
                     </td>
                     <td class="text-right nowrap">
-                        <a href="/?category_id={{ child.id }}{% if current_account_id %}&account_id={{ current_account_id }}{% endif %}" class="muted" style="text-decoration:none;">
+                        <a href="/transactions?category_id={{ child.id }}{% if current_account_id %}&account_id={{ current_account_id }}{% endif %}" class="muted" style="text-decoration:none;">
                             {{ child.tx_count }}
                         </a>
                     </td>

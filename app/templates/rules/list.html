@@ -86,6 +86,17 @@
                            placeholder="bijv. Albert Heijn"
                            value="{{ prefill.match_value if prefill else '' }}">
                 </div>
+                {% if accounts %}
+                <div class="form-group">
+                    <label for="condition_account_id">Alleen voor rekening <span class="muted">(optioneel)</span></label>
+                    <select name="condition_account_id" id="condition_account_id">
+                        <option value="">Alle rekeningen</option>
+                        {% for acc in accounts %}
+                        <option value="{{ acc.id }}">{{ acc.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
                 <input type="hidden" name="amount_min" value="">
                 <input type="hidden" name="amount_max" value="">
             </div>
@@ -124,6 +135,17 @@
                             {% endfor %}
                         </select>
                     </div>
+                </div>
+                <div class="form-group" style="margin-top:0.5rem;">
+                    <label for="action_rename_counterparty">Tegenpartij hernoemen naar <span class="muted">(optioneel)</span></label>
+                    <input type="text" id="action_rename_counterparty" name="action_rename_counterparty"
+                           placeholder="bijv. Albert Heijn BV → Albert Heijn">
+                </div>
+                <div class="form-group" style="margin-top:0.5rem;">
+                    <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+                        <input type="checkbox" name="action_set_reviewed" value="1">
+                        Markeer als beoordeeld
+                    </label>
                 </div>
             </div>
 
@@ -166,6 +188,10 @@
                             <span class="pill">{{ match_fields.get(rule.match_field, rule.match_field) }}</span>
                             <span class="muted">{{ match_types.get(rule.match_type, rule.match_type) }}</span>
                             <strong>"{{ rule.match_value }}"</strong>
+                            {% if rule.condition_account %}
+                            <span class="muted">op</span>
+                            <span class="pill">{{ rule.condition_account.name }}</span>
+                            {% endif %}
                             {% if rule.amount_min is not none or rule.amount_max is not none %}
                             <span class="muted">
                                 {% if rule.amount_min is not none %}van &euro;&nbsp;{{ rule.amount_min|euro }}{% endif %}
@@ -180,6 +206,12 @@
                             {% endif %}
                             {% if rule.assign_tag %}
                             <span class="tag-pill">{{ rule.assign_tag.name }}</span>
+                            {% endif %}
+                            {% if rule.action_rename_counterparty %}
+                            <span class="pill" style="background:var(--sky-bg); color:var(--sky); border:1px solid var(--sky);">✎ {{ rule.action_rename_counterparty }}</span>
+                            {% endif %}
+                            {% if rule.action_set_reviewed %}
+                            <span class="pill" style="background:var(--green-bg); color:var(--green); border:1px solid var(--green);">✓ beoordeeld</span>
                             {% endif %}
                         </div>
                     </div>
@@ -236,6 +268,17 @@
                             <label>Waarde</label>
                             <input type="text" name="match_value" value="{{ rule.match_value }}" required>
                         </div>
+                        {% if accounts %}
+                        <div class="form-group" style="margin-bottom:0.75rem;">
+                            <label>Alleen voor rekening</label>
+                            <select name="condition_account_id">
+                                <option value="">Alle rekeningen</option>
+                                {% for acc in accounts %}
+                                <option value="{{ acc.id }}" {% if rule.condition_account_id == acc.id %}selected{% endif %}>{{ acc.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        {% endif %}
                         <input type="hidden" name="amount_min" value="{{ '%.2f'|format(rule.amount_min) if rule.amount_min is not none else '' }}">
                         <input type="hidden" name="amount_max" value="{{ '%.2f'|format(rule.amount_max) if rule.amount_max is not none else '' }}">
                         <div class="rule-section-header" style="margin-bottom:0.5rem;">
@@ -271,6 +314,18 @@
                                     {% endfor %}
                                 </select>
                             </div>
+                        </div>
+                        <div class="form-group" style="margin-top:0.5rem;">
+                            <label>Tegenpartij hernoemen naar</label>
+                            <input type="text" name="action_rename_counterparty"
+                                   value="{{ rule.action_rename_counterparty or '' }}"
+                                   placeholder="Leeglaten = niet hernoemen">
+                        </div>
+                        <div class="form-group" style="margin-top:0.5rem;">
+                            <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+                                <input type="checkbox" name="action_set_reviewed" value="1" {% if rule.action_set_reviewed %}checked{% endif %}>
+                                Markeer als beoordeeld
+                            </label>
                         </div>
                         <div style="margin-top:0.75rem; display:flex; gap:0.5rem;">
                             <button type="submit" class="btn btn-sm btn-primary">Opslaan</button>

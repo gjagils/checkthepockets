@@ -133,16 +133,20 @@ class Rule(Base):
     match_value = Column(String(255), nullable=False)
     amount_min = Column(Numeric(12, 2), nullable=True)
     amount_max = Column(Numeric(12, 2), nullable=True)
+    condition_account_id = Column(Integer, ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True)
 
     # THEN actions
     assign_category_id = Column(Integer, ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)
     assign_tag_id = Column(Integer, ForeignKey("tags.id", ondelete="SET NULL"), nullable=True)
+    action_rename_counterparty = Column(String(255), nullable=True)
+    action_set_reviewed = Column(Integer, default=0)
 
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     user = relationship("User", back_populates="rules")
     assign_category = relationship("Category")
     assign_tag = relationship("Tag")
+    condition_account = relationship("Account", foreign_keys=[condition_account_id])
 
 
 class RecurringTransaction(Base):

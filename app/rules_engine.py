@@ -42,6 +42,10 @@ def rule_matches_transaction(rule: Rule, transaction: Transaction) -> bool:
     if rule.amount_max is not None and transaction.amount > rule.amount_max:
         return False
 
+    # Check optional account condition
+    if rule.condition_account_id is not None and transaction.account_id != rule.condition_account_id:
+        return False
+
     return True
 
 
@@ -58,6 +62,16 @@ def apply_rule_to_transaction(rule: Rule, transaction: Transaction, db: Session)
         if tag and tag not in transaction.tags:
             transaction.tags.append(tag)
             changed = True
+
+    if rule.action_rename_counterparty:
+        new_name = rule.action_rename_counterparty.strip()
+        if new_name and transaction.counterparty != new_name:
+            transaction.counterparty = new_name
+            changed = True
+
+    if rule.action_set_reviewed and not transaction.is_reviewed:
+        transaction.is_reviewed = 1
+        changed = True
 
     return changed
 

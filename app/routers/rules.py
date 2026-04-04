@@ -47,6 +47,12 @@ def rules_list(request: Request, from_tx: int = Query(None), db: Session = Depen
         .order_by(Tag.name)
         .all()
     )
+    accounts = (
+        db.query(Account)
+        .filter(Account.user_id == user.id)
+        .order_by(Account.name)
+        .all()
+    )
 
     suggestions = suggest_rules(db, user.id)
 
@@ -76,6 +82,7 @@ def rules_list(request: Request, from_tx: int = Query(None), db: Session = Depen
             "rules": rules,
             "categories": categories,
             "tags": tags,
+            "accounts": accounts,
             "suggestions": suggestions,
             "match_fields": MATCH_FIELDS,
             "match_types": MATCH_TYPES,
@@ -93,8 +100,11 @@ def create_rule(
     match_value: str = Form(...),
     amount_min: str = Form(""),
     amount_max: str = Form(""),
+    condition_account_id: str = Form(""),
     assign_category_id: str = Form(""),
     assign_tag_id: str = Form(""),
+    action_rename_counterparty: str = Form(""),
+    action_set_reviewed: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
@@ -111,21 +121,21 @@ def create_rule(
     # Parse optional IDs
     cat_id = int(assign_category_id) if assign_category_id.strip() else None
     tag_id = int(assign_tag_id) if assign_tag_id.strip() else None
+    acc_id = int(condition_account_id) if condition_account_id.strip() else None
 
-    # Validate category/tag belong to user
+    # Validate ownership
     if cat_id:
-        cat = db.query(Category).filter(
-            Category.id == cat_id, Category.user_id == user.id
-        ).first()
+        cat = db.query(Category).filter(Category.id == cat_id, Category.user_id == user.id).first()
         if not cat:
             cat_id = None
-
     if tag_id:
-        tag = db.query(Tag).filter(
-            Tag.id == tag_id, Tag.user_id == user.id
-        ).first()
+        tag = db.query(Tag).filter(Tag.id == tag_id, Tag.user_id == user.id).first()
         if not tag:
             tag_id = None
+    if acc_id:
+        acc = db.query(Account).filter(Account.id == acc_id, Account.user_id == user.id).first()
+        if not acc:
+            acc_id = None
 
     # Parse amounts
     parsed_min = None
@@ -149,8 +159,11 @@ def create_rule(
         match_value=match_value,
         amount_min=parsed_min,
         amount_max=parsed_max,
+        condition_account_id=acc_id,
         assign_category_id=cat_id,
         assign_tag_id=tag_id,
+        action_rename_counterparty=action_rename_counterparty.strip() or None,
+        action_set_reviewed=1 if action_set_reviewed else 0,
     )
     db.add(rule)
     db.commit()
@@ -168,8 +181,11 @@ def edit_rule(
     match_value: str = Form(...),
     amount_min: str = Form(""),
     amount_max: str = Form(""),
+    condition_account_id: str = Form(""),
     assign_category_id: str = Form(""),
     assign_tag_id: str = Form(""),
+    action_rename_counterparty: str = Form(""),
+    action_set_reviewed: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
@@ -206,22 +222,28 @@ def edit_rule(
     # Parse optional IDs
     cat_id = int(assign_category_id) if assign_category_id.strip() else None
     tag_id = int(assign_tag_id) if assign_tag_id.strip() else None
+    acc_id = int(condition_account_id) if condition_account_id.strip() else None
 
     if cat_id:
-        cat = db.query(Category).filter(
-            Category.id == cat_id, Category.user_id == user.id
-        ).first()
+        cat = db.query(Category).filter(Category.id == cat_id, Category.user_id == user.id).first()
         rule.assign_category_id = cat.id if cat else None
     else:
         rule.assign_category_id = None
 
     if tag_id:
-        tag = db.query(Tag).filter(
-            Tag.id == tag_id, Tag.user_id == user.id
-        ).first()
+        tag = db.query(Tag).filter(Tag.id == tag_id, Tag.user_id == user.id).first()
         rule.assign_tag_id = tag.id if tag else None
     else:
         rule.assign_tag_id = None
+
+    if acc_id:
+        acc = db.query(Account).filter(Account.id == acc_id, Account.user_id == user.id).first()
+        rule.condition_account_id = acc.id if acc else None
+    else:
+        rule.condition_account_id = None
+
+    rule.action_rename_counterparty = action_rename_counterparty.strip() or None
+    rule.action_set_reviewed = 1 if action_set_reviewed else 0
 
     db.commit()
     return RedirectResponse("/rules", status_code=302)
