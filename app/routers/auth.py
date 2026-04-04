@@ -15,10 +15,38 @@ from app.auth import (
     require_login,
     COOKIE_NAME,
 )
-from app.config import REGISTRATION_OPEN, REQUIRE_EMAIL_VERIFICATION
+from app.config import (
+    REGISTRATION_OPEN, REQUIRE_EMAIL_VERIFICATION,
+    GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, APP_URL,
+)
 from app.email_service import send_verification_email, send_password_reset_email
 from app.rate_limit import is_rate_limited, record_failed_attempt, clear_attempts
 from app.template_config import templates
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Google OAuth setup (only if credentials are configured)
+# ──────────────────────────────────────────────────────────────────────────────
+
+_google_oauth = None
+
+if GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET:
+    try:
+        from authlib.integrations.starlette_client import OAuth
+        _oauth = OAuth()
+        _oauth.register(
+            name="google",
+            client_id=GOOGLE_CLIENT_ID,
+            client_secret=GOOGLE_CLIENT_SECRET,
+            server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+            client_kwargs={"scope": "openid email profile"},
+        )
+        _google_oauth = _oauth.google
+    except Exception:
+        pass
+
+
+def google_login_enabled() -> bool:
+    return _google_oauth is not None
 
 router = APIRouter()
 
@@ -71,7 +99,10 @@ def login_page(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
     if user:
         return RedirectResponse("/dashboard", status_code=302)
-    return templates.TemplateResponse("auth/login.html", {"request": request})
+    return templates.TemplateResponse("auth/login.html", {
+        "request": request,
+        "google_login_enabled": google_login_enabled(),
+    })
 
 
 @router.post("/login")
@@ -420,6 +451,88 @@ def delete_all_transactions(
         "auth/settings.html",
         {"request": request, "user": user, "success": f"{deleted} transactie(s) verwijderd."},
     )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Google OAuth
+# ──────────────────────────────────────────────────────────────────────────────
+
+@router.get("/auth/google")
+async def google_login_redirect(request: Request):
+    if not _google_oauth:
+        return RedirectResponse("/login", status_code=302)
+    redirect_uri = f"{APP_URL}/auth/google/callback"
+    return await _google_oauth.authorize_redirect(request, redirect_uri)
+
+
+@router.get("/auth/google/callback")
+async def google_callback(request: Request, db: Session = Depends(get_db)):
+    if not _google_oauth:
+        return RedirectResponse("/login", status_code=302)
+
+    try:
+        token = await _google_oauth.authorize_access_token(request)
+    except Exception:
+        return templates.TemplateResponse("auth/login.html", {
+            "request": request,
+            "error": "Google login mislukt. Probeer het opnieuw.",
+            "google_login_enabled": True,
+        })
+
+    userinfo = token.get("userinfo")
+    if not userinfo or not userinfo.get("email"):
+        return templates.TemplateResponse("auth/login.html", {
+            "request": request,
+            "error": "Kon geen e-mailadres ophalen van Google.",
+            "google_login_enabled": True,
+        })
+
+    email = userinfo["email"]
+    name = userinfo.get("name", email.split("@")[0])
+
+    # Look up existing user by email
+    user = db.query(User).filter(User.email == email).first()
+
+    if not user:
+        if not REGISTRATION_OPEN:
+            return templates.TemplateResponse("auth/login.html", {
+                "request": request,
+                "error": "Registratie is gesloten. Vraag een uitnodigingslink aan.",
+                "google_login_enabled": True,
+            })
+
+        # Generate unique username from Google name
+        base = name.replace(" ", "_").lower()[:50]
+        username = base
+        suffix = 1
+        while db.query(User).filter(User.username == username).first():
+            username = f"{base}_{suffix}"
+            suffix += 1
+
+        is_first = db.query(User).count() == 0
+        user = User(
+            username=username,
+            password_hash=hash_password(secrets.token_urlsafe(32)),
+            email=email,
+            is_verified=1,
+            is_admin=1 if is_first else 0,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+    if not user.is_active:
+        return templates.TemplateResponse("auth/login.html", {
+            "request": request,
+            "error": "Je account is gedeactiveerd. Neem contact op met de beheerder.",
+            "google_login_enabled": True,
+        })
+
+    user.last_login_at = datetime.datetime.utcnow()
+    db.commit()
+
+    response = RedirectResponse("/dashboard", status_code=302)
+    return set_session_cookie(response, user.id)
 
 
 @router.get("/logout")

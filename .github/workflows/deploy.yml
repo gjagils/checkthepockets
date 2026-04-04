@@ -56,36 +56,94 @@ jobs:
           PORTAINER_API_TOKEN: ${{ secrets.PORTAINER_API_TOKEN }}
           PORTAINER_STACK_ID: ${{ secrets.PORTAINER_STACK_ID }}
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          FIELD_ENCRYPTION_KEY: ${{ secrets.FIELD_ENCRYPTION_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          APP_URL: ${{ secrets.APP_URL }}
         run: |
-          # Get stack info (endpoint ID)
+          # Get stack info (endpoint ID + current env vars)
           STACK_INFO=$(curl -s -H "X-API-Key: $PORTAINER_API_TOKEN" \
             "$PORTAINER_URL/api/stacks/$PORTAINER_STACK_ID")
           ENDPOINT_ID=$(echo "$STACK_INFO" | jq -r '.EndpointId')
+          CURRENT_ENV=$(echo "$STACK_INFO" | jq '.Env // []')
           echo "Endpoint ID: $ENDPOINT_ID"
 
-          # Step 1: Pull latest image via Docker API through Portainer
+          # Pull latest image
           echo "Pulling latest image..."
           curl -s -X POST \
             -H "X-API-Key: $PORTAINER_API_TOKEN" \
             "$PORTAINER_URL/api/endpoints/$ENDPOINT_ID/docker/images/create?fromImage=ghcr.io%2Fgjagils%2Fcheckthepockets&tag=latest"
           echo "Image pulled."
 
-          # Step 2: Read new compose file from repo
-          STACK_FILE=$(cat docker-compose.yml)
-          echo "Compose file read from repo."
+          # Merge env vars: keep existing, upsert from GitHub Secrets
+          # Only update vars that have a non-empty value in secrets
+          MERGED_ENV=$(echo "$CURRENT_ENV" | jq \
+            --arg db "$NEON_DATABASE_URL" \
+            --arg sk "$SECRET_KEY" \
+            --arg gc "$GOOGLE_CLIENT_ID" \
+            --arg gs "$GOOGLE_CLIENT_SECRET" \
+            --arg ak "$ANTHROPIC_API_KEY" \
+            --arg fk "$FIELD_ENCRYPTION_KEY" \
+            --arg ra "$RESEND_API_KEY" \
+            --arg au "$APP_URL" '
+            # Build list of new vars (only non-empty)
+            [ if $db != "" then {"name":"DATABASE_URL","value":$db} else empty end,
+              if $sk != "" then {"name":"SECRET_KEY","value":$sk} else empty end,
+              if $gc != "" then {"name":"GOOGLE_CLIENT_ID","value":$gc} else empty end,
+              if $gs != "" then {"name":"GOOGLE_CLIENT_SECRET","value":$gs} else empty end,
+              if $ak != "" then {"name":"ANTHROPIC_API_KEY","value":$ak} else empty end,
+              if $fk != "" then {"name":"FIELD_ENCRYPTION_KEY","value":$fk} else empty end,
+              if $ra != "" then {"name":"RESEND_API_KEY","value":$ra} else empty end,
+              if $au != "" then {"name":"APP_URL","value":$au} else empty end
+            ] as $new |
+            ($new | map(.name)) as $new_names |
+            # Keep existing vars that are NOT being overwritten
+            [.[] | select(.name as $n | $new_names | index($n) | not)]
+            + $new
+          ')
 
-          # Step 3: Redeploy stack via PUT — inject Neon DATABASE_URL, prune removed services (db + pgdata)
-          echo "Redeploying stack..."
+          # Read compose file and redeploy
+          STACK_FILE=$(cat docker-compose.yml)
+          echo "Redeploying stack with $(echo "$MERGED_ENV" | jq length) env vars..."
           REDEPLOY_RESULT=$(curl -s -X PUT \
             -H "X-API-Key: $PORTAINER_API_TOKEN" \
             -H "Content-Type: application/json" \
             -d "{
               \"StackFileContent\": $(echo "$STACK_FILE" | jq -Rs .),
-              \"Env\": [
-                {\"name\": \"DATABASE_URL\", \"value\": \"$NEON_DATABASE_URL\"}
-              ],
+              \"Env\": $MERGED_ENV,
               \"Prune\": true
             }" \
             "$PORTAINER_URL/api/stacks/$PORTAINER_STACK_ID?endpointId=$ENDPOINT_ID")
-          echo "Redeploy result: $REDEPLOY_RESULT"
           echo "Deploy complete."
+
+      - name: Sync env vars to Railway
+        if: ${{ secrets.RAILWAY_TOKEN != '' }}
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          npm i -g @railway/cli 2>/dev/null
+
+          # Set each var individually (railway CLI with project token)
+          # The RAILWAY_TOKEN should be a PROJECT token (not account token)
+          # so it's automatically scoped to the right project/environment.
+          declare -A VARS=(
+            ["DATABASE_URL"]="${{ secrets.NEON_DATABASE_URL }}"
+            ["SECRET_KEY"]="${{ secrets.SECRET_KEY }}"
+            ["GOOGLE_CLIENT_ID"]="${{ secrets.GOOGLE_CLIENT_ID }}"
+            ["GOOGLE_CLIENT_SECRET"]="${{ secrets.GOOGLE_CLIENT_SECRET }}"
+            ["ANTHROPIC_API_KEY"]="${{ secrets.ANTHROPIC_API_KEY }}"
+            ["FIELD_ENCRYPTION_KEY"]="${{ secrets.FIELD_ENCRYPTION_KEY }}"
+            ["RESEND_API_KEY"]="${{ secrets.RESEND_API_KEY }}"
+            ["APP_URL"]="${{ secrets.APP_URL }}"
+          )
+
+          for key in "${!VARS[@]}"; do
+            val="${VARS[$key]}"
+            if [ -n "$val" ]; then
+              railway variables set "$key=$val" 2>/dev/null || echo "Warning: could not set $key on Railway"
+            fi
+          done
+          echo "Railway env sync complete."

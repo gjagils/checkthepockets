@@ -56,6 +56,9 @@ def rules_list(request: Request, from_tx: int = Query(None), db: Session = Depen
 
     suggestions = suggest_rules(db, user.id)
 
+    from app.ai_suggest import ai_available
+    show_ai_suggest = ai_available()
+
     prefill = None
     if from_tx:
         tx = (
@@ -87,8 +90,70 @@ def rules_list(request: Request, from_tx: int = Query(None), db: Session = Depen
             "match_fields": MATCH_FIELDS,
             "match_types": MATCH_TYPES,
             "prefill": prefill,
+            "show_ai_suggest": show_ai_suggest,
         },
     )
+
+
+@router.post("/rules/suggest")
+async def suggest_rule_endpoint(request: Request, db: Session = Depends(get_db)):
+    """AI-powered rule suggestion from a transaction description."""
+    user = require_login(request, db)
+    form = await request.form()
+
+    transaction_id = (form.get("transaction_id") or "").strip()
+    description = (form.get("description") or "").strip()
+    counterparty = (form.get("counterparty") or "").strip()
+
+    # If transaction_id is given, look up the transaction
+    if transaction_id:
+        tx = (
+            db.query(Transaction)
+            .join(Account)
+            .filter(Transaction.id == int(transaction_id), Account.user_id == user.id)
+            .first()
+        )
+        if tx:
+            description = tx.description or ""
+            counterparty = tx.counterparty or ""
+
+    if not description and not counterparty:
+        return JSONResponse({"suggestion": None, "error": "Geen beschrijving opgegeven."})
+
+    categories = [
+        {"id": c.id, "name": c.name}
+        for c in db.query(Category).filter(Category.user_id == user.id).order_by(Category.name).all()
+    ]
+
+    from app.ai_suggest import suggest_rule, parse_description, ai_available
+
+    # Always do regex parsing first
+    parsed = parse_description(description)
+
+    if not ai_available():
+        return JSONResponse({"suggestion": {
+            "match_value": parsed.get("merchant", ""),
+            "match_field": "description",
+            "counterparty_clean": parsed.get("merchant", ""),
+            "category_id": None,
+            "category_name": None,
+            "reasoning": "AI-suggesties niet beschikbaar (ANTHROPIC_API_KEY niet ingesteld). "
+                         "Regex-extractie: " + parsed.get("type", "unknown"),
+        }})
+
+    result = suggest_rule(description, counterparty, categories)
+    if not result:
+        # Fallback to regex only
+        return JSONResponse({"suggestion": {
+            "match_value": parsed.get("merchant", ""),
+            "match_field": "description",
+            "counterparty_clean": parsed.get("merchant", ""),
+            "category_id": None,
+            "category_name": None,
+            "reasoning": "AI-suggestie mislukt; alleen regex-extractie beschikbaar.",
+        }})
+
+    return JSONResponse({"suggestion": result})
 
 
 @router.post("/rules")

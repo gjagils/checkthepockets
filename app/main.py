@@ -5,13 +5,17 @@ from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.sessions import SessionMiddleware
 
 from app.auth import LoginRequired, get_current_user
 from app.database import get_db
 from app.routers import auth, transactions, accounts, categories, tags, rules, budgets, recurring, dashboard, savings, analytics, portfolio, networth, settings, admin
 from app.scheduler import start_scheduler
 
+from app.config import SECRET_KEY
+
 app = FastAPI(title="Check Your Pockets", docs_url=None, redoc_url=None)
+app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 _landing_templates = Jinja2Templates(directory="app/templates")
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")

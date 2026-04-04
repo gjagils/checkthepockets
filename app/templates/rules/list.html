@@ -82,9 +82,19 @@
                 </div>
                 <div class="form-group">
                     <label for="match_value">Waarde</label>
-                    <input type="text" id="match_value" name="match_value" required
-                           placeholder="bijv. Albert Heijn"
-                           value="{{ prefill.match_value if prefill else '' }}">
+                    <div style="display:flex; gap:.5rem;">
+                        <input type="text" id="match_value" name="match_value" required
+                               placeholder="bijv. Albert Heijn" style="flex:1;"
+                               value="{{ prefill.match_value if prefill else '' }}">
+                        <button type="button" class="btn btn-sm btn-accent" id="ai-suggest-btn"
+                                onclick="aiSuggest()"
+                                {% if not show_ai_suggest and not prefill %}style="display:none;"{% endif %}
+                                title="Analyseer de beschrijving met AI">
+                            ✨ Analyseer
+                        </button>
+                    </div>
+                    <div id="ai-suggest-result" style="display:none; margin-top:.5rem; padding:.6rem; background:var(--card-bg); border:1px solid var(--gold); border-radius:6px; font-size:.85rem;">
+                    </div>
                 </div>
                 {% if accounts %}
                 <div class="form-group">
@@ -446,5 +456,73 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal()
 {% if prefill %}
 document.getElementById('new-rule-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
 {% endif %}
+
+/* ── AI Suggest ────────────────────────────────────────────────────────────── */
+function aiSuggest() {
+    const btn = document.getElementById('ai-suggest-btn');
+    const resultDiv = document.getElementById('ai-suggest-result');
+    const matchValue = document.getElementById('match_value').value;
+
+    btn.disabled = true;
+    btn.textContent = '⏳ Bezig...';
+    resultDiv.style.display = 'block';
+    resultDiv.innerHTML = '<span class="muted">Analyseren...</span>';
+
+    const body = new FormData();
+    body.append('description', matchValue);
+    {% if prefill and prefill.match_value %}
+    body.append('description', '{{ prefill.match_value|e }}');
+    {% endif %}
+
+    fetch('/rules/suggest', { method: 'POST', body: body })
+        .then(r => r.json())
+        .then(data => {
+            btn.disabled = false;
+            btn.textContent = '✨ Analyseer';
+
+            if (!data.suggestion) {
+                resultDiv.innerHTML = '<span style="color:var(--red);">' + escapeHtml(data.error || 'Geen suggestie.') + '</span>';
+                return;
+            }
+
+            const s = data.suggestion;
+
+            /* Pre-fill the form fields */
+            if (s.match_value) {
+                document.getElementById('match_value').value = s.match_value;
+            }
+            if (s.match_field) {
+                const mf = document.getElementById('match_field');
+                for (let i = 0; i < mf.options.length; i++) {
+                    if (mf.options[i].value === s.match_field) { mf.selectedIndex = i; break; }
+                }
+            }
+            if (s.counterparty_clean) {
+                const rn = document.getElementById('action_rename_counterparty');
+                if (rn) rn.value = s.counterparty_clean;
+                /* Also set the rule name */
+                const nameField = document.getElementById('name');
+                if (nameField && !nameField.value) {
+                    nameField.value = s.counterparty_clean + (s.category_name ? ' → ' + s.category_name : '');
+                }
+            }
+            if (s.category_id) {
+                const sel = document.getElementById('assign_category_id');
+                for (let i = 0; i < sel.options.length; i++) {
+                    if (sel.options[i].value == s.category_id) { sel.selectedIndex = i; break; }
+                }
+            }
+
+            /* Show reasoning */
+            resultDiv.innerHTML = '💡 <strong>' + escapeHtml(s.counterparty_clean || s.match_value || '') + '</strong>'
+                + (s.category_name ? ' → <span class="pill pill-gold">' + escapeHtml(s.category_name) + '</span>' : '')
+                + '<br><span class="muted">' + escapeHtml(s.reasoning || '') + '</span>';
+        })
+        .catch(() => {
+            btn.disabled = false;
+            btn.textContent = '✨ Analyseer';
+            resultDiv.innerHTML = '<span style="color:var(--red);">Er ging iets mis.</span>';
+        });
+}
 </script>
 {% endblock %}
