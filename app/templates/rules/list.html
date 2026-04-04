@@ -62,7 +62,7 @@
                     <span class="rule-section-badge badge-if">Als</span>
                     <span class="rule-section-line"></span>
                 </div>
-                <div class="rule-condition">
+                <div class="rule-condition" style="margin-bottom:0.6rem;">
                     <div class="form-group">
                         <label for="match_field">Veld</label>
                         <select name="match_field" id="match_field">
@@ -79,12 +79,12 @@
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="form-group" style="flex:2;">
-                        <label for="match_value">Waarde</label>
-                        <input type="text" id="match_value" name="match_value" required
-                               placeholder="bijv. Albert Heijn"
-                               value="{{ prefill.match_value if prefill else '' }}">
-                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="match_value">Waarde</label>
+                    <input type="text" id="match_value" name="match_value" required
+                           placeholder="bijv. Albert Heijn"
+                           value="{{ prefill.match_value if prefill else '' }}">
                 </div>
                 <input type="hidden" name="amount_min" value="">
                 <input type="hidden" name="amount_max" value="">
@@ -214,7 +214,7 @@
                             <span class="rule-section-badge badge-if">Als</span>
                             <span class="rule-section-line"></span>
                         </div>
-                        <div class="rule-condition" style="margin-bottom:0.75rem;">
+                        <div class="rule-condition" style="margin-bottom:0.6rem;">
                             <div class="form-group">
                                 <label>Veld</label>
                                 <select name="match_field">
@@ -231,10 +231,10 @@
                                     {% endfor %}
                                 </select>
                             </div>
-                            <div class="form-group" style="flex:2;">
-                                <label>Waarde</label>
-                                <input type="text" name="match_value" value="{{ rule.match_value }}" required>
-                            </div>
+                        </div>
+                        <div class="form-group" style="margin-bottom:0.75rem;">
+                            <label>Waarde</label>
+                            <input type="text" name="match_value" value="{{ rule.match_value }}" required>
                         </div>
                         <input type="hidden" name="amount_min" value="{{ '%.2f'|format(rule.amount_min) if rule.amount_min is not none else '' }}">
                         <input type="hidden" name="amount_max" value="{{ '%.2f'|format(rule.amount_max) if rule.amount_max is not none else '' }}">
