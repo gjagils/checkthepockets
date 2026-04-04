@@ -179,10 +179,10 @@ a:hover { color: var(--sky-dark); }
 
 /* When sub-nav exists, brand column spans both bars */
 .navbar-wrapper:has(.nav-sub) .nav-main {
-    padding-left: 270px;
+    padding-left: 290px;
 }
 .navbar-wrapper:has(.nav-sub) .nav-sub {
-    padding-left: 270px;
+    padding-left: 290px;
     min-height: 40px;
 }
 
@@ -221,19 +221,19 @@ a:hover { color: var(--sky-dark); }
     position: absolute;
     top: 0;
     left: 0;
-    width: 260px;
+    width: 280px;
     height: 92px; /* 52px + 40px */
-    padding: 0 1.1rem;
+    padding: 0 0.75rem;
     z-index: 101;
     background: var(--nav-bg);
     border-right: 1px solid var(--nav-border);
     flex-direction: row;
     align-items: center;
     justify-content: flex-start;
-    gap: 0.35rem;
+    gap: 0.2rem;
 }
 .navbar-wrapper:has(.nav-sub) .nav-brand img {
-    height: 70px;
+    height: 80px;
     flex-shrink: 0;
 }
 .navbar-wrapper:has(.nav-sub) .brand-text {
