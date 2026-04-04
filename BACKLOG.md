@@ -140,6 +140,42 @@ Sprints zijn gegroepeerd op gedeelde bestanden voor maximale efficiëntie per se
 
 ---
 
+## Sprint 16 — Encryptie at-rest van gevoelige velden
+*Middellang termijn. Onafhankelijk van andere sprints. Beschermt gebruikersdata als de database wordt gelekt.*
+
+**Doel:** gevoelige financiële velden versleutelen in de applicatielaag. Een aanvaller die alleen toegang heeft tot de database (bijv. via een dump of SQL-injection) kan dan geen leesbare transactiedata inzien.
+
+**Technische aanpak:**
+- Symmetrische encryptie met `cryptography` library (`Fernet` — AES-128-CBC + HMAC)
+- Encryptiesleutel (`FIELD_ENCRYPTION_KEY`) staat als omgevingsvariabele, **niet** in de database
+- Encryptie/decryptie in de applicatielaag via een helper — SQLAlchemy `TypeDecorator` zodat encrypt/decrypt transparant werkt voor de rest van de code
+- Velden worden versleuteld opgeslagen als base64-string; bestaande data wordt éénmalig gemigreerd
+
+**Te versleutelen velden op Transaction:**
+- `counterparty` (naam van de tegenpartij)
+- `counterparty_iban` (IBAN van de tegenpartij)
+- `description` (omschrijving)
+
+**Bestanden:** `app/crypto.py` (nieuw), `app/models.py`, `app/database.py`, migratie 024, Dockerfile/Railway env vars
+
+**Taken:**
+- [ ] `pip install cryptography` toevoegen aan `requirements.txt`
+- [ ] `app/crypto.py` — `EncryptedString` TypeDecorator: `process_bind_param` versleutelt, `process_result_value` ontsleutelt; sleutel via `os.environ["FIELD_ENCRYPTION_KEY"]`
+- [ ] `FIELD_ENCRYPTION_KEY` genereren (`Fernet.generate_key()`) en instellen in Railway + Portainer stack env
+- [ ] `counterparty`, `counterparty_iban`, `description` op Transaction omzetten naar `EncryptedString`
+- [ ] Eénmalig migratiescript: bestaande rijen uitlezen, opnieuw versleuteld wegschrijven (batchgewijs, buiten Alembic om)
+- [ ] Controleren dat alle queries die op deze velden filteren (ILIKE/contains) nog werken — encryptie maakt server-side LIKE onmogelijk; oplossing: zoekterm ook versleutelen en exacte vergelijking, of zoeken in Python na ophalen
+- [ ] Testen: dump van database bevat geen leesbare tegenpartijnamen meer
+
+**Aandachtspunt zoekfunctie:**
+ILIKE-queries op versleutelde velden werken niet meer. Oplossingen:
+- Optie A: zoeken in Python (alles ophalen, filteren in memory) — simpel maar langzamer
+- Optie B: aparte `counterparty_search_hash` kolom (HMAC van lowercase waarde) voor exacte lookups
+- Optie C: volledige tekstindex buiten de database (bijv. simpele Whoosh/in-memory index) — overkill voor persoonlijk gebruik
+- **Aanbeveling:** Optie A voor nu (dataset is klein), Optie B als performance een probleem wordt
+
+---
+
 ## Sprint 15 — Gebruikersbeheer (admin)
 *Middellang termijn. Bouwt op Sprint 14.*
 
