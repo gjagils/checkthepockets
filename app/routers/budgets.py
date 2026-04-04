@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, case
 
 from app.database import get_db
-from app.models import Account, Budget, Category, Transaction
+from app.models import Account, Budget, BudgetPreset, BudgetPresetLine, Category, Transaction
 from app.auth import require_login
 from app.template_config import templates
 
@@ -46,8 +46,8 @@ def budget_overview(
         cat_query = cat_query.filter(Category.account_id == account_id)
     all_categories = cat_query.order_by(Category.sort_order, Category.name).all()
 
-    top_level = [c for c in all_categories if c.parent_id is None and not c.is_income]
-    income_top_level = [c for c in all_categories if c.parent_id is None and c.is_income]
+    top_level = [c for c in all_categories if c.parent_id is None and not c.is_income and not c.exclude_from_budget]
+    income_top_level = [c for c in all_categories if c.parent_id is None and c.is_income and not c.exclude_from_budget]
     children_map = {}
     for c in all_categories:
         if c.parent_id is not None:
@@ -97,6 +97,7 @@ def budget_overview(
             func.extract("month", Transaction.date) == prev_month,
             Transaction.amount < 0,
             Transaction.is_excluded == 0,
+            Category.exclude_from_budget == 0,
         )
     )
     if account_id:
@@ -125,6 +126,7 @@ def budget_overview(
             func.extract("month", Transaction.date) == current_month,
             Transaction.amount < 0,
             Transaction.is_excluded == 0,
+            Category.exclude_from_budget == 0,
         )
     )
     if account_id:
@@ -287,6 +289,14 @@ def budget_overview(
     total_income = income_result.income or Decimal("0")
     unallocated = total_income - total_budgeted
 
+    # Load presets for this user
+    presets = (
+        db.query(BudgetPreset)
+        .filter(BudgetPreset.user_id == user.id)
+        .order_by(BudgetPreset.name)
+        .all()
+    )
+
     # Years with transactions
     tx_years = (
         db.query(func.extract("year", Transaction.date).label("yr"))
@@ -320,6 +330,7 @@ def budget_overview(
             "total_rollover": total_rollover,
             "prev_year": prev_year,
             "prev_month": prev_month,
+            "presets": presets,
         },
     )
 
@@ -507,3 +518,113 @@ def budget_from_average(
     db.commit()
 
     return RedirectResponse(f"/budgets?year={to_year}&month={to_month}", status_code=302)
+
+
+@router.post("/preset/save")
+def save_budget_preset(
+    request: Request,
+    name: str = Form(...),
+    year: int = Form(...),
+    month: int = Form(...),
+    db: Session = Depends(get_db),
+):
+    """Save current month's budgets as a named preset."""
+    user = require_login(request, db)
+
+    name = name.strip()
+    if not name:
+        return RedirectResponse(f"/budgets?year={year}&month={month}", status_code=302)
+
+    # Get existing preset or create new
+    preset = (
+        db.query(BudgetPreset)
+        .filter(BudgetPreset.user_id == user.id, BudgetPreset.name == name)
+        .first()
+    )
+    if preset:
+        # Delete existing lines; we'll recreate
+        db.query(BudgetPresetLine).filter(BudgetPresetLine.preset_id == preset.id).delete()
+    else:
+        preset = BudgetPreset(user_id=user.id, name=name)
+        db.add(preset)
+        db.flush()
+
+    # Copy current month's budgets into preset
+    budgets = (
+        db.query(Budget)
+        .filter(Budget.user_id == user.id, Budget.year == year, Budget.month == month)
+        .all()
+    )
+    for b in budgets:
+        db.add(BudgetPresetLine(preset_id=preset.id, category_id=b.category_id, amount=b.amount))
+
+    db.commit()
+    return RedirectResponse(f"/budgets?year={year}&month={month}", status_code=302)
+
+
+@router.post("/preset/load")
+def load_budget_preset(
+    request: Request,
+    preset_id: int = Form(...),
+    to_year: int = Form(...),
+    to_month: int = Form(...),
+    db: Session = Depends(get_db),
+):
+    """Apply a preset to the current month (overwrites existing budgets)."""
+    user = require_login(request, db)
+
+    preset = (
+        db.query(BudgetPreset)
+        .filter(BudgetPreset.id == preset_id, BudgetPreset.user_id == user.id)
+        .first()
+    )
+    if not preset:
+        return RedirectResponse(f"/budgets?year={to_year}&month={to_month}", status_code=302)
+
+    for line in preset.lines:
+        existing = (
+            db.query(Budget)
+            .filter(
+                Budget.user_id == user.id,
+                Budget.category_id == line.category_id,
+                Budget.year == to_year,
+                Budget.month == to_month,
+            )
+            .first()
+        )
+        if existing:
+            existing.amount = line.amount
+        else:
+            db.add(Budget(
+                user_id=user.id,
+                category_id=line.category_id,
+                year=to_year,
+                month=to_month,
+                amount=line.amount,
+            ))
+
+    db.commit()
+    return RedirectResponse(f"/budgets?year={to_year}&month={to_month}", status_code=302)
+
+
+@router.post("/preset/delete")
+def delete_budget_preset(
+    request: Request,
+    preset_id: int = Form(...),
+    year: int = Form(...),
+    month: int = Form(...),
+    db: Session = Depends(get_db),
+):
+    """Delete a saved budget preset."""
+    user = require_login(request, db)
+
+    preset = (
+        db.query(BudgetPreset)
+        .filter(BudgetPreset.id == preset_id, BudgetPreset.user_id == user.id)
+        .first()
+    )
+    if preset:
+        db.delete(preset)
+        db.commit()
+
+    return RedirectResponse(f"/budgets?year={year}&month={month}", status_code=302)
