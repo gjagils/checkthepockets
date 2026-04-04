@@ -26,6 +26,22 @@ async def add_asset_version(request: Request, call_next):
     request.state.asset_version = _ASSET_VERSION
     return await call_next(request)
 
+@app.get("/")
+def landing(request: Request):
+    """Landing page — redirect to dashboard if already logged in."""
+    from app.database import SessionLocal
+    db = SessionLocal()
+    try:
+        user = get_current_user(request, db)
+    except Exception:
+        user = None
+    finally:
+        db.close()
+    if user:
+        return RedirectResponse("/dashboard", status_code=302)
+    return _landing_templates.TemplateResponse("landing.html", {"request": request})
+
+
 app.include_router(auth.router)
 app.include_router(dashboard.router)
 app.include_router(transactions.router)
@@ -39,23 +55,6 @@ app.include_router(savings.router)
 app.include_router(analytics.router)
 app.include_router(portfolio.router)
 app.include_router(networth.router)
-
-
-@app.get("/")
-def landing(request: Request):
-    """Landing page — redirect to dashboard if already logged in."""
-    from sqlalchemy.orm import Session
-    from app.database import SessionLocal
-    db = SessionLocal()
-    try:
-        user = get_current_user(request, db)
-    except Exception:
-        user = None
-    finally:
-        db.close()
-    if user:
-        return RedirectResponse("/dashboard", status_code=302)
-    return _landing_templates.TemplateResponse("landing.html", {"request": request})
 
 
 @app.on_event("startup")
