@@ -5,6 +5,68 @@
     <h1>Categorieën</h1>
 </div>
 
+<!-- Add category forms (boven het overzicht) -->
+<div class="accounts-grid">
+    <!-- Hoofdcategorie -->
+    <div class="card">
+        <h2>Hoofdcategorie toevoegen</h2>
+        <form method="post" action="/categories">
+            <div class="form-stack">
+                <div class="form-group">
+                    <label for="cat_name">Naam</label>
+                    <input type="text" name="name" id="cat_name" required placeholder="bijv. Vaste lasten">
+                </div>
+                <div class="form-group">
+                    <label for="cat_account">Rekening</label>
+                    <select name="account_id" id="cat_account" required>
+                        <option value="">Kies rekening...</option>
+                        {% for acc in accounts %}
+                        <option value="{{ acc.id }}">{{ acc.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="cat_color">Kleur (optioneel)</label>
+                    <input type="color" name="color" id="cat_color" value="#89b4fa">
+                </div>
+                <div class="form-group">
+                    <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+                        <input type="checkbox" name="is_income" value="1"> Inkomen
+                    </label>
+                </div>
+                <button type="submit" class="btn btn-primary">Toevoegen</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Subcategorie -->
+    <div class="card">
+        <h2>Subcategorie toevoegen</h2>
+        <form method="post" action="/categories">
+            <div class="form-stack">
+                <div class="form-group">
+                    <label for="sub_parent">Hoofdcategorie</label>
+                    <select name="parent_id" id="sub_parent" required>
+                        <option value="">Kies hoofdcategorie...</option>
+                        {% for cat in top_level %}
+                        <option value="{{ cat.id }}">{{ cat.name }}{% if cat.account %} ({{ cat.account.name }}){% endif %}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="sub_name">Naam</label>
+                    <input type="text" name="name" id="sub_name" required placeholder="bijv. Huur">
+                </div>
+                <div class="form-group">
+                    <label for="sub_color">Kleur (optioneel)</label>
+                    <input type="color" name="color" id="sub_color" value="#89b4fa">
+                </div>
+                <button type="submit" class="btn btn-primary">Toevoegen</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <!-- Account filter -->
 <div class="card">
     <form method="get" action="/categories" class="filter-bar">
@@ -96,13 +158,13 @@
                                 <input type="color" name="color" value="{{ cat.color or '#89b4fa' }}">
                             </div>
                             <div class="form-group">
-                                <label><input type="checkbox" name="is_income" value="1" {% if cat.is_income %}checked{% endif %}> Inkomen</label>
+                                <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;"><input type="checkbox" name="is_income" value="1" {% if cat.is_income %}checked{% endif %}> Inkomen</label>
                             </div>
                             <div class="form-group">
-                                <label><input type="checkbox" name="exclude_from_budget" value="1" {% if cat.exclude_from_budget %}checked{% endif %}> Uitsluiten van budget</label>
+                                <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;"><input type="checkbox" name="exclude_from_budget" value="1" {% if cat.exclude_from_budget %}checked{% endif %}> Uitsluiten van budget</label>
                             </div>
                             <div class="form-group">
-                                <label><input type="checkbox" name="exclude_from_totals" value="1" {% if cat.exclude_from_totals %}checked{% endif %}> Uitsluiten van totalen</label>
+                                <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;"><input type="checkbox" name="exclude_from_totals" value="1" {% if cat.exclude_from_totals %}checked{% endif %}> Uitsluiten van totalen</label>
                             </div>
                             <div class="form-group" style="align-self:flex-end;">
                                 <button type="submit" class="btn btn-primary btn-sm">Opslaan</button>
@@ -149,10 +211,10 @@
                                 <input type="color" name="color" value="{{ sub.color or '#89b4fa' }}">
                             </div>
                             <div class="form-group">
-                                <label><input type="checkbox" name="exclude_from_budget" value="1" {% if sub.exclude_from_budget %}checked{% endif %}> Uitsluiten van budget</label>
+                                <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;"><input type="checkbox" name="exclude_from_budget" value="1" {% if sub.exclude_from_budget %}checked{% endif %}> Uitsluiten van budget</label>
                             </div>
                             <div class="form-group">
-                                <label><input type="checkbox" name="exclude_from_totals" value="1" {% if sub.exclude_from_totals %}checked{% endif %}> Uitsluiten van totalen</label>
+                                <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;"><input type="checkbox" name="exclude_from_totals" value="1" {% if sub.exclude_from_totals %}checked{% endif %}> Uitsluiten van totalen</label>
                             </div>
                             <div class="form-group" style="align-self:flex-end;">
                                 <button type="submit" class="btn btn-primary btn-sm">Opslaan</button>
@@ -172,68 +234,6 @@
     <p>Nog geen categorieën aangemaakt.</p>
 </div>
 {% endif %}
-
-<!-- Add category forms -->
-<div class="accounts-grid">
-    <!-- Hoofdcategorie -->
-    <div class="card">
-        <h2>Hoofdcategorie toevoegen</h2>
-        <form method="post" action="/categories">
-            <div class="form-stack">
-                <div class="form-group">
-                    <label for="cat_name">Naam</label>
-                    <input type="text" name="name" id="cat_name" required placeholder="bijv. Vaste lasten">
-                </div>
-                <div class="form-group">
-                    <label for="cat_account">Rekening</label>
-                    <select name="account_id" id="cat_account" required>
-                        <option value="">Kies rekening...</option>
-                        {% for acc in accounts %}
-                        <option value="{{ acc.id }}">{{ acc.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="cat_color">Kleur (optioneel)</label>
-                    <input type="color" name="color" id="cat_color" value="#89b4fa">
-                </div>
-                <div class="form-group">
-                    <label>
-                        <input type="checkbox" name="is_income" value="1"> Inkomen
-                    </label>
-                </div>
-                <button type="submit" class="btn btn-primary">Toevoegen</button>
-            </div>
-        </form>
-    </div>
-
-    <!-- Subcategorie -->
-    <div class="card">
-        <h2>Subcategorie toevoegen</h2>
-        <form method="post" action="/categories">
-            <div class="form-stack">
-                <div class="form-group">
-                    <label for="sub_parent">Hoofdcategorie</label>
-                    <select name="parent_id" id="sub_parent" required>
-                        <option value="">Kies hoofdcategorie...</option>
-                        {% for cat in top_level %}
-                        <option value="{{ cat.id }}">{{ cat.name }}{% if cat.account %} ({{ cat.account.name }}){% endif %}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="sub_name">Naam</label>
-                    <input type="text" name="name" id="sub_name" required placeholder="bijv. Huur">
-                </div>
-                <div class="form-group">
-                    <label for="sub_color">Kleur (optioneel)</label>
-                    <input type="color" name="color" id="sub_color" value="#89b4fa">
-                </div>
-                <button type="submit" class="btn btn-primary">Toevoegen</button>
-            </div>
-        </form>
-    </div>
-</div>
 
 <!-- Merge categories -->
 {% if all_active|length > 1 %}
