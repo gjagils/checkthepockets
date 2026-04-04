@@ -1,11 +1,11 @@
 from decimal import Decimal, InvalidOperation
 
-from fastapi import APIRouter, Depends, Request, Form
+from fastapi import APIRouter, Depends, Request, Form, Query
 from fastapi.responses import RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Rule, Category, Tag
+from app.models import Rule, Category, Tag, Transaction, Account
 from app.auth import require_login
 from app.rules_engine import apply_rules_to_all, apply_single_rule, preview_single_rule, suggest_rules
 from app.template_config import templates
@@ -26,7 +26,7 @@ MATCH_TYPES = {
 
 
 @router.get("/rules")
-def rules_list(request: Request, db: Session = Depends(get_db)):
+def rules_list(request: Request, from_tx: int = Query(None), db: Session = Depends(get_db)):
     user = require_login(request, db)
 
     rules = (
@@ -50,6 +50,26 @@ def rules_list(request: Request, db: Session = Depends(get_db)):
 
     suggestions = suggest_rules(db, user.id)
 
+    prefill = None
+    if from_tx:
+        tx = (
+            db.query(Transaction)
+            .join(Account)
+            .filter(Transaction.id == from_tx, Account.user_id == user.id)
+            .first()
+        )
+        if tx:
+            prefill = {
+                "name": tx.counterparty or "",
+                "match_field": "counterparty",
+                "match_type": "contains",
+                "match_value": tx.counterparty or "",
+                "amount_max": str(tx.amount) if tx.amount < 0 else "",
+                "amount_min": str(tx.amount) if tx.amount >= 0 else "",
+                "assign_category_id": tx.category_id or "",
+                "tx_display": f"{tx.counterparty or tx.description or '?'}  ·  €{tx.amount}",
+            }
+
     return templates.TemplateResponse(
         "rules/list.html",
         {
@@ -61,6 +81,7 @@ def rules_list(request: Request, db: Session = Depends(get_db)):
             "suggestions": suggestions,
             "match_fields": MATCH_FIELDS,
             "match_types": MATCH_TYPES,
+            "prefill": prefill,
         },
     )
 

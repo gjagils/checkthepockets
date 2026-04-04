@@ -93,13 +93,6 @@
 
 {% if transactions %}
 <div class="card">
-    <!-- Kolom-toggles -->
-    <div class="col-toggle-bar">
-        <span class="col-toggle-label">Kolommen:</span>
-        <button type="button" class="col-toggle-btn" data-col="col-counterparty">Tegenpartij</button>
-        <button type="button" class="col-toggle-btn" data-col="col-account">Rekening</button>
-    </div>
-
     <div class="table-wrap">
         <table id="txTable">
             <thead>
@@ -109,12 +102,26 @@
                     </th>
                     <th style="width:2rem;"></th>
                     <th>Datum</th>
+
                     <th>Omschrijving</th>
                     <th class="col-counterparty">Tegenpartij</th>
                     <th>Categorie</th>
                     <th class="text-right">Bedrag</th>
                     <th class="col-account">Rekening</th>
-                    <th></th>
+                    <th style="width:2rem;"></th>
+                    <th class="col-picker-th">
+                        <div class="col-picker-wrap">
+                            <button type="button" class="col-picker-btn" id="colPickerBtn" title="Kolommen kiezen">⊞</button>
+                            <div class="col-picker-dropdown" id="colPickerDropdown">
+                                <label class="col-picker-item">
+                                    <input type="checkbox" data-col="col-counterparty" checked> Tegenpartij
+                                </label>
+                                <label class="col-picker-item">
+                                    <input type="checkbox" data-col="col-account" checked> Rekening
+                                </label>
+                            </div>
+                        </div>
+                    </th>
                 </tr>
             </thead>
             <tbody>
@@ -174,6 +181,35 @@
                             <input type="hidden" name="redirect_to" value="/?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}">
                             <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Transactie uitsluiten?')">Uitsluiten</button>
                         </form>
+                    </td>
+                    <td style="text-align:center; padding:0.3rem;">
+                        <button type="button"
+                                class="tx-action-btn"
+                                id="txbtn-{{ tx.id }}"
+                                onclick="toggleTxPanel({{ tx.id }})"
+                                title="Acties">›</button>
+                    </td>
+                </tr>
+                <tr class="tx-action-panel" id="txpanel-{{ tx.id }}" style="display:none;">
+                    <td colspan="10" class="tx-panel-cell">
+                        <div class="tx-panel-inner">
+                            <div class="tx-panel-info">
+                                <strong>{{ tx.counterparty or tx.description or '—' }}</strong>
+                                <span class="muted">{{ tx.date.strftime('%d-%m-%Y') }} &middot; {{ tx.category.name if tx.category else 'Geen categorie' }} &middot; €{{ tx.amount|euro }}</span>
+                            </div>
+                            <div class="tx-panel-actions">
+                                <a href="/rules?from_tx={{ tx.id }}" class="tx-panel-btn">
+                                    <span class="tx-panel-btn-icon">📋</span>
+                                    <span class="tx-panel-btn-title">Maak een regel</span>
+                                    <span class="tx-panel-btn-desc">Categoriseer toekomstige transacties van <em>{{ tx.counterparty or 'deze tegenpartij' }}</em> automatisch</span>
+                                </a>
+                                <a href="/recurring?from_tx={{ tx.id }}" class="tx-panel-btn">
+                                    <span class="tx-panel-btn-icon">🔄</span>
+                                    <span class="tx-panel-btn-title">Maak terugkerend</span>
+                                    <span class="tx-panel-btn-desc">Verwacht deze transactie iedere maand en zet hem alvast in de planning</span>
+                                </a>
+                            </div>
+                        </div>
                     </td>
                 </tr>
                 {% endfor %}
@@ -334,7 +370,7 @@ function toggleBulkPanel(type) {
     }
 }
 
-// ── Kolommen tonen/verbergen ───────────────────────────────────
+// ── Kolom-kiezer ──────────────────────────────────────────────
 var COL_KEY = 'ctp_hidden_cols';
 
 function getHiddenCols() {
@@ -343,31 +379,56 @@ function getHiddenCols() {
 function saveHiddenCols(cols) {
     localStorage.setItem(COL_KEY, JSON.stringify(cols));
 }
-
 function applyColVisibility() {
     var hidden = getHiddenCols();
-    document.querySelectorAll('.col-toggle-btn').forEach(function(btn) {
-        var col = btn.dataset.col;
+    document.querySelectorAll('.col-picker-item input[data-col]').forEach(function(cb) {
+        var col = cb.dataset.col;
         var isHidden = hidden.indexOf(col) !== -1;
-        btn.classList.toggle('col-toggle-active', !isHidden);
-        // show/hide all cells with that class
+        cb.checked = !isHidden;
         document.querySelectorAll('.' + col).forEach(function(el) {
             el.style.display = isHidden ? 'none' : '';
         });
     });
 }
-
-document.querySelectorAll('.col-toggle-btn').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-        var col = btn.dataset.col;
+document.querySelectorAll('.col-picker-item input[data-col]').forEach(function(cb) {
+    cb.addEventListener('change', function() {
+        var col = cb.dataset.col;
         var hidden = getHiddenCols();
         var idx = hidden.indexOf(col);
-        if (idx === -1) { hidden.push(col); } else { hidden.splice(idx, 1); }
+        if (cb.checked) { if (idx !== -1) hidden.splice(idx, 1); }
+        else             { if (idx === -1) hidden.push(col); }
         saveHiddenCols(hidden);
         applyColVisibility();
     });
 });
 
+// Toggle dropdown open/close
+var colPickerBtn = document.getElementById('colPickerBtn');
+var colPickerDropdown = document.getElementById('colPickerDropdown');
+if (colPickerBtn) {
+    colPickerBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        colPickerDropdown.classList.toggle('open');
+    });
+    document.addEventListener('click', function() {
+        colPickerDropdown.classList.remove('open');
+    });
+    colPickerDropdown.addEventListener('click', function(e) { e.stopPropagation(); });
+}
+
 applyColVisibility();
+
+// ── Transactie actie-paneel ────────────────────────────
+function toggleTxPanel(id) {
+    var panel = document.getElementById('txpanel-' + id);
+    var btn   = document.getElementById('txbtn-' + id);
+    var isOpen = panel.style.display !== 'none';
+    document.querySelectorAll('.tx-action-panel').forEach(function(p) { p.style.display = 'none'; });
+    document.querySelectorAll('.tx-action-btn').forEach(function(b) { b.classList.remove('active'); });
+    if (!isOpen) {
+        panel.style.display = 'table-row';
+        btn.classList.add('active');
+    }
+}
 </script>
 {% endblock %}

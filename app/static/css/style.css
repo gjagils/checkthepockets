@@ -1,6 +1,6 @@
 /* ===== Check The Pockets – Brand Design System ===== */
 
-@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800&family=Lato:wght@300;400;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
 :root {
     /* === Dark theme (default) === */
@@ -35,9 +35,9 @@
 
     /* === Semantic / theme-aware aliases === */
 
-    /* Typography */
-    --font-heading: 'Heebo', system-ui, sans-serif;
-    --font-body:    'Lato', system-ui, sans-serif;
+    /* Typography – shared across both themes */
+    --font-heading: 'Plus Jakarta Sans', system-ui, sans-serif;
+    --font-body:    'Plus Jakarta Sans', system-ui, sans-serif;
 
     /* Nav */
     --nav-bg:                var(--nav-top);
@@ -105,10 +105,6 @@
     --green-bg:     rgba(39, 174, 96, 0.10);
     --red:          #E74C3C;
     --red-bg:       rgba(231, 76, 60, 0.10);
-
-    /* Typography */
-    --font-heading: 'Plus Jakarta Sans', system-ui, sans-serif;
-    --font-body:    'Plus Jakarta Sans', system-ui, sans-serif;
 
     /* Nav – navy background, white links */
     --nav-bg:                #234C75;
@@ -924,6 +920,115 @@ tfoot td { background: var(--surface-2); border-top: 1px solid var(--border); fo
     min-width: 280px;
 }
 .tx-more-panel .form-group { margin-bottom: 0.75rem; }
+
+/* ===== Transaction Action Panel (Sprint 9) ===== */
+.tx-action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--muted);
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: color 0.12s, border-color 0.12s, background 0.12s;
+    padding: 0;
+    line-height: 1;
+}
+.tx-action-btn:hover, .tx-action-btn.active {
+    color: var(--orange);
+    border-color: var(--orange);
+    background: var(--orange-bg);
+}
+.tx-panel-cell { padding: 0 !important; border-bottom: 2px solid var(--orange) !important; }
+.tx-panel-inner {
+    padding: 0.9rem 1.25rem;
+    background: var(--surface-2);
+    display: flex;
+    align-items: flex-start;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+}
+.tx-panel-info { flex-shrink: 0; min-width: 160px; }
+.tx-panel-info strong { display: block; font-size: 0.88rem; color: var(--text); margin-bottom: 0.2rem; }
+.tx-panel-actions { display: flex; gap: 0.65rem; flex: 1; flex-wrap: wrap; }
+.tx-panel-btn {
+    display: flex;
+    flex-direction: column;
+    gap: 0.18rem;
+    padding: 0.7rem 0.9rem;
+    border: 1px solid var(--border);
+    border-radius: var(--ctp-radius);
+    background: var(--surface);
+    text-decoration: none;
+    color: var(--text);
+    flex: 1;
+    min-width: 170px;
+    max-width: 260px;
+    transition: border-color 0.12s, background 0.12s;
+}
+.tx-panel-btn:hover { border-color: var(--orange); background: var(--orange-bg); color: var(--text); }
+.tx-panel-btn-icon { font-size: 1rem; }
+.tx-panel-btn-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    font-family: var(--font-heading);
+    color: var(--text);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.tx-panel-btn-desc { font-size: 0.7rem; color: var(--muted); line-height: 1.4; }
+
+/* ===== Column Picker (Sprint Design 4) ===== */
+.col-picker-th { width: 1.8rem; text-align: center; position: relative; }
+.col-picker-wrap { position: relative; display: inline-block; }
+.col-picker-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--surface-2);
+    color: var(--muted);
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: color 0.12s, border-color 0.12s;
+    padding: 0;
+    line-height: 1;
+}
+.col-picker-btn:hover { color: var(--text); border-color: var(--text); }
+.col-picker-dropdown {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: calc(100% + 4px);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--ctp-radius);
+    padding: 0.5rem 0.75rem;
+    box-shadow: var(--ctp-shadow);
+    z-index: 60;
+    min-width: 150px;
+    white-space: nowrap;
+}
+.col-picker-dropdown.open { display: block; }
+.col-picker-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.3rem 0;
+    font-size: 0.78rem;
+    color: var(--text);
+    cursor: pointer;
+    user-select: none;
+}
+.col-picker-item input { accent-color: var(--orange); cursor: pointer; }
 
 /* ===== Responsive ===== */
 @media (max-width: 640px) {

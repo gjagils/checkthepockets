@@ -122,6 +122,7 @@ def _is_in_active_period(item: RecurringTransaction, today: date) -> bool:
 @router.get("/recurring")
 def recurring_list(
     request: Request,
+    from_tx: int = Query(None),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
@@ -193,6 +194,23 @@ def recurring_list(
     total_due = len(items_due)
     total_missed = len(items_missed)
 
+    prefill = None
+    if from_tx:
+        tx = (
+            db.query(Transaction)
+            .join(Account)
+            .filter(Transaction.id == from_tx, Account.user_id == user.id)
+            .first()
+        )
+        if tx:
+            prefill = {
+                "name": tx.counterparty or tx.description or "",
+                "amount_expected": float(tx.amount),
+                "category_id": tx.category_id or "",
+                "counterparty": tx.counterparty or "",
+                "tx_display": f"{tx.counterparty or tx.description or '?'}  ·  €{tx.amount}",
+            }
+
     return templates.TemplateResponse(
         "recurring/list.html",
         {
@@ -208,6 +226,7 @@ def recurring_list(
             "total_due": total_due,
             "total_missed": total_missed,
             "today": today,
+            "prefill": prefill,
         },
     )
 

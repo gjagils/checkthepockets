@@ -42,12 +42,19 @@
 
 <div class="rules-layout">
     <!-- Create form -->
-    <div class="card">
+    <div class="card" id="new-rule-card">
         <h2>Nieuwe regel</h2>
+        {% if prefill %}
+        <div class="alert alert-success" style="margin-bottom:1rem;">
+            Ingevuld vanuit transactie: <strong>{{ prefill.tx_display }}</strong>
+        </div>
+        {% endif %}
         <form method="post" action="/rules">
             <div class="form-group">
                 <label for="name">Naam</label>
-                <input type="text" id="name" name="name" required placeholder="bijv. Albert Heijn → Boodschappen">
+                <input type="text" id="name" name="name" required
+                       placeholder="bijv. Albert Heijn → Boodschappen"
+                       value="{{ prefill.name if prefill else '' }}">
             </div>
 
             <fieldset class="rule-fieldset">
@@ -57,7 +64,7 @@
                         <label for="match_field">Veld</label>
                         <select name="match_field" id="match_field">
                             {% for key, label in match_fields.items() %}
-                            <option value="{{ key }}">{{ label }}</option>
+                            <option value="{{ key }}" {% if prefill and prefill.match_field == key %}selected{% endif %}>{{ label }}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -65,23 +72,29 @@
                         <label for="match_type">Conditie</label>
                         <select name="match_type" id="match_type">
                             {% for key, label in match_types.items() %}
-                            <option value="{{ key }}">{{ label }}</option>
+                            <option value="{{ key }}" {% if prefill and prefill.match_type == key %}selected{% endif %}>{{ label }}</option>
                             {% endfor %}
                         </select>
                     </div>
                     <div class="form-group" style="flex:2;">
                         <label for="match_value">Waarde</label>
-                        <input type="text" id="match_value" name="match_value" required placeholder="bijv. Albert Heijn">
+                        <input type="text" id="match_value" name="match_value" required
+                               placeholder="bijv. Albert Heijn"
+                               value="{{ prefill.match_value if prefill else '' }}">
                     </div>
                 </div>
                 <div class="rule-condition">
                     <div class="form-group">
                         <label for="amount_min">Bedrag min (optioneel)</label>
-                        <input type="number" step="0.01" id="amount_min" name="amount_min" placeholder="-100.00">
+                        <input type="number" step="0.01" id="amount_min" name="amount_min"
+                               placeholder="-100.00"
+                               value="{{ prefill.amount_min if prefill else '' }}">
                     </div>
                     <div class="form-group">
                         <label for="amount_max">Bedrag max (optioneel)</label>
-                        <input type="number" step="0.01" id="amount_max" name="amount_max" placeholder="0.00">
+                        <input type="number" step="0.01" id="amount_max" name="amount_max"
+                               placeholder="0.00"
+                               value="{{ prefill.amount_max if prefill else '' }}">
                     </div>
                 </div>
             </fieldset>
@@ -98,11 +111,11 @@
                                 {% if cat.children %}
                                 <optgroup label="{{ cat.name }}">
                                     {% for child in cat.children|sort(attribute='name') %}
-                                    <option value="{{ child.id }}">{{ child.name }}</option>
+                                    <option value="{{ child.id }}" {% if prefill and prefill.assign_category_id == child.id %}selected{% endif %}>{{ child.name }}</option>
                                     {% endfor %}
                                 </optgroup>
                                 {% else %}
-                                <option value="{{ cat.id }}">{{ cat.name }}</option>
+                                <option value="{{ cat.id }}" {% if prefill and prefill.assign_category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
                                 {% endif %}
                             {% endif %}
                             {% endfor %}
@@ -378,5 +391,9 @@ function escapeHtml(str) {
 }
 
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+{% if prefill %}
+document.getElementById('new-rule-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+{% endif %}
 </script>
 {% endblock %}
