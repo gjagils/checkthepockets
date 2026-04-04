@@ -56,23 +56,45 @@ jobs:
           PORTAINER_API_TOKEN: ${{ secrets.PORTAINER_API_TOKEN }}
           PORTAINER_STACK_ID: ${{ secrets.PORTAINER_STACK_ID }}
         run: |
-          # Get current stack info
-          STACK_INFO=$(curl -s -H "X-API-Key: $PORTAINER_API_TOKEN" "$PORTAINER_URL/api/stacks/$PORTAINER_STACK_ID")
+          # Get endpoint ID from stack info
+          STACK_INFO=$(curl -s -H "X-API-Key: $PORTAINER_API_TOKEN" \
+            "$PORTAINER_URL/api/stacks/$PORTAINER_STACK_ID")
           ENDPOINT_ID=$(echo "$STACK_INFO" | jq -r '.EndpointId')
           echo "Endpoint ID: $ENDPOINT_ID"
 
-          # Step 1: Pull the latest image via Docker API through Portainer
+          # Step 1: Pull latest image via Docker API through Portainer
           echo "Pulling latest image..."
-          PULL_RESULT=$(curl -s -X POST \
+          curl -s -X POST \
             -H "X-API-Key: $PORTAINER_API_TOKEN" \
-            "$PORTAINER_URL/api/endpoints/$ENDPOINT_ID/docker/images/create?fromImage=ghcr.io/gjagils/checkthepockets&tag=latest")
-          echo "Pull result: $PULL_RESULT"
+            "$PORTAINER_URL/api/endpoints/$ENDPOINT_ID/docker/images/create?fromImage=ghcr.io%2Fgjagils%2Fcheckthepockets&tag=latest"
+          echo "Image pulled."
 
-          # Step 2: Git redeploy (updates compose file from repo and restarts stack)
-          echo "Triggering git redeploy..."
-          REDEPLOY_RESULT=$(curl -s -X PUT \
+          # Step 2: Stop the stack
+          echo "Stopping stack..."
+          curl -s -X POST \
             -H "X-API-Key: $PORTAINER_API_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d '{"pullImage": true, "prune": false}' \
-            "$PORTAINER_URL/api/stacks/$PORTAINER_STACK_ID/git/redeploy?endpointId=$ENDPOINT_ID")
-          echo "Redeploy result: $REDEPLOY_RESULT"
+            "$PORTAINER_URL/api/stacks/$PORTAINER_STACK_ID/stop"
+          sleep 5
+
+          # Step 3: Remove old containers so Portainer creates fresh ones from new image
+          echo "Removing old containers..."
+          FILTER='{"label":["com.docker.compose.project=checkthepockets"]}'
+          FILTER_ENC=$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.argv[1]))" "$FILTER")
+          CONTAINERS=$(curl -s \
+            -H "X-API-Key: $PORTAINER_API_TOKEN" \
+            "$PORTAINER_URL/api/endpoints/$ENDPOINT_ID/docker/containers/json?all=true&filters=$FILTER_ENC")
+          echo "Containers found: $CONTAINERS"
+          echo "$CONTAINERS" | jq -r '.[].Id' | while read CID; do
+            echo "Removing container $CID"
+            curl -s -X DELETE \
+              -H "X-API-Key: $PORTAINER_API_TOKEN" \
+              "$PORTAINER_URL/api/endpoints/$ENDPOINT_ID/docker/containers/$CID?force=true"
+          done
+
+          # Step 4: Start stack — Portainer recreates containers from the new image
+          echo "Starting stack..."
+          START_RESULT=$(curl -s -X POST \
+            -H "X-API-Key: $PORTAINER_API_TOKEN" \
+            "$PORTAINER_URL/api/stacks/$PORTAINER_STACK_ID/start")
+          echo "Start result: $START_RESULT"
+          echo "Deploy complete."
