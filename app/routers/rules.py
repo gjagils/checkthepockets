@@ -13,8 +13,8 @@ from app.template_config import templates
 router = APIRouter()
 
 MATCH_FIELDS = {
-    "counterparty": "Tegenpartij",
     "description": "Omschrijving",
+    "counterparty": "Tegenpartij",
     "counterparty_iban": "IBAN tegenpartij",
 }
 
@@ -60,12 +60,10 @@ def rules_list(request: Request, from_tx: int = Query(None), db: Session = Depen
         )
         if tx:
             prefill = {
-                "name": tx.counterparty or "",
-                "match_field": "counterparty",
+                "name": tx.counterparty or tx.description or "",
+                "match_field": "description",
                 "match_type": "contains",
-                "match_value": tx.counterparty or "",
-                "amount_max": str(tx.amount) if tx.amount < 0 else "",
-                "amount_min": str(tx.amount) if tx.amount >= 0 else "",
+                "match_value": tx.description or tx.counterparty or "",
                 "assign_category_id": tx.category_id or "",
                 "tx_display": f"{tx.counterparty or tx.description or '?'}  ·  €{tx.amount}",
             }

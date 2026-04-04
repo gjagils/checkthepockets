@@ -1063,6 +1063,75 @@ tfoot td { background: var(--surface-2); border-top: 1px solid var(--border); fo
 }
 .col-picker-item input { accent-color: var(--orange); cursor: pointer; }
 
+/* ===== Rules ===== */
+.rules-layout { display: grid; grid-template-columns: 400px 1fr; gap: 1.5rem; align-items: start; }
+.rule-section { margin-bottom: 1.25rem; }
+.rule-section-header {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.75rem;
+}
+.rule-section-badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.badge-if {
+    background: var(--sky-bg);
+    color: var(--sky);
+    border: 1px solid var(--sky);
+}
+.badge-then {
+    background: var(--orange-bg);
+    color: var(--orange);
+    border: 1px solid var(--orange);
+}
+.rule-section-line {
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+}
+.rule-condition { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+.rule-condition .form-group { flex: 1; min-width: 100px; }
+
+.rules-list { display: flex; flex-direction: column; }
+.rule-item { padding: 0.875rem 0; border-bottom: 1px solid var(--border); }
+.rule-item:last-child { border-bottom: none; }
+.rule-inactive { opacity: 0.45; }
+.rule-summary { display: flex; flex-direction: column; gap: 0.3rem; }
+.rule-header { display: flex; align-items: center; gap: 0.5rem; }
+.rule-description { display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; font-size: 0.82rem; color: var(--muted); }
+.rule-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.5rem; }
+.rule-edit {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-top: 0.75rem;
+}
+
+.suggestions-list { display: flex; flex-direction: column; gap: 0.4rem; }
+.suggestion-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    padding: 0.6rem 0.75rem;
+    background: var(--surface-2);
+    border-radius: 6px;
+    border: 1px solid var(--border);
+}
+.suggestion-info { flex: 1; min-width: 200px; font-size: 0.85rem; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.suggestion-action { display: flex; align-items: center; gap: 0.5rem; }
+
 /* ===== Projected Transactions (Sprint 10) ===== */
 .tx-projected {
     background: repeating-linear-gradient(

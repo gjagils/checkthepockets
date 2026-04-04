@@ -57,14 +57,17 @@
                        value="{{ prefill.name if prefill else '' }}">
             </div>
 
-            <fieldset class="rule-fieldset">
-                <legend>Als (IF)</legend>
+            <div class="rule-section">
+                <div class="rule-section-header">
+                    <span class="rule-section-badge badge-if">Als</span>
+                    <span class="rule-section-line"></span>
+                </div>
                 <div class="rule-condition">
                     <div class="form-group">
                         <label for="match_field">Veld</label>
                         <select name="match_field" id="match_field">
                             {% for key, label in match_fields.items() %}
-                            <option value="{{ key }}" {% if prefill and prefill.match_field == key %}selected{% endif %}>{{ label }}</option>
+                            <option value="{{ key }}" {% if prefill and prefill.match_field == key %}selected{% elif not prefill and key == 'description' %}selected{% endif %}>{{ label }}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -83,24 +86,15 @@
                                value="{{ prefill.match_value if prefill else '' }}">
                     </div>
                 </div>
-                <div class="rule-condition">
-                    <div class="form-group">
-                        <label for="amount_min">Bedrag min (optioneel)</label>
-                        <input type="number" step="0.01" id="amount_min" name="amount_min"
-                               placeholder="-100.00"
-                               value="{{ prefill.amount_min if prefill else '' }}">
-                    </div>
-                    <div class="form-group">
-                        <label for="amount_max">Bedrag max (optioneel)</label>
-                        <input type="number" step="0.01" id="amount_max" name="amount_max"
-                               placeholder="0.00"
-                               value="{{ prefill.amount_max if prefill else '' }}">
-                    </div>
-                </div>
-            </fieldset>
+                <input type="hidden" name="amount_min" value="">
+                <input type="hidden" name="amount_max" value="">
+            </div>
 
-            <fieldset class="rule-fieldset">
-                <legend>Dan (THEN)</legend>
+            <div class="rule-section">
+                <div class="rule-section-header">
+                    <span class="rule-section-badge badge-then">Dan</span>
+                    <span class="rule-section-line"></span>
+                </div>
                 <div class="rule-condition">
                     <div class="form-group">
                         <label for="assign_category_id">Categorie toewijzen</label>
@@ -131,7 +125,7 @@
                         </select>
                     </div>
                 </div>
-            </fieldset>
+            </div>
 
             <button type="submit" class="btn btn-primary">Regel toevoegen</button>
         </form>
@@ -210,13 +204,17 @@
                 <!-- Edit form (hidden) -->
                 <div class="rule-edit" id="edit-{{ rule.id }}" style="display:none;">
                     <form method="post" action="/rules/{{ rule.id }}/edit">
-                        <div class="rule-condition">
+                        <div class="rule-condition" style="margin-bottom:0.75rem;">
                             <div class="form-group">
                                 <label>Naam</label>
                                 <input type="text" name="name" value="{{ rule.name }}" required>
                             </div>
                         </div>
-                        <div class="rule-condition">
+                        <div class="rule-section-header" style="margin-bottom:0.5rem;">
+                            <span class="rule-section-badge badge-if">Als</span>
+                            <span class="rule-section-line"></span>
+                        </div>
+                        <div class="rule-condition" style="margin-bottom:0.75rem;">
                             <div class="form-group">
                                 <label>Veld</label>
                                 <select name="match_field">
@@ -238,15 +236,13 @@
                                 <input type="text" name="match_value" value="{{ rule.match_value }}" required>
                             </div>
                         </div>
+                        <input type="hidden" name="amount_min" value="{{ '%.2f'|format(rule.amount_min) if rule.amount_min is not none else '' }}">
+                        <input type="hidden" name="amount_max" value="{{ '%.2f'|format(rule.amount_max) if rule.amount_max is not none else '' }}">
+                        <div class="rule-section-header" style="margin-bottom:0.5rem;">
+                            <span class="rule-section-badge badge-then">Dan</span>
+                            <span class="rule-section-line"></span>
+                        </div>
                         <div class="rule-condition">
-                            <div class="form-group">
-                                <label>Bedrag min</label>
-                                <input type="number" step="0.01" name="amount_min" value="{{ '%.2f'|format(rule.amount_min) if rule.amount_min is not none else '' }}">
-                            </div>
-                            <div class="form-group">
-                                <label>Bedrag max</label>
-                                <input type="number" step="0.01" name="amount_max" value="{{ '%.2f'|format(rule.amount_max) if rule.amount_max is not none else '' }}">
-                            </div>
                             <div class="form-group">
                                 <label>Categorie</label>
                                 <select name="assign_category_id">
@@ -276,7 +272,7 @@
                                 </select>
                             </div>
                         </div>
-                        <div style="margin-top:0.5rem; display:flex; gap:0.5rem;">
+                        <div style="margin-top:0.75rem; display:flex; gap:0.5rem;">
                             <button type="submit" class="btn btn-sm btn-primary">Opslaan</button>
                             <button type="button" class="btn btn-sm" onclick="toggleEdit({{ rule.id }})">Annuleren</button>
                         </div>
