@@ -8,6 +8,46 @@ Sprints zijn gegroepeerd op gedeelde bestanden voor maximale efficiëntie per se
 
 ---
 
+## Sprint Design 2 — Oranje redesign (Banani mockup)
+*Volledige visuele redesign op basis van het Banani-mockup. Behoudt de navigatiestructuur.*
+*Huidige logo (wallet-icoontje) behouden, alleen de CSS en templates aanpassen.*
+
+**Referentie:** screenshot gedeeld door gebruiker (april 2026) — oranje/navy/wit thema
+
+**Bestanden:** `app/static/css/style.css`, `app/templates/base.html`, `app/templates/transactions/list.html`
+
+**Context voor nieuwe sessie:**
+- Huidig thema: Editorial Finance — navy `#002752`, gold `#F9A800`, achtergrond `#f0f2f6`
+- Nieuw thema: oranje als primaire accentkleur, navy als secondaire kleur, witte cards op lichtgrijs
+- CSS custom properties staan bovenin `style.css` — alleen variabelen aanpassen werkt door het hele systeem
+- Logo staat in `base.html` — wallet-icoontje behouden, tekst-layout aanpassen
+- `--ctp-*` legacy aliassen moeten intact blijven
+
+**Kleurpalet (nieuw):**
+```
+--orange:      #F97316   /* primaire accentkleur, vervangt --gold */
+--orange-dark: #EA6C0A   /* hover state */
+--orange-light:#FFF3E8   /* lichte achtergrond tint */
+--navy:        #002752   /* ongewijzigd */
+--navy-mid:    #01356a   /* ongewijzigd */
+--bg:          #f0f2f6   /* ongewijzigd */
+--card:        #ffffff   /* ongewijzigd */
+```
+
+**Taken:**
+
+- [ ] **CSS variabelen**: vervang `--gold: #F9A800` door `--orange: #F97316` + voeg `--orange-dark` en `--orange-light` toe; update alle `.btn-primary` (oranje bg + witte tekst), `.nav-active` indicator, badges
+- [ ] **Paginatitels oranje**: `h1` in `.page-header` krijgt `color: var(--orange)` — groot, vet, opvallend
+- [ ] **Navigatie active-indicator**: huidige goud underline-indicator → oranje; sub-nav active item krijgt pill-stijl (afgeronde achtergrond, lichtoranje) in plaats van bold underline
+- [ ] **Logo layout**: `base.html` — gestapelde tekst "CHECK / THE / POCKETS" in oranje/navy boven elkaar (oranje voor CHECK THE, navy voor POCKETS), wallet-icoontje behouden links naast de tekst
+- [ ] **Filterbar**: zoekicoontje (🔍 of SVG) toevoegen aan het zoekveld in `transactions/list.html`; "Zoeken" knop oranje; "Meer filters" als subtiele link met chevron
+- [ ] **Tabelkoppen uppercase**: `<th>` in transactietabel krijgen `text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.72rem`
+- [ ] **Knoppen**: "Handmatig toevoegen" → `.btn-accent` (navy); "CSV importeren" → `.btn-primary` (oranje); beide als volledig gevulde knoppen met uppercase label
+- [ ] **Categorie inline-dropdown**: categorie-cel in transactierij toont een `<select>` dropdown in plaats van alleen tekst — bij wijziging AJAX-save via bestaand categoriseer-endpoint
+- [ ] **Gebruikersavatar in nav**: toevoegen aan `base.html` rechtsboven — ronde avatar-placeholder (initialen van gebruikersnaam, navy achtergrond) naast de gebruikersnaam
+
+---
+
 ## Sprint 1 — Database fundament ✅ (2026-04-03)
 *Model-wijzigingen waar latere sprints op bouwen.*
 
