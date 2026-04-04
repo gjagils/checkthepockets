@@ -242,6 +242,7 @@
                     <th class="text-right">Rollover</th>
                     <th class="text-right">Effectief</th>
                     <th class="text-right">Uitgegeven</th>
+                    <th class="text-right">Verwacht</th>
                     <th class="text-right">Vorige mnd</th>
                     <th class="text-right">Resterend</th>
                     <th>Voortgang</th>
@@ -261,6 +262,11 @@
                     </td>
                     <td class="text-right nowrap"><strong>&euro;&nbsp;{{ group.group_effective|euro }}</strong></td>
                     <td class="text-right nowrap"><strong>&euro;&nbsp;{{ group.group_spent|euro }}</strong></td>
+                    <td class="text-right nowrap">
+                        {% if group.group_projected > 0 %}
+                        <span class="muted" style="font-size:0.85rem;">&euro;&nbsp;{{ group.group_projected|euro }}</span>
+                        {% else %}<span class="muted">-</span>{% endif %}
+                    </td>
                     <td class="text-right nowrap muted">-</td>
                     <td class="text-right nowrap">
                         <strong class="{% if group.group_effective_remaining >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
@@ -291,7 +297,7 @@
                                onblur="saveBudget(this)"
                                onkeydown="if(event.key==='Enter')this.blur()">
                     </td>
-                    <td colspan="6"></td>
+                    <td colspan="7"></td>
                 </tr>
                 {% endif %}
 
@@ -319,6 +325,11 @@
                     </td>
                     <td class="text-right nowrap">&euro;&nbsp;{{ child.effective_budget|euro }}</td>
                     <td class="text-right nowrap">&euro;&nbsp;{{ child.spent|euro }}</td>
+                    <td class="text-right nowrap" style="font-size:0.85rem;">
+                        {% if child.projected > 0 %}
+                        <span class="muted">&euro;&nbsp;{{ child.projected|euro }}</span>
+                        {% else %}-{% endif %}
+                    </td>
                     <td class="text-right nowrap muted" style="font-size:0.85rem;">
                         {% if child.prev_spent > 0 %}
                         &euro;&nbsp;{{ child.prev_spent|euro }}

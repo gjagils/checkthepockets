@@ -41,6 +41,7 @@ def analytics(
         Account.user_id == user.id,
         func.extract("year", Transaction.date) == current_year,
         Transaction.is_excluded == 0,
+        Transaction.transfer_id.is_(None),
     ]
     if account_id:
         tx_filter.append(Transaction.account_id == account_id)

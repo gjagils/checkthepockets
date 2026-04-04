@@ -8,7 +8,7 @@ from fastapi.templating import Jinja2Templates
 
 from app.auth import LoginRequired, get_current_user
 from app.database import get_db
-from app.routers import auth, transactions, accounts, categories, tags, rules, budgets, recurring, dashboard, savings, analytics, portfolio, networth
+from app.routers import auth, transactions, accounts, categories, tags, rules, budgets, recurring, dashboard, savings, analytics, portfolio, networth, settings
 from app.scheduler import start_scheduler
 
 app = FastAPI(title="Check Your Pockets", docs_url=None, redoc_url=None)
@@ -55,6 +55,7 @@ app.include_router(savings.router)
 app.include_router(analytics.router)
 app.include_router(portfolio.router)
 app.include_router(networth.router)
+app.include_router(settings.router)
 
 
 @app.on_event("startup")

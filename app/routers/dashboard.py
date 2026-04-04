@@ -53,6 +53,7 @@ def dashboard(
         Account.user_id == user.id,
         func.extract("year", Transaction.date) == current_year,
         Transaction.is_excluded == 0,
+        Transaction.transfer_id.is_(None),
     ]
     if current_month:
         tx_filter.append(func.extract("month", Transaction.date) == current_month)
@@ -100,6 +101,8 @@ def dashboard(
         monthly_filter = [
             Account.user_id == user.id,
             func.extract("year", Transaction.date) == current_year,
+            Transaction.is_excluded == 0,
+            Transaction.transfer_id.is_(None),
         ]
         if account_id:
             monthly_filter.append(Transaction.account_id == account_id)

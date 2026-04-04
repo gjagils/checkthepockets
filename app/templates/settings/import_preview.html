@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Import voorvertoning - Check Your Pockets{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Import voorvertoning</h1>
+</div>
+
+<div class="card">
+    <h2>Wat staat er in het bestand?</h2>
+    <p style="color:var(--muted); font-size:0.9rem; margin-bottom:1.5rem;">
+        Controleer het overzicht hieronder. Bestaande items worden bijgewerkt; nieuwe items worden aangemaakt.
+        Klik op <strong>Importeren</strong> om te bevestigen.
+    </p>
+
+    <div class="import-summary" style="margin-bottom:1.5rem;">
+        <div class="summary-card">
+            <div class="value">{{ counts.categories }}</div>
+            <div class="label">Categorieën</div>
+        </div>
+        <div class="summary-card">
+            <div class="value">{{ counts.tags }}</div>
+            <div class="label">Tags</div>
+        </div>
+        <div class="summary-card">
+            <div class="value">{{ counts.rules }}</div>
+            <div class="label">Regels</div>
+        </div>
+        <div class="summary-card">
+            <div class="value">{{ counts.recurring }}</div>
+            <div class="label">Terugkerend</div>
+        </div>
+        <div class="summary-card">
+            <div class="value">{{ counts.budgets }}</div>
+            <div class="label">Budgetten</div>
+        </div>
+    </div>
+
+    <form method="post" action="/settings/import/confirm">
+        <input type="hidden" name="raw_json" value="{{ raw_json | e }}">
+        <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
+            <button type="submit" class="btn btn-primary">✓ Importeren</button>
+            <a href="/settings" class="btn">← Annuleren</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

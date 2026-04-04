@@ -113,7 +113,7 @@ _NL_MONTHS = ["", "Januari", "Februari", "Maart", "April", "Mei", "Juni",
               "Juli", "Augustus", "September", "Oktober", "November", "December"]
 
 
-@router.get("/")
+@router.get("/transactions")
 def transaction_list(
     request: Request,
     page: int = Query(1, ge=1),
@@ -294,7 +294,7 @@ def set_category(
     request: Request,
     transaction_id: int,
     category_id: int = Form(0),
-    redirect_to: str = Form("/"),
+    redirect_to: str = Form("/transactions"),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
@@ -318,7 +318,7 @@ def set_category(
 def exclude_transaction(
     request: Request,
     transaction_id: int,
-    redirect_to: str = Form("/"),
+    redirect_to: str = Form("/transactions"),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
@@ -342,7 +342,7 @@ def exclude_transaction(
 def toggle_reviewed(
     request: Request,
     transaction_id: int,
-    redirect_to: str = Form("/"),
+    redirect_to: str = Form("/transactions"),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
@@ -597,7 +597,7 @@ async def bulk_action(request: Request, db: Session = Depends(get_db)):
 
     tx_ids_raw = form.getlist("tx_ids")
     action = form.get("action", "")
-    redirect_to = form.get("redirect_to", "/")
+    redirect_to = form.get("redirect_to", "/transactions")
     category_id_raw = form.get("bulk_category_id", "")
     tag_id_raw = form.get("bulk_tag_id", "")
 
@@ -1048,7 +1048,7 @@ def link_transfer(
     transaction_id: int,
     request: Request,
     partner_id: int = Form(...),
-    redirect_to: str = Form("/"),
+    redirect_to: str = Form("/transactions"),
     db: Session = Depends(get_db),
 ):
     """Link two transactions as a transfer pair (bidirectional)."""
@@ -1077,7 +1077,7 @@ def link_transfer(
 def unlink_transfer(
     transaction_id: int,
     request: Request,
-    redirect_to: str = Form("/"),
+    redirect_to: str = Form("/transactions"),
     db: Session = Depends(get_db),
 ):
     """Remove the transfer link from both sides of a transfer pair."""

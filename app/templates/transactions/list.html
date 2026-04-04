@@ -21,7 +21,7 @@
         {% if current_month %}
         <a href="/?month={{ next_month }}{% if current_account_id %}&account_id={{ current_account_id }}{% endif %}{% if current_category_id %}&category_id={{ current_category_id }}{% endif %}" class="period-btn" title="Volgende maand">›</a>
         <span class="period-divider"></span>
-        <a href="/" class="period-btn">Alles</a>
+        <a href="/transactions" class="period-btn">Alles</a>
         {% else %}
         <a href="/?month={{ this_month }}{% if current_account_id %}&account_id={{ current_account_id }}{% endif %}" class="period-btn" title="Ga naar deze maand">Deze maand</a>
         {% endif %}
@@ -37,7 +37,7 @@
     <!-- More filters (compact dropdown) -->
     <details class="tx-more-filters">
         <summary>Meer filters</summary>
-        <form method="get" action="/" class="tx-more-panel">
+        <form method="get" action="/transactions" class="tx-more-panel">
             {% if current_month %}<input type="hidden" name="month" value="{{ current_month }}">{% endif %}
             <div class="form-group">
                 <label>Zoeken</label>
@@ -85,7 +85,7 @@
             </div>
             <div style="display:flex; gap:0.5rem; margin-top:0.25rem;">
                 <button type="submit" class="btn btn-sm btn-primary" style="flex:1;">Toepassen</button>
-                <a href="/" class="btn btn-sm">Wissen</a>
+                <a href="/transactions" class="btn btn-sm">Wissen</a>
             </div>
         </form>
     </details>
@@ -301,7 +301,7 @@
 <div class="card" style="text-align:center; padding:3rem;">
     {% if filter_params %}
     <p style="margin-bottom:1rem;">Geen transacties gevonden met deze filters.</p>
-    <a href="/" class="btn btn-primary">Filters wissen</a>
+    <a href="/transactions" class="btn btn-primary">Filters wissen</a>
     {% else %}
     <p style="margin-bottom:1rem;">Nog geen transacties geimporteerd.</p>
     <a href="/import" class="btn btn-primary">Eerste CSV importeren</a>

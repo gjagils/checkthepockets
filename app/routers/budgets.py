@@ -135,6 +135,28 @@ def budget_overview(
     spending = spending_query.group_by(Category.id).all()
     spending_map = {row.id: abs(row.total) for row in spending}
 
+    # Get projected (expected) spending per category for this month
+    projected_query = (
+        db.query(
+            Category.id,
+            func.sum(Transaction.amount).label("total"),
+        )
+        .join(Transaction, Transaction.category_id == Category.id)
+        .join(Account, Account.id == Transaction.account_id)
+        .filter(
+            Account.user_id == user.id,
+            func.extract("year", Transaction.date) == current_year,
+            func.extract("month", Transaction.date) == current_month,
+            Transaction.is_projected == 1,
+            Transaction.amount < 0,
+            Category.exclude_from_budget == 0,
+        )
+    )
+    if account_id:
+        projected_query = projected_query.filter(Transaction.account_id == account_id)
+    projected_rows = projected_query.group_by(Category.id).all()
+    projected_map = {row.id: abs(row.total) for row in projected_rows}
+
     # Build data for template
     budget_data = []
     total_budgeted = Decimal("0")
@@ -154,19 +176,23 @@ def budget_overview(
             group_budget = Decimal("0")
             group_spent = Decimal("0")
             group_rollover = Decimal("0")
+            group_projected = Decimal("0")
         else:
             group_budget = parent_budget
             group_spent = parent_spent
             group_rollover = parent_rollover
+            group_projected = projected_map.get(parent.id, Decimal("0"))
 
         for child in children:
             cb = budget_map.get(child.id, Decimal("0"))
             cs = spending_map.get(child.id, Decimal("0"))
             cr = rollover_map.get(child.id, Decimal("0"))
             cprev = prev_spending_map.get(child.id, Decimal("0"))
+            cp = projected_map.get(child.id, Decimal("0"))
             group_budget += cb
             group_spent += cs
             group_rollover += cr
+            group_projected += cp
             child_rows.append({
                 "id": child.id,
                 "name": child.name,
@@ -178,6 +204,7 @@ def budget_overview(
                 "effective_budget": cb + cr,
                 "effective_remaining": cb + cr - cs,
                 "prev_spent": cprev,
+                "projected": cp,
             })
 
         total_budgeted += group_budget
@@ -193,6 +220,7 @@ def budget_overview(
             "group_rollover": group_rollover,
             "group_effective": group_budget + group_rollover,
             "group_effective_remaining": group_budget + group_rollover - group_spent,
+            "group_projected": group_projected,
             "parent_budget": parent_budget,
             "parent_spent": parent_spent,
             "parent_rollover": parent_rollover,

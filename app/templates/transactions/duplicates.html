@@ -7,7 +7,7 @@
         <h1>Duplicaten</h1>
         <p class="muted" style="margin-top:0.25rem;">Transacties met dezelfde datum, bedrag en tegenpartij.</p>
     </div>
-    <a href="/" class="btn">← Terug naar transacties</a>
+    <a href="/transactions" class="btn">← Terug naar transacties</a>
 </div>
 
 {% if not groups %}
@@ -74,7 +74,7 @@
 {% endfor %}
 
 <div style="display:flex; gap:1rem; justify-content:flex-end; margin-top:1rem;">
-    <a href="/" class="btn">Annuleren</a>
+    <a href="/transactions" class="btn">Annuleren</a>
     <button type="submit" class="btn btn-primary"
             onclick="return confirm('Geselecteerde transacties uitsluiten? Ze verdwijnen uit overzichten.')">
         Geselecteerde uitsluiten

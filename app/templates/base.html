@@ -21,7 +21,7 @@
     {% set path = request.url.path %}
     {% set main_active =
         'dashboard' if path == '/dashboard'
-        else 'financien' if path in ['/', '/categories', '/tags', '/rules', '/recurring'] or path.startswith('/transactions')
+        else 'financien' if path in ['/transactions', '/categories', '/tags', '/rules', '/recurring'] or path.startswith('/transactions')
         else 'budgetten' if path.startswith('/budgets') or path.startswith('/savings')
         else 'analyse' if path.startswith('/analytics') or path.startswith('/portfolio') or path.startswith('/networth')
         else 'rekeningen' if path.startswith('/accounts') or path.startswith('/import')
@@ -38,7 +38,7 @@
             </a>
             <div class="nav-main-links">
                 <a href="/dashboard" class="{{ 'active' if main_active == 'dashboard' }}">Dashboard</a>
-                <a href="/" class="{{ 'active' if main_active == 'financien' }}">Financiën</a>
+                <a href="/transactions" class="{{ 'active' if main_active == 'financien' }}">Financiën</a>
                 <a href="/budgets" class="{{ 'active' if main_active == 'budgetten' }}">Budgetten</a>
                 <a href="/analytics" class="{{ 'active' if main_active == 'analyse' }}">Analyse</a>
                 <a href="/accounts" class="{{ 'active' if main_active == 'rekeningen' }}">Rekeningen</a>
@@ -51,7 +51,7 @@
         </nav>
         <nav class="nav-sub">
             {% if main_active == 'financien' %}
-                <a href="/" class="{{ 'active' if path == '/' or path.startswith('/transactions') }}">Transacties</a>
+                <a href="/transactions" class="{{ 'active' if path == '/transactions' or path.startswith('/transactions/') }}">Transacties</a>
                 <a href="/categories" class="{{ 'active' if path == '/categories' }}">Categorieën</a>
                 <a href="/tags" class="{{ 'active' if path == '/tags' }}">Tags</a>
                 <a href="/rules" class="{{ 'active' if path == '/rules' }}">Regels</a>
