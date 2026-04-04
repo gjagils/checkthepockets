@@ -10,6 +10,7 @@ from sqlalchemy import func
 from app.database import get_db
 from app.models import User, AuthToken, Account, Transaction
 from app.auth import require_login
+from app.config import SUPER_ADMIN_USERNAME
 from app.email_service import send_invite_email
 from app.crypto import encrypt_existing_transactions, encryption_enabled
 from app.template_config import templates
@@ -65,7 +66,10 @@ def admin_users(request: Request, db: Session = Depends(get_db)):
 def toggle_active(user_id: int, request: Request, db: Session = Depends(get_db)):
     admin = _require_admin(request, db)
     target = db.query(User).filter(User.id == user_id).first()
-    if target and target.id != admin.id:  # can't deactivate yourself
+    if target and target.id != admin.id:
+        # Super admin cannot be deactivated
+        if SUPER_ADMIN_USERNAME and target.username == SUPER_ADMIN_USERNAME:
+            return RedirectResponse("/admin/users", status_code=302)
         target.is_active = 0 if target.is_active else 1
         db.commit()
     return RedirectResponse("/admin/users", status_code=302)
@@ -75,7 +79,10 @@ def toggle_active(user_id: int, request: Request, db: Session = Depends(get_db))
 def toggle_admin(user_id: int, request: Request, db: Session = Depends(get_db)):
     admin = _require_admin(request, db)
     target = db.query(User).filter(User.id == user_id).first()
-    if target and target.id != admin.id:  # can't remove own admin
+    if target and target.id != admin.id:
+        # Super admin cannot lose admin rights
+        if SUPER_ADMIN_USERNAME and target.username == SUPER_ADMIN_USERNAME:
+            return RedirectResponse("/admin/users", status_code=302)
         target.is_admin = 0 if target.is_admin else 1
         db.commit()
     return RedirectResponse("/admin/users", status_code=302)
@@ -86,6 +93,9 @@ def delete_user(user_id: int, request: Request, db: Session = Depends(get_db)):
     admin = _require_admin(request, db)
     target = db.query(User).filter(User.id == user_id).first()
     if target and target.id != admin.id:
+        # Super admin cannot be deleted
+        if SUPER_ADMIN_USERNAME and target.username == SUPER_ADMIN_USERNAME:
+            return RedirectResponse("/admin/users", status_code=302)
         db.delete(target)
         db.commit()
     return RedirectResponse("/admin/users", status_code=302)

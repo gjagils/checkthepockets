@@ -20,6 +20,9 @@ REQUIRE_EMAIL_VERIFICATION = os.getenv("REQUIRE_EMAIL_VERIFICATION", "false").lo
 # Sprint 16 — Encryption at-rest
 FIELD_ENCRYPTION_KEY = os.getenv("FIELD_ENCRYPTION_KEY", "")
 
+# Super admin — can never be deactivated or de-admin'd
+SUPER_ADMIN_USERNAME = os.getenv("SUPER_ADMIN_USERNAME", "")
+
 # Sprint 17 — AI rule suggestions
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 

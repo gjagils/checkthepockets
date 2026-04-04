@@ -23,3 +23,5 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       # Encryptie at-rest
       - FIELD_ENCRYPTION_KEY=${FIELD_ENCRYPTION_KEY:-}
+      # Super admin (kan niet worden gedeactiveerd/verwijderd)
+      - SUPER_ADMIN_USERNAME=${SUPER_ADMIN_USERNAME:-}

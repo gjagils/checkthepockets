@@ -18,6 +18,7 @@ from app.auth import (
 from app.config import (
     REGISTRATION_OPEN, REQUIRE_EMAIL_VERIFICATION,
     GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, APP_URL,
+    SUPER_ADMIN_USERNAME,
 )
 from app.email_service import send_verification_email, send_password_reset_email
 from app.rate_limit import is_rate_limited, record_failed_attempt, clear_attempts
@@ -53,6 +54,20 @@ router = APIRouter()
 # ──────────────────────────────────────────────────────────────────────────────
 # Helpers
 # ──────────────────────────────────────────────────────────────────────────────
+
+def _enforce_super_admin(user: "User", db: Session) -> None:
+    """Ensure the super admin always has is_admin=1 and is_active=1."""
+    if SUPER_ADMIN_USERNAME and user.username == SUPER_ADMIN_USERNAME:
+        changed = False
+        if not user.is_admin:
+            user.is_admin = 1
+            changed = True
+        if not user.is_active:
+            user.is_active = 1
+            changed = True
+        if changed:
+            db.commit()
+
 
 def _client_ip(request: Request) -> str:
     forwarded = request.headers.get("x-forwarded-for")
@@ -146,6 +161,7 @@ def login(
         )
 
     clear_attempts(ip)
+    _enforce_super_admin(user, db)
     user.last_login_at = datetime.datetime.utcnow()
     db.commit()
 
@@ -528,6 +544,7 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
             "google_login_enabled": True,
         })
 
+    _enforce_super_admin(user, db)
     user.last_login_at = datetime.datetime.utcnow()
     db.commit()
 
