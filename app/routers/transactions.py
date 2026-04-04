@@ -14,7 +14,7 @@ from sqlalchemy import func, or_, tuple_
 from sqlalchemy.exc import IntegrityError
 
 from app.database import get_db
-from app.models import Account, Transaction, Category, Tag, Rule
+from app.models import Account, Transaction, Category, Tag, Rule, RecurringTransaction
 from app.auth import require_login
 from app.parsers import abn_amro, bunq, ics, ing, rabobank
 from app.parsers.base import ParseError, ParsedTransaction
@@ -53,6 +53,7 @@ def _build_tx_query(db, user, account_id, category_id, tag_id, search,
     )
     query = query.filter(Transaction.id.notin_(split_parent_ids))
     query = query.filter(Transaction.is_excluded == 0)
+    query = query.filter(Transaction.is_projected == 0)
 
     if account_id:
         query = query.filter(Transaction.account_id == account_id)
@@ -196,6 +197,26 @@ def transaction_list(
     )
     uncategorized_count = uncat_base.filter(Transaction.category_id.is_(None)).count()
 
+    # Sync + fetch projected transactions for current month view
+    projected_transactions = []
+    if current_month:
+        from app.routers.recurring import sync_projected_transactions
+        y, m = int(current_month[:4]), int(current_month[5:7])
+        sync_projected_transactions(user.id, y, m, db)
+        proj_date_from = date_type.fromisoformat(date_from) if date_from else None
+        proj_date_to = date_type.fromisoformat(date_to) if date_to else None
+        proj_q = (
+            db.query(Transaction)
+            .join(Account)
+            .options(joinedload(Transaction.category))
+            .filter(Account.user_id == user.id, Transaction.is_projected == 1)
+        )
+        if proj_date_from:
+            proj_q = proj_q.filter(Transaction.date >= proj_date_from)
+        if proj_date_to:
+            proj_q = proj_q.filter(Transaction.date <= proj_date_to)
+        projected_transactions = proj_q.order_by(Transaction.date.asc()).all()
+
     filter_params = {}
     if current_month:
         filter_params["month"] = current_month
@@ -263,6 +284,7 @@ def transaction_list(
             "this_month": this_month,
             "period_label": period_label,
             "uncategorized_count": uncategorized_count,
+            "projected_transactions": projected_transactions,
         },
     )
 
@@ -844,6 +866,10 @@ async def import_csv(
         imported += 1
 
     db.commit()
+
+    # Remove projected placeholders that now have a real matching transaction
+    from app.routers.recurring import cleanup_matched_projected
+    cleanup_matched_projected(user.id, db)
 
     return templates.TemplateResponse(
         "transactions/import_result.html",

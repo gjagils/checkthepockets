@@ -91,7 +91,7 @@
     </details>
 </div>
 
-{% if transactions %}
+{% if transactions or projected_transactions %}
 <div class="card">
     <div class="table-wrap">
         <table id="txTable">
@@ -125,6 +125,25 @@
                 </tr>
             </thead>
             <tbody>
+                {% for tx in projected_transactions %}
+                <tr class="tx-projected">
+                    <td></td>
+                    <td></td>
+                    <td class="nowrap muted">{{ tx.date.strftime('%m-%Y') }}</td>
+                    <td class="desc-cell">
+                        <span class="tx-projected-label">Verwacht</span>
+                        {{ tx.description or '-' }}
+                    </td>
+                    <td class="col-counterparty muted">{{ tx.counterparty or '-' }}</td>
+                    <td class="nowrap muted">{{ tx.category.name if tx.category else '-' }}</td>
+                    <td class="text-right nowrap {% if tx.amount < 0 %}amount-negative{% else %}amount-positive{% endif %}" style="opacity:0.6;">
+                        {{ tx.amount|euro }}
+                    </td>
+                    <td class="col-account muted"></td>
+                    <td></td>
+                    <td></td>
+                </tr>
+                {% endfor %}
                 {% for tx in transactions %}
                 <tr data-txid="{{ tx.id }}">
                     <td style="text-align:center;">

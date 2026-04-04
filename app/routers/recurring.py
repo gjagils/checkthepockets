@@ -1,6 +1,8 @@
 import calendar
+import hashlib
 from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
+from typing import List
 
 from fastapi import APIRouter, Depends, Request, Form, Query
 from fastapi.responses import RedirectResponse
@@ -20,6 +22,11 @@ FREQUENCIES = {
     "quarterly": "Per kwartaal",
     "yearly": "Jaarlijks",
 }
+
+NL_MONTH_ABBREVS = [
+    "", "Jan", "Feb", "Mrt", "Apr", "Mei", "Jun",
+    "Jul", "Aug", "Sep", "Okt", "Nov", "Dec",
+]
 
 MONTH_NAMES_NL = [
     "", "Januari", "Februari", "Maart", "April", "Mei", "Juni",
@@ -79,6 +86,7 @@ def _find_matching_transaction(
             Transaction.date >= start,
             Transaction.date <= end,
             Transaction.is_excluded == 0,
+            Transaction.is_projected == 0,
         )
         .first()
     )
@@ -103,11 +111,30 @@ def _find_matching_transaction(
             Transaction.date >= start,
             Transaction.date <= end,
             Transaction.is_excluded == 0,
+            Transaction.is_projected == 0,
             or_(*conditions),
         )
         .order_by(Transaction.date.desc())
         .first()
     )
+
+
+def _parse_active_months(values: List[str]) -> str | None:
+    """Convert list of month number strings to stored comma-separated string, or None for all."""
+    nums = sorted({int(v) for v in values if v.isdigit() and 1 <= int(v) <= 12})
+    if len(nums) == 12:
+        return None  # all months = no restriction
+    return ",".join(str(m) for m in nums) if nums else None
+
+
+def _active_months_set(item: RecurringTransaction) -> set[int]:
+    """Return the set of active month numbers for a recurring item (1-12). Empty = all."""
+    if not item.active_months:
+        return set(range(1, 13))
+    try:
+        return {int(m) for m in item.active_months.split(",") if m.strip()}
+    except ValueError:
+        return set(range(1, 13))
 
 
 def _is_in_active_period(item: RecurringTransaction, today: date) -> bool:
@@ -116,7 +143,125 @@ def _is_in_active_period(item: RecurringTransaction, today: date) -> bool:
         return False
     if item.end_date and item.end_date < today:
         return False
+    months = _active_months_set(item)
+    if today.month not in months:
+        return False
     return True
+
+
+def _is_active_in_month(item: RecurringTransaction, year: int, month: int) -> bool:
+    """Check if a recurring item should be active in the given year/month."""
+    ref = date(year, month, 1)
+    if item.start_date and item.start_date > date(year, month, calendar.monthrange(year, month)[1]):
+        return False
+    if item.end_date and item.end_date < ref:
+        return False
+    months = _active_months_set(item)
+    if month not in months:
+        return False
+    return True
+
+
+def sync_projected_transactions(user_id: int, year: int, month: int, db: Session) -> None:
+    """
+    For the given month:
+    - Create projected Transaction placeholders for active recurring items with no real match.
+    - Delete projected placeholders where a real transaction now exists.
+    """
+    ref = date(year, month, 1)
+
+    recurring_items = (
+        db.query(RecurringTransaction)
+        .filter(RecurringTransaction.user_id == user_id, RecurringTransaction.is_active == 1)
+        .all()
+    )
+
+    # Need at least one account to attach projected transactions to
+    default_account = (
+        db.query(Account)
+        .filter(Account.user_id == user_id)
+        .order_by(Account.id)
+        .first()
+    )
+    if not default_account:
+        return
+
+    changed = False
+    for item in recurring_items:
+        if not _is_active_in_month(item, year, month):
+            # Clean up any stale projected tx for this item+period
+            proj_hash = f"projected-{item.id}-{year}-{month:02d}"
+            stale = db.query(Transaction).filter(Transaction.import_hash == proj_hash).first()
+            if stale:
+                db.delete(stale)
+                changed = True
+            continue
+
+        # Determine the period for this item's frequency in the given month
+        period_start, period_end = _get_period_range(item.frequency, ref)
+        proj_hash = f"projected-{item.id}-{period_start.isoformat()}"
+
+        # Check if a real (non-projected) transaction already matches
+        real_tx = _find_matching_transaction(db, user_id, item, period_start, period_end)
+
+        if real_tx:
+            # Real match exists — delete projected placeholder if present
+            proj = db.query(Transaction).filter(Transaction.import_hash == proj_hash).first()
+            if proj:
+                db.delete(proj)
+                changed = True
+        else:
+            # No real match — ensure projected placeholder exists
+            proj = db.query(Transaction).filter(Transaction.import_hash == proj_hash).first()
+            if not proj:
+                # Determine account: prefer recurring item's category account, else default
+                db.add(Transaction(
+                    account_id=default_account.id,
+                    date=period_start,
+                    amount=item.amount_expected,
+                    currency="EUR",
+                    description=item.name,
+                    counterparty=item.counterparty or item.name,
+                    import_hash=proj_hash,
+                    is_projected=1,
+                    is_excluded=0,
+                    category_id=item.category_id,
+                    recurring_id=item.id,
+                ))
+                changed = True
+
+    if changed:
+        db.commit()
+
+
+def cleanup_matched_projected(user_id: int, db: Session) -> None:
+    """Delete projected transactions that now have a matching real transaction."""
+    projected = (
+        db.query(Transaction)
+        .join(Account)
+        .filter(Account.user_id == user_id, Transaction.is_projected == 1)
+        .all()
+    )
+    changed = False
+    for proj in projected:
+        if not proj.recurring_id:
+            db.delete(proj)
+            changed = True
+            continue
+        item = db.query(RecurringTransaction).filter(
+            RecurringTransaction.id == proj.recurring_id
+        ).first()
+        if not item:
+            db.delete(proj)
+            changed = True
+            continue
+        period_start, period_end = _get_period_range(item.frequency, proj.date)
+        real_tx = _find_matching_transaction(db, user_id, item, period_start, period_end)
+        if real_tx:
+            db.delete(proj)
+            changed = True
+    if changed:
+        db.commit()
 
 
 @router.get("/recurring")
@@ -184,10 +329,8 @@ def recurring_list(
         if cur_match:
             items_active.append(entry)
         elif prev_match is None:
-            # Previous period also had no match → genuinely missed
             items_missed.append(entry)
         else:
-            # Previous period was fine, just waiting for current period
             items_due.append(entry)
 
     total_active = len(items_active)
@@ -222,6 +365,7 @@ def recurring_list(
             "items_inactive": items_inactive,
             "categories": categories,
             "frequencies": FREQUENCIES,
+            "nl_month_abbrevs": NL_MONTH_ABBREVS,
             "total_active": total_active,
             "total_due": total_due,
             "total_missed": total_missed,
@@ -242,6 +386,7 @@ def create_recurring(
     description_match: str = Form(""),
     start_date: str = Form(""),
     end_date: str = Form(""),
+    active_months: List[str] = Form(default=[]),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
@@ -286,6 +431,7 @@ def create_recurring(
         description_match=description_match.strip() or None,
         start_date=parsed_start,
         end_date=parsed_end,
+        active_months=_parse_active_months(active_months),
     )
     db.add(item)
     db.commit()
@@ -305,6 +451,7 @@ def edit_recurring(
     description_match: str = Form(""),
     start_date: str = Form(""),
     end_date: str = Form(""),
+    active_months: List[str] = Form(default=[]),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
@@ -341,6 +488,7 @@ def edit_recurring(
     item.description_match = description_match.strip() or None
     item.start_date = parsed_start
     item.end_date = parsed_end
+    item.active_months = _parse_active_months(active_months)
 
     cat_id = int(category_id) if category_id.strip() else None
     if cat_id:

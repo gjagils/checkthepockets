@@ -54,6 +54,20 @@
             <input type="date" name="end_date" value="{{ item.end_date.isoformat() if item.end_date else '' }}">
         </div>
     </div>
+    <div class="form-group">
+        <label>Actieve maanden</label>
+        {% set active_set = item.active_months.split(',') | map('int') | list if item.active_months else [] %}
+        <div class="month-picker">
+            {% for m in range(1, 13) %}
+            <label class="month-pill-toggle {% if not item.active_months or m|string in item.active_months.split(',') %}active{% endif %}">
+                <input type="checkbox" name="active_months" value="{{ m }}"
+                       {% if not item.active_months or m|string in item.active_months.split(',') %}checked{% endif %}>
+                {{ nl_month_abbrevs[m] }}
+            </label>
+            {% endfor %}
+        </div>
+        <small class="muted">Leeg = alle maanden.</small>
+    </div>
     <div style="margin-top:0.5rem; display:flex; gap:0.5rem;">
         <button type="submit" class="btn btn-sm btn-primary">Opslaan</button>
         <button type="button" class="btn btn-sm" onclick="toggleRecurringEdit({{ item.id }})">Annuleren</button>

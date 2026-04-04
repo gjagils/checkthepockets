@@ -48,6 +48,13 @@
             {% if item.category %}
             <span class="category-pill" style="--cat-color: {{ item.category.color or '#1F6FB2' }}">{{ item.category.name }}</span>
             {% endif %}
+            {% if item.active_months %}
+            <span class="month-pills-row">
+                {% for m in range(1, 13) %}
+                <span class="month-pill {% if m|string in item.active_months.split(',') %}month-pill-on{% else %}month-pill-off{% endif %}">{{ nl_month_abbrevs[m] }}</span>
+                {% endfor %}
+            </span>
+            {% endif %}
             <span class="muted" style="font-size:0.78rem;">
                 Vorige periode: {{ entry.prev_period_start.strftime('%d-%m') }} t/m {{ entry.prev_period_end.strftime('%d-%m-%Y') }}
             </span>
@@ -98,6 +105,13 @@
                 <div class="recurring-meta">
                     <span class="pill">{{ frequencies.get(item.frequency, item.frequency) }}</span>
                     {% if item.category %}<span class="category-pill" style="--cat-color: {{ item.category.color or '#1F6FB2' }}">{{ item.category.name }}</span>{% endif %}
+                    {% if item.active_months %}
+                    <span class="month-pills-row">
+                        {% for m in range(1, 13) %}
+                        <span class="month-pill {% if m|string in item.active_months.split(',') %}month-pill-on{% else %}month-pill-off{% endif %}">{{ nl_month_abbrevs[m] }}</span>
+                        {% endfor %}
+                    </span>
+                    {% endif %}
                     <span class="muted" style="font-size:0.78rem;">t/m {{ entry.period_end.strftime('%d-%m-%Y') }}</span>
                     <span class="recurring-badge recurring-badge-due">Nog niet gevonden</span>
                 </div>
@@ -144,6 +158,13 @@
                 <div class="recurring-meta">
                     <span class="pill">{{ frequencies.get(item.frequency, item.frequency) }}</span>
                     {% if item.category %}<span class="category-pill" style="--cat-color: {{ item.category.color or '#1F6FB2' }}">{{ item.category.name }}</span>{% endif %}
+                    {% if item.active_months %}
+                    <span class="month-pills-row">
+                        {% for m in range(1, 13) %}
+                        <span class="month-pill {% if m|string in item.active_months.split(',') %}month-pill-on{% else %}month-pill-off{% endif %}">{{ nl_month_abbrevs[m] }}</span>
+                        {% endfor %}
+                    </span>
+                    {% endif %}
                     <span class="recurring-badge recurring-badge-ok">
                         {{ entry.matched_transaction.date.strftime('%d-%m') }}
                         &euro;&nbsp;{{ entry.matched_transaction.amount|euro }}
@@ -293,6 +314,18 @@
                         </div>
                     </div>
                 </details>
+                <div class="form-group">
+                    <label>Actieve maanden</label>
+                    <div class="month-picker">
+                        {% for m in range(1, 13) %}
+                        <label class="month-pill-toggle active">
+                            <input type="checkbox" name="active_months" value="{{ m }}" checked>
+                            {{ nl_month_abbrevs[m] }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                    <small class="muted">Alle maanden geselecteerd = geen beperking.</small>
+                </div>
                 <button type="submit" class="btn btn-primary">Toevoegen</button>
             </form>
         </div>
@@ -309,5 +342,17 @@ function toggleRecurringEdit(id) {
 {% if prefill %}
 document.getElementById('new-recurring-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
 {% endif %}
+
+// Month pill toggle: sync checkbox state with active class
+document.querySelectorAll('.month-pill-toggle').forEach(function(label) {
+    label.addEventListener('click', function() {
+        var cb = label.querySelector('input[type="checkbox"]');
+        // The browser toggles the checkbox before this runs (for label clicks),
+        // so we read the new state after a tick.
+        setTimeout(function() {
+            label.classList.toggle('active', cb.checked);
+        }, 0);
+    });
+});
 </script>
 {% endblock %}
