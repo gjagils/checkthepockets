@@ -384,8 +384,19 @@ a:hover { color: var(--sky-dark); }
     border: 1px solid var(--border);
     box-shadow: var(--ctp-shadow);
 }
-.auth-logo { text-align: center; margin-bottom: 1.5rem; }
-.auth-logo img { height: 80px; width: auto; }
+.auth-logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.7rem;
+    margin-bottom: 2rem;
+}
+.auth-logo img { height: 56px; width: auto; }
+.auth-logo .brand-text { display: flex; flex-direction: column; line-height: 1; }
+.auth-logo .brand-line { font-size: 1.05rem; font-weight: 800; letter-spacing: 0.08em; }
+.auth-logo .brand-check { color: var(--nav-active-border); }
+.auth-logo .brand-the   { color: var(--text); }
+.auth-logo .brand-pockets { color: var(--nav-active-border); }
 .auth-container h1 { margin-bottom: 1.5rem; font-size: 1.5rem; text-align: center; }
 .auth-link { margin-top: 1.25rem; text-align: center; font-size: 0.9rem; color: var(--muted); }
 .auth-link a { color: var(--sky); text-decoration: none; font-weight: 700; }

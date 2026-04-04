@@ -2,8 +2,14 @@
 {% block title %}Inloggen - Check The Pockets{% endblock %}
 {% block content %}
 <div class="auth-container">
-    <div class="auth-logo"><img src="/static/img/logo.png" alt="Check The Pockets"></div>
-    <h1>Inloggen</h1>
+    <div class="auth-logo">
+        <img src="/static/img/logo.png" alt="Check The Pockets">
+        <span class="brand-text">
+            <span class="brand-line brand-check">CHECK</span>
+            <span class="brand-line brand-the">THE</span>
+            <span class="brand-line brand-pockets">POCKETS</span>
+        </span>
+    </div>
     {% if error %}
     <div class="alert alert-error">{{ error }}</div>
     {% endif %}
