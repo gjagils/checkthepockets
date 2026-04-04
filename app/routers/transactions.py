@@ -1,13 +1,15 @@
+import csv
 import hashlib
+import io
 import uuid
 from datetime import date as date_type
 from decimal import Decimal, InvalidOperation
+from typing import List
 
 from fastapi import APIRouter, Depends, Request, UploadFile, File, Form, Query
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, StreamingResponse
 from sqlalchemy.orm import Session, joinedload
-
-from sqlalchemy import or_
+from sqlalchemy import func, or_, tuple_
 from sqlalchemy.exc import IntegrityError
 
 from app.database import get_db
@@ -32,35 +34,16 @@ PARSERS = {
 PER_PAGE = 50
 
 
-@router.get("/")
-def transaction_list(
-    request: Request,
-    page: int = Query(1, ge=1),
-    account_id: str = Query(""),
-    category_id: str = Query(""),
-    tag_id: str = Query(""),
-    search: str | None = Query(None),
-    date_from: str | None = Query(None),
-    date_to: str | None = Query(None),
-    amount_min: str | None = Query(None),
-    amount_max: str | None = Query(None),
-    db: Session = Depends(get_db),
-):
-    user = require_login(request, db)
-
-    # Parse optional int query params (HTML forms send "" for empty selects)
-    account_id = int(account_id) if account_id.strip() else None
-    category_id = int(category_id) if category_id.strip() else None
-    tag_id = int(tag_id) if tag_id.strip() else None
-
+def _build_tx_query(db, user, account_id, category_id, tag_id, search,
+                    date_from, date_to, amount_min, amount_max):
+    """Shared filter logic used by list view, export, and duplicates."""
     query = (
         db.query(Transaction)
         .join(Account)
-        .options(joinedload(Transaction.category))
+        .options(joinedload(Transaction.category), joinedload(Transaction.tags))
         .filter(Account.user_id == user.id)
     )
 
-    # Hide parent transactions that have been split (children replace them)
     split_parent_ids = (
         db.query(Transaction.parent_id)
         .filter(Transaction.parent_id.isnot(None))
@@ -68,11 +51,8 @@ def transaction_list(
         .scalar_subquery()
     )
     query = query.filter(Transaction.id.notin_(split_parent_ids))
-
-    # Hide excluded (soft-deleted) transactions
     query = query.filter(Transaction.is_excluded == 0)
 
-    # Filters
     if account_id:
         query = query.filter(Transaction.account_id == account_id)
 
@@ -80,7 +60,6 @@ def transaction_list(
         if category_id == -1:
             query = query.filter(Transaction.category_id.is_(None))
         else:
-            # Include child categories
             cat = db.query(Category).filter(
                 Category.id == category_id, Category.user_id == user.id
             ).first()
@@ -94,14 +73,12 @@ def transaction_list(
         query = query.filter(Transaction.tags.any(Tag.id == tag_id))
 
     if search:
-        search_term = f"%{search.strip()}%"
-        query = query.filter(
-            or_(
-                Transaction.description.ilike(search_term),
-                Transaction.counterparty.ilike(search_term),
-                Transaction.counterparty_iban.ilike(search_term),
-            )
-        )
+        term = f"%{search.strip()}%"
+        query = query.filter(or_(
+            Transaction.description.ilike(term),
+            Transaction.counterparty.ilike(term),
+            Transaction.counterparty_iban.ilike(term),
+        ))
 
     if date_from:
         try:
@@ -126,6 +103,35 @@ def transaction_list(
             query = query.filter(Transaction.amount <= float(amount_max))
         except ValueError:
             pass
+
+    return query
+
+
+@router.get("/")
+def transaction_list(
+    request: Request,
+    page: int = Query(1, ge=1),
+    account_id: str = Query(""),
+    category_id: str = Query(""),
+    tag_id: str = Query(""),
+    search: str | None = Query(None),
+    date_from: str | None = Query(None),
+    date_to: str | None = Query(None),
+    amount_min: str | None = Query(None),
+    amount_max: str | None = Query(None),
+    db: Session = Depends(get_db),
+):
+    user = require_login(request, db)
+
+    # Parse optional int query params (HTML forms send "" for empty selects)
+    account_id = int(account_id) if account_id.strip() else None
+    category_id = int(category_id) if category_id.strip() else None
+    tag_id = int(tag_id) if tag_id.strip() else None
+
+    query = _build_tx_query(
+        db, user, account_id, category_id, tag_id,
+        search, date_from, date_to, amount_min, amount_max,
+    )
 
     total = query.count()
     transactions = (
@@ -256,6 +262,30 @@ def exclude_transaction(
         return RedirectResponse(redirect_to, status_code=302)
 
     tx.is_excluded = 1 if not tx.is_excluded else 0
+    db.commit()
+
+    return RedirectResponse(redirect_to, status_code=302)
+
+
+@router.post("/transactions/{transaction_id}/reviewed")
+def toggle_reviewed(
+    request: Request,
+    transaction_id: int,
+    redirect_to: str = Form("/"),
+    db: Session = Depends(get_db),
+):
+    user = require_login(request, db)
+
+    tx = (
+        db.query(Transaction)
+        .join(Account)
+        .filter(Transaction.id == transaction_id, Account.user_id == user.id)
+        .first()
+    )
+    if not tx:
+        return RedirectResponse(redirect_to, status_code=302)
+
+    tx.is_reviewed = 0 if tx.is_reviewed else 1
     db.commit()
 
     return RedirectResponse(redirect_to, status_code=302)
@@ -431,6 +461,196 @@ def create_transaction(
     db.commit()
 
     return RedirectResponse("/", status_code=302)
+
+
+# ===== CSV Export =====
+
+@router.get("/transactions/export")
+def export_transactions(
+    request: Request,
+    account_id: str = Query(""),
+    category_id: str = Query(""),
+    tag_id: str = Query(""),
+    search: str | None = Query(None),
+    date_from: str | None = Query(None),
+    date_to: str | None = Query(None),
+    amount_min: str | None = Query(None),
+    amount_max: str | None = Query(None),
+    db: Session = Depends(get_db),
+):
+    user = require_login(request, db)
+
+    acc_id = int(account_id) if account_id.strip() else None
+    cat_id = int(category_id) if category_id.strip() else None
+    tg_id  = int(tag_id) if tag_id.strip() else None
+
+    transactions = (
+        _build_tx_query(db, user, acc_id, cat_id, tg_id,
+                        search, date_from, date_to, amount_min, amount_max)
+        .order_by(Transaction.date.desc(), Transaction.id.desc())
+        .all()
+    )
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["datum", "bedrag", "omschrijving", "tegenpartij", "iban_tegenpartij",
+                     "categorie", "tags", "rekening", "gecontroleerd"])
+    for tx in transactions:
+        writer.writerow([
+            tx.date.isoformat(),
+            str(tx.amount),
+            tx.description or "",
+            tx.counterparty or "",
+            tx.counterparty_iban or "",
+            tx.category.name if tx.category else "",
+            ";".join(t.name for t in tx.tags),
+            tx.account.name,
+            "ja" if tx.is_reviewed else "nee",
+        ])
+
+    output.seek(0)
+    filename = f"transacties-export.csv"
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+# ===== Bulk acties =====
+
+@router.post("/transactions/bulk")
+async def bulk_action(request: Request, db: Session = Depends(get_db)):
+    user = require_login(request, db)
+    form = await request.form()
+
+    tx_ids_raw = form.getlist("tx_ids")
+    action = form.get("action", "")
+    redirect_to = form.get("redirect_to", "/")
+    category_id_raw = form.get("bulk_category_id", "")
+    tag_id_raw = form.get("bulk_tag_id", "")
+
+    if not tx_ids_raw:
+        return RedirectResponse(redirect_to, status_code=302)
+
+    # Validate and fetch transactions belonging to this user
+    tx_ids = []
+    for raw in tx_ids_raw:
+        try:
+            tx_ids.append(int(raw))
+        except (ValueError, TypeError):
+            pass
+
+    if not tx_ids:
+        return RedirectResponse(redirect_to, status_code=302)
+
+    transactions = (
+        db.query(Transaction)
+        .join(Account)
+        .filter(Transaction.id.in_(tx_ids), Account.user_id == user.id)
+        .all()
+    )
+
+    if action == "category":
+        cat_id = int(category_id_raw) if category_id_raw.strip() else None
+        for tx in transactions:
+            tx.category_id = cat_id
+
+    elif action == "tag":
+        tg_id = int(tag_id_raw) if tag_id_raw.strip() else None
+        if tg_id:
+            tag = db.query(Tag).filter(Tag.id == tg_id, Tag.user_id == user.id).first()
+            if tag:
+                for tx in transactions:
+                    if tag not in tx.tags:
+                        tx.tags.append(tag)
+
+    elif action == "reviewed":
+        for tx in transactions:
+            tx.is_reviewed = 1
+
+    elif action == "unreviewed":
+        for tx in transactions:
+            tx.is_reviewed = 0
+
+    elif action == "exclude":
+        for tx in transactions:
+            tx.is_excluded = 1
+
+    db.commit()
+    return RedirectResponse(redirect_to, status_code=302)
+
+
+# ===== Deduplicatie =====
+
+@router.get("/transactions/duplicates")
+def duplicates_page(request: Request, db: Session = Depends(get_db)):
+    user = require_login(request, db)
+
+    # Find (date, amount, counterparty) combos with 2+ transactions
+    dup_groups = (
+        db.query(
+            Transaction.date,
+            Transaction.amount,
+            Transaction.counterparty,
+            func.count(Transaction.id).label("cnt"),
+        )
+        .join(Account)
+        .filter(Account.user_id == user.id, Transaction.is_excluded == 0)
+        .group_by(Transaction.date, Transaction.amount, Transaction.counterparty)
+        .having(func.count(Transaction.id) > 1)
+        .order_by(Transaction.date.desc())
+        .all()
+    )
+
+    # Fetch the actual transactions per group
+    groups = []
+    for grp in dup_groups:
+        txs = (
+            db.query(Transaction)
+            .join(Account)
+            .options(joinedload(Transaction.category))
+            .filter(
+                Account.user_id == user.id,
+                Transaction.date == grp.date,
+                Transaction.amount == grp.amount,
+                Transaction.counterparty == grp.counterparty,
+                Transaction.is_excluded == 0,
+            )
+            .order_by(Transaction.id)
+            .all()
+        )
+        if len(txs) > 1:
+            groups.append(txs)
+
+    return templates.TemplateResponse(
+        "transactions/duplicates.html",
+        {"request": request, "user": user, "groups": groups},
+    )
+
+
+@router.post("/transactions/duplicates/exclude")
+async def exclude_duplicates(request: Request, db: Session = Depends(get_db)):
+    user = require_login(request, db)
+    form = await request.form()
+    tx_ids_raw = form.getlist("tx_ids")
+
+    for raw in tx_ids_raw:
+        try:
+            tx_id = int(raw)
+        except (ValueError, TypeError):
+            continue
+        tx = (
+            db.query(Transaction)
+            .join(Account)
+            .filter(Transaction.id == tx_id, Account.user_id == user.id)
+            .first()
+        )
+        if tx:
+            tx.is_excluded = 1
+
+    db.commit()
+    return RedirectResponse("/transactions/duplicates", status_code=302)
 
 
 @router.get("/import")

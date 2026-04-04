@@ -4,8 +4,10 @@
 {% block content %}
 <div class="page-header">
     <h1>Transacties <span class="muted" style="font-weight:400; font-size:0.9rem;">({{ total }})</span></h1>
-    <div style="display:flex; gap:0.5rem;">
-        <a href="/transactions/create" class="btn btn-accent">Handmatig toevoegen</a>
+    <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+        <a href="/transactions/duplicates" class="btn">Duplicaten</a>
+        <a href="/transactions/export?{% for k, v in filter_params.items() %}{{ k }}={{ v }}&{% endfor %}" class="btn">↓ CSV Export</a>
+        <a href="/transactions/create" class="btn btn-accent">+ Handmatig</a>
         <a href="/import" class="btn btn-primary">CSV importeren</a>
     </div>
 </div>
@@ -43,13 +45,9 @@
                     <option value="-1" {% if current_category_id == -1 %}selected{% endif %}>Zonder categorie</option>
                     {% for cat in categories %}
                     {% if not cat.parent_id %}
-                    <option value="{{ cat.id }}" {% if current_category_id == cat.id %}selected{% endif %}>
-                        {{ cat.name }}
-                    </option>
+                    <option value="{{ cat.id }}" {% if current_category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
                     {% for child in cat.children|sort(attribute='name') %}
-                    <option value="{{ child.id }}" {% if current_category_id == child.id %}selected{% endif %}>
-                        &nbsp;&nbsp;{{ child.name }}
-                    </option>
+                    <option value="{{ child.id }}" {% if current_category_id == child.id %}selected{% endif %}>&nbsp;&nbsp;{{ child.name }}</option>
                     {% endfor %}
                     {% endif %}
                     {% endfor %}
@@ -61,9 +59,7 @@
                 <select name="tag_id" id="tag_id" onchange="this.form.submit()">
                     <option value="">Alle tags</option>
                     {% for tag in tags %}
-                    <option value="{{ tag.id }}" {% if current_tag_id == tag.id %}selected{% endif %}>
-                        {{ tag.name }}
-                    </option>
+                    <option value="{{ tag.id }}" {% if current_tag_id == tag.id %}selected{% endif %}>{{ tag.name }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -97,25 +93,45 @@
 
 {% if transactions %}
 <div class="card">
+    <!-- Kolom-toggles -->
+    <div class="col-toggle-bar">
+        <span class="col-toggle-label">Kolommen:</span>
+        <button type="button" class="col-toggle-btn" data-col="col-counterparty">Tegenpartij</button>
+        <button type="button" class="col-toggle-btn" data-col="col-account">Rekening</button>
+    </div>
+
     <div class="table-wrap">
-        <table>
+        <table id="txTable">
             <thead>
                 <tr>
+                    <th style="width:2.2rem;">
+                        <input type="checkbox" id="selectAll" title="Selecteer alles" style="cursor:pointer; accent-color:var(--navy-mid);">
+                    </th>
+                    <th style="width:2rem;"></th>
                     <th>Datum</th>
                     <th>Omschrijving</th>
-                    <th>Tegenpartij</th>
+                    <th class="col-counterparty">Tegenpartij</th>
                     <th>Categorie</th>
                     <th class="text-right">Bedrag</th>
-                    <th>Rekening</th>
+                    <th class="col-account">Rekening</th>
                     <th></th>
                 </tr>
             </thead>
             <tbody>
                 {% for tx in transactions %}
-                <tr>
+                <tr data-txid="{{ tx.id }}">
+                    <td style="text-align:center;">
+                        <input type="checkbox" class="tx-select" data-id="{{ tx.id }}" style="cursor:pointer; accent-color:var(--navy-mid);">
+                    </td>
+                    <td style="text-align:center;">
+                        <form method="post" action="/transactions/{{ tx.id }}/reviewed" style="display:inline;">
+                            <input type="hidden" name="redirect_to" value="/?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}">
+                            <button type="submit" class="btn-reviewed {% if tx.is_reviewed %}reviewed{% endif %}" title="{% if tx.is_reviewed %}Gecontroleerd{% else %}Markeer als gecontroleerd{% endif %}">✓</button>
+                        </form>
+                    </td>
                     <td class="nowrap">{{ tx.date.strftime('%d-%m-%Y') }}</td>
                     <td class="desc-cell">{{ tx.description or '-' }}</td>
-                    <td>{{ tx.counterparty or '-' }}</td>
+                    <td class="col-counterparty">{{ tx.counterparty or '-' }}</td>
                     <td class="nowrap">
                         {% set acct_cats = cats_by_account.get(tx.account_id, {"parents": [], "children": {}}) %}
                         <form method="post" action="/transactions/{{ tx.id }}/category" class="inline-cat-form">
@@ -135,12 +151,12 @@
                     <td class="text-right nowrap {% if tx.amount >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
                         &euro;&nbsp;{{ tx.amount|euro }}
                     </td>
-                    <td class="nowrap">{{ tx.account.name }}</td>
+                    <td class="nowrap col-account">{{ tx.account.name }}</td>
                     <td class="nowrap">
                         <a href="/transactions/{{ tx.id }}/edit" class="btn btn-sm">Bewerken</a>
                         <form method="post" action="/transactions/{{ tx.id }}/exclude" style="display:inline;">
                             <input type="hidden" name="redirect_to" value="/?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}">
-                            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Transactie uitsluiten? Deze verdwijnt uit overzichten maar wordt niet opnieuw geimporteerd.')">Uitsluiten</button>
+                            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Transactie uitsluiten?')">Uitsluiten</button>
                         </form>
                     </td>
                 </tr>
@@ -150,13 +166,51 @@
     </div>
 </div>
 
+<!-- Bulk action bar -->
+<div class="bulk-bar" id="bulkBar">
+    <span class="bulk-count"><span id="bulkCount">0</span> geselecteerd</span>
+    <div class="bulk-actions">
+        <form id="bulkForm" method="post" action="/transactions/bulk">
+            <input type="hidden" name="redirect_to" value="/?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}">
+            <input type="hidden" name="action" id="bulkAction">
+            <div id="bulkCatWrap" style="display:none; align-items:center; gap:0.4rem;">
+                <select name="bulk_category_id" id="bulkCatSelect" class="select-sm">
+                    <option value="">— categorie —</option>
+                    {% for cat in categories %}
+                    {% if not cat.parent_id %}
+                    <option value="{{ cat.id }}">{{ cat.name }}</option>
+                    {% for child in cat.children|sort(attribute='name') %}
+                    <option value="{{ child.id }}">&nbsp;&nbsp;{{ child.name }}</option>
+                    {% endfor %}
+                    {% endif %}
+                    {% endfor %}
+                </select>
+                <button type="button" class="btn btn-sm btn-primary" onclick="submitBulk('category')">Toewijzen</button>
+            </div>
+            <div id="bulkTagWrap" style="display:none; align-items:center; gap:0.4rem;">
+                <select name="bulk_tag_id" id="bulkTagSelect" class="select-sm">
+                    <option value="">— tag —</option>
+                    {% for tag in tags %}
+                    <option value="{{ tag.id }}">{{ tag.name }}</option>
+                    {% endfor %}
+                </select>
+                <button type="button" class="btn btn-sm btn-primary" onclick="submitBulk('tag')">Toevoegen</button>
+            </div>
+        </form>
+        <button type="button" class="btn btn-sm" onclick="toggleBulkPanel('cat')">Categorie</button>
+        <button type="button" class="btn btn-sm" onclick="toggleBulkPanel('tag')">Tag</button>
+        <button type="button" class="btn btn-sm" onclick="submitBulk('reviewed')">✓ Reviewed</button>
+        <button type="button" class="btn btn-sm btn-danger" onclick="if(confirm('Geselecteerde transacties uitsluiten?')) submitBulk('exclude')">Uitsluiten</button>
+        <button type="button" class="btn btn-sm" id="clearSelection">Selectie wissen</button>
+    </div>
+</div>
+
 {% if total_pages > 1 %}
 <div class="pagination">
     {% set fp = filter_params.copy() %}
     {% if page > 1 %}
     <a href="?page={{ page - 1 }}{% for k, v in fp.items() %}&{{ k }}={{ v }}{% endfor %}">Vorige</a>
     {% endif %}
-
     {% for p in range(1, total_pages + 1) %}
         {% if p == page %}
         <span class="current">{{ p }}</span>
@@ -166,7 +220,6 @@
         <span class="dots">...</span>
         {% endif %}
     {% endfor %}
-
     {% if page < total_pages %}
     <a href="?page={{ page + 1 }}{% for k, v in fp.items() %}&{{ k }}={{ v }}{% endfor %}">Volgende</a>
     {% endif %}
@@ -184,4 +237,121 @@
     {% endif %}
 </div>
 {% endif %}
+
+<script>
+// ── Bulk selectie ──────────────────────────────────────────────
+var bulkBar     = document.getElementById('bulkBar');
+var bulkCount   = document.getElementById('bulkCount');
+var bulkForm    = document.getElementById('bulkForm');
+var bulkAction  = document.getElementById('bulkAction');
+var selectAll   = document.getElementById('selectAll');
+
+function getChecked() {
+    return Array.from(document.querySelectorAll('.tx-select:checked'));
+}
+
+function updateBulkBar() {
+    var checked = getChecked();
+    bulkCount.textContent = checked.length;
+    if (checked.length > 0) {
+        bulkBar.classList.add('active');
+    } else {
+        bulkBar.classList.remove('active');
+        hideBulkPanels();
+    }
+}
+
+document.querySelectorAll('.tx-select').forEach(function(cb) {
+    cb.addEventListener('change', updateBulkBar);
+});
+
+if (selectAll) {
+    selectAll.addEventListener('change', function() {
+        document.querySelectorAll('.tx-select').forEach(function(cb) {
+            cb.checked = selectAll.checked;
+        });
+        updateBulkBar();
+    });
+}
+
+document.getElementById('clearSelection') && document.getElementById('clearSelection').addEventListener('click', function() {
+    document.querySelectorAll('.tx-select').forEach(function(cb) { cb.checked = false; });
+    if (selectAll) selectAll.checked = false;
+    updateBulkBar();
+});
+
+function addTxIdsToForm() {
+    // Remove old hidden inputs
+    bulkForm.querySelectorAll('input[name="tx_ids"]').forEach(function(el) { el.remove(); });
+    getChecked().forEach(function(cb) {
+        var inp = document.createElement('input');
+        inp.type = 'hidden';
+        inp.name = 'tx_ids';
+        inp.value = cb.dataset.id;
+        bulkForm.appendChild(inp);
+    });
+}
+
+function submitBulk(action) {
+    if (getChecked().length === 0) return;
+    bulkAction.value = action;
+    addTxIdsToForm();
+    bulkForm.submit();
+}
+
+function hideBulkPanels() {
+    document.getElementById('bulkCatWrap').style.display = 'none';
+    document.getElementById('bulkTagWrap').style.display = 'none';
+}
+
+function toggleBulkPanel(type) {
+    var catWrap = document.getElementById('bulkCatWrap');
+    var tagWrap = document.getElementById('bulkTagWrap');
+    if (type === 'cat') {
+        var open = catWrap.style.display === 'flex';
+        hideBulkPanels();
+        catWrap.style.display = open ? 'none' : 'flex';
+    } else {
+        var open = tagWrap.style.display === 'flex';
+        hideBulkPanels();
+        tagWrap.style.display = open ? 'none' : 'flex';
+    }
+}
+
+// ── Kolommen tonen/verbergen ───────────────────────────────────
+var COL_KEY = 'ctp_hidden_cols';
+
+function getHiddenCols() {
+    try { return JSON.parse(localStorage.getItem(COL_KEY) || '[]'); } catch(e) { return []; }
+}
+function saveHiddenCols(cols) {
+    localStorage.setItem(COL_KEY, JSON.stringify(cols));
+}
+
+function applyColVisibility() {
+    var hidden = getHiddenCols();
+    document.querySelectorAll('.col-toggle-btn').forEach(function(btn) {
+        var col = btn.dataset.col;
+        var isHidden = hidden.indexOf(col) !== -1;
+        btn.classList.toggle('col-toggle-active', !isHidden);
+        // show/hide all cells with that class
+        document.querySelectorAll('.' + col).forEach(function(el) {
+            el.style.display = isHidden ? 'none' : '';
+        });
+    });
+}
+
+document.querySelectorAll('.col-toggle-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        var col = btn.dataset.col;
+        var hidden = getHiddenCols();
+        var idx = hidden.indexOf(col);
+        if (idx === -1) { hidden.push(col); } else { hidden.splice(idx, 1); }
+        saveHiddenCols(hidden);
+        applyColVisibility();
+    });
+});
+
+applyColVisibility();
+</script>
 {% endblock %}

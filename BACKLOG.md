@@ -1,192 +1,179 @@
-# Check The Pockets - Product Backlog
+# CheckThePockets — Product Backlog
 
-Backlog gebaseerd op feature-analyse van [Lunch Money](https://lunchmoney.app/features), afgezet tegen de huidige staat van Check The Pockets.
+Gebaseerd op vergelijking met Lunch Money (april 2026). Import beperkt tot CSV.
+Sprints zijn gegroepeerd op gedeelde bestanden voor maximale efficiëntie per sessie.
 
----
-
-## Huidige staat (al geïmplementeerd)
-
-- Gebruikersregistratie en login (sessie-gebaseerd, bcrypt)
-- Rekeningbeheer (aanmaken/verwijderen, IBAN, meerdere banken)
-- CSV-import voor ABN AMRO, Bunq en ICS
-- Duplicaatdetectie bij import (SHA256 hash)
-- Transactie-overzicht met paginering en filtering per rekening
-- Responsieve UI met eigen design system
+> **Nieuwe sessie starten?** Zeg: *"Start Sprint X"* en Claude pakt de taken direct op.
+> Elke sprint is zelfstandig uitvoerbaar zonder context uit vorige sessies.
 
 ---
 
-## Epic 1: Categorieën & Transactiebeheer
+## Sprint 1 — Database fundament ✅ (2026-04-03)
+*Model-wijzigingen waar latere sprints op bouwen.*
 
-> Fundament voor budgettering en analyse. Moet als eerste gebouwd worden.
-
-| # | User Story | Prioriteit |
-|---|-----------|------------|
-| 1.1 | Als gebruiker wil ik categorieën kunnen aanmaken, bewerken en verwijderen zodat ik mijn uitgaven kan ordenen | Must Have |
-| 1.2 | Als gebruiker wil ik categorieën kunnen groeperen (bijv. "Vaste lasten" > "Huur", "Gas/Water/Licht") zodat ik overzicht houd | Must Have |
-| 1.3 | Als gebruiker wil ik een transactie aan een categorie kunnen toewijzen | Must Have |
-| 1.4 | Als gebruiker wil ik een transactie kunnen splitsen over meerdere categorieën (bijv. Albert Heijn: 80% boodschappen, 20% huishouden) | Should Have |
-| 1.5 | Als gebruiker wil ik transacties kunnen taggen met vrije labels zodat ik ze flexibel kan groeperen | Should Have |
-| 1.6 | Als gebruiker wil ik transacties handmatig kunnen invoeren voor contante uitgaven of correcties | Should Have |
-| 1.7 | Als gebruiker wil ik transacties kunnen bewerken (omschrijving, categorie, tags) | Must Have |
-| 1.8 | Als gebruiker wil ik transacties kunnen groeperen (bijv. losse Tikkie-betalingen samenvoegen) | Could Have |
-| 1.9 | Als gebruiker wil ik transacties kunnen doorzoeken en filteren op datum, bedrag, categorie, tag en tegenrekening | Must Have |
+- [x] `is_reviewed` veld op Transaction model + migratie (018)
+- [x] `exclude_from_budget` veld op Category model + migratie (018)
+- [x] `exclude_from_totals` veld op Category model + migratie (018)
+- [x] UI: reviewed-vinkje per transactie (toggle inline op transactiepagina)
+- [x] UI: exclude-flags instellen in categorie-beheer
+- [x] Budgetpagina: `exclude_from_budget` categorieën niet tonen
+- [x] Dashboard/analytics: `exclude_from_totals` categorieën uitsluiten van totalen
 
 ---
 
-## Epic 2: Budget
+## Sprint Design — Editorial Finance redesign ✅ (2026-04-03)
+*Volledige CSS-herschrijving van dark Catppuccin naar light navy/gold design system.*
 
-> Kernfunctionaliteit: budgetteren per categorie met flexibele periodes.
-
-| # | User Story | Prioriteit |
-|---|-----------|------------|
-| 2.1 | Als gebruiker wil ik een maandbudget kunnen instellen per categorie | Must Have |
-| 2.2 | Als gebruiker wil ik mijn budget-periode kunnen kiezen (wekelijks, tweewekelijks, maandelijks, custom startdatum) | Should Have |
-| 2.3 | Als gebruiker wil ik zien hoeveel ik per categorie heb uitgegeven vs. gebudgetteerd | Must Have |
-| 2.4 | Als gebruiker wil ik een zero-based budget view waarin ik zie hoeveel inkomen nog niet is toegewezen | Should Have |
-| 2.5 | Als gebruiker wil ik per categorie kunnen kiezen wat er met het restant gebeurt (rollover naar volgende maand of terug naar pot) | Should Have |
-| 2.6 | Als gebruiker wil ik snel budgetten kunnen instellen op basis van vorige maand of gemiddelde van 3 maanden | Could Have |
-| 2.7 | Als gebruiker wil ik historische budgetten kunnen terugkijken (plan vs. werkelijk) | Could Have |
-
----
-
-## Epic 3: Dashboard & Overzicht
-
-> Visueel inzicht in je financiële situatie.
-
-| # | User Story | Prioriteit |
-|---|-----------|------------|
-| 3.1 | Als gebruiker wil ik een dashboard zien met inkomsten, uitgaven en netto resultaat voor de huidige periode | Must Have |
-| 3.2 | Als gebruiker wil ik een spaarquote zien ((Inkomen - Uitgaven) / Inkomen × 100%) | Should Have |
-| 3.3 | Als gebruiker wil ik een spending breakdown per categorie zien met visuele balken | Must Have |
-| 3.4 | Als gebruiker wil ik de periode kunnen kiezen (maand tot nu, jaar tot nu, custom datumbereik) | Must Have |
-| 3.5 | Als gebruiker wil ik projecties zien van verwachte inkomsten en uitgaven op basis van terugkerende posten | Could Have |
+- [x] Fonts: `Syne` (headings/nav/bedragen) + `DM Sans` (body) via Google Fonts
+- [x] Kleurpalet: Primary Navy `#002752`, Gold `#F9A800`, licht grijs-blauw achtergrond
+- [x] Navigatie: donker navy topbar, gold active-indicator, sub-nav in `#01356a`
+- [x] Cards: wit met subtiele schaduw, geen harde borders
+- [x] Tabellen: licht thema, navy kolomhoofd, subtiele hover
+- [x] Knoppen: gold = primaire CTA, navy = accent, ghost = outline
+- [x] Bedragen: Syne tabular-nums, groen/rood semantisch
+- [x] Modals: navy backdrop blur, nette header/footer
+- [x] Alle legacy `--ctp-` variabelen intact gehouden
 
 ---
 
-## Epic 4: Terugkerende Transacties
+## Sprint 2 — Transactie UX ✅ (2026-04-04)
+*Bulk-acties, export en deduplicatie op de transactiepagina.*
 
-> Vaste lasten en inkomsten bijhouden en projecteren.
-
-| # | User Story | Prioriteit |
-|---|-----------|------------|
-| 4.1 | Als gebruiker wil ik terugkerende posten kunnen aanmaken (huur, salaris, abonnementen) met frequentie (maandelijks/jaarlijks/wekelijks) | Must Have |
-| 4.2 | Als gebruiker wil ik zien welke terugkerende posten deze periode al zijn afgeschreven en welke nog verwacht worden | Must Have |
-| 4.3 | Als gebruiker wil ik dat inkomende transacties automatisch worden gekoppeld aan terugkerende posten | Should Have |
-| 4.4 | Als gebruiker wil ik een overzicht van al mijn vaste lasten en vaste inkomsten | Must Have |
+- [x] **Bulk selectie + acties**: checkbox per rij + sticky bulk-balk onderaan — categorie, tag, reviewed, uitsluiten — POST `/transactions/bulk`
+- [x] **CSV export**: knop in page-header — GET `/transactions/export` met zelfde filterparams — alle velden incl. tags en reviewed
+- [x] **Deduplicatie tool**: `/transactions/duplicates` — groepeert op datum+bedrag+tegenpartij, eerste in groep bewaard, rest selecteerbaar voor uitsluiten
+- [x] **Kolommen tonen/verbergen**: toggle-knoppen boven tabel voor Tegenpartij en Rekening, staat opgeslagen in `localStorage`
+- [x] **Filterlogica gerefactored**: `_build_tx_query()` helper gedeeld tussen list, export en duplicates
 
 ---
 
-## Epic 5: Rules Engine (Automatisering)
+## Sprint 3 — Budget verbeteringen
+*Betere planning en inzicht op de budgetpagina. Bouwt op Sprint 1 (exclude_from_budget).*
 
-> Transacties automatisch categoriseren en labelen.
+**Bestanden:** `app/routers/budgets.py`, `app/templates/budgets/overview.html`
 
-| # | User Story | Prioriteit |
-|---|-----------|------------|
-| 5.1 | Als gebruiker wil ik regels kunnen aanmaken die transacties automatisch categoriseren op basis van tegenpartij, omschrijving of bedrag | Must Have |
-| 5.2 | Als gebruiker wil ik dat het systeem regels voorstelt op basis van mijn categoriseergedrag | Should Have |
-| 5.3 | Als gebruiker wil ik regels kunnen beheren (aan/uit, bewerken, verwijderen) | Must Have |
-| 5.4 | Als gebruiker wil ik dat regels ook tags en terugkerende posten kunnen toewijzen | Could Have |
-| 5.5 | Als gebruiker wil ik dat regels worden toegepast bij import én achteraf op bestaande transacties | Should Have |
+**Context voor nieuwe sessie:**
+- Budget router berekent `total_budgeted`, `total_spent`, `total_rollover` per categorie
+- Template heeft een tabel met parent/child categorieën en budget-inputs
+- Inkomen staat in `income_top_level`, uitgaven in `top_level`
+- "Left to budget" = totaal inkomen − totaal gebudgetteerd (uitgaven)
 
----
-
-## Epic 6: Analytics & Inzichten
-
-> Trends en patronen herkennen in je financiën.
-
-| # | User Story | Prioriteit |
-|---|-----------|------------|
-| 6.1 | Als gebruiker wil ik trends zien in mijn uitgaven per categorie over meerdere maanden | Should Have |
-| 6.2 | Als gebruiker wil ik grafieken zien (staaf, lijn) van mijn inkomsten vs. uitgaven over tijd | Should Have |
-| 6.3 | Als gebruiker wil ik een query-tool waarmee ik geavanceerde vragen kan stellen aan mijn transactiedata | Could Have |
-| 6.4 | Als gebruiker wil ik inzichten krijgen in veranderingen in mijn bestedingspatroon t.o.v. vorige periodes | Could Have |
+**Taken:**
+- [ ] **"Left to budget" balk**: toon bovenaan budgetpagina hoeveel inkomen nog niet is toegewezen; kleur: groen (surplus), rood (overbudgeted) — berekening in router, tonen in template
+- [ ] **Overbudgeted indicator**: badge/waarschuwing als `total_budgeted > total_income`
+- [ ] **Budget kopiëren van vorige maand**: knop "Kopieer vorige maand" — POST `/budgets/copy-previous` — kopieert alle budget-entries van vorige maand naar huidige maand (overslaat als al ingevuld)
+- [ ] **Budget presets**: sla huidig budget op als named template — model `BudgetPreset` + `BudgetPresetLine`, laad via dropdown in budget-header
 
 ---
 
-## Epic 7: Vermogenstracker (Net Worth)
+## Sprint 4 — Analyse & Rapportage
+*Nieuwe rapportage-pagina's. Onafhankelijk van andere sprints.*
 
-> Lange-termijn financieel overzicht.
+**Bestanden:** `app/routers/analytics.py`, `app/templates/analytics/index.html`, nieuw: `app/templates/analytics/stats.html`
 
-| # | User Story | Prioriteit |
-|---|-----------|------------|
-| 7.1 | Als gebruiker wil ik assets kunnen toevoegen (spaargeld, beleggingen, vastgoed) met actuele waarde | Should Have |
-| 7.2 | Als gebruiker wil ik schulden/leningen kunnen bijhouden | Should Have |
-| 7.3 | Als gebruiker wil ik mijn netto vermogen over tijd in een grafiek zien | Should Have |
-| 7.4 | Als gebruiker wil ik zien hoe mijn vermogen verandert als ik mijn uitgaven verlaag | Could Have |
+**Context voor nieuwe sessie:**
+- Analytics router staat in `app/routers/analytics.py` — huidige functie: `analytics()` op `/analytics`
+- Dashboard router (`app/routers/dashboard.py`) heeft al spaartarief-logica en recurring preview
+- Recurring transacties model: `RecurringTransaction` met `frequency`, `amount_expected`, `is_active`
 
----
-
-## Epic 8: Multi-Valuta
-
-> Relevant voor internationale gebruikers en beleggingen.
-
-| # | User Story | Prioriteit |
-|---|-----------|------------|
-| 8.1 | Als gebruiker wil ik transacties in andere valuta's kunnen importeren en bekijken | Could Have |
-| 8.2 | Als gebruiker wil ik een thuisvaluta instellen en alles omgerekend zien | Could Have |
-| 8.3 | Als gebruiker wil ik actuele wisselkoersen zien bij omrekening | Could Have |
+**Taken:**
+- [ ] **Stats pagina** `/analytics/stats`: top merchants op totaalkosten + transactiefrequentie, nieuwe tegenpartijen deze maand (niet eerder gezien), top-10 categorieën — nieuwe route + template
+- [ ] **Spaartarief op dashboard**: al berekend in dashboard router, alleen prominent tonen in de summary-kaarten boven de grafiek
+- [ ] **Projectie op dashboard**: bereken voor huidige maand: verwacht nog te ontvangen/betalen via actieve recurring items die nog niet gematcht zijn — toon als "+€X verwacht" naast de totalen
+- [ ] **Flexibele query-builder** `/analytics/query`: form met datumrange + groepeer-op (categorie/tag/merchant) + grafiektype (bar, pie, line) — render resultaat als chart + downloadbare CSV
 
 ---
 
-## Epic 9: Samenwerking
+## Sprint 5 — Regels uitbreiden
+*Meer condities en acties in de rules engine. Onafhankelijk van andere sprints.*
 
-> Gedeeld huishoudboekje.
+**Bestanden:** `app/routers/rules.py`, `app/rules_engine.py`, `app/models.py` (Rule model), `app/templates/rules/list.html`
 
-| # | User Story | Prioriteit |
-|---|-----------|------------|
-| 9.1 | Als gebruiker wil ik anderen kunnen uitnodigen om mijn budget mee te beheren | Could Have |
-| 9.2 | Als medegebruiker wil ik transacties kunnen toevoegen en categoriseren | Could Have |
+**Context voor nieuwe sessie:**
+- Rule model heeft: `match_field` (counterparty/description/iban), `match_type` (contains/exact/starts_with), `match_value`, `action_category_id`, `action_tag_id`, `amount_min`, `amount_max`
+- Rules engine in `app/rules_engine.py` — `apply_rules(transaction, rules, db)`
+- Toevoegen van condities: voeg kolom toe aan Rule model + migratie + UI
+- Toevoegen van acties: zelfde patroon als `action_category_id`
 
----
-
-## Epic 10: Beveiliging & Account
-
-> Extra beveiligingslagen.
-
-| # | User Story | Prioriteit |
-|---|-----------|------------|
-| 10.1 | Als gebruiker wil ik twee-factor authenticatie (TOTP) kunnen inschakelen | Should Have |
-| 10.2 | Als gebruiker wil ik mijn wachtwoord kunnen wijzigen | Must Have |
-| 10.3 | Als gebruiker wil ik mijn account en alle data kunnen verwijderen | Should Have |
+**Taken:**
+- [ ] **Regelactie: counterparty hernoemen** — nieuw veld `action_rename_counterparty` op Rule model + migratie (019) + toepassen in rules engine + UI
+- [ ] **Regelactie: markeer als reviewed** — nieuw veld `action_set_reviewed` (0/1) op Rule model + migratie + toepassen + UI
+- [ ] **Regelconditie: account filter** — nieuw veld `condition_account_id` op Rule model + migratie + UI dropdown
+- [ ] **Regelconditie: notes/omschrijving** — nieuw veld voor matching op `description` kolom (aparte van counterparty) — check of dit al bestaat en evt. uitbreiden
+- [ ] **Suggestie bij categoriseren**: op de transactiepagina, na inline categorie-wijziging via AJAX, toon een kleine banner "Wil je een regel aanmaken voor [tegenpartij]?" — JS + endpoint
 
 ---
 
-## Epic 11: API & Integraties
+## Sprint 6 — CSV import verbeteringen
+*Betere import-ervaring voor niet-standaard CSV's. Onafhankelijk.*
 
-> Voor power users en uitbreidbaarheid.
+**Bestanden:** `app/routers/transactions.py` (import routes), `app/templates/transactions/import.html`, `app/parsers/`
 
-| # | User Story | Prioriteit |
-|---|-----------|------------|
-| 11.1 | Als gebruiker wil ik een REST API om mijn transacties en budgetten programmatisch te benaderen | Could Have |
-| 11.2 | Als ontwikkelaar wil ik API-documentatie zodat ik eigen tools kan bouwen | Could Have |
-| 11.3 | Als gebruiker wil ik meer bankformaten kunnen importeren (Rabobank, ING, ASN, Knab) | Should Have |
+**Context voor nieuwe sessie:**
+- Import route: `GET/POST /import` in `app/routers/transactions.py`
+- Huidige flow: upload → auto-detect bank format → parse → save
+- Parsers in `app/parsers/` — base parser heeft `ParsedTransaction` dataclass
+- Nieuwe flow moet zijn: upload → kolommapping UI → preview → bevestigen → save
 
----
-
-## Epic 12: Kalender & Notificaties
-
-> Financieel overzicht in de tijd.
-
-| # | User Story | Prioriteit |
-|---|-----------|------------|
-| 12.1 | Als gebruiker wil ik een kalenderweergave van mijn transacties | Could Have |
-| 12.2 | Als gebruiker wil ik notificaties als ik boven mijn budget dreig te komen | Could Have |
+**Taken:**
+- [ ] **Kolommapping UI**: na upload, als bank-format niet herkend, toon tabel met CSV-headers en dropdowns om velden te mappen (datum, bedrag, omschrijving, tegenpartij, IBAN) — POST naar `/import/preview`
+- [ ] **Opgeslagen importconfiguraties**: model `ImportConfig` (naam, kolomnamen-mapping als JSON) — sla op per gebruiker, laad via dropdown bij import
+- [ ] **Import preview/review scherm**: toon parsed transacties vóór opslaan — checkbox per rij, samenvatting (nieuw/duplicaat/auto-gecategoriseerd) — bevestigen via POST
+- [ ] **Tags/categorieën uit CSV**: als CSV kolom "category" of "tags" heeft, map naar CTP categorieën/tags tijdens import
 
 ---
 
-## Voorgestelde ontwikkelvolgorde
+## Sprint 7 — Terugkerende transacties uitbreiden
+*Onafhankelijk van andere sprints.*
 
-De epics zijn geordend op afhankelijkheid en waarde:
+**Bestanden:** `app/routers/recurring.py`, `app/templates/recurring/list.html`, `app/models.py` (RecurringTransaction)
 
-1. **Epic 1: Categorieën & Transactiebeheer** - Fundament voor alles
-2. **Epic 5: Rules Engine** - Maakt categoriseren schalenbaar
-3. **Epic 2: Budget** - Kernwaarde van de app
-4. **Epic 4: Terugkerende Transacties** - Nodig voor projecties
-5. **Epic 3: Dashboard & Overzicht** - Alles samengebracht
-6. **Epic 10: Beveiliging & Account** - Basisbeveiliging
-7. **Epic 6: Analytics & Inzichten** - Extra waarde
-8. **Epic 7: Vermogenstracker** - Lange termijn
-9. **Epic 11: API & Integraties** - Extra bankparsers
-10. **Epic 8: Multi-Valuta** - Nice to have
-11. **Epic 9: Samenwerking** - Nice to have
-12. **Epic 12: Kalender & Notificaties** - Nice to have
+**Context voor nieuwe sessie:**
+- RecurringTransaction model heeft: `name`, `amount_expected`, `frequency`, `category_id`, `counterparty`, `description_match`, `is_active`
+- Matching-logica in recurring router
+- Migratie 019 of 020 nodig voor nieuwe velden
+
+**Taken:**
+- [ ] **Actieve periode**: voeg `start_date` en `end_date` toe aan RecurringTransaction + migratie + UI datepickers — filter recurring items op actieve periode bij matching en dashboardweergave
+- [ ] **Handmatig koppelen**: knop op transactiepagina of recurring-pagina om bestaande transactie te linken aan recurring item — sla op via `recurring_id` FK op Transaction model
+- [ ] **Gemiste betalingen sectie**: op recurring-pagina, aparte sectie "Gemist" voor items die al hadden moeten betaald zijn maar geen overeenkomende transactie hebben — prominenter dan nu
+
+---
+
+## Sprint 8 — Categorieën & Tags opruimen
+*Onafhankelijk van andere sprints.*
+
+**Bestanden:** `app/routers/categories.py`, `app/routers/tags.py`, `app/templates/categories/list.html`, `app/templates/tags/list.html`, `app/models.py`
+
+**Context voor nieuwe sessie:**
+- Category model heeft `is_income`, `exclude_from_budget`, `exclude_from_totals`, `sort_order`, `parent_id`
+- Archiveren = nieuw veld `is_archived` (0/1) + filter in lijstweergaven
+- Mergen = alle transacties van categorie A overzetten naar categorie B, daarna A verwijderen
+
+**Taken:**
+- [ ] **Categorieën archiveren**: veld `is_archived` + migratie + toggle-knop + standaard verbergen in lijsten (toon toggle "toon gearchiveerd")
+- [ ] **Categorieën samenvoegen**: form om twee categorieën te mergen — UPDATE transactions SET category_id=B WHERE category_id=A, daarna A verwijderen
+- [ ] **Transfer-transacties**: twee transacties koppelen als "transfer" (debet op rekening A + credit op rekening B) — nieuw veld `transfer_id` op Transaction + UI om te koppelen + uitsluiten van totalen
+- [ ] **Tag kleuren**: `color` veld op Tag model + migratie + kleurkiezer in tag-beheer + toon als gekleurde pill op transactiepagina
+- [ ] **Tags archiveren**: veld `is_archived` op Tag + toggle + verbergen in dropdowns
+
+---
+
+## Reeds geïmplementeerd (referentie)
+
+- Gebruikersregistratie / login (sessie-gebaseerd, bcrypt)
+- Rekeningbeheer (ABN, ING, Rabobank, Bunq, ICS)
+- CSV-import met duplicaatdetectie en auto-format detectie
+- ICS PDF transactiesplitsing (parent/child)
+- Transacties: aanmaken, bewerken, uitsluiten (`is_excluded`), reviewed toggle (`is_reviewed`), paginering, filtering
+- Categorieën: hiërarchie, kleuren, income-flag, exclude-flags, drag-and-drop volgorde
+- Tags: many-to-many, gebruikscount
+- Rules engine: counterparty/description/IBAN matching, category+tag acties, suggesties, preview
+- Terugkerende transacties: frequenties, auto-detectie, dashboard-integratie
+- Budgetten: maandelijks per categorie, rollover, exclude_from_budget filtering
+- Dashboard: inkomen/uitgaven, categorie-breakdown, recurring-preview, spaartarief
+- Analytics: maandtrend, top-10 categorieën, exclude_from_totals filtering
+- Savings plans: jaarplanning met regels en statustracking
+- Portfolio: crypto + metalen met live prijzen (CoinGecko + currency API)
+- Net worth: activa/passiva met historische snapshots
+- Design system: Editorial Finance (navy/gold, Syne + DM Sans, light theme)

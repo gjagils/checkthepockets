@@ -44,6 +44,7 @@ class User(Base):
     portfolio_holdings = relationship("PortfolioHolding", back_populates="user", cascade="all, delete-orphan")
     networth_accounts = relationship("NetWorthAccount", back_populates="user", cascade="all, delete-orphan")
     networth_snapshots = relationship("NetWorthSnapshot", back_populates="user", cascade="all, delete-orphan")
+    budget_presets = relationship("BudgetPreset", back_populates="user", cascade="all, delete-orphan")
 
 
 class Account(Base):
@@ -84,6 +85,8 @@ class Category(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     is_income = Column(Integer, default=0)
     sort_order = Column(Integer, default=0)
+    exclude_from_budget = Column(Integer, default=0)
+    exclude_from_totals = Column(Integer, default=0)
 
     user = relationship("User", back_populates="categories")
     account = relationship("Account", back_populates="categories")
@@ -173,6 +176,7 @@ class Transaction(Base):
     parent_id = Column(Integer, ForeignKey("transactions.id", ondelete="CASCADE"), nullable=True)
     import_hash = Column(String(64), unique=True, nullable=False)
     is_excluded = Column(Integer, default=0)
+    is_reviewed = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     account = relationship("Account", back_populates="transactions")
@@ -304,6 +308,34 @@ class Budget(Base):
     __table_args__ = (
         UniqueConstraint("user_id", "category_id", "year", "month", name="uq_budget_user_cat_year_month"),
     )
+
+
+class BudgetPreset(Base):
+    __tablename__ = "budget_presets"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name = Column(String(100), nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    user = relationship("User", back_populates="budget_presets")
+    lines = relationship("BudgetPresetLine", back_populates="preset", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "name", name="uq_budget_preset_user_name"),
+    )
+
+
+class BudgetPresetLine(Base):
+    __tablename__ = "budget_preset_lines"
+
+    id = Column(Integer, primary_key=True)
+    preset_id = Column(Integer, ForeignKey("budget_presets.id", ondelete="CASCADE"), nullable=False)
+    category_id = Column(Integer, ForeignKey("categories.id", ondelete="CASCADE"), nullable=False)
+    amount = Column(Numeric(12, 2), nullable=False, default=0)
+
+    preset = relationship("BudgetPreset", back_populates="lines")
+    category = relationship("Category")
 
 
 class NetWorthAccount(Base):

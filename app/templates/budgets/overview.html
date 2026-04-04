@@ -3,6 +3,66 @@
 {% block content %}
 <div class="page-header">
     <h1>Budgetten</h1>
+    <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+        <!-- Quick copy previous month -->
+        <form method="post" action="/budgets/copy" style="display:inline;">
+            <input type="hidden" name="from_year" value="{{ prev_year }}">
+            <input type="hidden" name="from_month" value="{{ prev_month }}">
+            <input type="hidden" name="to_year" value="{{ current_year }}">
+            <input type="hidden" name="to_month" value="{{ current_month }}">
+            <button type="submit" class="btn btn-sm"
+                    onclick="return confirm('Budgetten van {{ months[prev_month] }} {{ prev_year }} kopiëren naar huidige maand? Bestaande waarden worden overschreven.')">
+                ↩ Kopieer {{ months[prev_month] }}
+            </button>
+        </form>
+
+        <!-- Preset dropdown -->
+        {% if presets %}
+        <form method="post" action="/budgets/preset/load" style="display:inline-flex; gap:0.35rem; align-items:center;">
+            <input type="hidden" name="to_year" value="{{ current_year }}">
+            <input type="hidden" name="to_month" value="{{ current_month }}">
+            <select name="preset_id" class="select-sm" style="height:2rem;">
+                <option value="">— preset laden —</option>
+                {% for p in presets %}
+                <option value="{{ p.id }}">{{ p.name }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-sm btn-accent"
+                    onclick="return confirm('Preset toepassen? Bestaande budgetten worden overschreven.')">Laden</button>
+        </form>
+        {% endif %}
+
+        <!-- Save as preset -->
+        <button type="button" class="btn btn-sm" onclick="document.getElementById('presetSaveModal').style.display='flex'">
+            + Opslaan als preset
+        </button>
+    </div>
+</div>
+
+<!-- Left to budget bar -->
+{% set pct_allocated = ((total_budgeted / total_income) * 100)|int if total_income > 0 else 0 %}
+<div class="card" style="padding:1rem 1.25rem;">
+    <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:0.5rem;">
+        <span style="font-family:'Syne',sans-serif; font-weight:700; font-size:0.78rem; text-transform:uppercase; letter-spacing:0.07em; color:var(--muted);">
+            Nog toe te wijzen
+        </span>
+        <span style="font-family:'Syne',sans-serif; font-weight:700; font-size:1.1rem; {% if unallocated >= 0 %}color:var(--green);{% else %}color:var(--red);{% endif %}">
+            {% if unallocated >= 0 %}+{% endif %}&euro;&nbsp;{{ unallocated|euro }}
+        </span>
+    </div>
+    <div style="background:var(--bg); border-radius:6px; height:10px; overflow:hidden;">
+        <div style="height:100%; width:{{ [pct_allocated, 100]|min }}%; border-radius:6px; transition:width .4s ease;
+            background: {% if pct_allocated > 100 %}var(--red){% elif pct_allocated > 90 %}var(--gold){% else %}var(--navy-mid){% endif %};"></div>
+    </div>
+    <div style="display:flex; justify-content:space-between; margin-top:0.35rem; font-size:0.78rem; color:var(--muted);">
+        <span>&euro;&nbsp;{{ total_budgeted|euro }} gebudgetteerd</span>
+        <span>&euro;&nbsp;{{ total_income|euro }} inkomen · {{ pct_allocated }}%</span>
+    </div>
+    {% if unallocated < 0 %}
+    <div class="alert alert-error" style="margin-top:0.75rem; padding:0.5rem 0.85rem; font-size:0.83rem;">
+        <strong>Overbudgeted!</strong> Je hebt &euro;&nbsp;{{ (unallocated * -1)|euro }} meer gebudgetteerd dan je inkomen.
+    </div>
+    {% endif %}
 </div>
 
 <!-- Filters -->
@@ -291,66 +351,114 @@
 </div>
 {% endif %}
 
-<!-- Copy budgets -->
-<div class="card">
-    <h2>Budget kopiëren</h2>
-    <p class="muted" style="margin-bottom:1rem;">Kopieer budgetten van een andere maand naar de huidige.</p>
-    <form method="post" action="/budgets/copy" class="filter-bar" style="flex-wrap:wrap;">
-        <input type="hidden" name="to_year" value="{{ current_year }}">
-        <input type="hidden" name="to_month" value="{{ current_month }}">
-        <div class="form-group">
-            <label>Van jaar</label>
-            <select name="from_year">
-                {% for y in years %}
-                <option value="{{ y }}" {% if y == current_year %}selected{% endif %}>{{ y }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="form-group">
-            <label>Van maand</label>
-            <select name="from_month">
-                {% for m in range(1, 13) %}
-                {% set prev = current_month - 1 if current_month > 1 else 12 %}
-                <option value="{{ m }}" {% if m == prev %}selected{% endif %}>{{ months[m] }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="form-group" style="align-self:flex-end;">
-            <button type="submit" class="btn btn-primary btn-sm"
-                    onclick="return confirm('Budgetten kopiëren? Bestaande waarden worden overschreven.')">
-                Kopiëren
-            </button>
-        </div>
-    </form>
-</div>
+<!-- Budget tools (collapsible) -->
+<details class="card" style="padding:0;">
+    <summary style="padding:1rem 1.25rem; cursor:pointer; font-family:'Syne',sans-serif; font-weight:700; font-size:0.85rem; text-transform:uppercase; letter-spacing:0.06em;">
+        Geavanceerde opties
+    </summary>
+    <div style="padding:0 1.25rem 1.25rem;">
 
-<!-- Budget from average spending -->
-<div class="card">
-    <h2>Budget op basis van gemiddelde</h2>
-    <p class="muted" style="margin-bottom:1rem;">Stel budgetten in op basis van het gemiddelde van de afgelopen maanden.</p>
-    <form method="post" action="/budgets/average" class="filter-bar" style="flex-wrap:wrap;">
-        <input type="hidden" name="to_year" value="{{ current_year }}">
-        <input type="hidden" name="to_month" value="{{ current_month }}">
-        <div class="form-group">
-            <label>Aantal maanden</label>
-            <select name="num_months">
-                <option value="3" selected>3 maanden</option>
-                <option value="6">6 maanden</option>
-                <option value="12">12 maanden</option>
-            </select>
+        <!-- Copy budgets -->
+        <h3 style="margin-top:1rem; margin-bottom:0.5rem;">Budget kopiëren</h3>
+        <p class="muted" style="margin-bottom:0.75rem; font-size:0.85rem;">Kopieer budgetten van een andere maand naar de huidige.</p>
+        <form method="post" action="/budgets/copy" class="filter-bar" style="flex-wrap:wrap;">
+            <input type="hidden" name="to_year" value="{{ current_year }}">
+            <input type="hidden" name="to_month" value="{{ current_month }}">
+            <div class="form-group">
+                <label>Van jaar</label>
+                <select name="from_year">
+                    {% for y in years %}
+                    <option value="{{ y }}" {% if y == current_year %}selected{% endif %}>{{ y }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Van maand</label>
+                <select name="from_month">
+                    {% for m in range(1, 13) %}
+                    {% set prev = current_month - 1 if current_month > 1 else 12 %}
+                    <option value="{{ m }}" {% if m == prev %}selected{% endif %}>{{ months[m] }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group" style="align-self:flex-end;">
+                <button type="submit" class="btn btn-primary btn-sm"
+                        onclick="return confirm('Budgetten kopiëren? Bestaande waarden worden overschreven.')">
+                    Kopiëren
+                </button>
+            </div>
+        </form>
+
+        <!-- Budget from average spending -->
+        <h3 style="margin-top:1.25rem; margin-bottom:0.5rem;">Budget op basis van gemiddelde</h3>
+        <p class="muted" style="margin-bottom:0.75rem; font-size:0.85rem;">Stel budgetten in op basis van het gemiddelde van de afgelopen maanden.</p>
+        <form method="post" action="/budgets/average" class="filter-bar" style="flex-wrap:wrap;">
+            <input type="hidden" name="to_year" value="{{ current_year }}">
+            <input type="hidden" name="to_month" value="{{ current_month }}">
+            <div class="form-group">
+                <label>Aantal maanden</label>
+                <select name="num_months">
+                    <option value="3" selected>3 maanden</option>
+                    <option value="6">6 maanden</option>
+                    <option value="12">12 maanden</option>
+                </select>
+            </div>
+            <div class="form-group" style="align-self:flex-end;">
+                <button type="submit" class="btn btn-primary btn-sm"
+                        onclick="return confirm('Budgetten instellen op basis van gemiddelde uitgaven? Bestaande waarden worden overschreven.')">
+                    Gemiddelde toepassen
+                </button>
+            </div>
+        </form>
+
+        <!-- Manage presets -->
+        {% if presets %}
+        <h3 style="margin-top:1.25rem; margin-bottom:0.5rem;">Presets beheren</h3>
+        <div style="display:flex; flex-wrap:wrap; gap:0.5rem;">
+            {% for p in presets %}
+            <div style="display:flex; align-items:center; gap:0.35rem; background:var(--bg); border-radius:6px; padding:0.3rem 0.65rem; font-size:0.83rem;">
+                <span>{{ p.name }}</span>
+                <form method="post" action="/budgets/preset/delete" style="display:inline;">
+                    <input type="hidden" name="preset_id" value="{{ p.id }}">
+                    <input type="hidden" name="year" value="{{ current_year }}">
+                    <input type="hidden" name="month" value="{{ current_month }}">
+                    <button type="submit" class="btn btn-sm btn-danger" style="padding:0.1rem 0.45rem; font-size:0.75rem;"
+                            onclick="return confirm('Preset &quot;{{ p.name }}&quot; verwijderen?')">✕</button>
+                </form>
+            </div>
+            {% endfor %}
         </div>
-        <div class="form-group" style="align-self:flex-end;">
-            <button type="submit" class="btn btn-primary btn-sm"
-                    onclick="return confirm('Budgetten instellen op basis van gemiddelde uitgaven? Bestaande waarden worden overschreven.')">
-                Gemiddelde toepassen
-            </button>
-        </div>
-    </form>
+        {% endif %}
+    </div>
+</details>
+
+<!-- Preset save modal -->
+<div id="presetSaveModal" style="display:none; position:fixed; inset:0; z-index:999; align-items:center; justify-content:center; background:rgba(0,39,82,0.45); backdrop-filter:blur(3px);">
+    <div class="card" style="width:min(400px,90vw); padding:1.5rem;">
+        <h3 style="margin-bottom:1rem;">Opslaan als preset</h3>
+        <form method="post" action="/budgets/preset/save">
+            <input type="hidden" name="year" value="{{ current_year }}">
+            <input type="hidden" name="month" value="{{ current_month }}">
+            <div class="form-group" style="margin-bottom:1rem;">
+                <label for="presetName">Naam</label>
+                <input type="text" id="presetName" name="name" placeholder="bijv. Standaard, Zomer…" required autofocus>
+            </div>
+            <div style="display:flex; gap:0.5rem; justify-content:flex-end;">
+                <button type="button" class="btn" onclick="document.getElementById('presetSaveModal').style.display='none'">Annuleren</button>
+                <button type="submit" class="btn btn-primary">Opslaan</button>
+            </div>
+        </form>
+    </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
+// Close modal on backdrop click
+document.getElementById('presetSaveModal').addEventListener('click', function(e) {
+    if (e.target === this) this.style.display = 'none';
+});
+
 function formatEuro(val) {
     var parts = Math.abs(val).toFixed(2).split('.');
     var intPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');

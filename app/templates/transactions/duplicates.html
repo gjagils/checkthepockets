@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Duplicaten — Check The Pockets{% endblock %}
+{% block container_class %}container-wide{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Duplicaten</h1>
+        <p class="muted" style="margin-top:0.25rem;">Transacties met dezelfde datum, bedrag en tegenpartij.</p>
+    </div>
+    <a href="/" class="btn">← Terug naar transacties</a>
+</div>
+
+{% if not groups %}
+<div class="card" style="text-align:center; padding:3rem;">
+    <p style="font-size:1.1rem; color:var(--green); font-weight:700; margin-bottom:0.5rem;">✓ Geen duplicaten gevonden</p>
+    <p class="muted">Alle transacties zijn uniek op datum, bedrag en tegenpartij.</p>
+</div>
+{% else %}
+<div class="alert alert-error" style="margin-bottom:1.5rem;">
+    <strong>{{ groups|length }} groep{{ 'en' if groups|length != 1 }} gevonden</strong> met mogelijke duplicaten.
+    Selecteer de transacties die je wilt uitsluiten en klik op "Uitsluiten".
+</div>
+
+<form method="post" action="/transactions/duplicates/exclude">
+{% for group in groups %}
+<div class="card" style="margin-bottom:1rem;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+        <span class="muted" style="font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; font-family:'Syne',sans-serif;">
+            {{ group|length }}× duplicaat — {{ group[0].date.strftime('%d-%m-%Y') }} · €{{ group[0].amount|euro }} · {{ group[0].counterparty or '—' }}
+        </span>
+        <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.78rem; cursor:pointer; color:var(--muted);">
+            <input type="checkbox" class="select-group-cb" data-group="{{ loop.index }}"> Selecteer alles behalve eerste
+        </label>
+    </div>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:2rem;"></th>
+                    <th>Datum</th>
+                    <th>Omschrijving</th>
+                    <th>Tegenpartij</th>
+                    <th>Categorie</th>
+                    <th class="text-right">Bedrag</th>
+                    <th>Rekening</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for tx in group %}
+                <tr {% if loop.first %}style="background:var(--green-bg);"{% endif %}>
+                    <td style="text-align:center;">
+                        {% if not loop.first %}
+                        <input type="checkbox" name="tx_ids" value="{{ tx.id }}"
+                               class="group-cb-{{ loop.index0 }}-grp-{{ loop.index }}"
+                               data-group="{{ loop.index }}">
+                        {% else %}
+                        <span title="Eerste — wordt bewaard" style="color:var(--green); font-size:0.9rem;">✓</span>
+                        {% endif %}
+                    </td>
+                    <td class="nowrap">{{ tx.date.strftime('%d-%m-%Y') }}</td>
+                    <td>{{ tx.description or '—' }}</td>
+                    <td>{{ tx.counterparty or '—' }}</td>
+                    <td>{{ tx.category.name if tx.category else '—' }}</td>
+                    <td class="text-right nowrap {% if tx.amount >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
+                        €&nbsp;{{ tx.amount|euro }}
+                    </td>
+                    <td class="nowrap">{{ tx.account.name }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endfor %}
+
+<div style="display:flex; gap:1rem; justify-content:flex-end; margin-top:1rem;">
+    <a href="/" class="btn">Annuleren</a>
+    <button type="submit" class="btn btn-primary"
+            onclick="return confirm('Geselecteerde transacties uitsluiten? Ze verdwijnen uit overzichten.')">
+        Geselecteerde uitsluiten
+    </button>
+</div>
+</form>
+{% endif %}
+
+<script>
+// "Selecteer alles behalve eerste" per groep
+document.querySelectorAll('.select-group-cb').forEach(function(cb) {
+    cb.addEventListener('change', function() {
+        var grp = this.dataset.group;
+        document.querySelectorAll('input[type="checkbox"][name="tx_ids"][data-group="' + grp + '"]').forEach(function(c) {
+            c.checked = cb.checked;
+        });
+    });
+});
+// Add data-group to individual checkboxes so the above works
+document.querySelectorAll('input[name="tx_ids"]').forEach(function(cb) {
+    // data-group is already set via template
+});
+</script>
+{% endblock %}
