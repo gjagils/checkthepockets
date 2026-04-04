@@ -6,149 +6,225 @@
 </div>
 
 <!-- Summary -->
-{% if items %}
 <div class="recurring-summary">
     <div class="summary-card">
-        <div class="value">{{ total_active }}</div>
-        <div class="label">Actief</div>
+        <div class="value amount-positive">{{ total_active }}</div>
+        <div class="label">Ontvangen</div>
     </div>
     <div class="summary-card">
-        <div class="value amount-positive">{{ total_confirmed }}</div>
-        <div class="label">Ontvangen deze periode</div>
+        <div class="value {% if total_due > 0 %}amount-negative{% endif %}">{{ total_due }}</div>
+        <div class="label">Verwacht</div>
     </div>
     <div class="summary-card">
-        {% if total_due > 0 %}
-        <div class="value" style="color:var(--ctp-coin-dark);">{{ total_due }}</div>
-        {% else %}
-        <div class="value amount-positive">0</div>
-        {% endif %}
-        <div class="label">Nog verwacht</div>
+        <div class="value {% if total_missed > 0 %}amount-negative{% endif %}">{{ total_missed }}</div>
+        <div class="label">Gemist</div>
     </div>
+</div>
+
+<!-- ── GEMISTE BETALINGEN ─────────────────────────────── -->
+{% if items_missed %}
+<div class="card" style="border-left: 4px solid var(--red); margin-bottom:1.25rem;">
+    <div style="display:flex; align-items:center; gap:0.6rem; margin-bottom:1rem;">
+        <span style="font-size:1.2rem;">⚠</span>
+        <h2 style="margin:0; color:var(--red);">Gemiste betalingen ({{ items_missed|length }})</h2>
+    </div>
+    <p class="muted" style="margin-bottom:1rem; font-size:0.85rem;">
+        Deze items hadden al moeten plaatsvinden maar zijn ook in de vorige periode niet aangetroffen.
+    </p>
+    {% for entry in items_missed %}
+    {% set item = entry.item %}
+    <div class="recurring-card" style="margin-bottom:0.75rem; border-left:3px solid var(--red); padding-left:1rem;">
+        <div class="recurring-header">
+            <div>
+                <strong>{{ item.name }}</strong>
+                <span class="pill" style="background:rgba(224,62,62,0.12); color:var(--red); margin-left:0.4rem;">Gemist</span>
+            </div>
+            <div class="recurring-amount {% if item.amount_expected < 0 %}amount-negative{% else %}amount-positive{% endif %}">
+                &euro;&nbsp;{{ item.amount_expected|euro }}
+            </div>
+        </div>
+        <div class="recurring-meta">
+            <span class="pill">{{ frequencies.get(item.frequency, item.frequency) }}</span>
+            {% if item.category %}
+            <span class="category-pill" style="--cat-color: {{ item.category.color or '#1F6FB2' }}">{{ item.category.name }}</span>
+            {% endif %}
+            <span class="muted" style="font-size:0.78rem;">
+                Vorige periode: {{ entry.prev_period_start.strftime('%d-%m') }} t/m {{ entry.prev_period_end.strftime('%d-%m-%Y') }}
+            </span>
+        </div>
+        <!-- Koppel transactie -->
+        <details style="margin-top:0.5rem;">
+            <summary style="font-size:0.8rem; cursor:pointer; color:var(--navy-mid); font-weight:600;">↩ Handmatig koppelen</summary>
+            <form method="post" action="/recurring/{{ item.id }}/link" style="display:flex; gap:0.4rem; margin-top:0.4rem; align-items:center;">
+                <input type="number" name="transaction_id" placeholder="Transactie ID" style="width:140px;"
+                       title="Vind het ID via de transactiepagina (URL /transactions/{id}/edit)">
+                <button type="submit" class="btn btn-sm btn-accent">Koppelen</button>
+            </form>
+        </details>
+        <div class="recurring-actions" style="margin-top:0.5rem;">
+            <button class="btn btn-sm" onclick="toggleRecurringEdit({{ item.id }})">Bewerken</button>
+            <form method="post" action="/recurring/{{ item.id }}/toggle" style="display:inline;">
+                <button type="submit" class="btn btn-sm">Deactiveren</button>
+            </form>
+        </div>
+        <div class="recurring-edit" id="recurring-edit-{{ item.id }}" style="display:none; margin-top:0.75rem;">
+            {% include "recurring/_edit_form.html" %}
+        </div>
+    </div>
+    {% endfor %}
 </div>
 {% endif %}
 
 <div class="recurring-layout">
-    <!-- List -->
+    <!-- Left: active + due + inactive list -->
     <div>
-        {% if items %}
-        <div class="recurring-list">
-            {% for entry in items %}
+
+        <!-- Verwacht deze periode -->
+        {% if items_due %}
+        <div class="card" style="margin-bottom:1rem; border-left:4px solid var(--gold);">
+            <h3 style="margin-bottom:0.75rem; color:var(--navy);">
+                Verwacht deze periode
+                <span class="pill" style="background:rgba(249,168,0,0.15); color:#b07500; margin-left:0.4rem;">{{ items_due|length }}</span>
+            </h3>
+            {% for entry in items_due %}
             {% set item = entry.item %}
-            <div class="card recurring-card {% if not item.is_active %}recurring-inactive{% endif %}">
+            <div class="recurring-card" style="margin-bottom:0.6rem;">
                 <div class="recurring-header">
-                    <div>
-                        <strong>{{ item.name }}</strong>
-                        {% if not item.is_active %}
-                        <span class="pill" style="background:var(--ctp-danger-bg); color:var(--ctp-danger);">Inactief</span>
-                        {% endif %}
-                    </div>
+                    <strong>{{ item.name }}</strong>
                     <div class="recurring-amount {% if item.amount_expected < 0 %}amount-negative{% else %}amount-positive{% endif %}">
                         &euro;&nbsp;{{ item.amount_expected|euro }}
                     </div>
                 </div>
-
                 <div class="recurring-meta">
                     <span class="pill">{{ frequencies.get(item.frequency, item.frequency) }}</span>
-                    {% if item.category %}
-                    <span class="category-pill" style="--cat-color: {{ item.category.color or '#1F6FB2' }}">
-                        {{ item.category.name }}
-                    </span>
-                    {% endif %}
-                    {% if item.counterparty %}
-                    <span class="muted">Tegenpartij: {{ item.counterparty }}</span>
-                    {% endif %}
-                </div>
-
-                <div class="recurring-status">
-                    <span class="muted">Periode: {{ entry.period_start.strftime('%d-%m') }} t/m {{ entry.period_end.strftime('%d-%m-%Y') }}</span>
-                    {% if entry.matched_transaction %}
-                    <span class="recurring-badge recurring-badge-ok">
-                        Gevonden: {{ entry.matched_transaction.date.strftime('%d-%m') }}
-                        (&euro;&nbsp;{{ entry.matched_transaction.amount|euro }})
-                    </span>
-                    {% elif entry.is_due %}
+                    {% if item.category %}<span class="category-pill" style="--cat-color: {{ item.category.color or '#1F6FB2' }}">{{ item.category.name }}</span>{% endif %}
+                    <span class="muted" style="font-size:0.78rem;">t/m {{ entry.period_end.strftime('%d-%m-%Y') }}</span>
                     <span class="recurring-badge recurring-badge-due">Nog niet gevonden</span>
-                    {% endif %}
                 </div>
-
-                <div class="recurring-actions">
+                <details style="margin-top:0.4rem;">
+                    <summary style="font-size:0.78rem; cursor:pointer; color:var(--navy-mid); font-weight:600;">↩ Handmatig koppelen</summary>
+                    <form method="post" action="/recurring/{{ item.id }}/link" style="display:flex; gap:0.4rem; margin-top:0.35rem; align-items:center;">
+                        <input type="number" name="transaction_id" placeholder="Transactie ID" style="width:140px;">
+                        <button type="submit" class="btn btn-sm btn-accent">Koppelen</button>
+                    </form>
+                </details>
+                <div class="recurring-actions" style="margin-top:0.4rem;">
                     <button class="btn btn-sm" onclick="toggleRecurringEdit({{ item.id }})">Bewerken</button>
                     <form method="post" action="/recurring/{{ item.id }}/toggle" style="display:inline;">
-                        <button type="submit" class="btn btn-sm">
-                            {{ "Deactiveren" if item.is_active else "Activeren" }}
-                        </button>
+                        <button type="submit" class="btn btn-sm">Deactiveren</button>
                     </form>
-                    <form method="post" action="/recurring/{{ item.id }}/delete" style="display:inline;"
-                          onsubmit="return confirm('Verwijderen?')">
+                    <form method="post" action="/recurring/{{ item.id }}/delete" style="display:inline;" onsubmit="return confirm('Verwijderen?')">
                         <button type="submit" class="btn btn-sm btn-danger">Verwijderen</button>
                     </form>
                 </div>
-
-                <!-- Edit form (hidden) -->
-                <div class="recurring-edit" id="recurring-edit-{{ item.id }}" style="display:none;">
-                    <form method="post" action="/recurring/{{ item.id }}/edit">
-                        <div class="rule-condition">
-                            <div class="form-group">
-                                <label>Naam</label>
-                                <input type="text" name="name" value="{{ item.name }}" required>
-                            </div>
-                            <div class="form-group">
-                                <label>Verwacht bedrag</label>
-                                <input type="number" step="0.01" name="amount_expected"
-                                       value="{{ '%.2f'|format(item.amount_expected) }}" required>
-                            </div>
-                            <div class="form-group">
-                                <label>Frequentie</label>
-                                <select name="frequency">
-                                    {% for key, label in frequencies.items() %}
-                                    <option value="{{ key }}" {% if item.frequency == key %}selected{% endif %}>{{ label }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                        </div>
-                        <div class="rule-condition">
-                            <div class="form-group">
-                                <label>Categorie</label>
-                                <select name="category_id">
-                                    <option value="">Geen</option>
-                                    {% for cat in categories %}
-                                    {% if not cat.parent_id %}
-                                    <optgroup label="{{ cat.name }}">
-                                        <option value="{{ cat.id }}" {% if item.category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
-                                        {% for child in cat.children|sort(attribute='name') %}
-                                        <option value="{{ child.id }}" {% if item.category_id == child.id %}selected{% endif %}>{{ child.name }}</option>
-                                        {% endfor %}
-                                    </optgroup>
-                                    {% endif %}
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label>Tegenpartij (zoekterm)</label>
-                                <input type="text" name="counterparty" value="{{ item.counterparty or '' }}">
-                            </div>
-                            <div class="form-group">
-                                <label>Omschrijving (zoekterm)</label>
-                                <input type="text" name="description_match" value="{{ item.description_match or '' }}">
-                            </div>
-                        </div>
-                        <div style="margin-top:0.5rem; display:flex; gap:0.5rem;">
-                            <button type="submit" class="btn btn-sm btn-primary">Opslaan</button>
-                            <button type="button" class="btn btn-sm" onclick="toggleRecurringEdit({{ item.id }})">Annuleren</button>
-                        </div>
-                    </form>
+                <div class="recurring-edit" id="recurring-edit-{{ item.id }}" style="display:none; margin-top:0.75rem;">
+                    {% include "recurring/_edit_form.html" %}
                 </div>
             </div>
             {% endfor %}
         </div>
-        {% else %}
+        {% endif %}
+
+        <!-- Ontvangen / gevonden -->
+        {% if items_active %}
+        <div class="card" style="margin-bottom:1rem;">
+            <h3 style="margin-bottom:0.75rem; color:var(--navy);">
+                Ontvangen deze periode
+                <span class="pill" style="background:rgba(34,197,94,0.12); color:var(--green); margin-left:0.4rem;">{{ items_active|length }}</span>
+            </h3>
+            {% for entry in items_active %}
+            {% set item = entry.item %}
+            <div class="recurring-card" style="margin-bottom:0.6rem;">
+                <div class="recurring-header">
+                    <strong>{{ item.name }}</strong>
+                    <div class="recurring-amount {% if item.amount_expected < 0 %}amount-negative{% else %}amount-positive{% endif %}">
+                        &euro;&nbsp;{{ item.amount_expected|euro }}
+                    </div>
+                </div>
+                <div class="recurring-meta">
+                    <span class="pill">{{ frequencies.get(item.frequency, item.frequency) }}</span>
+                    {% if item.category %}<span class="category-pill" style="--cat-color: {{ item.category.color or '#1F6FB2' }}">{{ item.category.name }}</span>{% endif %}
+                    <span class="recurring-badge recurring-badge-ok">
+                        {{ entry.matched_transaction.date.strftime('%d-%m') }}
+                        &euro;&nbsp;{{ entry.matched_transaction.amount|euro }}
+                        {% if entry.matched_transaction.recurring_id == item.id %}· handmatig{% endif %}
+                    </span>
+                    {% if entry.matched_transaction.recurring_id == item.id %}
+                    <form method="post" action="/recurring/{{ item.id }}/unlink" style="display:inline;">
+                        <input type="hidden" name="transaction_id" value="{{ entry.matched_transaction.id }}">
+                        <button type="submit" class="btn btn-sm" style="font-size:0.7rem; padding:0.1rem 0.4rem;" title="Koppeling verwijderen">✕ ontkoppelen</button>
+                    </form>
+                    {% endif %}
+                </div>
+                <div class="recurring-actions">
+                    <button class="btn btn-sm" onclick="toggleRecurringEdit({{ item.id }})">Bewerken</button>
+                    <form method="post" action="/recurring/{{ item.id }}/toggle" style="display:inline;">
+                        <button type="submit" class="btn btn-sm">Deactiveren</button>
+                    </form>
+                    <form method="post" action="/recurring/{{ item.id }}/delete" style="display:inline;" onsubmit="return confirm('Verwijderen?')">
+                        <button type="submit" class="btn btn-sm btn-danger">Verwijderen</button>
+                    </form>
+                </div>
+                <div class="recurring-edit" id="recurring-edit-{{ item.id }}" style="display:none; margin-top:0.75rem;">
+                    {% include "recurring/_edit_form.html" %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Inactief / buiten actieve periode -->
+        {% if items_inactive %}
+        <details class="card" style="padding:0; margin-bottom:1rem;">
+            <summary style="padding:0.75rem 1.25rem; cursor:pointer; font-size:0.78rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; font-family:'Syne',sans-serif; color:var(--muted);">
+                Inactief / buiten periode ({{ items_inactive|length }})
+            </summary>
+            <div style="padding:0 1.25rem 1rem;">
+                {% for entry in items_inactive %}
+                {% set item = entry.item %}
+                <div class="recurring-card recurring-inactive" style="margin-bottom:0.6rem;">
+                    <div class="recurring-header">
+                        <div>
+                            <strong>{{ item.name }}</strong>
+                            {% if not item.is_active %}
+                            <span class="pill" style="background:var(--ctp-danger-bg); color:var(--ctp-danger);">Inactief</span>
+                            {% elif not entry.in_active_period %}
+                            <span class="pill" style="background:var(--bg); color:var(--muted);">Buiten periode</span>
+                            {% endif %}
+                        </div>
+                        <div class="recurring-amount muted">&euro;&nbsp;{{ item.amount_expected|euro }}</div>
+                    </div>
+                    <div class="recurring-meta">
+                        <span class="pill">{{ frequencies.get(item.frequency, item.frequency) }}</span>
+                        {% if item.start_date %}<span class="muted" style="font-size:0.75rem;">Vanaf {{ item.start_date.strftime('%d-%m-%Y') }}</span>{% endif %}
+                        {% if item.end_date %}<span class="muted" style="font-size:0.75rem;">T/m {{ item.end_date.strftime('%d-%m-%Y') }}</span>{% endif %}
+                    </div>
+                    <div class="recurring-actions">
+                        <button class="btn btn-sm" onclick="toggleRecurringEdit({{ item.id }})">Bewerken</button>
+                        <form method="post" action="/recurring/{{ item.id }}/toggle" style="display:inline;">
+                            <button type="submit" class="btn btn-sm">{{ "Activeren" if not item.is_active else "Deactiveren" }}</button>
+                        </form>
+                        <form method="post" action="/recurring/{{ item.id }}/delete" style="display:inline;" onsubmit="return confirm('Verwijderen?')">
+                            <button type="submit" class="btn btn-sm btn-danger">Verwijderen</button>
+                        </form>
+                    </div>
+                    <div class="recurring-edit" id="recurring-edit-{{ item.id }}" style="display:none; margin-top:0.75rem;">
+                        {% include "recurring/_edit_form.html" %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </details>
+        {% endif %}
+
+        {% if not items_active and not items_due and not items_missed and not items_inactive %}
         <div class="card">
             <p class="muted" style="text-align:center; padding:1rem;">Nog geen terugkerende transacties. Voeg rechts je eerste toe.</p>
         </div>
         {% endif %}
     </div>
 
-    <!-- Add form -->
+    <!-- Right: Add form -->
     <div>
         <div class="card">
             <h2>Toevoegen</h2>
@@ -188,14 +264,25 @@
                 </div>
                 <div class="form-group">
                     <label for="counterparty">Tegenpartij (zoekterm)</label>
-                    <input type="text" id="counterparty" name="counterparty"
-                           placeholder="bijv. Spotify">
+                    <input type="text" id="counterparty" name="counterparty" placeholder="bijv. Spotify">
                 </div>
                 <div class="form-group">
                     <label for="description_match">Omschrijving (zoekterm)</label>
-                    <input type="text" id="description_match" name="description_match"
-                           placeholder="bijv. maandhuur">
+                    <input type="text" id="description_match" name="description_match" placeholder="bijv. maandhuur">
                 </div>
+                <details style="margin-bottom:0.75rem;">
+                    <summary style="font-size:0.8rem; cursor:pointer; color:var(--navy-mid); font-weight:600; margin-bottom:0.4rem;">Actieve periode (optioneel)</summary>
+                    <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.4rem;">
+                        <div class="form-group" style="flex:1; min-width:120px;">
+                            <label for="start_date">Startdatum</label>
+                            <input type="date" id="start_date" name="start_date">
+                        </div>
+                        <div class="form-group" style="flex:1; min-width:120px;">
+                            <label for="end_date">Einddatum</label>
+                            <input type="date" id="end_date" name="end_date">
+                        </div>
+                    </div>
+                </details>
                 <button type="submit" class="btn btn-primary">Toevoegen</button>
             </form>
         </div>

@@ -56,32 +56,67 @@ def _get_period_range(frequency: str, ref_date: date) -> tuple[date, date]:
     return start, end
 
 
+def _get_previous_period_range(frequency: str, ref_date: date) -> tuple[date, date]:
+    """Get the start and end date of the period BEFORE the current one."""
+    current_start, _ = _get_period_range(frequency, ref_date)
+    prev_date = current_start - timedelta(days=1)
+    return _get_period_range(frequency, prev_date)
+
+
 def _find_matching_transaction(
     db: Session, user_id: int, recurring: RecurringTransaction, start: date, end: date
 ) -> Transaction | None:
-    """Find a transaction matching this recurring item in the given period."""
-    query = (
+    """Find a transaction matching this recurring item in the given period.
+    Checks both auto-matching (counterparty/description) and manual links (recurring_id).
+    """
+    # First: check manually linked transactions
+    linked = (
         db.query(Transaction)
         .join(Account)
         .filter(
             Account.user_id == user_id,
+            Transaction.recurring_id == recurring.id,
             Transaction.date >= start,
             Transaction.date <= end,
+            Transaction.is_excluded == 0,
         )
+        .first()
     )
+    if linked:
+        return linked
 
+    # Fall back to auto-matching by counterparty/description
     conditions = []
     if recurring.counterparty:
         conditions.append(Transaction.counterparty.ilike(f"%{recurring.counterparty}%"))
     if recurring.description_match:
         conditions.append(Transaction.description.ilike(f"%{recurring.description_match}%"))
 
-    if conditions:
-        query = query.filter(or_(*conditions))
-    else:
+    if not conditions:
         return None
 
-    return query.order_by(Transaction.date.desc()).first()
+    return (
+        db.query(Transaction)
+        .join(Account)
+        .filter(
+            Account.user_id == user_id,
+            Transaction.date >= start,
+            Transaction.date <= end,
+            Transaction.is_excluded == 0,
+            or_(*conditions),
+        )
+        .order_by(Transaction.date.desc())
+        .first()
+    )
+
+
+def _is_in_active_period(item: RecurringTransaction, today: date) -> bool:
+    """Check if a recurring item is within its configured active period."""
+    if item.start_date and item.start_date > today:
+        return False
+    if item.end_date and item.end_date < today:
+        return False
+    return True
 
 
 @router.get("/recurring")
@@ -106,36 +141,72 @@ def recurring_list(
         .all()
     )
 
-    # Check status for each recurring item
-    items_with_status = []
+    items_active = []    # active period, matched this period
+    items_due = []       # active period, not matched yet (current period still ongoing)
+    items_missed = []    # active period, previous period was NOT matched (overdue)
+    items_inactive = []  # is_active=0 or outside active period
+
     for item in recurring_items:
-        start, end = _get_period_range(item.frequency, today)
-        match = _find_matching_transaction(db, user.id, item, start, end)
+        in_period = _is_in_active_period(item, today)
 
-        items_with_status.append({
+        if not item.is_active or not in_period:
+            cur_start, cur_end = _get_period_range(item.frequency, today)
+            match = _find_matching_transaction(db, user.id, item, cur_start, cur_end)
+            items_inactive.append({
+                "item": item,
+                "period_start": cur_start,
+                "period_end": cur_end,
+                "matched_transaction": match,
+                "is_due": False,
+                "in_active_period": in_period,
+            })
+            continue
+
+        cur_start, cur_end = _get_period_range(item.frequency, today)
+        cur_match = _find_matching_transaction(db, user.id, item, cur_start, cur_end)
+
+        prev_start, prev_end = _get_previous_period_range(item.frequency, today)
+        prev_match = _find_matching_transaction(db, user.id, item, prev_start, prev_end)
+
+        entry = {
             "item": item,
-            "period_start": start,
-            "period_end": end,
-            "matched_transaction": match,
-            "is_due": match is None and item.is_active,
-        })
+            "period_start": cur_start,
+            "period_end": cur_end,
+            "matched_transaction": cur_match,
+            "prev_period_start": prev_start,
+            "prev_period_end": prev_end,
+            "prev_matched_transaction": prev_match,
+            "is_due": cur_match is None,
+            "in_active_period": True,
+        }
 
-    # Summary
-    total_active = sum(1 for i in items_with_status if i["item"].is_active)
-    total_due = sum(1 for i in items_with_status if i["is_due"])
-    total_confirmed = sum(1 for i in items_with_status if i["matched_transaction"] and i["item"].is_active)
+        if cur_match:
+            items_active.append(entry)
+        elif prev_match is None:
+            # Previous period also had no match → genuinely missed
+            items_missed.append(entry)
+        else:
+            # Previous period was fine, just waiting for current period
+            items_due.append(entry)
+
+    total_active = len(items_active)
+    total_due = len(items_due)
+    total_missed = len(items_missed)
 
     return templates.TemplateResponse(
         "recurring/list.html",
         {
             "request": request,
             "user": user,
-            "items": items_with_status,
+            "items_active": items_active,
+            "items_due": items_due,
+            "items_missed": items_missed,
+            "items_inactive": items_inactive,
             "categories": categories,
             "frequencies": FREQUENCIES,
             "total_active": total_active,
             "total_due": total_due,
-            "total_confirmed": total_confirmed,
+            "total_missed": total_missed,
             "today": today,
         },
     )
@@ -150,6 +221,8 @@ def create_recurring(
     category_id: str = Form(""),
     counterparty: str = Form(""),
     description_match: str = Form(""),
+    start_date: str = Form(""),
+    end_date: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
@@ -173,6 +246,17 @@ def create_recurring(
         if not cat:
             cat_id = None
 
+    from datetime import date as date_type
+    parsed_start = None
+    parsed_end = None
+    try:
+        if start_date.strip():
+            parsed_start = date_type.fromisoformat(start_date.strip())
+        if end_date.strip():
+            parsed_end = date_type.fromisoformat(end_date.strip())
+    except ValueError:
+        pass
+
     item = RecurringTransaction(
         user_id=user.id,
         name=name,
@@ -181,6 +265,8 @@ def create_recurring(
         category_id=cat_id,
         counterparty=counterparty.strip() or None,
         description_match=description_match.strip() or None,
+        start_date=parsed_start,
+        end_date=parsed_end,
     )
     db.add(item)
     db.commit()
@@ -198,6 +284,8 @@ def edit_recurring(
     category_id: str = Form(""),
     counterparty: str = Form(""),
     description_match: str = Form(""),
+    start_date: str = Form(""),
+    end_date: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
@@ -216,11 +304,24 @@ def edit_recurring(
     except (InvalidOperation, ValueError):
         return RedirectResponse("/recurring", status_code=302)
 
+    from datetime import date as date_type
+    parsed_start = None
+    parsed_end = None
+    try:
+        if start_date.strip():
+            parsed_start = date_type.fromisoformat(start_date.strip())
+        if end_date.strip():
+            parsed_end = date_type.fromisoformat(end_date.strip())
+    except ValueError:
+        pass
+
     item.name = name
     item.amount_expected = parsed_amount
     item.frequency = frequency if frequency in FREQUENCIES else item.frequency
     item.counterparty = counterparty.strip() or None
     item.description_match = description_match.strip() or None
+    item.start_date = parsed_start
+    item.end_date = parsed_end
 
     cat_id = int(category_id) if category_id.strip() else None
     if cat_id:
@@ -232,6 +333,58 @@ def edit_recurring(
         item.category_id = None
 
     db.commit()
+    return RedirectResponse("/recurring", status_code=302)
+
+
+@router.post("/recurring/{item_id}/link")
+def link_transaction(
+    item_id: int,
+    request: Request,
+    transaction_id: int = Form(...),
+    db: Session = Depends(get_db),
+):
+    """Manually link a transaction to a recurring item."""
+    user = require_login(request, db)
+
+    item = db.query(RecurringTransaction).filter(
+        RecurringTransaction.id == item_id, RecurringTransaction.user_id == user.id
+    ).first()
+    if not item:
+        return RedirectResponse("/recurring", status_code=302)
+
+    tx = (
+        db.query(Transaction)
+        .join(Account)
+        .filter(Transaction.id == transaction_id, Account.user_id == user.id)
+        .first()
+    )
+    if tx:
+        tx.recurring_id = item.id
+        db.commit()
+
+    return RedirectResponse("/recurring", status_code=302)
+
+
+@router.post("/recurring/{item_id}/unlink")
+def unlink_transaction(
+    item_id: int,
+    request: Request,
+    transaction_id: int = Form(...),
+    db: Session = Depends(get_db),
+):
+    """Remove manual link between a transaction and a recurring item."""
+    user = require_login(request, db)
+
+    tx = (
+        db.query(Transaction)
+        .join(Account)
+        .filter(Transaction.id == transaction_id, Account.user_id == user.id)
+        .first()
+    )
+    if tx and tx.recurring_id == item_id:
+        tx.recurring_id = None
+        db.commit()
+
     return RedirectResponse("/recurring", status_code=302)
 
 

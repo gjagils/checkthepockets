@@ -154,6 +154,8 @@ class RecurringTransaction(Base):
     counterparty = Column(String(255), nullable=True)
     description_match = Column(String(255), nullable=True)  # for auto-detection
     is_active = Column(Integer, default=1)
+    start_date = Column(Date, nullable=True)
+    end_date = Column(Date, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     user = relationship("User", back_populates="recurring_transactions")
@@ -177,6 +179,7 @@ class Transaction(Base):
     import_hash = Column(String(64), unique=True, nullable=False)
     is_excluded = Column(Integer, default=0)
     is_reviewed = Column(Integer, default=0)
+    recurring_id = Column(Integer, ForeignKey("recurring_transactions.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     account = relationship("Account", back_populates="transactions")
