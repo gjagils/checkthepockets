@@ -27,19 +27,19 @@
 <div class="tx-toolbar">
     <!-- Period navigation -->
     <div class="period-nav">
-        <a href="/?month={{ prev_month }}{% if current_account_id %}&account_id={{ current_account_id }}{% endif %}{% if current_category_id %}&category_id={{ current_category_id }}{% endif %}" class="period-btn" title="Vorige maand">‹</a>
+        <a href="/transactions?month={{ prev_month }}{% if current_account_id %}&account_id={{ current_account_id }}{% endif %}{% if current_category_id %}&category_id={{ current_category_id }}{% endif %}" class="period-btn" title="Vorige maand">‹</a>
         <span class="period-label">{{ period_label }}</span>
         {% if current_month %}
-        <a href="/?month={{ next_month }}{% if current_account_id %}&account_id={{ current_account_id }}{% endif %}{% if current_category_id %}&category_id={{ current_category_id }}{% endif %}" class="period-btn" title="Volgende maand">›</a>
+        <a href="/transactions?month={{ next_month }}{% if current_account_id %}&account_id={{ current_account_id }}{% endif %}{% if current_category_id %}&category_id={{ current_category_id }}{% endif %}" class="period-btn" title="Volgende maand">›</a>
         <span class="period-divider"></span>
         <a href="/transactions" class="period-btn">Alles</a>
         {% else %}
-        <a href="/?month={{ this_month }}{% if current_account_id %}&account_id={{ current_account_id }}{% endif %}" class="period-btn" title="Ga naar deze maand">Deze maand</a>
+        <a href="/transactions?month={{ this_month }}{% if current_account_id %}&account_id={{ current_account_id }}{% endif %}" class="period-btn" title="Ga naar deze maand">Deze maand</a>
         {% endif %}
     </div>
 
     <!-- Quick filter: uncategorized -->
-    {% set _uncat = "/?category_id=-1" + ("&month=" + current_month if current_month else "") + ("&account_id=" + current_account_id|string if current_account_id else "") %}
+    {% set _uncat = "/transactions?category_id=-1" + ("&month=" + current_month if current_month else "") + ("&account_id=" + current_account_id|string if current_account_id else "") %}
     <a href="{{ _uncat }}"
        class="btn btn-sm {% if current_category_id == -1 %}btn-primary{% endif %}">
         Niet gecategoriseerd{% if uncategorized_count %}&nbsp;<span class="tx-badge">{{ uncategorized_count }}</span>{% endif %}
