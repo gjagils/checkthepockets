@@ -108,7 +108,6 @@
                     <th>Categorie</th>
                     <th class="text-right">Bedrag</th>
                     <th class="col-account">Rekening</th>
-                    <th style="width:2rem;"></th>
                     <th class="col-picker-th">
                         <div class="col-picker-wrap">
                             <button type="button" class="col-picker-btn" id="colPickerBtn" title="Kolommen kiezen">⊞</button>
@@ -140,7 +139,6 @@
                         {{ tx.amount|euro }}
                     </td>
                     <td class="col-account muted"></td>
-                    <td></td>
                     <td></td>
                 </tr>
                 {% endfor %}
@@ -178,29 +176,6 @@
                         &euro;&nbsp;{{ tx.amount|euro }}
                     </td>
                     <td class="nowrap col-account">{{ tx.account.name }}</td>
-                    <td class="nowrap">
-                        <a href="/transactions/{{ tx.id }}/edit" class="btn btn-sm">Bewerken</a>
-                        {% if tx.transfer_id %}
-                        <form method="post" action="/transactions/{{ tx.id }}/unlink-transfer" style="display:inline;">
-                            <input type="hidden" name="redirect_to" value="/?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}">
-                            <button type="submit" class="btn btn-sm" title="Transfer — klik om te ontkoppelen" onclick="return confirm('Transfer koppeling verwijderen?')" style="color:var(--navy-mid);">⇄</button>
-                        </form>
-                        {% else %}
-                        <button type="button" class="btn btn-sm" title="Koppelen als transfer"
-                                onclick="document.getElementById('tf-{{ tx.id }}').style.display='inline-flex'">⇄</button>
-                        <span id="tf-{{ tx.id }}" style="display:none; gap:0.3rem; align-items:center;">
-                            <form method="post" action="/transactions/{{ tx.id }}/link-transfer" style="display:inline-flex; gap:0.3rem; align-items:center;">
-                                <input type="hidden" name="redirect_to" value="/?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}">
-                                <input type="number" name="partner_id" placeholder="ID" style="width:65px; padding:0.2rem 0.4rem;" title="ID van de tegenpartij-transactie (te vinden in de URL van Bewerken)">
-                                <button type="submit" class="btn btn-sm btn-accent">OK</button>
-                            </form>
-                        </span>
-                        {% endif %}
-                        <form method="post" action="/transactions/{{ tx.id }}/exclude" style="display:inline;">
-                            <input type="hidden" name="redirect_to" value="/?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}">
-                            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Transactie uitsluiten?')">Uitsluiten</button>
-                        </form>
-                    </td>
                     <td style="text-align:center; padding:0.3rem;">
                         <button type="button"
                                 class="tx-action-btn"
@@ -210,7 +185,7 @@
                     </td>
                 </tr>
                 <tr class="tx-action-panel" id="txpanel-{{ tx.id }}" style="display:none;">
-                    <td colspan="10" class="tx-panel-cell">
+                    <td colspan="9" class="tx-panel-cell">
                         <div class="tx-panel-inner">
                             <div class="tx-panel-info">
                                 <strong>{{ tx.counterparty or tx.description or '—' }}</strong>
@@ -227,6 +202,31 @@
                                     <span class="tx-panel-btn-title">Maak terugkerend</span>
                                     <span class="tx-panel-btn-desc">Verwacht deze transactie iedere maand en zet hem alvast in de planning</span>
                                 </a>
+                            </div>
+                            <div class="tx-panel-footer">
+                                <a href="/transactions/{{ tx.id }}/edit" class="tx-panel-footer-btn">Bewerken</a>
+                                <span class="tx-panel-footer-sep">·</span>
+                                {% if tx.transfer_id %}
+                                <form method="post" action="/transactions/{{ tx.id }}/unlink-transfer" style="display:inline;">
+                                    <input type="hidden" name="redirect_to" value="/?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}">
+                                    <button type="submit" class="tx-panel-footer-btn" onclick="return confirm('Transfer koppeling verwijderen?')">⇄ Transfer ontkoppelen</button>
+                                </form>
+                                {% else %}
+                                <button type="button" class="tx-panel-footer-btn"
+                                        onclick="document.getElementById('tf2-{{ tx.id }}').style.display='inline-flex'">⇄ Koppel als transfer</button>
+                                <span id="tf2-{{ tx.id }}" style="display:none; gap:0.3rem; align-items:center; margin-left:0.3rem;">
+                                    <form method="post" action="/transactions/{{ tx.id }}/link-transfer" style="display:inline-flex; gap:0.3rem; align-items:center;">
+                                        <input type="hidden" name="redirect_to" value="/?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}">
+                                        <input type="number" name="partner_id" placeholder="Transactie ID" style="width:110px; padding:0.2rem 0.4rem; font-size:0.8rem;">
+                                        <button type="submit" class="btn btn-sm btn-accent">OK</button>
+                                    </form>
+                                </span>
+                                {% endif %}
+                                <span class="tx-panel-footer-sep">·</span>
+                                <form method="post" action="/transactions/{{ tx.id }}/exclude" style="display:inline;">
+                                    <input type="hidden" name="redirect_to" value="/?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}">
+                                    <button type="submit" class="tx-panel-footer-btn tx-panel-footer-danger" onclick="return confirm('Transactie uitsluiten?')">Uitsluiten</button>
+                                </form>
                             </div>
                         </div>
                     </td>

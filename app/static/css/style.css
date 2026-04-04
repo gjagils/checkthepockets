@@ -982,6 +982,28 @@ tfoot td { background: var(--surface-2); border-top: 1px solid var(--border); fo
     letter-spacing: 0.05em;
 }
 .tx-panel-btn-desc { font-size: 0.7rem; color: var(--muted); line-height: 1.4; }
+.tx-panel-footer {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding-top: 0.6rem;
+    margin-top: 0.6rem;
+    border-top: 1px solid var(--border);
+    flex-wrap: wrap;
+}
+.tx-panel-footer-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 0.78rem;
+    color: var(--muted);
+    cursor: pointer;
+    text-decoration: none;
+    font-family: inherit;
+}
+.tx-panel-footer-btn:hover { color: var(--text); text-decoration: underline; }
+.tx-panel-footer-danger:hover { color: var(--red); }
+.tx-panel-footer-sep { color: var(--border); font-size: 0.78rem; }
 
 /* ===== Column Picker (Sprint Design 4) ===== */
 .col-picker-th { width: 1.8rem; text-align: center; position: relative; }
