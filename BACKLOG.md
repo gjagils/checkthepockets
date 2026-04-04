@@ -127,6 +127,33 @@ Sprints zijn gegroepeerd op gedeelde bestanden voor maximale efficiëntie per se
 
 ---
 
+## Sprint 14 — Gebruikerstoegang & beveiliging
+*Kort termijn. Vereist e-mailprovider (bijv. Resend.com — gratis tier 3000 mails/mnd).*
+
+**Bestanden:** `app/routers/auth.py`, `app/models.py` (User), `app/templates/auth/`
+
+**Taken:**
+- [ ] **E-mail verificatie**: bij registratie een verificatielink sturen — `is_verified` veld op User, onverifieerde accounts kunnen niet inloggen
+- [ ] **Wachtwoord reset**: "Vergeten wachtwoord" flow — e-mail met reset-link (token met TTL), nieuw wachtwoord instellen
+- [ ] **Invite-only registratie**: `REGISTRATION_OPEN` config flag — als uit, alleen registreren via uitnodigingslink die jij genereert (`/admin/invite`)
+- [ ] **Rate limiting op login**: max 5 pogingen per IP per minuut — bescherming tegen brute force
+
+---
+
+## Sprint 15 — Gebruikersbeheer (admin)
+*Middellang termijn. Bouwt op Sprint 14.*
+
+**Bestanden:** nieuw `app/routers/admin.py`, `app/templates/admin/`
+
+**Taken:**
+- [ ] **Admin flag op User**: `is_admin` veld + migratie — eerste geregistreerde gebruiker krijgt automatisch admin
+- [ ] **Admin panel** `/admin/users`: lijst van alle gebruikers (naam, e-mail, registratiedatum, laatste login, verified/actief), activeren/deactiveren
+- [ ] **Invite links genereren**: admin genereert uitnodigingslink met TTL (7 dagen) — ontvangt link per mail of kopiëren
+- [ ] **Gebruikersstatistieken**: per gebruiker aantal transacties, rekeningen, laatste activiteit
+- [ ] **Neon database schaling**: documentatie voor upgrade naar betaald plan bij groei (>512MB of >10 gebruikers)
+
+---
+
 ## Sprint 13 — Setup export & import (configuratie-backup)
 *Exporteer de volledige app-configuratie als JSON, importeer met één druk op de knop.*
 
