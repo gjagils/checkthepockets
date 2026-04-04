@@ -8,84 +8,105 @@ Sprints zijn gegroepeerd op gedeelde bestanden voor maximale efficiëntie per se
 
 ---
 
-## Sprint Design 2 — Oranje redesign (Banani mockup)
-*Volledige visuele redesign op basis van het Banani-mockup. Behoudt de navigatiestructuur.*
-*Huidige wallet-icoontje behouden. Alle overige kleuren, fonts en layout-details vervangen.*
+## Sprint Design 2 — Layout redesign + dark/light thema-switcher
+
+*Tweefasige aanpak:*
+*Fase A — Layout: HTML-structuur van alle pagina's aanpassen naar de Banani-mockup (geldt voor beide thema's)*
+*Fase B — Thema's: huidige navy/gold stijl als "dark" bewaren + nieuw oranje/licht als "light" toevoegen + toggle*
 
 **Referentie:** twee screenshots gedeeld door gebruiker (april 2026):
-1. Transactiepagina mockup (exacte UI)
-2. Design system sheet (exacte tokens)
+1. Transactiepagina mockup (exacte UI-layout)
+2. Design system sheet (exacte kleur- en font-tokens)
 
 **Bestanden:** `app/static/css/style.css`, `app/templates/base.html`, `app/templates/transactions/list.html`
 
 **Context voor nieuwe sessie:**
 - Huidig thema: Editorial Finance — navy `#002752`, gold `#F9A800`, fonts: Syne + DM Sans
-- CSS custom properties staan bovenin `style.css` — variabelen aanpassen werkt door hele systeem
-- `--ctp-*` legacy aliassen moeten intact blijven zodat bestaande templates niet breken
-- Google Fonts import staat in `base.html` `<head>` — font URL vervangen
+- CSS custom properties staan bovenin `style.css` — thema-switching via `[data-theme]` op `<html>`
+- `--ctp-*` legacy aliassen moeten intact blijven
+- Google Fonts import in `base.html` `<head>`
+- Themavoorkeur opslaan in `localStorage`, instellen via `data-theme="light"|"dark"` op `<html>`
 
-**Design system (exacte waarden uit mockup):**
+**Design system light thema (exacte tokens uit mockup):**
 ```
-Kleuren:
-  --primary:     #234C75   /* was --navy: #002752 */
-  --secondary:   #F28C28   /* was --gold: #F9A800 — dit is HET oranje */
-  --tertiary:    #5DADE2   /* nieuw: lichtblauw accent */
-  --neutral:     #F8F9FA   /* achtergrond, was #f0f2f6 */
-  --card:        #ffffff
-  --text:        #1a1a2e   /* donkere bodytekst */
-  --muted:       #6b7280
+--primary:     #234C75   /* navy */
+--secondary:   #F28C28   /* oranje — primaire CTA-kleur */
+--tertiary:    #5DADE2   /* lichtblauw accent */
+--bg:          #F8F9FA   /* pagina-achtergrond */
+--card:        #ffffff
+--text:        #1a1a2e
+--muted:       #6b7280
+--border:      #e5e7eb
 
-Font:
-  Plus Jakarta Sans (vervangt Syne + DM Sans)
-  → Google Fonts: https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap
-  → Alle font-family refs: 'Syne' en 'DM Sans' → 'Plus Jakarta Sans'
-
-Knoppen (uit design system sheet):
-  Primary   = --primary bg (#234C75), witte tekst
-  Secondary = outlined dark
-  Inverted  = donker filled (#1a1a2e)
-  Outlined  = witte bg, border
-
-Nav active indicator:
-  Primaire nav: navy underline onder actief item (geen goud meer)
-  Sub-nav actief: beige/zand pill (background ~#F5F0E8, border-radius 999px)
+Font: Plus Jakarta Sans 400/500/600/700/800
+→ https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap
 ```
 
-**Taken:**
+---
 
-- [ ] **CSS variabelen herschrijven**: vervang het volledige variabelenblok bovenin `style.css`:
-  `--navy → #234C75`, `--gold → #F28C28` (als --orange/--secondary), voeg `--tertiary: #5DADE2` toe,
-  `--bg → #F8F9FA`; update btn-primary (oranje), btn-accent (navy), alle gold-refs naar --secondary
+### FASE A — Layout (thema-onafhankelijk, 1 sprint)
 
-- [ ] **Font vervangen**: in `base.html` Google Fonts URL wijzigen naar Plus Jakarta Sans (400/500/600/700/800);
-  in `style.css` alle `font-family: 'Syne'` en `font-family: 'DM Sans'` → `'Plus Jakarta Sans', sans-serif`
+**Bestanden:** `base.html`, `transactions/list.html`, `style.css` (structurele CSS)
 
-- [ ] **Paginatitels oranje**: `h1` in `.page-header` krijgt `color: var(--secondary); font-weight: 800`
-  Teller/count (bijv. "(175)") in `color: var(--muted); font-weight: 400; font-size: 1.1rem`
+- [ ] **Logo restructuur** (`base.html`): wallet-icoontje behouden + tekst gestapeld naast het icoontje:
+  `CHECK` / `THE` / `POCKETS` in drie regels, CHECK+THE in accentkleur (`var(--secondary)`), POCKETS in primaire kleur (`var(--primary)`). Gebruik CSS-variabelen zodat dit in beide thema's werkt.
 
-- [ ] **Logo**: in `base.html` — wallet-icoontje behouden; tekst aanpassen naar gestapeld:
+- [ ] **Gebruikersavatar** (`base.html`): ronde initialen-cirkel rechts in de primaire nav:
+  `{{ user.username[:2].upper() }}` in een `div.user-avatar` — stijl via CSS-variabelen. Vervangt huidige tekst-only gebruikersnaam.
+
+- [ ] **Primaire nav active-indicator** (`style.css`): van huidige goud-streep → `border-bottom: 3px solid var(--primary)` onder actief item.
+
+- [ ] **Sub-nav active-indicator** (`style.css`): actief item krijgt pill-stijl:
+  `background: var(--subnav-pill-bg); border-radius: 999px; padding: 0.3rem 1rem`
+  (variabele `--subnav-pill-bg` verschilt per thema: licht = `#F5F0E8`, donker = `rgba(255,255,255,0.1)`)
+
+- [ ] **Paginatitels** (`style.css`): `h1` in `.page-header` → `color: var(--secondary); font-weight: 800; font-size: 2rem`.
+  Teller "(N)" → `color: var(--muted); font-weight: 400; font-size: 1.1rem` (via `<span class="page-count">`)
+
+- [ ] **Tabelstructuur** (`style.css` + `transactions/list.html`): tabel zonder card-wrapper (zit direct op achtergrond), rijen gescheiden door `border-bottom: 1px solid var(--border)`. Kolomkoppen: `text-transform: uppercase; letter-spacing: 0.07em; font-size: 0.7rem; font-weight: 600; color: var(--muted)`.
+
+- [ ] **Filterbar** (`transactions/list.html`):
+  - Veldlabels boven de inputs als uppercase captions: `font-size:0.68rem; text-transform:uppercase; letter-spacing:0.08em; color:var(--muted)`
+  - Zoekicoontje als inline SVG in het zoekveld (absolute positioning, `padding-left:2.5rem` op input)
+  - "Meer filters" → oranje/accent link met `›` chevron, geen knop
+
+- [ ] **Knoppen transactiepagina** (`transactions/list.html`):
+  - "Handmatig toevoegen" → `.btn-accent` (primary/navy filled, uppercase)
+  - "CSV importeren" → `.btn-primary` (secondary/oranje filled, met document-icoon `📄` of SVG)
+  - BEWERKEN → `.btn-sm` outlined grijs
+  - UITSLUITEN → `.btn-sm` outlined met accentkleur tekst (geen gevulde achtergrond)
+
+---
+
+### FASE B — Thema-switcher (aparte sprint na Fase A)
+
+**Bestanden:** `style.css`, `base.html`
+
+- [ ] **CSS thema-variabelen**: twee variabelenblokken in `style.css`:
+  ```css
+  :root, [data-theme="light"] { --primary:#234C75; --secondary:#F28C28; --bg:#F8F9FA; ... }
+  [data-theme="dark"]          { --primary:#002752; --secondary:#F9A800; --bg:#1e1e2e; ... }
+  ```
+  Alle bestaande kleurwaarden in dark-blok zetten, light-blok is het nieuwe Banani-palet.
+
+- [ ] **Font-switcher** (`style.css`): font-stacks per thema of één gedeeld font (Plus Jakarta Sans voor beide, of Syne/DM Sans behouden voor dark). Keuze: **Plus Jakarta Sans voor beide** (eenvoudiger).
+
+- [ ] **Toggle-knop** (`base.html`): zon/maan icoon-knop in de nav naast de avatar:
   ```html
-  <span style="color:#F28C28; font-weight:800; line-height:1;">CHECK<br>THE<br></span>
-  <span style="color:#234C75; font-weight:800;">POCKETS</span>
+  <button class="theme-toggle" onclick="toggleTheme()" title="Wissel thema">🌙</button>
   ```
 
-- [ ] **Navigatie**: primaire nav active-indicator → `border-bottom: 3px solid #234C75` (navy, niet oranje);
-  sub-nav actief item → pill stijl: `background: #F5F0E8; border-radius: 999px; padding: 0.3rem 1rem`
-
-- [ ] **Gebruikersavatar**: in `base.html` — ronde foto-placeholder of initialen-cirkel rechts in nav:
-  ```html
-  <div class="user-avatar">{{ user.username[:2].upper() }}</div>
+- [ ] **Toggle JS** (`base.html` of `static/js/theme.js`):
+  ```js
+  function toggleTheme() {
+    const html = document.documentElement;
+    const next = html.dataset.theme === 'dark' ? 'light' : 'dark';
+    html.dataset.theme = next;
+    localStorage.setItem('theme', next);
+  }
+  // On load:
+  document.documentElement.dataset.theme = localStorage.getItem('theme') || 'light';
   ```
-  CSS: `width:36px; height:36px; border-radius:50%; background:#234C75; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:0.75rem`
-
-- [ ] **Filterbar transactiepagina**: in `transactions/list.html`:
-  - Zoekveld: voeg SVG zoekicoontje toe als prefix (positie: absolute links in het inputveld, `padding-left: 2.5rem` op input)
-  - Labels boven velden (ZOEKEN, REKENING, CATEGORIE) in `font-size:0.68rem; text-transform:uppercase; letter-spacing:0.08em; color:var(--muted); font-weight:600`
-  - "Meer filters" → `<a>` met oranje tekst + `›` chevron voor
-
-- [ ] **Tabelkoppen uppercase**: `<th>` krijgen `text-transform:uppercase; letter-spacing:0.07em; font-size:0.7rem; font-weight:600; color:var(--muted)` — geen card wrapper om tabel, tabel zit direct op de achtergrond met subtiele rij-scheidingslijnen
-
-- [ ] **Knoppen transactiepagina**: "Handmatig toevoegen" → navy filled uppercase; "CSV importeren" → oranje filled met document-icoontje voor de tekst; BEWERKEN → small outlined gray; UITSLUITEN → small outlined met rode/oranje tekst (geen gevulde achtergrond)
 
 ---
 
