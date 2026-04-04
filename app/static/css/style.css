@@ -1064,7 +1064,7 @@ tfoot td { background: var(--surface-2); border-top: 1px solid var(--border); fo
 .col-picker-item input { accent-color: var(--orange); cursor: pointer; }
 
 /* ===== Rules ===== */
-.rules-layout { display: grid; grid-template-columns: 400px 1fr; gap: 1.5rem; align-items: start; }
+.rules-layout { display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; align-items: start; }
 .rule-section { margin-bottom: 1.25rem; }
 .rule-section-header {
     display: flex;
