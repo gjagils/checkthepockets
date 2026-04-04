@@ -108,6 +108,44 @@ Sprints zijn gegroepeerd op gedeelde bestanden voor maximale efficiëntie per se
 
 ---
 
+## Sprint 12 — Database migratie naar Neon
+*Eenmalige migratie. Onafhankelijk van andere sprints.*
+
+**Context voor nieuwe sessie:**
+- Huidige database: PostgreSQL in Docker container op Synology NAS
+- Verbinding via `DATABASE_URL` in `stack.env`
+- Neon account aanmaken op https://neon.tech (gratis tier, 512MB)
+
+**Taken:**
+- [ ] Neon project + database aanmaken, connection string ophalen
+- [ ] `pg_dump` van huidige database op NAS
+- [ ] `pg_restore` naar Neon
+- [ ] `DATABASE_URL` in `stack.env` op Portainer updaten naar Neon connection string
+- [ ] Alembic migraties draaien op Neon om schema te verifiëren
+- [ ] App herstarten + smoke test
+- [ ] Oude PostgreSQL container + volume uit docker-compose.yml verwijderen
+
+---
+
+## Sprint 13 — Setup export & import (configuratie-backup)
+*Exporteer de volledige app-configuratie als JSON, importeer met één druk op de knop.*
+
+**Bestanden:** nieuw `app/routers/settings.py`, `app/templates/settings/index.html`
+
+**Context voor nieuwe sessie:**
+- Exporteren: Rules, RecurringTransactions, Categories (incl. hiërarchie + kleuren), Budgets (per maand), Tags
+- Geen transactie-data in de export — alleen de "setup"
+- Import: JSON uploaden → preview wat er geladen wordt → bevestigen → upsert naar database
+
+**Taken:**
+- [ ] `GET /settings/export` — genereert JSON met alle configuratie-entiteiten voor de ingelogde gebruiker
+- [ ] `POST /settings/import` — parseert JSON, toont preview (aantallen per type), bevestig-knop
+- [ ] Conflict-strategie bij import: bestaande items overslaan of overschrijven (keuze via radio)
+- [ ] Downloadknop in settings-pagina + upload-formulier
+- [ ] Versienummer in export-JSON zodat toekomstige formaat-wijzigingen te detecteren zijn
+
+---
+
 ## Sprint 4 — Analyse & Rapportage
 *Nieuwe rapportage-pagina's. Onafhankelijk van andere sprints.*
 
