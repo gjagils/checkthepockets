@@ -63,6 +63,7 @@ jobs:
           FIELD_ENCRYPTION_KEY: ${{ secrets.FIELD_ENCRYPTION_KEY }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           APP_URL: ${{ secrets.APP_URL }}
+          SUPER_ADMIN_USERNAME: ${{ secrets.SUPER_ADMIN_USERNAME }}
         run: |
           STACK_INFO=$(curl -s -H "X-API-Key: $PORTAINER_API_TOKEN" \
             "$PORTAINER_URL/api/stacks/$PORTAINER_STACK_ID")
@@ -85,7 +86,8 @@ jobs:
             --arg fk "$FIELD_ENCRYPTION_KEY" \
             --arg ra "$RESEND_API_KEY" \
             --arg au "$APP_URL" \
-            '[ if $db != "" then {"name":"DATABASE_URL","value":$db} else empty end, if $sk != "" then {"name":"SECRET_KEY","value":$sk} else empty end, if $gc != "" then {"name":"GOOGLE_CLIENT_ID","value":$gc} else empty end, if $gs != "" then {"name":"GOOGLE_CLIENT_SECRET","value":$gs} else empty end, if $ak != "" then {"name":"ANTHROPIC_API_KEY","value":$ak} else empty end, if $fk != "" then {"name":"FIELD_ENCRYPTION_KEY","value":$fk} else empty end, if $ra != "" then {"name":"RESEND_API_KEY","value":$ra} else empty end, if $au != "" then {"name":"APP_URL","value":$au} else empty end ] as $new | ($new | map(.name)) as $new_names | [.[] | select(.name as $n | $new_names | index($n) | not)] + $new')
+            --arg sa "$SUPER_ADMIN_USERNAME" \
+            '[ if $db != "" then {"name":"DATABASE_URL","value":$db} else empty end, if $sk != "" then {"name":"SECRET_KEY","value":$sk} else empty end, if $gc != "" then {"name":"GOOGLE_CLIENT_ID","value":$gc} else empty end, if $gs != "" then {"name":"GOOGLE_CLIENT_SECRET","value":$gs} else empty end, if $ak != "" then {"name":"ANTHROPIC_API_KEY","value":$ak} else empty end, if $fk != "" then {"name":"FIELD_ENCRYPTION_KEY","value":$fk} else empty end, if $ra != "" then {"name":"RESEND_API_KEY","value":$ra} else empty end, if $au != "" then {"name":"APP_URL","value":$au} else empty end, if $sa != "" then {"name":"SUPER_ADMIN_USERNAME","value":$sa} else empty end ] as $new | ($new | map(.name)) as $new_names | [.[] | select(.name as $n | $new_names | index($n) | not)] + $new')
 
           STACK_FILE=$(cat docker-compose.yml)
           echo "Redeploying stack with $(echo "$MERGED_ENV" | jq length) env vars..."
@@ -111,6 +113,7 @@ jobs:
           VAR_FIELD_ENCRYPTION_KEY: ${{ secrets.FIELD_ENCRYPTION_KEY }}
           VAR_RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           VAR_APP_URL: ${{ secrets.APP_URL }}
+          VAR_SUPER_ADMIN_USERNAME: ${{ secrets.SUPER_ADMIN_USERNAME }}
         run: |
           if [ -z "$RAILWAY_TOKEN" ]; then
             echo "RAILWAY_TOKEN not set, skipping Railway sync."
@@ -127,7 +130,8 @@ jobs:
             "ANTHROPIC_API_KEY=$VAR_ANTHROPIC_API_KEY" \
             "FIELD_ENCRYPTION_KEY=$VAR_FIELD_ENCRYPTION_KEY" \
             "RESEND_API_KEY=$VAR_RESEND_API_KEY" \
-            "APP_URL=$VAR_APP_URL"; do
+            "APP_URL=$VAR_APP_URL" \
+            "SUPER_ADMIN_USERNAME=$VAR_SUPER_ADMIN_USERNAME"; do
             key="${pair%%=*}"
             val="${pair#*=}"
             if [ -n "$val" ]; then
