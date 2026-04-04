@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="nl" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Check Your Pockets — Grip op je geld</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16.png">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: var(--font-body);
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        /* ===== Nav ===== */
+        .land-nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 2rem;
+            background: var(--nav-bg);
+            border-bottom: 1px solid var(--nav-border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .land-nav-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+        }
+        .land-nav-brand img { height: 40px; width: auto; }
+        .land-nav-brand .brand-text { display: flex; flex-direction: column; line-height: 1.05; }
+        .land-nav-brand .brand-line {
+            font-family: var(--font-heading);
+            font-weight: 800;
+            font-size: 0.72rem;
+            letter-spacing: 0.09em;
+            text-transform: uppercase;
+        }
+        .land-nav-brand .brand-check   { color: var(--nav-active-border); }
+        .land-nav-brand .brand-the     { color: var(--text-white); }
+        .land-nav-brand .brand-pockets { color: var(--nav-active-border); }
+        .land-nav-links { display: flex; gap: 0.75rem; align-items: center; }
+
+        /* ===== Hero ===== */
+        .hero {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            padding: 5rem 2rem 4rem;
+            background: linear-gradient(160deg, var(--nav-bg) 0%, var(--bg) 60%);
+        }
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            background: var(--orange-bg);
+            border: 1px solid var(--orange);
+            color: var(--orange);
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            padding: 0.3rem 0.75rem;
+            border-radius: 999px;
+            margin-bottom: 1.5rem;
+        }
+        .hero h1 {
+            font-family: var(--font-heading);
+            font-size: clamp(2.2rem, 5vw, 3.5rem);
+            font-weight: 800;
+            color: var(--text-white);
+            line-height: 1.15;
+            max-width: 700px;
+            margin-bottom: 1.25rem;
+        }
+        .hero h1 span { color: var(--orange); }
+        .hero p {
+            font-size: 1.1rem;
+            color: var(--muted);
+            max-width: 520px;
+            line-height: 1.7;
+            margin-bottom: 2.5rem;
+        }
+        .hero-cta { display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; }
+
+        /* ===== Features ===== */
+        .features {
+            padding: 4rem 2rem;
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+        .features-title {
+            text-align: center;
+            font-family: var(--font-heading);
+            font-size: 1.75rem;
+            font-weight: 800;
+            color: var(--text-white);
+            margin-bottom: 0.5rem;
+        }
+        .features-sub {
+            text-align: center;
+            color: var(--muted);
+            margin-bottom: 3rem;
+            font-size: 1rem;
+        }
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+        }
+        .feature-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.75rem;
+        }
+        .feature-icon {
+            font-size: 1.75rem;
+            margin-bottom: 1rem;
+        }
+        .feature-card h3 {
+            font-family: var(--font-heading);
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--text-white);
+            margin-bottom: 0.5rem;
+        }
+        .feature-card p {
+            font-size: 0.88rem;
+            color: var(--muted);
+            line-height: 1.6;
+        }
+
+        /* ===== CTA Banner ===== */
+        .cta-banner {
+            background: var(--orange-bg);
+            border-top: 1px solid var(--orange);
+            border-bottom: 1px solid var(--orange);
+            padding: 3.5rem 2rem;
+            text-align: center;
+            margin: 2rem 0 0;
+        }
+        .cta-banner h2 {
+            font-family: var(--font-heading);
+            font-size: 1.75rem;
+            font-weight: 800;
+            color: var(--text-white);
+            margin-bottom: 0.75rem;
+        }
+        .cta-banner p {
+            color: var(--muted);
+            margin-bottom: 2rem;
+            font-size: 1rem;
+        }
+
+        /* ===== Footer ===== */
+        .land-footer {
+            background: var(--nav-bg);
+            border-top: 1px solid var(--nav-border);
+            padding: 1.5rem 2rem;
+            text-align: center;
+            color: var(--muted);
+            font-size: 0.82rem;
+        }
+
+        /* ===== Buttons ===== */
+        .btn { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.65rem 1.5rem; border-radius: 8px; font-weight: 700; font-size: 0.9rem; font-family: var(--font-heading); text-decoration: none; border: none; cursor: pointer; transition: opacity 0.15s; letter-spacing: 0.02em; }
+        .btn:hover { opacity: 0.88; }
+        .btn-primary { background: var(--orange); color: #fff; }
+        .btn-ghost { background: transparent; color: var(--text-white); border: 1.5px solid var(--border); }
+        .btn-lg { padding: 0.85rem 2rem; font-size: 1rem; }
+    </style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav class="land-nav">
+    <a href="/" class="land-nav-brand">
+        <img src="/static/logo.png" alt="Check Your Pockets">
+        <span class="brand-text">
+            <span class="brand-line brand-check">CHECK</span>
+            <span class="brand-line brand-the">YOUR</span>
+            <span class="brand-line brand-pockets">POCKETS</span>
+        </span>
+    </a>
+    <div class="land-nav-links">
+        <a href="/login" class="btn btn-ghost">Inloggen</a>
+        <a href="/register" class="btn btn-primary">Gratis starten</a>
+    </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+    <div class="hero-badge">✦ Persoonlijk financieel overzicht</div>
+    <h1>Altijd weten wat er<br>in je <span>pockets</span> zit</h1>
+    <p>Check Your Pockets geeft je een helder overzicht van je inkomsten, uitgaven en spaardoelen. Importeer je bankafschriften en krijg direct inzicht.</p>
+    <div class="hero-cta">
+        <a href="/register" class="btn btn-primary btn-lg">Maak een gratis account</a>
+        <a href="/login" class="btn btn-ghost btn-lg">Inloggen</a>
+    </div>
+</section>
+
+<!-- Features -->
+<section class="features">
+    <h2 class="features-title">Alles wat je nodig hebt</h2>
+    <p class="features-sub">Gebouwd voor mensen die grip willen op hun financiën, zonder spreadsheets.</p>
+    <div class="features-grid">
+        <div class="feature-card">
+            <div class="feature-icon">📥</div>
+            <h3>CSV import</h3>
+            <p>Importeer transacties van ABN AMRO, ING, Rabobank, Bunq en ICS. Duplicaten worden automatisch herkend.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">🏷️</div>
+            <h3>Categorieën & regels</h3>
+            <p>Maak automatische regels die transacties categoriseren. Eén keer instellen, altijd bijgehouden.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">🔄</div>
+            <h3>Terugkerende uitgaven</h3>
+            <p>Houd abonnementen, huur en vaste lasten bij. Zie in één oogopslag wat er elke maand afgaat.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">📊</div>
+            <h3>Budgetten</h3>
+            <p>Stel maandbudgetten in per categorie en zie direct hoeveel je nog over hebt.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">📈</div>
+            <h3>Analyse & trends</h3>
+            <p>Maandtrends, top uitgavencategorieën en inzicht in je spaartarief over de tijd.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">🔒</div>
+            <h3>Privé & veilig</h3>
+            <p>Je data staat in een beveiligde Europese database. Geen bankkoppelingen, geen API-toegang tot je rekening.</p>
+        </div>
+    </div>
+</section>
+
+<!-- CTA Banner -->
+<section class="cta-banner">
+    <h2>Klaar om je pockets te checken?</h2>
+    <p>Maak een gratis account aan en importeer je eerste bankafschrift in minder dan 5 minuten.</p>
+    <a href="/register" class="btn btn-primary btn-lg">Gratis starten</a>
+</section>
+
+<!-- Footer -->
+<footer class="land-footer">
+    <p>© 2026 Check Your Pockets · Gebouwd met ❤️ · <a href="/login">Inloggen</a></p>
+</footer>
+
+</body>
+</html>

@@ -4,12 +4,15 @@ import time
 from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 
-from app.auth import LoginRequired
+from app.auth import LoginRequired, get_current_user
+from app.database import get_db
 from app.routers import auth, transactions, accounts, categories, tags, rules, budgets, recurring, dashboard, savings, analytics, portfolio, networth
 from app.scheduler import start_scheduler
 
-app = FastAPI(title="Check The Pockets", docs_url=None, redoc_url=None)
+app = FastAPI(title="Check Your Pockets", docs_url=None, redoc_url=None)
+_landing_templates = Jinja2Templates(directory="app/templates")
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
@@ -36,6 +39,23 @@ app.include_router(savings.router)
 app.include_router(analytics.router)
 app.include_router(portfolio.router)
 app.include_router(networth.router)
+
+
+@app.get("/")
+def landing(request: Request):
+    """Landing page — redirect to dashboard if already logged in."""
+    from sqlalchemy.orm import Session
+    from app.database import SessionLocal
+    db = SessionLocal()
+    try:
+        user = get_current_user(request, db)
+    except Exception:
+        user = None
+    finally:
+        db.close()
+    if user:
+        return RedirectResponse("/dashboard", status_code=302)
+    return _landing_templates.TemplateResponse("landing.html", {"request": request})
 
 
 @app.on_event("startup")
