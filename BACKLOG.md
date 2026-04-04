@@ -8,6 +8,52 @@ Sprints zijn gegroepeerd op gedeelde bestanden voor maximale efficiëntie per se
 
 ---
 
+## Sprint 17 — Slimme regelanalyse (Claude API)
+*Beschrijvingen opknippen + automatische categorie-suggestie bij het aanmaken van regels.*
+
+**Bestanden:** `app/routers/rules.py`, `app/templates/rules/list.html`, nieuw `app/ai_suggest.py`
+
+**Vereisten:** `ANTHROPIC_API_KEY` als environment variable, `anthropic` package in requirements.txt
+
+**Flow:**
+1. Gebruiker opent regelformulier (vanuit transactie of handmatig)
+2. "✨ Analyseer" knop → `POST /rules/suggest` met beschrijving + transactie-id
+3. Claude extraheert merchant-naam, stelt match-waarde en categorie voor op basis van jouw categorieënlijst
+4. Formulier wordt pre-filled — gebruiker bevestigt of past aan
+
+**Taken:**
+- [ ] `anthropic` toevoegen aan `requirements.txt`
+- [ ] `app/ai_suggest.py` — `suggest_rule(description, counterparty, categories)` → `{match_value, counterparty_clean, category_id, reasoning}`
+- [ ] Regex-parser voor bekende bankformaten (ABN AMRO BEA/PIN, SEPA, iDEAL) als snelle pre-parse vóór AI-call
+- [ ] `POST /rules/suggest` endpoint — geeft JSON terug
+- [ ] "✨ Analyseer" knop in regelformulier — fetch-aanroep, pre-fill velden via JS
+- [ ] Fallback: als `ANTHROPIC_API_KEY` niet ingesteld, toon knop niet
+
+---
+
+## Sprint 18 — Google login (OAuth2)
+*Inloggen met Google-account naast bestaand gebruikersnaam/wachtwoord.*
+
+**Bestanden:** `app/routers/auth.py`, `app/templates/auth/login.html`, `app/config.py`
+
+**Vereisten:** Google Cloud project met OAuth2 client ID + secret (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`), `authlib` package
+
+**Flow:**
+1. "Inloggen met Google" knop op loginpagina → `/auth/google` → redirect naar Google consent
+2. Google redirect naar `/auth/google/callback` met auth code
+3. Wissel code in voor user-info (e-mail, naam)
+4. Zoek bestaand account op e-mail — log in; geen account → maak aan (als REGISTRATION_OPEN of invite geldig)
+
+**Taken:**
+- [ ] `authlib` toevoegen aan `requirements.txt`
+- [ ] `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` in `app/config.py`
+- [ ] `GET /auth/google` — redirect naar Google OAuth consent screen
+- [ ] `GET /auth/google/callback` — verwerk callback, zoek/maak user, zet sessie-cookie
+- [ ] "Inloggen met Google" knop op `auth/login.html`
+- [ ] Fallback: als Google credentials niet ingesteld, knop niet tonen
+
+---
+
 ## Sprint Design 3 — Font & grootte pariteit tussen themes ✅ (2026-04-04)
 
 - [x] Plus Jakarta Sans voor beide thema's — font-vars alleen in `:root`, niet overschreven in `[data-theme="light"]`
@@ -117,76 +163,41 @@ Sprints zijn gegroepeerd op gedeelde bestanden voor maximale efficiëntie per se
 - Neon account aanmaken op https://neon.tech (gratis tier, 512MB)
 
 **Taken:**
-- [ ] Neon project + database aanmaken, connection string ophalen
-- [ ] `pg_dump` van huidige database op NAS
-- [ ] `pg_restore` naar Neon
-- [ ] `DATABASE_URL` in `stack.env` op Portainer updaten naar Neon connection string
-- [ ] Alembic migraties draaien op Neon om schema te verifiëren
-- [ ] App herstarten + smoke test
-- [ ] Oude PostgreSQL container + volume uit docker-compose.yml verwijderen
+- [x] Neon project + database aanmaken, connection string ophalen
+- [x] `pg_dump` van huidige database op NAS
+- [x] `pg_restore` naar Neon
+- [x] `DATABASE_URL` in `stack.env` op Portainer updaten naar Neon connection string
+- [x] Alembic migraties draaien op Neon om schema te verifiëren
+- [x] App herstarten + smoke test
+- [x] Oude PostgreSQL container + volume uit docker-compose.yml verwijderen
 
 ---
 
-## Sprint 14 — Gebruikerstoegang & beveiliging
-*Kort termijn. Vereist e-mailprovider (bijv. Resend.com — gratis tier 3000 mails/mnd).*
+## Sprint 14 — Gebruikerstoegang & beveiliging ✅ (2026-04-04)
 
-**Bestanden:** `app/routers/auth.py`, `app/models.py` (User), `app/templates/auth/`
-
-**Taken:**
-- [ ] **E-mail verificatie**: bij registratie een verificatielink sturen — `is_verified` veld op User, onverifieerde accounts kunnen niet inloggen
-- [ ] **Wachtwoord reset**: "Vergeten wachtwoord" flow — e-mail met reset-link (token met TTL), nieuw wachtwoord instellen
-- [ ] **Invite-only registratie**: `REGISTRATION_OPEN` config flag — als uit, alleen registreren via uitnodigingslink die jij genereert (`/admin/invite`)
-- [ ] **Rate limiting op login**: max 5 pogingen per IP per minuut — bescherming tegen brute force
+- [x] **E-mail verificatie**: `is_verified` veld, verificatielink via Resend, `REQUIRE_EMAIL_VERIFICATION` flag
+- [x] **Wachtwoord reset**: "Wachtwoord vergeten" flow met token (TTL 1 uur)
+- [x] **Invite-only registratie**: `REGISTRATION_OPEN` config flag + invite tokens (TTL 7 dagen)
+- [x] **Rate limiting op login**: max 5 pogingen per IP per minuut (in-memory)
 
 ---
 
-## Sprint 16 — Encryptie at-rest van gevoelige velden
-*Middellang termijn. Onafhankelijk van andere sprints. Beschermt gebruikersdata als de database wordt gelekt.*
+## Sprint 16 — Encryptie at-rest van gevoelige velden ✅ (2026-04-04)
 
-**Doel:** gevoelige financiële velden versleutelen in de applicatielaag. Een aanvaller die alleen toegang heeft tot de database (bijv. via een dump of SQL-injection) kan dan geen leesbare transactiedata inzien.
-
-**Technische aanpak:**
-- Symmetrische encryptie met `cryptography` library (`Fernet` — AES-128-CBC + HMAC)
-- Encryptiesleutel (`FIELD_ENCRYPTION_KEY`) staat als omgevingsvariabele, **niet** in de database
-- Encryptie/decryptie in de applicatielaag via een helper — SQLAlchemy `TypeDecorator` zodat encrypt/decrypt transparant werkt voor de rest van de code
-- Velden worden versleuteld opgeslagen als base64-string; bestaande data wordt éénmalig gemigreerd
-
-**Te versleutelen velden op Transaction:**
-- `counterparty` (naam van de tegenpartij)
-- `counterparty_iban` (IBAN van de tegenpartij)
-- `description` (omschrijving)
-
-**Bestanden:** `app/crypto.py` (nieuw), `app/models.py`, `app/database.py`, migratie 024, Dockerfile/Railway env vars
-
-**Taken:**
-- [ ] `pip install cryptography` toevoegen aan `requirements.txt`
-- [ ] `app/crypto.py` — `EncryptedString` TypeDecorator: `process_bind_param` versleutelt, `process_result_value` ontsleutelt; sleutel via `os.environ["FIELD_ENCRYPTION_KEY"]`
-- [ ] `FIELD_ENCRYPTION_KEY` genereren (`Fernet.generate_key()`) en instellen in Railway + Portainer stack env
-- [ ] `counterparty`, `counterparty_iban`, `description` op Transaction omzetten naar `EncryptedString`
-- [ ] Eénmalig migratiescript: bestaande rijen uitlezen, opnieuw versleuteld wegschrijven (batchgewijs, buiten Alembic om)
-- [ ] Controleren dat alle queries die op deze velden filteren (ILIKE/contains) nog werken — encryptie maakt server-side LIKE onmogelijk; oplossing: zoekterm ook versleutelen en exacte vergelijking, of zoeken in Python na ophalen
-- [ ] Testen: dump van database bevat geen leesbare tegenpartijnamen meer
-
-**Aandachtspunt zoekfunctie:**
-ILIKE-queries op versleutelde velden werken niet meer. Oplossingen:
-- Optie A: zoeken in Python (alles ophalen, filteren in memory) — simpel maar langzamer
-- Optie B: aparte `counterparty_search_hash` kolom (HMAC van lowercase waarde) voor exacte lookups
-- Optie C: volledige tekstindex buiten de database (bijv. simpele Whoosh/in-memory index) — overkill voor persoonlijk gebruik
-- **Aanbeveling:** Optie A voor nu (dataset is klein), Optie B als performance een probleem wordt
+- [x] `cryptography==43.0.3` in `requirements.txt`
+- [x] `app/crypto.py` — `EncryptedText` TypeDecorator (Fernet AES-128-CBC + HMAC-SHA256)
+- [x] `counterparty`, `counterparty_iban`, `description` op Transaction versleuteld
+- [x] Admin endpoint om bestaande data te (her)versleutelen
+- [x] Graceful fallback voor legacy plaintext data
 
 ---
 
-## Sprint 15 — Gebruikersbeheer (admin)
-*Middellang termijn. Bouwt op Sprint 14.*
+## Sprint 15 — Gebruikersbeheer (admin) ✅ (2026-04-04)
 
-**Bestanden:** nieuw `app/routers/admin.py`, `app/templates/admin/`
-
-**Taken:**
-- [ ] **Admin flag op User**: `is_admin` veld + migratie — eerste geregistreerde gebruiker krijgt automatisch admin
-- [ ] **Admin panel** `/admin/users`: lijst van alle gebruikers (naam, e-mail, registratiedatum, laatste login, verified/actief), activeren/deactiveren
-- [ ] **Invite links genereren**: admin genereert uitnodigingslink met TTL (7 dagen) — ontvangt link per mail of kopiëren
-- [ ] **Gebruikersstatistieken**: per gebruiker aantal transacties, rekeningen, laatste activiteit
-- [ ] **Neon database schaling**: documentatie voor upgrade naar betaald plan bij groei (>512MB of >10 gebruikers)
+- [x] `is_admin` veld op User — eerste geregistreerde gebruiker = admin
+- [x] Admin panel `/admin/users`: gebruikerslijst, activeren/deactiveren, admin toggle, verwijderen
+- [x] Invite links genereren (met optionele e-mail via Resend)
+- [x] Gebruikersstatistieken: rekening- en transactieaantallen per gebruiker
 
 ---
 
@@ -227,42 +238,21 @@ ILIKE-queries op versleutelde velden werken niet meer. Oplossingen:
 
 ---
 
-## Sprint 5 — Regels uitbreiden
-*Meer condities en acties in de rules engine. Onafhankelijk van andere sprints.*
+## Sprint 5 — Regels uitbreiden ✅ (2026-04-04)
 
-**Bestanden:** `app/routers/rules.py`, `app/rules_engine.py`, `app/models.py` (Rule model), `app/templates/rules/list.html`
-
-**Context voor nieuwe sessie:**
-- Rule model heeft: `match_field` (counterparty/description/iban), `match_type` (contains/exact/starts_with), `match_value`, `action_category_id`, `action_tag_id`, `amount_min`, `amount_max`
-- Rules engine in `app/rules_engine.py` — `apply_rules(transaction, rules, db)`
-- Toevoegen van condities: voeg kolom toe aan Rule model + migratie + UI
-- Toevoegen van acties: zelfde patroon als `action_category_id`
-
-**Taken:**
-- [ ] **Regelactie: counterparty hernoemen** — nieuw veld `action_rename_counterparty` op Rule model + migratie (019) + toepassen in rules engine + UI
-- [ ] **Regelactie: markeer als reviewed** — nieuw veld `action_set_reviewed` (0/1) op Rule model + migratie + toepassen + UI
-- [ ] **Regelconditie: account filter** — nieuw veld `condition_account_id` op Rule model + migratie + UI dropdown
-- [ ] **Regelconditie: notes/omschrijving** — nieuw veld voor matching op `description` kolom (aparte van counterparty) — check of dit al bestaat en evt. uitbreiden
-- [ ] **Suggestie bij categoriseren**: op de transactiepagina, na inline categorie-wijziging via AJAX, toon een kleine banner "Wil je een regel aanmaken voor [tegenpartij]?" — JS + endpoint
+- [x] **Regelactie: counterparty hernoemen** — `action_rename_counterparty` veld + migratie + rules engine + UI
+- [x] **Regelactie: markeer als reviewed** — `action_set_reviewed` veld + migratie + UI
+- [x] **Regelconditie: account filter** — `condition_account_id` veld + migratie + UI dropdown
+- [x] **Suggestie bij categoriseren** — dismissible banner na inline categorie-wijziging met link naar regelformulier
 
 ---
 
-## Sprint 6 — CSV import verbeteringen
-*Betere import-ervaring voor niet-standaard CSV's. Onafhankelijk.*
+## Sprint 6 — CSV import verbeteringen ✅ (2026-04-04)
 
-**Bestanden:** `app/routers/transactions.py` (import routes), `app/templates/transactions/import.html`, `app/parsers/`
-
-**Context voor nieuwe sessie:**
-- Import route: `GET/POST /import` in `app/routers/transactions.py`
-- Huidige flow: upload → auto-detect bank format → parse → save
-- Parsers in `app/parsers/` — base parser heeft `ParsedTransaction` dataclass
-- Nieuwe flow moet zijn: upload → kolommapping UI → preview → bevestigen → save
-
-**Taken:**
-- [ ] **Kolommapping UI**: na upload, als bank-format niet herkend, toon tabel met CSV-headers en dropdowns om velden te mappen (datum, bedrag, omschrijving, tegenpartij, IBAN) — POST naar `/import/preview`
-- [ ] **Opgeslagen importconfiguraties**: model `ImportConfig` (naam, kolomnamen-mapping als JSON) — sla op per gebruiker, laad via dropdown bij import
-- [ ] **Import preview/review scherm**: toon parsed transacties vóór opslaan — checkbox per rij, samenvatting (nieuw/duplicaat/auto-gecategoriseerd) — bevestigen via POST
-- [ ] **Tags/categorieën uit CSV**: als CSV kolom "category" of "tags" heeft, map naar CTP categorieën/tags tijdens import
+- [x] **Import preview**: toon nieuwe vs. duplicaat transacties vóór opslaan (voor alle bankformaten)
+- [x] **Kolomtoewijzing UI**: aangepast CSV-formaat met dropdowns per veld
+- [x] **Categorie uit CSV**: categorie-kolom matcht op naam met bestaande categorieën
+- Opgeslagen importconfiguraties: bewust weggelaten (overkill voor persoonlijk gebruik)
 
 ---
 
