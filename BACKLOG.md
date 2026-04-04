@@ -186,6 +186,33 @@ Font: Plus Jakarta Sans 400/500/600/700/800
 
 ---
 
+## Sprint Design 4 — Kolom-kiezer icoon in tabel
+
+*Vervangt de huidige "Kolommen: Tegenpartij | Rekening" balk boven de tabel.*
+
+**Bestanden:** `app/templates/transactions/list.html`, `app/static/css/style.css`
+
+**Concept:**
+- Huidige toggle-balk (`div.col-toggle-bar`) verwijderen
+- Klein ⊞ icoon toevoegen als laatste `<th>` in de tabelheader (rechts)
+- Klikken opent een kleine absolute-positioned dropdown met checkboxes per kolom
+- Zelfde `localStorage`-logica als nu (`ctp_hidden_cols`)
+
+```
+| DATUM | OMSCHRIJVING | CATEGORIE | BEDRAG | ⊞ |
+                                             ↓
+                                    ☑ Tegenpartij
+                                    ☑ Rekening
+```
+
+**Taken:**
+- [ ] Verwijder `div.col-toggle-bar` + bijbehorende CSS (`.col-toggle-bar`, `.col-toggle-btn`)
+- [ ] Voeg `<th class="col-picker-th"><button class="col-picker-btn">⊞</button></th>` toe als laatste kolom
+- [ ] Dropdown als absolute-positioned div met checkboxes, toggled via JS, sluit bij click buiten
+- [ ] Bestaande `localStorage`-logica intact houden — alleen de UI-trigger verandert
+
+---
+
 ## Sprint 9 — Actieknop per transactie (">" paneel)
 
 *Bouwt op het bestaande `is_reviewed` veld (Sprint 1) en koppelt aan Sprint 10 (terugkerende placeholder-transacties).*
