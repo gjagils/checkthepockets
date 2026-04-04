@@ -10,41 +10,82 @@ Sprints zijn gegroepeerd op gedeelde bestanden voor maximale efficiëntie per se
 
 ## Sprint Design 2 — Oranje redesign (Banani mockup)
 *Volledige visuele redesign op basis van het Banani-mockup. Behoudt de navigatiestructuur.*
-*Huidige logo (wallet-icoontje) behouden, alleen de CSS en templates aanpassen.*
+*Huidige wallet-icoontje behouden. Alle overige kleuren, fonts en layout-details vervangen.*
 
-**Referentie:** screenshot gedeeld door gebruiker (april 2026) — oranje/navy/wit thema
+**Referentie:** twee screenshots gedeeld door gebruiker (april 2026):
+1. Transactiepagina mockup (exacte UI)
+2. Design system sheet (exacte tokens)
 
 **Bestanden:** `app/static/css/style.css`, `app/templates/base.html`, `app/templates/transactions/list.html`
 
 **Context voor nieuwe sessie:**
-- Huidig thema: Editorial Finance — navy `#002752`, gold `#F9A800`, achtergrond `#f0f2f6`
-- Nieuw thema: oranje als primaire accentkleur, navy als secondaire kleur, witte cards op lichtgrijs
-- CSS custom properties staan bovenin `style.css` — alleen variabelen aanpassen werkt door het hele systeem
-- Logo staat in `base.html` — wallet-icoontje behouden, tekst-layout aanpassen
-- `--ctp-*` legacy aliassen moeten intact blijven
+- Huidig thema: Editorial Finance — navy `#002752`, gold `#F9A800`, fonts: Syne + DM Sans
+- CSS custom properties staan bovenin `style.css` — variabelen aanpassen werkt door hele systeem
+- `--ctp-*` legacy aliassen moeten intact blijven zodat bestaande templates niet breken
+- Google Fonts import staat in `base.html` `<head>` — font URL vervangen
 
-**Kleurpalet (nieuw):**
+**Design system (exacte waarden uit mockup):**
 ```
---orange:      #F97316   /* primaire accentkleur, vervangt --gold */
---orange-dark: #EA6C0A   /* hover state */
---orange-light:#FFF3E8   /* lichte achtergrond tint */
---navy:        #002752   /* ongewijzigd */
---navy-mid:    #01356a   /* ongewijzigd */
---bg:          #f0f2f6   /* ongewijzigd */
---card:        #ffffff   /* ongewijzigd */
+Kleuren:
+  --primary:     #234C75   /* was --navy: #002752 */
+  --secondary:   #F28C28   /* was --gold: #F9A800 — dit is HET oranje */
+  --tertiary:    #5DADE2   /* nieuw: lichtblauw accent */
+  --neutral:     #F8F9FA   /* achtergrond, was #f0f2f6 */
+  --card:        #ffffff
+  --text:        #1a1a2e   /* donkere bodytekst */
+  --muted:       #6b7280
+
+Font:
+  Plus Jakarta Sans (vervangt Syne + DM Sans)
+  → Google Fonts: https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap
+  → Alle font-family refs: 'Syne' en 'DM Sans' → 'Plus Jakarta Sans'
+
+Knoppen (uit design system sheet):
+  Primary   = --primary bg (#234C75), witte tekst
+  Secondary = outlined dark
+  Inverted  = donker filled (#1a1a2e)
+  Outlined  = witte bg, border
+
+Nav active indicator:
+  Primaire nav: navy underline onder actief item (geen goud meer)
+  Sub-nav actief: beige/zand pill (background ~#F5F0E8, border-radius 999px)
 ```
 
 **Taken:**
 
-- [ ] **CSS variabelen**: vervang `--gold: #F9A800` door `--orange: #F97316` + voeg `--orange-dark` en `--orange-light` toe; update alle `.btn-primary` (oranje bg + witte tekst), `.nav-active` indicator, badges
-- [ ] **Paginatitels oranje**: `h1` in `.page-header` krijgt `color: var(--orange)` — groot, vet, opvallend
-- [ ] **Navigatie active-indicator**: huidige goud underline-indicator → oranje; sub-nav active item krijgt pill-stijl (afgeronde achtergrond, lichtoranje) in plaats van bold underline
-- [ ] **Logo layout**: `base.html` — gestapelde tekst "CHECK / THE / POCKETS" in oranje/navy boven elkaar (oranje voor CHECK THE, navy voor POCKETS), wallet-icoontje behouden links naast de tekst
-- [ ] **Filterbar**: zoekicoontje (🔍 of SVG) toevoegen aan het zoekveld in `transactions/list.html`; "Zoeken" knop oranje; "Meer filters" als subtiele link met chevron
-- [ ] **Tabelkoppen uppercase**: `<th>` in transactietabel krijgen `text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.72rem`
-- [ ] **Knoppen**: "Handmatig toevoegen" → `.btn-accent` (navy); "CSV importeren" → `.btn-primary` (oranje); beide als volledig gevulde knoppen met uppercase label
-- [ ] **Categorie inline-dropdown**: categorie-cel in transactierij toont een `<select>` dropdown in plaats van alleen tekst — bij wijziging AJAX-save via bestaand categoriseer-endpoint
-- [ ] **Gebruikersavatar in nav**: toevoegen aan `base.html` rechtsboven — ronde avatar-placeholder (initialen van gebruikersnaam, navy achtergrond) naast de gebruikersnaam
+- [ ] **CSS variabelen herschrijven**: vervang het volledige variabelenblok bovenin `style.css`:
+  `--navy → #234C75`, `--gold → #F28C28` (als --orange/--secondary), voeg `--tertiary: #5DADE2` toe,
+  `--bg → #F8F9FA`; update btn-primary (oranje), btn-accent (navy), alle gold-refs naar --secondary
+
+- [ ] **Font vervangen**: in `base.html` Google Fonts URL wijzigen naar Plus Jakarta Sans (400/500/600/700/800);
+  in `style.css` alle `font-family: 'Syne'` en `font-family: 'DM Sans'` → `'Plus Jakarta Sans', sans-serif`
+
+- [ ] **Paginatitels oranje**: `h1` in `.page-header` krijgt `color: var(--secondary); font-weight: 800`
+  Teller/count (bijv. "(175)") in `color: var(--muted); font-weight: 400; font-size: 1.1rem`
+
+- [ ] **Logo**: in `base.html` — wallet-icoontje behouden; tekst aanpassen naar gestapeld:
+  ```html
+  <span style="color:#F28C28; font-weight:800; line-height:1;">CHECK<br>THE<br></span>
+  <span style="color:#234C75; font-weight:800;">POCKETS</span>
+  ```
+
+- [ ] **Navigatie**: primaire nav active-indicator → `border-bottom: 3px solid #234C75` (navy, niet oranje);
+  sub-nav actief item → pill stijl: `background: #F5F0E8; border-radius: 999px; padding: 0.3rem 1rem`
+
+- [ ] **Gebruikersavatar**: in `base.html` — ronde foto-placeholder of initialen-cirkel rechts in nav:
+  ```html
+  <div class="user-avatar">{{ user.username[:2].upper() }}</div>
+  ```
+  CSS: `width:36px; height:36px; border-radius:50%; background:#234C75; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:0.75rem`
+
+- [ ] **Filterbar transactiepagina**: in `transactions/list.html`:
+  - Zoekveld: voeg SVG zoekicoontje toe als prefix (positie: absolute links in het inputveld, `padding-left: 2.5rem` op input)
+  - Labels boven velden (ZOEKEN, REKENING, CATEGORIE) in `font-size:0.68rem; text-transform:uppercase; letter-spacing:0.08em; color:var(--muted); font-weight:600`
+  - "Meer filters" → `<a>` met oranje tekst + `›` chevron voor
+
+- [ ] **Tabelkoppen uppercase**: `<th>` krijgen `text-transform:uppercase; letter-spacing:0.07em; font-size:0.7rem; font-weight:600; color:var(--muted)` — geen card wrapper om tabel, tabel zit direct op de achtergrond met subtiele rij-scheidingslijnen
+
+- [ ] **Knoppen transactiepagina**: "Handmatig toevoegen" → navy filled uppercase; "CSV importeren" → oranje filled met document-icoontje voor de tekst; BEWERKEN → small outlined gray; UITSLUITEN → small outlined met rode/oranje tekst (geen gevulde achtergrond)
 
 ---
 
