@@ -14,4 +14,4 @@ COPY . .
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "echo '=== ENV CHECK ===' && echo \"DATABASE_URL starts with: ${DATABASE_URL:0:40}\" && alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+CMD ["sh", "-c", "echo '=== ENV CHECK ===' && if [ -z \"$DATABASE_URL\" ]; then echo 'DATABASE_URL: EMPTY - using default'; else echo 'DATABASE_URL: SET'; fi && alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
