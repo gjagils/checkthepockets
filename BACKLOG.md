@@ -8,132 +8,25 @@ Sprints zijn gegroepeerd op gedeelde bestanden voor maximale efficiëntie per se
 
 ---
 
-## Sprint Design 3 — Font & grootte pariteit tussen themes + logo verificatie
+## Sprint Design 3 — Font & grootte pariteit tussen themes ✅ (2026-04-04)
 
-> **Logo-fix (commit `2ab4609`)**: brand-panel gewijzigd naar `flex-direction: row` zodat icon links en CHECK/THE/POCKETS rechts staat. Als na deploy nog steeds column-layout zichtbaar is, controleer dan:
-> - CSS cache busten (asset_version verhogen of hard refresh)
-> - Of `.navbar-wrapper:has(.nav-sub)` selector correct matcht in de browser
-> - Brand-panel breedte (244px) — eventueel vergroten naar 260px als tekst afgekapt wordt
-
-*Alleen kleuren mogen verschillen bij het wisselen van thema — lettertype, lettergroottes en spacing zijn identiek.*
-
-**Bestanden:** `app/static/css/style.css`
-
-**Probleem:** In `[data-theme="light"]` worden nu `--font-heading` en `--font-body` overschreven naar Plus Jakarta Sans, terwijl dark Heebo + Lato gebruikt. Dit zorgt voor zichtbare layout-verschuivingen bij het wisselen.
-
-**Oplossing:** Kies één font-stack voor beide thema's en verwijder de font-variabelen uit het `[data-theme="light"]` blok.
-
-**Keuze (te maken bij uitvoering):**
-- Optie A: **Plus Jakarta Sans voor beide** — modernste look, één font laden
-- Optie B: **Heebo + Lato voor beide** — huidige dark-font, bewezen leesbaar
-
-**Taken:**
-- [ ] Verwijder `--font-heading` en `--font-body` uit het `[data-theme="light"]` blok in `style.css`
-- [ ] Kies één font-stack en zet die alleen in `:root` (geldt dan voor beide thema's)
-- [ ] Controleer dat alle font-groottes, `letter-spacing` en `line-height` identiek zijn in beide thema's — geen overrides in het theme-blok behalve kleurvariabelen
-- [ ] Doorloop visueel alle pagina's na het switchen om te verifiëren dat layout niet verschuift
+- [x] Plus Jakarta Sans voor beide thema's — font-vars alleen in `:root`, niet overschreven in `[data-theme="light"]`
+- [x] Logo layout: icon links, CHECK/THE/POCKETS rechts gestapeld (`flex-direction: row`)
 
 ---
 
-## Sprint Design 2 — Layout redesign + dark/light thema-switcher
+## Sprint Design 2 — Layout redesign + dark/light thema-switcher ✅ (2026-04-04)
 
-*Tweefasige aanpak:*
-*Fase A — Layout: HTML-structuur van alle pagina's aanpassen naar de Banani-mockup (geldt voor beide thema's)*
-*Fase B — Thema's: huidige navy/gold stijl als "dark" bewaren + nieuw oranje/licht als "light" toevoegen + toggle*
-
-**Referentie:** twee screenshots gedeeld door gebruiker (april 2026):
-1. Transactiepagina mockup (exacte UI-layout)
-2. Design system sheet (exacte kleur- en font-tokens)
-
-**Bestanden:** `app/static/css/style.css`, `app/templates/base.html`, `app/templates/transactions/list.html`
-
-**Context voor nieuwe sessie:**
-- Huidig thema: Editorial Finance — navy `#002752`, gold `#F9A800`, fonts: Syne + DM Sans
-- CSS custom properties staan bovenin `style.css` — thema-switching via `[data-theme]` op `<html>`
-- `--ctp-*` legacy aliassen moeten intact blijven
-- Google Fonts import in `base.html` `<head>`
-- Themavoorkeur opslaan in `localStorage`, instellen via `data-theme="light"|"dark"` op `<html>`
-
-**Design system light thema (exacte tokens uit mockup):**
-```
---primary:     #234C75   /* navy */
---secondary:   #F28C28   /* oranje — primaire CTA-kleur */
---tertiary:    #5DADE2   /* lichtblauw accent */
---bg:          #F8F9FA   /* pagina-achtergrond */
---card:        #ffffff
---text:        #1a1a2e
---muted:       #6b7280
---border:      #e5e7eb
-
-Font: Plus Jakarta Sans 400/500/600/700/800
-→ https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap
-```
-
----
-
-### FASE A — Layout (thema-onafhankelijk, 1 sprint)
-
-**Bestanden:** `base.html`, `transactions/list.html`, `style.css` (structurele CSS)
-
-- [ ] **Logo restructuur** (`base.html`): wallet-icoontje behouden + tekst gestapeld naast het icoontje:
-  `CHECK` / `THE` / `POCKETS` in drie regels, CHECK+THE in accentkleur (`var(--secondary)`), POCKETS in primaire kleur (`var(--primary)`). Gebruik CSS-variabelen zodat dit in beide thema's werkt.
-
-- [ ] **Gebruikersavatar** (`base.html`): ronde initialen-cirkel rechts in de primaire nav:
-  `{{ user.username[:2].upper() }}` in een `div.user-avatar` — stijl via CSS-variabelen. Vervangt huidige tekst-only gebruikersnaam.
-
-- [ ] **Primaire nav active-indicator** (`style.css`): van huidige goud-streep → `border-bottom: 3px solid var(--primary)` onder actief item.
-
-- [ ] **Sub-nav active-indicator** (`style.css`): actief item krijgt pill-stijl:
-  `background: var(--subnav-pill-bg); border-radius: 999px; padding: 0.3rem 1rem`
-  (variabele `--subnav-pill-bg` verschilt per thema: licht = `#F5F0E8`, donker = `rgba(255,255,255,0.1)`)
-
-- [ ] **Paginatitels** (`style.css`): `h1` in `.page-header` → `color: var(--secondary); font-weight: 800; font-size: 2rem`.
-  Teller "(N)" → `color: var(--muted); font-weight: 400; font-size: 1.1rem` (via `<span class="page-count">`)
-
-- [ ] **Tabelstructuur** (`style.css` + `transactions/list.html`): tabel zonder card-wrapper (zit direct op achtergrond), rijen gescheiden door `border-bottom: 1px solid var(--border)`. Kolomkoppen: `text-transform: uppercase; letter-spacing: 0.07em; font-size: 0.7rem; font-weight: 600; color: var(--muted)`.
-
-- [ ] **Filterbar** (`transactions/list.html`):
-  - Veldlabels boven de inputs als uppercase captions: `font-size:0.68rem; text-transform:uppercase; letter-spacing:0.08em; color:var(--muted)`
-  - Zoekicoontje als inline SVG in het zoekveld (absolute positioning, `padding-left:2.5rem` op input)
-  - "Meer filters" → oranje/accent link met `›` chevron, geen knop
-
-- [ ] **Knoppen transactiepagina** (`transactions/list.html`):
-  - "Handmatig toevoegen" → `.btn-accent` (primary/navy filled, uppercase)
-  - "CSV importeren" → `.btn-primary` (secondary/oranje filled, met document-icoon `📄` of SVG)
-  - BEWERKEN → `.btn-sm` outlined grijs
-  - UITSLUITEN → `.btn-sm` outlined met accentkleur tekst (geen gevulde achtergrond)
-
----
-
-### FASE B — Thema-switcher (aparte sprint na Fase A)
-
-**Bestanden:** `style.css`, `base.html`
-
-- [ ] **CSS thema-variabelen**: twee variabelenblokken in `style.css`:
-  ```css
-  :root, [data-theme="light"] { --primary:#234C75; --secondary:#F28C28; --bg:#F8F9FA; ... }
-  [data-theme="dark"]          { --primary:#002752; --secondary:#F9A800; --bg:#1e1e2e; ... }
-  ```
-  Alle bestaande kleurwaarden in dark-blok zetten, light-blok is het nieuwe Banani-palet.
-
-- [ ] **Font-switcher** (`style.css`): font-stacks per thema of één gedeeld font (Plus Jakarta Sans voor beide, of Syne/DM Sans behouden voor dark). Keuze: **Plus Jakarta Sans voor beide** (eenvoudiger).
-
-- [ ] **Toggle-knop** (`base.html`): zon/maan icoon-knop in de nav naast de avatar:
-  ```html
-  <button class="theme-toggle" onclick="toggleTheme()" title="Wissel thema">🌙</button>
-  ```
-
-- [ ] **Toggle JS** (`base.html` of `static/js/theme.js`):
-  ```js
-  function toggleTheme() {
-    const html = document.documentElement;
-    const next = html.dataset.theme === 'dark' ? 'light' : 'dark';
-    html.dataset.theme = next;
-    localStorage.setItem('theme', next);
-  }
-  // On load:
-  document.documentElement.dataset.theme = localStorage.getItem('theme') || 'light';
-  ```
+- [x] Logo: icon links + CHECK/THE/POCKETS gestapeld rechts, kleuren via CSS-variabelen
+- [x] Gebruikersavatar: ronde initialen-cirkel rechts in nav (`nav-avatar`)
+- [x] Nav active-indicators: border + subnav pill-stijl
+- [x] Paginatitels: `var(--secondary)` kleur, font-weight 800
+- [x] Tabelstructuur: border-bottom per rij, uppercase kolomkoppen
+- [x] Filterbar: slim `.tx-toolbar` met period-nav + "Niet gecategoriseerd" quickfilter + "Meer filters" details
+- [x] CSS thema-variabelen: dark = `:root`, light = `[data-theme="light"]` override
+- [x] Font: Plus Jakarta Sans voor beide thema's (zie Sprint Design 3)
+- [x] Toggle-knop: zon/maan knop in nav
+- [x] Toggle JS + anti-flash in `<head>`, voorkeur in `localStorage`
 
 ---
 
@@ -186,80 +79,21 @@ Font: Plus Jakarta Sans 400/500/600/700/800
 
 ---
 
-## Sprint Design 4 — Kolom-kiezer icoon in tabel
+## Sprint Design 4 — Kolom-kiezer icoon in tabel ✅ (2026-04-04)
 
-*Vervangt de huidige "Kolommen: Tegenpartij | Rekening" balk boven de tabel.*
-
-**Bestanden:** `app/templates/transactions/list.html`, `app/static/css/style.css`
-
-**Concept:**
-- Huidige toggle-balk (`div.col-toggle-bar`) verwijderen
-- Klein ⊞ icoon toevoegen als laatste `<th>` in de tabelheader (rechts)
-- Klikken opent een kleine absolute-positioned dropdown met checkboxes per kolom
-- Zelfde `localStorage`-logica als nu (`ctp_hidden_cols`)
-
-```
-| DATUM | OMSCHRIJVING | CATEGORIE | BEDRAG | ⊞ |
-                                             ↓
-                                    ☑ Tegenpartij
-                                    ☑ Rekening
-```
-
-**Taken:**
-- [ ] Verwijder `div.col-toggle-bar` + bijbehorende CSS (`.col-toggle-bar`, `.col-toggle-btn`)
-- [ ] Voeg `<th class="col-picker-th"><button class="col-picker-btn">⊞</button></th>` toe als laatste kolom
-- [ ] Dropdown als absolute-positioned div met checkboxes, toggled via JS, sluit bij click buiten
-- [ ] Bestaande `localStorage`-logica intact houden — alleen de UI-trigger verandert
+- [x] `div.col-toggle-bar` verwijderd
+- [x] ⊞ icoon als laatste `<th>` in tabelheader met checkbox-dropdown
+- [x] Sluit bij click buiten, `localStorage`-logica intact
 
 ---
 
-## Sprint 9 — Actieknop per transactie (">" paneel)
+## Sprint 9 — Actieknop per transactie (">" paneel) ✅ (2026-04-04)
 
-*Bouwt op het bestaande `is_reviewed` veld (Sprint 1) en koppelt aan Sprint 10 (terugkerende placeholder-transacties).*
-
-**Bestanden:** `app/templates/transactions/list.html`, `app/routers/transactions.py`, `app/routers/rules.py`, `app/routers/recurring.py`
-
-**Context voor nieuwe sessie:**
-- `Transaction.is_reviewed` (bool) + toggle route bestaan al (Sprint 1)
-- Rule model: `match_field`, `match_type`, `match_value`, `action_category_id`, `action_tag_id`
-- RecurringTransaction model: `name`, `amount_expected`, `frequency`, `counterparty`, `category_id`, `account_id`
-- `GET /rules/new` bestaat al — moet `?from_tx={id}` query-param krijgen voor pre-fill
-- `GET /recurring/new` bestaat al — moet `?from_tx={id}` query-param krijgen voor pre-fill
-
-**Concept van het paneel:**
-
-Klikken op "›" opent een smal slide-in paneel (of inline uitklapbare rij) met:
-
-```
-┌─────────────────────────────────────┐
-│  Albert Heijn                       │
-│  Wed 31-12  ·  Boodschappen         │
-│  -€64,08  ·  ING Betaalrekening     │
-├─────────────────────────────────────┤
-│  [ Maak een regel ]                 │
-│    Automatisch categoriseren voor   │
-│    alle toekomstige transacties     │
-│    van deze tegenpartij             │
-│                                     │
-│  [ Maak terugkerend ]               │
-│    Verwacht deze transactie iedere  │
-│    maand en zet hem alvast in de    │
-│    planning                         │
-└─────────────────────────────────────┘
-```
-
-**Taken:**
-
-- [ ] **"›" knop** helemaal rechts in elke rij — toggled een uitklapbare rij eronder (geen aparte pagina, geen modal)
-- [ ] **Paneel toont transactiegegevens**: tegenpartij, datum, categorie, bedrag, rekening
-- [ ] **"Maak een regel"** → `GET /rules/new?from_tx={id}`:
-  - Pre-fill: `match_field=counterparty`, `match_value={tx.counterparty}`, richting (debet/credit) als `amount_max=0` of `amount_min=0`
-  - Gebruiker kan direct opslaan of aanpassen
-- [ ] **"Maak terugkerend"** → `GET /recurring/new?from_tx={id}`:
-  - Pre-fill: `name={tx.counterparty}`, `amount_expected={tx.amount}`, `category_id={tx.category_id}`, `account_id={tx.account_id}`
-  - Frequentie standaard "Maandelijks"
-  - Na opslaan → genereert direct een placeholder voor volgende maand (zie Sprint 10)
-- [ ] **Styling**: uitklapbare rij met lichte achtergrond (`var(--surface-2)`), twee grote knoppen naast elkaar, sluit bij tweede klik op "›"
+- [x] `›` knop rechts in elke rij — toggled inline uitklapbare rij eronder
+- [x] Paneel toont tegenpartij, datum, categorie
+- [x] "Maak een regel" → `GET /rules?from_tx={id}` met pre-fill (counterparty, match-type, bedragrichting, categorie)
+- [x] "Maak terugkerend" → `GET /recurring?from_tx={id}` met pre-fill (naam, bedrag, categorie, tegenpartij)
+- [x] Beide formulieren scrollen automatisch naar het aanmaak-formulier + tonen alert-banner
 
 ---
 
