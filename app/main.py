@@ -15,7 +15,7 @@ from app.scheduler import start_scheduler
 from app.config import SECRET_KEY
 
 app = FastAPI(title="Check Your Pockets", docs_url=None, redoc_url=None)
-app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
+app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY, session_cookie="oauth_state")
 _landing_templates = Jinja2Templates(directory="app/templates")
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
