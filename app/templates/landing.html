@@ -8,183 +8,188 @@
     <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16.png">
     <link rel="stylesheet" href="/static/css/style.css">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        /* ===== Landing-specific styles ===== */
+        .land-body { background: var(--bg); color: var(--text); min-height: 100vh; }
 
-        body {
-            font-family: var(--font-body);
-            background: var(--bg);
-            color: var(--text);
-            min-height: 100vh;
-        }
-
-        /* ===== Nav ===== */
+        /* ── Nav (re-uses app nav styling) ── */
         .land-nav {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 1rem 2rem;
-            background: var(--nav-bg);
-            border-bottom: 1px solid var(--nav-border);
-            position: sticky;
-            top: 0;
-            z-index: 100;
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0.75rem 2rem; background: var(--nav-bg); border-bottom: 1px solid var(--nav-border);
+            position: sticky; top: 0; z-index: 100;
         }
-        .land-nav-brand {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            text-decoration: none;
+        .land-nav .nav-brand { display: flex; align-items: center; gap: 0.5rem; text-decoration: none; }
+        .land-nav .nav-brand img { height: 38px; width: auto; }
+        .land-nav .nav-brand .brand-text { display: flex; flex-direction: column; line-height: 1.05; }
+        .land-nav .nav-brand .brand-line {
+            font-family: var(--font-heading); font-weight: 800; font-size: 0.72rem;
+            letter-spacing: 0.09em; text-transform: uppercase;
         }
-        .land-nav-brand img { height: 40px; width: auto; }
-        .land-nav-brand .brand-text { display: flex; flex-direction: column; line-height: 1.05; }
-        .land-nav-brand .brand-line {
-            font-family: var(--font-heading);
-            font-weight: 800;
-            font-size: 0.72rem;
-            letter-spacing: 0.09em;
-            text-transform: uppercase;
-        }
-        .land-nav-brand .brand-check   { color: var(--nav-active-border); }
-        .land-nav-brand .brand-the     { color: var(--text-white); }
-        .land-nav-brand .brand-pockets { color: var(--nav-active-border); }
+        .land-nav .brand-check   { color: var(--orange); }
+        .land-nav .brand-the     { color: var(--text-white); }
+        .land-nav .brand-pockets { color: var(--orange); }
         .land-nav-links { display: flex; gap: 0.75rem; align-items: center; }
+        .land-btn {
+            display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.55rem 1.25rem;
+            border-radius: 8px; font-weight: 700; font-size: 0.85rem; font-family: var(--font-heading);
+            text-decoration: none; border: none; cursor: pointer; transition: opacity 0.15s;
+            letter-spacing: 0.02em;
+        }
+        .land-btn:hover { opacity: 0.88; }
+        .land-btn-primary { background: var(--orange); color: #fff; }
+        .land-btn-ghost { background: transparent; color: var(--text-white); border: 1.5px solid var(--border); }
+        .land-btn-lg { padding: 0.85rem 2rem; font-size: 1rem; }
 
-        /* ===== Hero ===== */
+        /* ── Hero ── */
         .hero {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            text-align: center;
-            padding: 5rem 2rem 4rem;
-            background: linear-gradient(160deg, var(--nav-bg) 0%, var(--bg) 60%);
+            background: linear-gradient(170deg, var(--nav-bg) 0%, #0a1628 40%, var(--nav-bg) 100%);
+            text-align: center; padding: 4rem 2rem 0;
         }
         .hero-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.4rem;
-            background: var(--orange-bg);
-            border: 1px solid var(--orange);
-            color: var(--orange);
-            font-size: 0.72rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            padding: 0.3rem 0.75rem;
-            border-radius: 999px;
-            margin-bottom: 1.5rem;
+            display: inline-flex; align-items: center; gap: 0.4rem;
+            background: var(--orange-bg); border: 1px solid var(--orange);
+            color: var(--orange); font-size: 0.72rem; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.1em;
+            padding: 0.3rem 0.85rem; border-radius: 999px; margin-bottom: 1.5rem;
         }
         .hero h1 {
-            font-family: var(--font-heading);
-            font-size: clamp(2.2rem, 5vw, 3.5rem);
-            font-weight: 800;
-            color: var(--text-white);
-            line-height: 1.15;
-            max-width: 700px;
-            margin-bottom: 1.25rem;
+            font-family: var(--font-heading); font-size: clamp(2.4rem, 5vw, 3.8rem);
+            font-weight: 800; color: var(--text-white); line-height: 1.1;
+            max-width: 600px; margin: 0 auto 1rem;
         }
         .hero h1 span { color: var(--orange); }
         .hero p {
-            font-size: 1.1rem;
-            color: var(--muted);
-            max-width: 520px;
-            line-height: 1.7;
-            margin-bottom: 2.5rem;
+            font-size: 1.05rem; color: var(--muted); max-width: 540px;
+            margin: 0 auto 2rem; line-height: 1.7;
         }
-        .hero-cta { display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; }
+        .hero-cta { display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; margin-bottom: 3rem; }
 
-        /* ===== Features ===== */
+        /* Dashboard mockup */
+        .hero-image-wrap {
+            max-width: 800px; margin: 0 auto; position: relative;
+            border-radius: 12px 12px 0 0; overflow: hidden;
+            box-shadow: 0 -8px 40px rgba(0,0,0,0.4);
+        }
+        .hero-image-wrap img {
+            display: block; width: 100%; height: auto; border-radius: 12px 12px 0 0;
+        }
+        .hero-mockup {
+            background: var(--surface); border-radius: 12px 12px 0 0;
+            padding: 1.5rem; min-height: 280px;
+            display: flex; align-items: center; justify-content: center;
+            color: var(--muted); font-size: 0.9rem;
+        }
+
+        /* ── Features ── */
         .features {
-            padding: 4rem 2rem;
-            max-width: 1100px;
-            margin: 0 auto;
+            background: var(--bg); padding: 5rem 2rem; text-align: center;
         }
-        .features-title {
-            text-align: center;
-            font-family: var(--font-heading);
-            font-size: 1.75rem;
-            font-weight: 800;
-            color: var(--text-white);
-            margin-bottom: 0.5rem;
+        .features h2 {
+            font-family: var(--font-heading); font-size: 1.8rem; font-weight: 800;
+            color: var(--orange); margin-bottom: 0.75rem;
         }
-        .features-sub {
-            text-align: center;
-            color: var(--muted);
-            margin-bottom: 3rem;
-            font-size: 1rem;
+        .features .sub {
+            color: var(--muted); font-size: 1rem; max-width: 520px;
+            margin: 0 auto 3rem; line-height: 1.6;
         }
         .features-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 1.5rem;
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 1.5rem; max-width: 960px; margin: 0 auto;
         }
         .feature-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 1.75rem;
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 12px; padding: 2rem 1.5rem; text-align: center;
         }
         .feature-icon {
-            font-size: 1.75rem;
-            margin-bottom: 1rem;
+            width: 48px; height: 48px; border-radius: 12px; margin: 0 auto 1.25rem;
+            background: var(--orange-bg);
         }
         .feature-card h3 {
-            font-family: var(--font-heading);
-            font-size: 1rem;
-            font-weight: 700;
-            color: var(--text-white);
-            margin-bottom: 0.5rem;
+            font-family: var(--font-heading); font-size: 1.05rem; font-weight: 700;
+            color: var(--orange); margin-bottom: 0.6rem;
         }
-        .feature-card p {
-            font-size: 0.88rem;
-            color: var(--muted);
-            line-height: 1.6;
+        .feature-card p { color: var(--muted); font-size: 0.9rem; line-height: 1.6; }
+
+        /* ── Import section ── */
+        .import-section {
+            background: var(--surface); padding: 5rem 2rem;
+        }
+        .import-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 3rem;
+            max-width: 1000px; margin: 0 auto; align-items: center;
+        }
+        .import-text h2 {
+            font-family: var(--font-heading); font-size: 1.8rem; font-weight: 800;
+            color: var(--orange); line-height: 1.2; margin-bottom: 1rem;
+        }
+        .import-text p { color: var(--muted); line-height: 1.7; margin-bottom: 1.5rem; font-size: 0.95rem; }
+        .import-list { list-style: none; padding: 0; margin: 0; }
+        .import-list li {
+            display: flex; align-items: flex-start; gap: 0.6rem;
+            margin-bottom: 0.75rem; color: var(--text); font-size: 0.92rem;
+        }
+        .import-list li::before {
+            content: ''; flex-shrink: 0; width: 10px; height: 10px;
+            background: var(--orange); border-radius: 50%; margin-top: 0.35rem;
+        }
+        .import-image {
+            background: var(--nav-bg); border-radius: 16px; overflow: hidden;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+        }
+        .import-image img { display: block; width: 100%; height: auto; }
+        .import-mockup {
+            min-height: 260px; display: flex; align-items: center; justify-content: center;
+            color: var(--muted); font-size: 0.9rem; padding: 2rem;
         }
 
-        /* ===== CTA Banner ===== */
-        .cta-banner {
-            background: var(--orange-bg);
-            border-top: 1px solid var(--orange);
-            border-bottom: 1px solid var(--orange);
-            padding: 3.5rem 2rem;
-            text-align: center;
-            margin: 2rem 0 0;
-        }
-        .cta-banner h2 {
-            font-family: var(--font-heading);
-            font-size: 1.75rem;
-            font-weight: 800;
-            color: var(--text-white);
-            margin-bottom: 0.75rem;
-        }
-        .cta-banner p {
-            color: var(--muted);
-            margin-bottom: 2rem;
-            font-size: 1rem;
-        }
-
-        /* ===== Footer ===== */
+        /* ── Footer ── */
         .land-footer {
-            background: var(--nav-bg);
-            border-top: 1px solid var(--nav-border);
-            padding: 1.5rem 2rem;
-            text-align: center;
-            color: var(--muted);
-            font-size: 0.82rem;
+            background: var(--nav-bg); border-top: 1px solid var(--nav-border);
+            padding: 3rem 2rem 1.5rem;
         }
+        .footer-grid {
+            display: grid; grid-template-columns: 1.5fr 1fr 1fr; gap: 2rem;
+            max-width: 1000px; margin: 0 auto 2rem;
+        }
+        .footer-brand .nav-brand { display: flex; align-items: center; gap: 0.5rem; text-decoration: none; margin-bottom: 0.75rem; }
+        .footer-brand .nav-brand img { height: 32px; }
+        .footer-brand .brand-text { display: flex; flex-direction: column; line-height: 1.05; }
+        .footer-brand .brand-line { font-family: var(--font-heading); font-weight: 800; font-size: 0.65rem; letter-spacing: 0.09em; text-transform: uppercase; }
+        .footer-brand .brand-check { color: var(--orange); }
+        .footer-brand .brand-the   { color: var(--text-white); }
+        .footer-brand .brand-pockets { color: var(--orange); }
+        .footer-brand p { color: var(--muted); font-size: 0.85rem; line-height: 1.5; }
+        .footer-col h4 { color: var(--text-white); font-family: var(--font-heading); font-weight: 700; font-size: 0.9rem; margin-bottom: 0.75rem; }
+        .footer-col a { display: block; color: var(--muted); text-decoration: none; font-size: 0.85rem; margin-bottom: 0.5rem; }
+        .footer-col a:hover { color: var(--orange); }
+        .footer-bottom {
+            max-width: 1000px; margin: 0 auto; padding-top: 1.5rem;
+            border-top: 1px solid var(--border); display: flex;
+            justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;
+        }
+        .footer-bottom span { color: var(--muted); font-size: 0.8rem; }
+        .footer-bottom a { color: var(--muted); text-decoration: none; font-size: 0.8rem; margin-left: 1rem; }
+        .footer-bottom a:hover { color: var(--orange); }
 
-        /* ===== Buttons ===== */
-        .btn { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.65rem 1.5rem; border-radius: 8px; font-weight: 700; font-size: 0.9rem; font-family: var(--font-heading); text-decoration: none; border: none; cursor: pointer; transition: opacity 0.15s; letter-spacing: 0.02em; }
-        .btn:hover { opacity: 0.88; }
-        .btn-primary { background: var(--orange); color: #fff; }
-        .btn-ghost { background: transparent; color: var(--text-white); border: 1.5px solid var(--border); }
-        .btn-lg { padding: 0.85rem 2rem; font-size: 1rem; }
+        /* ── Responsive ── */
+        @media (max-width: 768px) {
+            .import-grid { grid-template-columns: 1fr; }
+            .footer-grid { grid-template-columns: 1fr; }
+            .land-nav { padding: 0.75rem 1rem; }
+            .hero { padding: 3rem 1.25rem 0; }
+        }
     </style>
+    <script>
+        (function() {
+            var t = localStorage.getItem('ctp-theme') || 'light';
+            document.documentElement.setAttribute('data-theme', t);
+        })();
+    </script>
 </head>
-<body>
+<body class="land-body">
 
-<!-- Nav -->
+<!-- ── Nav ── -->
 <nav class="land-nav">
-    <a href="/" class="land-nav-brand">
+    <a href="/" class="nav-brand">
         <img src="/static/logo.png" alt="Check Your Pockets">
         <span class="brand-text">
             <span class="brand-line brand-check">CHECK</span>
@@ -193,70 +198,116 @@
         </span>
     </a>
     <div class="land-nav-links">
-        <a href="/login" class="btn btn-ghost">Inloggen</a>
-        <a href="/register" class="btn btn-primary">Gratis starten</a>
+        <a href="/login" class="land-btn land-btn-ghost">Inloggen</a>
+        <a href="/register" class="land-btn land-btn-primary">Gratis starten</a>
     </div>
 </nav>
 
-<!-- Hero -->
+<!-- ── Hero ── -->
 <section class="hero">
     <div class="hero-badge">✦ Persoonlijk financieel overzicht</div>
-    <h1>Altijd weten wat er<br>in je <span>pockets</span> zit</h1>
-    <p>Check Your Pockets geeft je een helder overzicht van je inkomsten, uitgaven en spaardoelen. Importeer je bankafschriften en krijg direct inzicht.</p>
+    <h1>Check <span>your</span><br>pockets</h1>
+    <p>Krijg helder inzicht in je inkomsten, uitgaven en spaardoelen. Importeer je bankafschriften en zie direct waar je geld naartoe gaat.</p>
     <div class="hero-cta">
-        <a href="/register" class="btn btn-primary btn-lg">Maak een gratis account</a>
-        <a href="/login" class="btn btn-ghost btn-lg">Inloggen</a>
+        <a href="/register" class="land-btn land-btn-primary land-btn-lg">Maak een gratis account</a>
+        <a href="/login" class="land-btn land-btn-ghost land-btn-lg">Inloggen</a>
+    </div>
+    <div class="hero-image-wrap">
+        <!-- Vervang dit door een echte screenshot van het dashboard -->
+        <div class="hero-mockup">
+            <div style="text-align:center;">
+                <div style="font-size:2rem; margin-bottom:.5rem;">📊</div>
+                <div>Dashboard screenshot — vervang door een echte afbeelding</div>
+                <div style="font-size:.8rem; margin-top:.3rem;">Plaats als <code>/static/img/hero-dashboard.png</code></div>
+            </div>
+        </div>
+        <!-- <img src="/static/img/hero-dashboard.png" alt="Check Your Pockets dashboard"> -->
     </div>
 </section>
 
-<!-- Features -->
+<!-- ── Features ── -->
 <section class="features">
-    <h2 class="features-title">Alles wat je nodig hebt</h2>
-    <p class="features-sub">Gebouwd voor mensen die grip willen op hun financiën, zonder spreadsheets.</p>
+    <h2>Alles wat je nodig hebt</h2>
+    <p class="sub">Gebouwd voor mensen die grip willen op hun financien, zonder ingewikkelde spreadsheets of verouderde software.</p>
     <div class="features-grid">
         <div class="feature-card">
-            <div class="feature-icon">📥</div>
-            <h3>CSV import</h3>
-            <p>Importeer transacties van ABN AMRO, ING, Rabobank, Bunq en ICS. Duplicaten worden automatisch herkend.</p>
+            <div class="feature-icon"></div>
+            <h3>Helder overzicht</h3>
+            <p>Bekijk direct waar je geld naartoe gaat met automatische categorisatie en duidelijke grafieken.</p>
         </div>
         <div class="feature-card">
-            <div class="feature-icon">🏷️</div>
-            <h3>Categorieën & regels</h3>
-            <p>Maak automatische regels die transacties categoriseren. Eén keer instellen, altijd bijgehouden.</p>
+            <div class="feature-icon"></div>
+            <h3>Doelen stellen</h3>
+            <p>Maak slimme potjes aan voor je spaardoelen en houd je financiele voortgang eenvoudig bij.</p>
         </div>
         <div class="feature-card">
-            <div class="feature-icon">🔄</div>
-            <h3>Terugkerende uitgaven</h3>
-            <p>Houd abonnementen, huur en vaste lasten bij. Zie in één oogopslag wat er elke maand afgaat.</p>
-        </div>
-        <div class="feature-card">
-            <div class="feature-icon">📊</div>
-            <h3>Budgetten</h3>
-            <p>Stel maandbudgetten in per categorie en zie direct hoeveel je nog over hebt.</p>
-        </div>
-        <div class="feature-card">
-            <div class="feature-icon">📈</div>
-            <h3>Analyse & trends</h3>
-            <p>Maandtrends, top uitgavencategorieën en inzicht in je spaartarief over de tijd.</p>
-        </div>
-        <div class="feature-card">
-            <div class="feature-icon">🔒</div>
-            <h3>Privé & veilig</h3>
-            <p>Je data staat in een beveiligde Europese database. Geen bankkoppelingen, geen API-toegang tot je rekening.</p>
+            <div class="feature-icon"></div>
+            <h3>Makkelijk importeren</h3>
+            <p>Importeer moeiteloos je bankafschriften via CSV-bestanden van alle grote Nederlandse banken.</p>
         </div>
     </div>
 </section>
 
-<!-- CTA Banner -->
-<section class="cta-banner">
-    <h2>Klaar om je pockets te checken?</h2>
-    <p>Maak een gratis account aan en importeer je eerste bankafschrift in minder dan 5 minuten.</p>
-    <a href="/register" class="btn btn-primary btn-lg">Gratis starten</a>
+<!-- ── Import section ── -->
+<section class="import-section">
+    <div class="import-grid">
+        <div class="import-text">
+            <h2>Nooit meer handmatig typen</h2>
+            <p>Download simpelweg je afschriften bij je bank in CSV-formaat en upload ze in Check The Pockets. De transacties worden automatisch herkend en aan de juiste categorie toegewezen.</p>
+            <ul class="import-list">
+                <li>Ondersteunt ING, Rabobank, ABN AMRO en meer</li>
+                <li>Leer de app nieuwe regels aan voor jouw uitgaven</li>
+                <li>Splits grote bonnetjes op in meerdere categorieen</li>
+            </ul>
+        </div>
+        <div class="import-image">
+            <!-- Vervang dit door een echte screenshot -->
+            <div class="import-mockup">
+                <div style="text-align:center;">
+                    <div style="font-size:2rem; margin-bottom:.5rem;">📱</div>
+                    <div>Import screenshot</div>
+                    <div style="font-size:.8rem; margin-top:.3rem;">Plaats als <code>/static/img/hero-import.png</code></div>
+                </div>
+            </div>
+            <!-- <img src="/static/img/hero-import.png" alt="Import CSV bestanden"> -->
+        </div>
+    </div>
 </section>
 
-<!-- Footer -->
+<!-- ── Footer ── -->
 <footer class="land-footer">
-    <p>© 2026 Check Your Pockets · Gebouwd met ❤️ · <a href="/login">Inloggen</a></p>
+    <div class="footer-grid">
+        <div class="footer-brand">
+            <a href="/" class="nav-brand">
+                <img src="/static/logo.png" alt="Check Your Pockets">
+                <span class="brand-text">
+                    <span class="brand-line brand-check">CHECK</span>
+                    <span class="brand-line brand-the">YOUR</span>
+                    <span class="brand-line brand-pockets">POCKETS</span>
+                </span>
+            </a>
+            <p>Jouw persoonlijke financien in een helder overzicht. Grip op je geld, zonder gedoe.</p>
+        </div>
+        <div class="footer-col">
+            <h4>Product</h4>
+            <a href="/register">Functies</a>
+            <a href="/register">Prijzen</a>
+            <a href="/register">Veiligheid</a>
+        </div>
+        <div class="footer-col">
+            <h4>Ondersteuning</h4>
+            <a href="/register">Helpcenter</a>
+            <a href="/register">Contact</a>
+            <a href="/register">FAQ</a>
+        </div>
+    </div>
+    <div class="footer-bottom">
+        <span>&copy; 2026 Check The Pockets. Alle rechten voorbehouden.</span>
+        <div>
+            <a href="#">Algemene voorwaarden</a>
+            <a href="#">Privacy policy</a>
+        </div>
+    </div>
 </footer>
 
 </body>
