@@ -12,51 +12,62 @@
     </div>
 </div>
 
-<!-- Search & Filters -->
-<div class="card">
-    <form method="get" action="/" id="filterForm">
-        <div class="search-row">
-            <div class="form-group" style="flex:1;">
-                <label for="search">Zoeken</label>
-                <input type="text" id="search" name="search" value="{{ search }}" placeholder="Zoek op omschrijving, tegenpartij of IBAN...">
-            </div>
-            <button type="submit" class="btn btn-primary" style="align-self:flex-end;">Zoeken</button>
-            {% if filter_params %}
-            <a href="/" class="btn" style="align-self:flex-end;">Wissen</a>
-            {% endif %}
-        </div>
+<!-- Slim transaction toolbar -->
+<div class="tx-toolbar">
+    <!-- Period navigation -->
+    <div class="period-nav">
+        <a href="/?month={{ prev_month }}{% if current_account_id %}&account_id={{ current_account_id }}{% endif %}{% if current_category_id %}&category_id={{ current_category_id }}{% endif %}" class="period-btn" title="Vorige maand">‹</a>
+        <span class="period-label">{{ period_label }}</span>
+        {% if current_month %}
+        <a href="/?month={{ next_month }}{% if current_account_id %}&account_id={{ current_account_id }}{% endif %}{% if current_category_id %}&category_id={{ current_category_id }}{% endif %}" class="period-btn" title="Volgende maand">›</a>
+        <span class="period-divider"></span>
+        <a href="/" class="period-btn">Alles</a>
+        {% else %}
+        <a href="/?month={{ this_month }}{% if current_account_id %}&account_id={{ current_account_id }}{% endif %}" class="period-btn" title="Ga naar deze maand">Deze maand</a>
+        {% endif %}
+    </div>
 
-        <div class="filter-bar">
+    <!-- Quick filter: uncategorized -->
+    {% set _uncat = "/?category_id=-1" + ("&month=" + current_month if current_month else "") + ("&account_id=" + current_account_id|string if current_account_id else "") %}
+    <a href="{{ _uncat }}"
+       class="btn btn-sm {% if current_category_id == -1 %}btn-primary{% endif %}">
+        Niet gecategoriseerd{% if uncategorized_count %}&nbsp;<span class="tx-badge">{{ uncategorized_count }}</span>{% endif %}
+    </a>
+
+    <!-- More filters (compact dropdown) -->
+    <details class="tx-more-filters">
+        <summary>Meer filters</summary>
+        <form method="get" action="/" class="tx-more-panel">
+            {% if current_month %}<input type="hidden" name="month" value="{{ current_month }}">{% endif %}
             <div class="form-group">
-                <label for="account_id">Rekening</label>
-                <select name="account_id" id="account_id" onchange="this.form.submit()">
+                <label>Zoeken</label>
+                <input type="text" name="search" value="{{ search }}" placeholder="Omschrijving, tegenpartij, IBAN...">
+            </div>
+            <div class="form-group">
+                <label>Rekening</label>
+                <select name="account_id">
                     <option value="">Alle rekeningen</option>
                     {% for acc in accounts %}
-                    <option value="{{ acc.id }}" {% if current_account_id == acc.id %}selected{% endif %}>
-                        {{ acc.name }}{% if acc.iban %} ({{ acc.iban }}){% endif %}
-                    </option>
+                    <option value="{{ acc.id }}" {% if current_account_id == acc.id %}selected{% endif %}>{{ acc.name }}</option>
                     {% endfor %}
                 </select>
             </div>
             <div class="form-group">
-                <label for="category_id">Categorie</label>
-                <select name="category_id" id="category_id" onchange="this.form.submit()">
+                <label>Categorie</label>
+                <select name="category_id">
                     <option value="">Alle categorieën</option>
                     <option value="-1" {% if current_category_id == -1 %}selected{% endif %}>Zonder categorie</option>
-                    {% for cat in categories %}
-                    {% if not cat.parent_id %}
+                    {% for cat in categories %}{% if not cat.parent_id %}
                     <option value="{{ cat.id }}" {% if current_category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
                     {% for child in cat.children|sort(attribute='name') %}
                     <option value="{{ child.id }}" {% if current_category_id == child.id %}selected{% endif %}>&nbsp;&nbsp;{{ child.name }}</option>
-                    {% endfor %}
-                    {% endif %}
-                    {% endfor %}
+                    {% endfor %}{% endif %}{% endfor %}
                 </select>
             </div>
             {% if tags %}
             <div class="form-group">
-                <label for="tag_id">Tag</label>
-                <select name="tag_id" id="tag_id" onchange="this.form.submit()">
+                <label>Tag</label>
+                <select name="tag_id">
                     <option value="">Alle tags</option>
                     {% for tag in tags %}
                     <option value="{{ tag.id }}" {% if current_tag_id == tag.id %}selected{% endif %}>{{ tag.name }}</option>
@@ -64,31 +75,20 @@
                 </select>
             </div>
             {% endif %}
-        </div>
-
-        <details class="filter-details">
-            <summary>Meer filters</summary>
-            <div class="filter-bar" style="margin-top:0.75rem;">
-                <div class="form-group">
-                    <label for="date_from">Datum van</label>
-                    <input type="date" id="date_from" name="date_from" value="{{ date_from }}">
-                </div>
-                <div class="form-group">
-                    <label for="date_to">Datum t/m</label>
-                    <input type="date" id="date_to" name="date_to" value="{{ date_to }}">
-                </div>
-                <div class="form-group">
-                    <label for="amount_min">Bedrag min</label>
-                    <input type="number" step="0.01" id="amount_min" name="amount_min" value="{{ amount_min }}" placeholder="-100.00">
-                </div>
-                <div class="form-group">
-                    <label for="amount_max">Bedrag max</label>
-                    <input type="number" step="0.01" id="amount_max" name="amount_max" value="{{ amount_max }}" placeholder="100.00">
-                </div>
-                <button type="submit" class="btn btn-sm btn-primary" style="align-self:flex-end;">Toepassen</button>
+            <div class="form-group">
+                <label>Datum van</label>
+                <input type="date" name="date_from" value="{{ date_from }}">
             </div>
-        </details>
-    </form>
+            <div class="form-group">
+                <label>Datum t/m</label>
+                <input type="date" name="date_to" value="{{ date_to }}">
+            </div>
+            <div style="display:flex; gap:0.5rem; margin-top:0.25rem;">
+                <button type="submit" class="btn btn-sm btn-primary" style="flex:1;">Toepassen</button>
+                <a href="/" class="btn btn-sm">Wissen</a>
+            </div>
+        </form>
+    </details>
 </div>
 
 {% if transactions %}

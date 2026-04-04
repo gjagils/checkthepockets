@@ -204,14 +204,21 @@ a:hover { color: var(--sky-dark); }
     width: auto;
 }
 .brand-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.05;
+    gap: 0;
+}
+.brand-line {
     font-family: var(--font-heading);
     font-weight: 800;
-    font-size: 0.85rem;
-    color: var(--text-white);
-    letter-spacing: 0.07em;
+    font-size: 0.78rem;
+    letter-spacing: 0.09em;
     text-transform: uppercase;
 }
-.brand-the { display: none; }
+.brand-check   { color: var(--nav-active-border); }
+.brand-the     { color: var(--text-white); }
+.brand-pockets { color: var(--nav-active-border); }
 
 /* Brand – two-bar mode (fixed column spanning both bars) */
 .navbar-wrapper:has(.nav-sub) .nav-brand {
@@ -230,12 +237,11 @@ a:hover { color: var(--sky-dark); }
     gap: 0.3rem;
 }
 .navbar-wrapper:has(.nav-sub) .nav-brand img {
-    height: 42px;
+    height: 48px;
 }
-.navbar-wrapper:has(.nav-sub) .brand-text {
-    font-size: 0.88rem;
-    font-weight: 900;
-    letter-spacing: 0.05em;
+.navbar-wrapper:has(.nav-sub) .brand-line {
+    font-size: 0.92rem;
+    letter-spacing: 0.08em;
 }
 
 /* Primary nav links */
@@ -813,6 +819,107 @@ tfoot td { background: var(--surface-2); border-top: 1px solid var(--border); fo
     border-top: 1px solid var(--border);
     flex-shrink: 0;
 }
+
+/* ===== Transaction Toolbar ===== */
+.tx-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+}
+.period-nav {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--ctp-radius-sm);
+    overflow: hidden;
+}
+.period-btn {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.35rem 0.65rem;
+    color: var(--muted);
+    font-size: 0.75rem;
+    font-weight: 700;
+    font-family: var(--font-heading);
+    letter-spacing: 0.04em;
+    text-decoration: none;
+    transition: color 0.12s, background 0.12s;
+    white-space: nowrap;
+}
+.period-btn:hover { color: var(--text); background: var(--surface-2); }
+.period-label {
+    padding: 0.35rem 0.7rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+    font-family: var(--font-heading);
+    color: var(--text);
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+}
+.period-divider {
+    width: 1px;
+    height: 18px;
+    background: var(--border);
+    flex-shrink: 0;
+}
+.tx-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--orange);
+    color: #111;
+    font-size: 0.62rem;
+    font-weight: 800;
+    border-radius: 999px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    line-height: 1;
+}
+.tx-more-filters {
+    position: relative;
+    margin-left: auto;
+}
+.tx-more-filters > summary {
+    list-style: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.35rem 0.8rem;
+    border: 1px solid var(--border);
+    border-radius: var(--ctp-radius-sm);
+    font-size: 0.72rem;
+    font-weight: 700;
+    font-family: var(--font-heading);
+    color: var(--muted);
+    background: var(--surface-2);
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    transition: color 0.12s, border-color 0.12s;
+}
+.tx-more-filters > summary:hover { color: var(--text); border-color: var(--text); }
+.tx-more-filters > summary::-webkit-details-marker { display: none; }
+.tx-more-filters[open] > summary { color: var(--text); border-color: var(--sky); }
+.tx-more-panel {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 6px);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--ctp-radius);
+    padding: 1rem;
+    box-shadow: var(--ctp-shadow);
+    z-index: 50;
+    min-width: 280px;
+}
+.tx-more-panel .form-group { margin-bottom: 0.75rem; }
 
 /* ===== Responsive ===== */
 @media (max-width: 640px) {

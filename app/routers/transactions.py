@@ -2,7 +2,8 @@ import csv
 import hashlib
 import io
 import uuid
-from datetime import date as date_type
+import calendar as _calendar
+from datetime import date as date_type, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import List
 
@@ -107,6 +108,10 @@ def _build_tx_query(db, user, account_id, category_id, tag_id, search,
     return query
 
 
+_NL_MONTHS = ["", "Januari", "Februari", "Maart", "April", "Mei", "Juni",
+              "Juli", "Augustus", "September", "Oktober", "November", "December"]
+
+
 @router.get("/")
 def transaction_list(
     request: Request,
@@ -115,6 +120,7 @@ def transaction_list(
     category_id: str = Query(""),
     tag_id: str = Query(""),
     search: str | None = Query(None),
+    month: str = Query(""),        # NEW: YYYY-MM shorthand for a full month
     date_from: str | None = Query(None),
     date_to: str | None = Query(None),
     amount_min: str | None = Query(None),
@@ -127,6 +133,34 @@ def transaction_list(
     account_id = int(account_id) if account_id.strip() else None
     category_id = int(category_id) if category_id.strip() else None
     tag_id = int(tag_id) if tag_id.strip() else None
+
+    # Resolve month → date_from / date_to
+    current_month = month.strip()
+    today = date_type.today()
+    this_month = today.strftime("%Y-%m")
+
+    if current_month and not date_from and not date_to:
+        try:
+            y, m = int(current_month[:4]), int(current_month[5:7])
+            _, last = _calendar.monthrange(y, m)
+            date_from = f"{current_month}-01"
+            date_to = f"{current_month}-{last:02d}"
+        except (ValueError, IndexError):
+            current_month = ""
+
+    # Compute prev/next month for navigation
+    if current_month:
+        y, m = int(current_month[:4]), int(current_month[5:7])
+        _, last = _calendar.monthrange(y, m)
+        prev_month = (date_type(y, m, 1) - timedelta(days=1)).strftime("%Y-%m")
+        next_month = (date_type(y, m, last) + timedelta(days=1)).strftime("%Y-%m")
+        period_label = f"{_NL_MONTHS[m]} {y}"
+    else:
+        # No month selected — prev goes to last month, next to this month
+        first_this = date_type(today.year, today.month, 1)
+        prev_month = (first_this - timedelta(days=1)).strftime("%Y-%m")
+        next_month = this_month
+        period_label = "Alle periodes"
 
     query = _build_tx_query(
         db, user, account_id, category_id, tag_id,
@@ -156,7 +190,15 @@ def transaction_list(
     )
     total_pages = max(1, (total + PER_PAGE - 1) // PER_PAGE)
 
+    # Count uncategorized in current period (ignoring category filter)
+    uncat_base = _build_tx_query(
+        db, user, account_id, None, None, None, date_from, date_to, None, None
+    )
+    uncategorized_count = uncat_base.filter(Transaction.category_id.is_(None)).count()
+
     filter_params = {}
+    if current_month:
+        filter_params["month"] = current_month
     if account_id:
         filter_params["account_id"] = account_id
     if category_id:
@@ -165,10 +207,11 @@ def transaction_list(
         filter_params["tag_id"] = tag_id
     if search:
         filter_params["search"] = search
-    if date_from:
-        filter_params["date_from"] = date_from
-    if date_to:
-        filter_params["date_to"] = date_to
+    if not current_month:
+        if date_from:
+            filter_params["date_from"] = date_from
+        if date_to:
+            filter_params["date_to"] = date_to
     if amount_min:
         filter_params["amount_min"] = amount_min
     if amount_max:
@@ -214,6 +257,12 @@ def transaction_list(
             "total_pages": total_pages,
             "total": total,
             "cats_by_account": cats_by_account,
+            "current_month": current_month,
+            "prev_month": prev_month,
+            "next_month": next_month,
+            "this_month": this_month,
+            "period_label": period_label,
+            "uncategorized_count": uncategorized_count,
         },
     )
 
