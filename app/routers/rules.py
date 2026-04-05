@@ -126,7 +126,7 @@ def analyze_rules(request: Request, db: Session = Depends(get_db)):
 
     from app.ai_suggest import parse_description, suggest_rules_bulk, ai_available
 
-    # Fetch only uncategorized, non-excluded, non-projected transactions
+    # Fetch ALL non-excluded, non-projected transactions (need both for counts)
     all_txs = (
         db.query(Transaction)
         .join(Account)
@@ -134,13 +134,12 @@ def analyze_rules(request: Request, db: Session = Depends(get_db)):
             Account.user_id == user.id,
             Transaction.is_excluded == 0,
             Transaction.is_projected == 0,
-            Transaction.category_id.is_(None),
         )
         .all()
     )
 
-    # Group by extracted merchant (all are uncategorized)
-    groups = defaultdict(lambda: {"txs": [], "descs": []})
+    # Group by extracted merchant, track uncat vs cat separately
+    groups = defaultdict(lambda: {"uncat_txs": [], "cat_count": 0, "descs": []})
     for tx in all_txs:
         desc = tx.description or ""
         cp = tx.counterparty or ""
@@ -150,22 +149,25 @@ def analyze_rules(request: Request, db: Session = Depends(get_db)):
             continue
 
         key = merchant.lower()
-        groups[key]["txs"].append(tx)
         groups[key]["merchant"] = merchant
-        if len(groups[key]["descs"]) < 3:
-            groups[key]["descs"].append(desc[:120])
+        if tx.category_id:
+            groups[key]["cat_count"] += 1
+        else:
+            groups[key]["uncat_txs"].append(tx)
+            if len(groups[key]["descs"]) < 3:
+                groups[key]["descs"].append(desc[:120])
 
     # Filter: minimum 2 transactions, sort by uncat count
-    # Build candidate list (all are uncategorized)
+    # Build candidate list — only groups with uncategorized transactions
     candidates = []
     for g in groups.values():
-        if len(g["txs"]) < 2:
+        if len(g["uncat_txs"]) < 2:
             continue
         candidates.append({
             "merchant": g["merchant"],
             "match_value": g["merchant"],
-            "uncat_count": len(g["txs"]),
-            "cat_count": 0,
+            "uncat_count": len(g["uncat_txs"]),
+            "cat_count": g["cat_count"],
             "sample_descriptions": g["descs"],
         })
     candidates.sort(key=lambda c: c["uncat_count"], reverse=True)
