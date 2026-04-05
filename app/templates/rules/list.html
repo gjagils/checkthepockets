@@ -35,9 +35,9 @@
                     <th style="min-width:120px;">Herkenning</th>
                     <th style="min-width:120px;">Tegenpartij</th>
                     <th style="min-width:140px;">Categorie</th>
-                    <th class="text-right" style="width:50px;" title="Ongecategoriseerd">Nieuw</th>
-                    <th class="text-right" style="width:50px;" title="Al gecategoriseerd">Bestaand</th>
-                    <th style="width:60px;">Overschr.</th>
+                    <th class="text-center" style="width:50px;" title="Ongecategoriseerd">Nieuw</th>
+                    <th class="text-center" style="width:50px;" title="Al gecategoriseerd">Bestaand</th>
+                    <th class="text-center" style="width:60px;">Overschr.</th>
                     <th style="width:100px;"></th>
                 </tr>
             </thead>
@@ -70,10 +70,10 @@
                         {% endfor %}
                     </select>
                 </td>
-                <td class="text-right">
+                <td class="text-center">
                     <strong {% if s.uncat_count > 0 %}style="color:var(--orange);"{% endif %}>{{ s.uncat_count }}</strong>
                 </td>
-                <td class="text-right muted">{{ s.cat_count }}</td>
+                <td class="text-center muted">{{ s.cat_count }}</td>
                 <td class="text-center">
                     <label style="cursor:pointer;" title="Ook bestaande categorisering overschrijven">
                         <input type="checkbox" name="apply_existing" value="1">
