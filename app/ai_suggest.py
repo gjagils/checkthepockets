@@ -188,9 +188,12 @@ def suggest_rules_bulk(
     if not ANTHROPIC_API_KEY or not groups:
         return None
 
-    # Only subcategories for the prompt
+    # Only subcategories for the prompt — include IDs so Claude can pick exactly
     sub_cats = [c for c in categories if c.get("parent_name")]
-    cat_list = ", ".join(f"{c['name']} (onder {c['parent_name']})" for c in sub_cats) or "(geen subcategorieën)"
+    cat_list = "\n".join(
+        f"  id={c['id']}: \"{c['name']}\" (onder \"{c['parent_name']}\")"
+        for c in sub_cats
+    ) or "(geen subcategorieën)"
 
     # Limit to top 25 groups
     top = groups[:25]
@@ -215,7 +218,7 @@ def suggest_rules_bulk(
                         "Analyseer deze gegroepeerde transactiepatronen uit een Nederlandse "
                         "persoonlijke financiele app. Geef per groep een regelsuggestie.\n\n"
                         f"Patronen:\n{groups_text}\n\n"
-                        f"Beschikbare subcategorieen: {cat_list}\n\n"
+                        f"Beschikbare subcategorieen (kies ALLEEN uit deze IDs):\n{cat_list}\n\n"
                         "Antwoord UITSLUITEND als JSON array (geen markdown).\n"
                         "Per item:\n"
                         "[\n"
@@ -223,11 +226,12 @@ def suggest_rules_bulk(
                         '    "match_value": "zoekterm voor herkenning (kort, uniek)",\n'
                         '    "match_field": "description",\n'
                         '    "counterparty_clean": "schone naam voor tegenpartij",\n'
-                        '    "category_name": "best passende SUBcategorie uit de lijst, of null",\n'
+                        '    "category_id": category ID als integer uit de lijst hierboven, of null,\n'
+                        '    "category_name": "naam van de gekozen categorie, of null",\n'
                         '    "reasoning": "1 zin uitleg in het Nederlands"\n'
                         "  }\n"
                         "]\n"
-                        "BELANGRIJK: category_name moet een BESTAANDE subcategorie uit de lijst zijn, "
+                        "BELANGRIJK: category_id moet een BESTAAND id uit de lijst zijn, "
                         "of null als er geen passende is. Geef alle items terug."
                     ),
                 }
@@ -240,18 +244,25 @@ def suggest_rules_bulk(
 
         results = json.loads(text)
 
-        # Resolve category names to IDs (exact match first, then partial)
+        # Build ID lookup
+        cat_by_id = {c["id"]: c for c in categories}
+
         for item in results:
+            # If Claude returned a valid category_id directly, validate it
+            raw_id = item.get("category_id")
+            if isinstance(raw_id, int) and raw_id in cat_by_id:
+                item["category_name"] = cat_by_id[raw_id]["name"]
+                continue
+
+            # Fallback: resolve by name (exact then partial)
             item["category_id"] = None
             cat_name = (item.get("category_name") or "").lower().strip()
             if not cat_name:
                 continue
-            # Exact match
             for cat in categories:
                 if cat["name"].lower() == cat_name:
                     item["category_id"] = cat["id"]
                     break
-            # Partial match fallback
             if item["category_id"] is None:
                 for cat in categories:
                     if cat_name in cat["name"].lower() or cat["name"].lower() in cat_name:
