@@ -195,8 +195,8 @@ def suggest_rules_bulk(
         for c in sub_cats
     ) or "(geen subcategorieën)"
 
-    # Limit to top 25 groups
-    top = groups[:25]
+    # Limit to top 15 groups (more causes token overflow)
+    top = groups[:15]
     groups_text = "\n".join(
         f"- {g['merchant']} | match: \"{g['match_value']}\" | "
         f"{g['uncat_count']} ongecategoriseerd, {g['cat_count']} gecategoriseerd | "
@@ -210,7 +210,7 @@ def suggest_rules_bulk(
         client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
         resp = client.messages.create(
             model="claude-sonnet-4-20250514",
-            max_tokens=2000,
+            max_tokens=4000,
             messages=[
                 {
                     "role": "user",
