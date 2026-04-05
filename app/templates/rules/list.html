@@ -21,9 +21,15 @@
 <!-- AI Rule Suggestions -->
 {% if rule_suggestions %}
 <div class="card" style="border-left: 4px solid var(--gold); margin-bottom:1.25rem;">
-    <div style="display:flex; align-items:center; gap:0.6rem; margin-bottom:0.75rem;">
-        <span style="font-size:1.2rem;">✨</span>
-        <h2 style="margin:0; color:var(--orange);">Regelvoorstellen ({{ rule_suggestions|length }})</h2>
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.75rem;">
+        <div style="display:flex; align-items:center; gap:0.6rem;">
+            <span style="font-size:1.2rem;">✨</span>
+            <h2 style="margin:0; color:var(--orange);">Regelvoorstellen ({{ rule_suggestions|length }})</h2>
+        </div>
+        <form method="post" action="/rules/suggestions/clear" style="margin:0;"
+              onsubmit="return confirm('Alle regelvoorstellen verwijderen?')">
+            <button type="submit" class="btn btn-sm" style="font-size:.75rem;">Alles wissen</button>
+        </form>
     </div>
     <p class="muted" style="margin-bottom:1rem; font-size:0.85rem;">
         Op basis van je transactiepatronen. Pas de velden aan en klik op "Toevoegen" om een regel aan te maken en direct toe te passen.

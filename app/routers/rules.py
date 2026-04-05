@@ -314,6 +314,15 @@ def dismiss_rule_suggestion(suggestion_id: int, request: Request, db: Session = 
     return RedirectResponse("/rules", status_code=302)
 
 
+@router.post("/rules/suggestions/clear")
+def clear_rule_suggestions(request: Request, db: Session = Depends(get_db)):
+    """Delete all rule suggestions for the current user."""
+    user = require_login(request, db)
+    db.query(RuleSuggestion).filter(RuleSuggestion.user_id == user.id).delete()
+    db.commit()
+    return RedirectResponse("/rules", status_code=302)
+
+
 @router.post("/rules/suggest")
 async def suggest_rule_endpoint(request: Request, db: Session = Depends(get_db)):
     """AI-powered rule suggestion from a transaction description."""
