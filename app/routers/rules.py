@@ -329,6 +329,46 @@ def dismiss_rule_suggestion(suggestion_id: int, request: Request, db: Session = 
     return RedirectResponse("/rules", status_code=302)
 
 
+@router.get("/rules/suggestion/{suggestion_id}/transactions")
+def suggestion_transactions(suggestion_id: int, request: Request, db: Session = Depends(get_db)):
+    """Return matching transactions for a rule suggestion as JSON."""
+    user = require_login(request, db)
+    s = db.query(RuleSuggestion).filter(
+        RuleSuggestion.id == suggestion_id, RuleSuggestion.user_id == user.id
+    ).first()
+    if not s:
+        return JSONResponse({"transactions": []})
+
+    # In-Python filtering (encrypted fields don't support ILIKE)
+    from datetime import timedelta, date
+    all_txs = (
+        db.query(Transaction)
+        .join(Account)
+        .filter(Account.user_id == user.id, Transaction.is_excluded == 0, Transaction.is_projected == 0)
+        .order_by(Transaction.date.desc())
+        .all()
+    )
+
+    term = s.match_value.lower()
+    matches = []
+    for tx in all_txs:
+        desc = (tx.description or "").lower()
+        cp = (tx.counterparty or "").lower()
+        if term in desc or term in cp:
+            matches.append({
+                "id": tx.id,
+                "date": tx.date.isoformat(),
+                "counterparty": tx.counterparty or "",
+                "description": (tx.description or "")[:80],
+                "amount": float(tx.amount),
+                "category": tx.category.name if tx.category else None,
+            })
+        if len(matches) >= 30:
+            break
+
+    return JSONResponse({"transactions": matches})
+
+
 @router.post("/rules/suggestions/clear")
 def clear_rule_suggestions(request: Request, db: Session = Depends(get_db)):
     """Delete all rule suggestions for the current user."""

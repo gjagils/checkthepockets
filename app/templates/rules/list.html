@@ -81,9 +81,13 @@
                     </select>
                 </td>
                 <td style="text-align:center;">
-                    <strong {% if s.uncat_count > 0 %}style="color:var(--orange);"{% endif %}>{{ s.uncat_count }}</strong>
+                    <a href="#" onclick="toggleSuggestionTxs(event, {{ s.id }})" style="text-decoration:none;" title="Toon transacties">
+                        <strong {% if s.uncat_count > 0 %}style="color:var(--orange);"{% endif %}>{{ s.uncat_count }}</strong>
+                    </a>
                 </td>
-                <td style="text-align:center; color:var(--muted);">{{ s.cat_count }}</td>
+                <td style="text-align:center;">
+                    <a href="#" onclick="toggleSuggestionTxs(event, {{ s.id }})" style="text-decoration:none; color:var(--muted);" title="Toon transacties">{{ s.cat_count }}</a>
+                </td>
                 <td style="text-align:center;">
                     <label style="cursor:pointer;" title="Ook bestaande categorisering overschrijven">
                         <input type="checkbox" name="apply_existing" value="1">
@@ -99,13 +103,20 @@
                     </div>
                 </td>
             </tr>
+            <tr id="suggestion-txs-{{ s.id }}" style="display:none;">
+                <td colspan="7" style="padding:0;">
+                    <div id="suggestion-txs-content-{{ s.id }}" style="padding:.5rem .75rem; background:var(--bg); max-height:300px; overflow-y:auto; font-size:.8rem;">
+                        <span class="muted">Laden...</span>
+                    </div>
+                </td>
+            </tr>
             {% endfor %}
             </tbody>
         </table>
     </div>
     {% if rule_suggestions|length > 0 %}
     <div style="margin-top:.75rem; font-size:.8rem; color:var(--muted);">
-        💡 "Nieuw" = ongecategoriseerde transacties die geraakt worden. "Overschr." = ook al gecategoriseerde transacties herindelen.
+        💡 Klik op de aantallen om de matchende transacties te bekijken. "Overschr." = ook al gecategoriseerde herindelen.
     </div>
     {% endif %}
 </div>
@@ -558,6 +569,54 @@ document.getElementById('new-rule-card').scrollIntoView({ behavior: 'smooth', bl
 {% endif %}
 
 /* ── AI Suggest ────────────────────────────────────────────────────────────── */
+/* ── Suggestion transaction details ─────────────────────────────────────── */
+var _loadedSuggestions = {};
+
+function toggleSuggestionTxs(event, id) {
+    event.preventDefault();
+    var row = document.getElementById('suggestion-txs-' + id);
+    if (row.style.display === 'none') {
+        row.style.display = '';
+        if (!_loadedSuggestions[id]) {
+            fetch('/rules/suggestion/' + id + '/transactions')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    _loadedSuggestions[id] = true;
+                    var container = document.getElementById('suggestion-txs-content-' + id);
+                    var txs = data.transactions;
+                    if (!txs.length) {
+                        container.innerHTML = '<span class="muted">Geen transacties gevonden.</span>';
+                        return;
+                    }
+                    var html = '<table style="width:100%; font-size:.8rem; border-collapse:collapse;">'
+                        + '<thead><tr style="border-bottom:1px solid var(--border);">'
+                        + '<th style="text-align:left; padding:.25rem .4rem;">Datum</th>'
+                        + '<th style="text-align:left; padding:.25rem .4rem;">Tegenpartij</th>'
+                        + '<th style="text-align:left; padding:.25rem .4rem;">Omschrijving</th>'
+                        + '<th style="text-align:left; padding:.25rem .4rem;">Categorie</th>'
+                        + '<th style="text-align:right; padding:.25rem .4rem;">Bedrag</th>'
+                        + '</tr></thead><tbody>';
+                    txs.forEach(function(tx) {
+                        var cls = tx.amount < 0 ? 'amount-negative' : 'amount-positive';
+                        var cat = tx.category ? escapeHtml(tx.category) : '<span style="color:var(--orange);">—</span>';
+                        html += '<tr style="border-bottom:1px solid var(--border);">'
+                            + '<td style="padding:.25rem .4rem; white-space:nowrap;">' + tx.date + '</td>'
+                            + '<td style="padding:.25rem .4rem;">' + escapeHtml(tx.counterparty || '—') + '</td>'
+                            + '<td style="padding:.25rem .4rem; color:var(--muted); max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + escapeHtml(tx.description || '—') + '</td>'
+                            + '<td style="padding:.25rem .4rem;">' + cat + '</td>'
+                            + '<td style="padding:.25rem .4rem; text-align:right;" class="' + cls + '">&euro;&nbsp;' + tx.amount.toFixed(2).replace('.', ',') + '</td>'
+                            + '</tr>';
+                    });
+                    html += '</tbody></table>';
+                    if (txs.length >= 30) html += '<div class="muted" style="padding:.3rem .4rem; font-size:.75rem;">Eerste 30 getoond.</div>';
+                    container.innerHTML = html;
+                });
+        }
+    } else {
+        row.style.display = 'none';
+    }
+}
+
 function aiSuggest() {
     const btn = document.getElementById('ai-suggest-btn');
     const resultDiv = document.getElementById('ai-suggest-result');
