@@ -4,8 +4,11 @@ from fastapi import APIRouter, Depends, Request, Form, Query
 from fastapi.responses import RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 
+import logging
 from collections import defaultdict
 from decimal import Decimal
+
+logger = logging.getLogger(__name__)
 
 from app.database import get_db
 from app.models import Rule, Category, Tag, Transaction, Account, RuleSuggestion
@@ -191,10 +194,22 @@ def analyze_rules(request: Request, db: Session = Depends(get_db)):
     # AI enrichment
     ai_results = None
     ai_error = False
+    ai_error_msg = ""
+    logger.info("Rule analyze: %d candidates, %d categories, AI available: %s",
+                len(candidates), len(categories_for_ai), ai_available())
     if ai_available():
-        ai_results = suggest_rules_bulk(candidates[:25], categories_for_ai)
-        if ai_results is None:
+        try:
+            ai_results = suggest_rules_bulk(candidates[:25], categories_for_ai)
+            if ai_results is None:
+                ai_error = True
+                ai_error_msg = "AI gaf geen resultaat terug (check server logs)"
+                logger.warning("Rule analyze: AI returned None")
+            else:
+                logger.info("Rule analyze: AI returned %d results", len(ai_results))
+        except Exception as exc:
             ai_error = True
+            ai_error_msg = str(exc)
+            logger.error("Rule analyze: AI call failed: %s", exc, exc_info=True)
 
     # Clear old suggestions and write new ones
     db.query(RuleSuggestion).filter(RuleSuggestion.user_id == user.id).delete()
@@ -239,8 +254,10 @@ def analyze_rules(request: Request, db: Session = Depends(get_db)):
             ))
 
     db.commit()
-    status = "done" if not ai_error else "done_no_ai"
-    return RedirectResponse(f"/rules?analyze={status}", status_code=302)
+    if ai_error:
+        from urllib.parse import quote_plus
+        return RedirectResponse(f"/rules?analyze=done_no_ai&ai_err={quote_plus(ai_error_msg[:200])}", status_code=302)
+    return RedirectResponse("/rules?analyze=done", status_code=302)
 
 
 @router.post("/rules/suggestion/{suggestion_id}/accept")

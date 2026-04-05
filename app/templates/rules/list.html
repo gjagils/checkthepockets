@@ -18,7 +18,10 @@
 <div class="alert alert-info">Geen nieuwe regelpatronen gevonden in je transacties.</div>
 {% elif analyze_status == 'done_no_ai' %}
 <div class="alert alert-error" style="font-size:.9rem;">
-    ⚠ AI-analyse mislukt (ANTHROPIC_API_KEY niet ingesteld of API-fout). Categorieën zijn ingevuld op basis van bestaande transactiedata.
+    ⚠ AI-analyse mislukt. Categorieën zijn ingevuld op basis van bestaande transactiedata.
+    {% if request.query_params.get('ai_err') %}
+    <br><code style="font-size:.8rem; word-break:break-all;">{{ request.query_params.get('ai_err') }}</code>
+    {% endif %}
 </div>
 {% endif %}
 
