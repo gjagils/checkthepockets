@@ -132,7 +132,7 @@ def analyze_rules(request: Request, db: Session = Depends(get_db)):
     )
 
     # Group by extracted merchant
-    groups = defaultdict(lambda: {"txs": [], "uncat": 0, "cat": 0, "descs": []})
+    groups = defaultdict(lambda: {"txs": [], "uncat": 0, "cat": 0, "descs": [], "cat_votes": defaultdict(int)})
     for tx in all_txs:
         desc = tx.description or ""
         cp = tx.counterparty or ""
@@ -148,21 +148,28 @@ def analyze_rules(request: Request, db: Session = Depends(get_db)):
             groups[key]["descs"].append(desc[:120])
         if tx.category_id:
             groups[key]["cat"] += 1
+            groups[key]["cat_votes"][tx.category_id] += 1
         else:
             groups[key]["uncat"] += 1
 
     # Filter: minimum 2 transactions, sort by uncat count
-    candidates = [
-        {
+    # Build candidate list with most-voted category
+    cat_map_all = {c.id: c for c in db.query(Category).filter(Category.user_id == user.id).all()}
+    candidates = []
+    for g in groups.values():
+        if len(g["txs"]) < 2:
+            continue
+        top_cat_id = max(g["cat_votes"], key=g["cat_votes"].get) if g["cat_votes"] else None
+        top_cat = cat_map_all.get(top_cat_id) if top_cat_id else None
+        candidates.append({
             "merchant": g["merchant"],
             "match_value": g["merchant"],
             "uncat_count": g["uncat"],
             "cat_count": g["cat"],
             "sample_descriptions": g["descs"],
-        }
-        for g in groups.values()
-        if len(g["txs"]) >= 2
-    ]
+            "top_category_id": top_cat_id,
+            "top_category_name": top_cat.name if top_cat else None,
+        })
     candidates.sort(key=lambda c: c["uncat_count"], reverse=True)
 
     # Filter out merchants that already have a rule
@@ -183,10 +190,13 @@ def analyze_rules(request: Request, db: Session = Depends(get_db)):
 
     # AI enrichment
     ai_results = None
+    ai_error = False
     if ai_available():
         ai_results = suggest_rules_bulk(candidates[:25], categories_for_ai)
+        if ai_results is None:
+            ai_error = True
 
-    # Merge AI results with candidate counts
+    # Clear old suggestions and write new ones
     db.query(RuleSuggestion).filter(RuleSuggestion.user_id == user.id).delete()
 
     if ai_results:
@@ -196,7 +206,6 @@ def analyze_rules(request: Request, db: Session = Depends(get_db)):
             mv = (ai.get("match_value") or "").lower()
             cand = candidate_map.get(mv)
             if not cand:
-                # Try to find by original merchant name
                 for k, v in candidate_map.items():
                     if mv in k or k in mv:
                         cand = v
@@ -213,19 +222,25 @@ def analyze_rules(request: Request, db: Session = Depends(get_db)):
                 cat_count=cand["cat_count"] if cand else 0,
             ))
     else:
-        # No AI: use raw candidates
+        # Fallback: use raw candidates WITH most-voted category from transaction data
         for c in candidates[:25]:
             db.add(RuleSuggestion(
                 user_id=user.id,
                 match_value=c["match_value"],
                 match_field="description",
                 counterparty_clean=c["merchant"],
+                category_id=c.get("top_category_id"),
+                category_name=c.get("top_category_name"),
+                reasoning=f"{c['uncat_count'] + c['cat_count']}x gevonden" + (
+                    " (AI niet beschikbaar)" if ai_error else ""
+                ),
                 uncat_count=c["uncat_count"],
                 cat_count=c["cat_count"],
             ))
 
     db.commit()
-    return RedirectResponse("/rules?analyze=done", status_code=302)
+    status = "done" if not ai_error else "done_no_ai"
+    return RedirectResponse(f"/rules?analyze={status}", status_code=302)
 
 
 @router.post("/rules/suggestion/{suggestion_id}/accept")
