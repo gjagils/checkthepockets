@@ -149,16 +149,20 @@ def suggest_rule(
 
         result = json.loads(text)
 
-        # Resolve category name → id
-        if result.get("category_name"):
+        # Resolve category name → id (exact match first, then partial)
+        result["category_id"] = None
+        cat_name = (result.get("category_name") or "").lower().strip()
+        if cat_name:
             for cat in categories:
-                if cat["name"].lower() == result["category_name"].lower():
+                if cat["name"].lower() == cat_name:
                     result["category_id"] = cat["id"]
                     break
-            else:
-                result["category_id"] = None
-        else:
-            result["category_id"] = None
+            if result["category_id"] is None:
+                for cat in categories:
+                    if cat_name in cat["name"].lower() or cat["name"].lower() in cat_name:
+                        result["category_id"] = cat["id"]
+                        result["category_name"] = cat["name"]
+                        break
 
         return result
 
@@ -236,13 +240,23 @@ def suggest_rules_bulk(
 
         results = json.loads(text)
 
-        # Resolve category names to IDs
+        # Resolve category names to IDs (exact match first, then partial)
         for item in results:
             item["category_id"] = None
-            if item.get("category_name"):
+            cat_name = (item.get("category_name") or "").lower().strip()
+            if not cat_name:
+                continue
+            # Exact match
+            for cat in categories:
+                if cat["name"].lower() == cat_name:
+                    item["category_id"] = cat["id"]
+                    break
+            # Partial match fallback
+            if item["category_id"] is None:
                 for cat in categories:
-                    if cat["name"].lower() == item["category_name"].lower():
+                    if cat_name in cat["name"].lower() or cat["name"].lower() in cat_name:
                         item["category_id"] = cat["id"]
+                        item["category_name"] = cat["name"]
                         break
 
         return results
