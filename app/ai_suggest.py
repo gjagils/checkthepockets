@@ -167,6 +167,91 @@ def suggest_rule(
         return None
 
 
+def suggest_rules_bulk(
+    groups: list[dict],
+    categories: list[dict],
+) -> list[dict] | None:
+    """
+    Use Claude to suggest rules for grouped transaction patterns.
+
+    Args:
+        groups: [{"merchant": str, "match_value": str, "uncat_count": int,
+                  "cat_count": int, "sample_descriptions": [str, ...]}, ...]
+        categories: [{"id": int, "name": str, "parent_name": str|None}, ...]
+
+    Returns list of enriched suggestions or None on failure.
+    """
+    if not ANTHROPIC_API_KEY or not groups:
+        return None
+
+    # Only subcategories for the prompt
+    sub_cats = [c for c in categories if c.get("parent_name")]
+    cat_list = ", ".join(f"{c['name']} (onder {c['parent_name']})" for c in sub_cats) or "(geen subcategorieën)"
+
+    # Limit to top 25 groups
+    top = groups[:25]
+    groups_text = "\n".join(
+        f"- {g['merchant']} | match: \"{g['match_value']}\" | "
+        f"{g['uncat_count']} ongecategoriseerd, {g['cat_count']} gecategoriseerd | "
+        f"voorbeeld: \"{g['sample_descriptions'][0] if g['sample_descriptions'] else ''}\" "
+        for g in top
+    )
+
+    try:
+        import anthropic
+
+        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        resp = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=2000,
+            messages=[
+                {
+                    "role": "user",
+                    "content": (
+                        "Analyseer deze gegroepeerde transactiepatronen uit een Nederlandse "
+                        "persoonlijke financiele app. Geef per groep een regelsuggestie.\n\n"
+                        f"Patronen:\n{groups_text}\n\n"
+                        f"Beschikbare subcategorieen: {cat_list}\n\n"
+                        "Antwoord UITSLUITEND als JSON array (geen markdown).\n"
+                        "Per item:\n"
+                        "[\n"
+                        "  {\n"
+                        '    "match_value": "zoekterm voor herkenning (kort, uniek)",\n'
+                        '    "match_field": "description",\n'
+                        '    "counterparty_clean": "schone naam voor tegenpartij",\n'
+                        '    "category_name": "best passende SUBcategorie uit de lijst, of null",\n'
+                        '    "reasoning": "1 zin uitleg in het Nederlands"\n'
+                        "  }\n"
+                        "]\n"
+                        "BELANGRIJK: category_name moet een BESTAANDE subcategorie uit de lijst zijn, "
+                        "of null als er geen passende is. Geef alle items terug."
+                    ),
+                }
+            ],
+        )
+
+        text = resp.content[0].text.strip()
+        if text.startswith("```"):
+            text = text.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+
+        results = json.loads(text)
+
+        # Resolve category names to IDs
+        for item in results:
+            item["category_id"] = None
+            if item.get("category_name"):
+                for cat in categories:
+                    if cat["name"].lower() == item["category_name"].lower():
+                        item["category_id"] = cat["id"]
+                        break
+
+        return results
+
+    except Exception as exc:
+        logger.error("AI bulk rule suggest failed: %s", exc)
+        return None
+
+
 def ai_available() -> bool:
     """True when the Anthropic API key is configured."""
     return bool(ANTHROPIC_API_KEY)

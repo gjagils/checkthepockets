@@ -3,11 +3,101 @@
 {% block content %}
 <div class="page-header">
     <h1>Regels</h1>
+    <form method="post" action="/rules/analyze" style="margin:0;">
+        <button type="submit" class="btn btn-accent">✨ Analyseer transacties</button>
+    </form>
 </div>
 
 {% if request.query_params.get('applied') %}
 <div class="alert alert-success">
     {{ request.query_params.get('applied') }} transactie(s) bijgewerkt door regels toe te passen.
+</div>
+{% endif %}
+
+{% if analyze_status == 'empty' %}
+<div class="alert alert-info">Geen nieuwe regelpatronen gevonden in je transacties.</div>
+{% endif %}
+
+<!-- AI Rule Suggestions -->
+{% if rule_suggestions %}
+<div class="card" style="border-left: 4px solid var(--gold); margin-bottom:1.25rem;">
+    <div style="display:flex; align-items:center; gap:0.6rem; margin-bottom:0.75rem;">
+        <span style="font-size:1.2rem;">✨</span>
+        <h2 style="margin:0; color:var(--orange);">Regelvoorstellen ({{ rule_suggestions|length }})</h2>
+    </div>
+    <p class="muted" style="margin-bottom:1rem; font-size:0.85rem;">
+        Op basis van je transactiepatronen. Pas de velden aan en klik op "Toevoegen" om een regel aan te maken en direct toe te passen.
+    </p>
+    <div class="table-wrapper" style="overflow-x:auto;">
+        <table class="data-table" style="font-size:.85rem;">
+            <thead>
+                <tr>
+                    <th style="min-width:120px;">Herkenning</th>
+                    <th style="min-width:120px;">Tegenpartij</th>
+                    <th style="min-width:140px;">Categorie</th>
+                    <th class="text-right" style="width:50px;" title="Ongecategoriseerd">Nieuw</th>
+                    <th class="text-right" style="width:50px;" title="Al gecategoriseerd">Bestaand</th>
+                    <th style="width:60px;">Overschr.</th>
+                    <th style="width:100px;"></th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for s in rule_suggestions %}
+            <tr>
+                <form method="post" action="/rules/suggestion/{{ s.id }}/accept">
+                <td>
+                    <input type="text" name="match_value" value="{{ s.match_value }}"
+                           style="width:100%; font-size:.85rem; padding:.3rem .5rem;" required>
+                </td>
+                <td>
+                    <input type="text" name="counterparty_clean" value="{{ s.counterparty_clean or '' }}"
+                           style="width:100%; font-size:.85rem; padding:.3rem .5rem;"
+                           placeholder="Schone naam">
+                </td>
+                <td>
+                    <select name="category_id" style="width:100%; font-size:.85rem; padding:.3rem .4rem;">
+                        <option value="">— Geen —</option>
+                        {% for cat in categories %}
+                        {% if not cat.parent_id %}
+                            {% if cat.children %}
+                            <optgroup label="{{ cat.name }}">
+                                {% for child in cat.children|sort(attribute='name') %}
+                                <option value="{{ child.id }}" {% if s.category_id == child.id %}selected{% endif %}>{{ child.name }}</option>
+                                {% endfor %}
+                            </optgroup>
+                            {% endif %}
+                        {% endif %}
+                        {% endfor %}
+                    </select>
+                </td>
+                <td class="text-right">
+                    <strong {% if s.uncat_count > 0 %}style="color:var(--orange);"{% endif %}>{{ s.uncat_count }}</strong>
+                </td>
+                <td class="text-right muted">{{ s.cat_count }}</td>
+                <td class="text-center">
+                    <label style="cursor:pointer;" title="Ook bestaande categorisering overschrijven">
+                        <input type="checkbox" name="apply_existing" value="1">
+                    </label>
+                </td>
+                <td>
+                    <div style="display:flex; gap:.3rem;">
+                        <button type="submit" class="btn btn-sm btn-primary" style="padding:.25rem .6rem;">✓</button>
+                        </form>
+                        <form method="post" action="/rules/suggestion/{{ s.id }}/dismiss" style="margin:0;">
+                            <button type="submit" class="btn btn-sm" style="padding:.25rem .6rem;" title="Verwijder suggestie">✕</button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% if rule_suggestions|length > 0 %}
+    <div style="margin-top:.75rem; font-size:.8rem; color:var(--muted);">
+        💡 "Nieuw" = ongecategoriseerde transacties die geraakt worden. "Overschr." = ook al gecategoriseerde transacties herindelen.
+    </div>
+    {% endif %}
 </div>
 {% endif %}
 

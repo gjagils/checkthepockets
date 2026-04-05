@@ -4,8 +4,11 @@ from fastapi import APIRouter, Depends, Request, Form, Query
 from fastapi.responses import RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 
+from collections import defaultdict
+from decimal import Decimal
+
 from app.database import get_db
-from app.models import Rule, Category, Tag, Transaction, Account
+from app.models import Rule, Category, Tag, Transaction, Account, RuleSuggestion
 from app.auth import require_login
 from app.rules_engine import apply_rules_to_all, apply_single_rule, preview_single_rule, suggest_rules
 from app.template_config import templates
@@ -59,6 +62,21 @@ def rules_list(request: Request, from_tx: int = Query(None), db: Session = Depen
     from app.ai_suggest import ai_available
     show_ai_suggest = ai_available()
 
+    rule_suggestions = (
+        db.query(RuleSuggestion)
+        .filter(RuleSuggestion.user_id == user.id)
+        .order_by(RuleSuggestion.uncat_count.desc())
+        .all()
+    )
+    analyze_status = request.query_params.get("analyze", "")
+
+    # Build subcategories list for the suggestion dropdowns
+    sub_categories = []
+    for cat in categories:
+        if cat.parent_id:
+            parent = next((c for c in categories if c.id == cat.parent_id), None)
+            sub_categories.append({"id": cat.id, "name": cat.name, "parent_name": parent.name if parent else ""})
+
     prefill = None
     if from_tx:
         tx = (
@@ -91,8 +109,209 @@ def rules_list(request: Request, from_tx: int = Query(None), db: Session = Depen
             "match_types": MATCH_TYPES,
             "prefill": prefill,
             "show_ai_suggest": show_ai_suggest,
+            "rule_suggestions": rule_suggestions,
+            "sub_categories": sub_categories,
+            "analyze_status": analyze_status,
         },
     )
+
+
+@router.post("/rules/analyze")
+def analyze_rules(request: Request, db: Session = Depends(get_db)):
+    """Analyze all transactions and suggest rules based on patterns."""
+    user = require_login(request, db)
+
+    from app.ai_suggest import parse_description, suggest_rules_bulk, ai_available
+
+    # Fetch all non-excluded, non-projected transactions
+    all_txs = (
+        db.query(Transaction)
+        .join(Account)
+        .filter(Account.user_id == user.id, Transaction.is_excluded == 0, Transaction.is_projected == 0)
+        .all()
+    )
+
+    # Group by extracted merchant
+    groups = defaultdict(lambda: {"txs": [], "uncat": 0, "cat": 0, "descs": []})
+    for tx in all_txs:
+        desc = tx.description or ""
+        cp = tx.counterparty or ""
+        parsed = parse_description(desc)
+        merchant = parsed.get("merchant", cp or desc).strip()
+        if not merchant:
+            continue
+
+        key = merchant.lower()
+        groups[key]["txs"].append(tx)
+        groups[key]["merchant"] = merchant
+        if len(groups[key]["descs"]) < 3:
+            groups[key]["descs"].append(desc[:120])
+        if tx.category_id:
+            groups[key]["cat"] += 1
+        else:
+            groups[key]["uncat"] += 1
+
+    # Filter: minimum 2 transactions, sort by uncat count
+    candidates = [
+        {
+            "merchant": g["merchant"],
+            "match_value": g["merchant"],
+            "uncat_count": g["uncat"],
+            "cat_count": g["cat"],
+            "sample_descriptions": g["descs"],
+        }
+        for g in groups.values()
+        if len(g["txs"]) >= 2
+    ]
+    candidates.sort(key=lambda c: c["uncat_count"], reverse=True)
+
+    # Filter out merchants that already have a rule
+    existing_rules = db.query(Rule).filter(Rule.user_id == user.id).all()
+    existing_values = {r.match_value.lower() for r in existing_rules}
+    candidates = [c for c in candidates if c["match_value"].lower() not in existing_values]
+
+    if not candidates:
+        return RedirectResponse("/rules?analyze=empty", status_code=302)
+
+    # Build categories list with parent info for AI
+    all_cats = db.query(Category).filter(Category.user_id == user.id).order_by(Category.name).all()
+    cat_map = {c.id: c for c in all_cats}
+    categories_for_ai = []
+    for c in all_cats:
+        parent_name = cat_map[c.parent_id].name if c.parent_id and c.parent_id in cat_map else None
+        categories_for_ai.append({"id": c.id, "name": c.name, "parent_name": parent_name})
+
+    # AI enrichment
+    ai_results = None
+    if ai_available():
+        ai_results = suggest_rules_bulk(candidates[:25], categories_for_ai)
+
+    # Merge AI results with candidate counts
+    db.query(RuleSuggestion).filter(RuleSuggestion.user_id == user.id).delete()
+
+    if ai_results:
+        # Match AI results back to candidates by match_value
+        candidate_map = {c["match_value"].lower(): c for c in candidates}
+        for ai in ai_results:
+            mv = (ai.get("match_value") or "").lower()
+            cand = candidate_map.get(mv)
+            if not cand:
+                # Try to find by original merchant name
+                for k, v in candidate_map.items():
+                    if mv in k or k in mv:
+                        cand = v
+                        break
+            db.add(RuleSuggestion(
+                user_id=user.id,
+                match_value=ai.get("match_value", mv),
+                match_field=ai.get("match_field", "description"),
+                counterparty_clean=ai.get("counterparty_clean"),
+                category_id=ai.get("category_id"),
+                category_name=ai.get("category_name"),
+                reasoning=ai.get("reasoning"),
+                uncat_count=cand["uncat_count"] if cand else 0,
+                cat_count=cand["cat_count"] if cand else 0,
+            ))
+    else:
+        # No AI: use raw candidates
+        for c in candidates[:25]:
+            db.add(RuleSuggestion(
+                user_id=user.id,
+                match_value=c["match_value"],
+                match_field="description",
+                counterparty_clean=c["merchant"],
+                uncat_count=c["uncat_count"],
+                cat_count=c["cat_count"],
+            ))
+
+    db.commit()
+    return RedirectResponse("/rules?analyze=done", status_code=302)
+
+
+@router.post("/rules/suggestion/{suggestion_id}/accept")
+async def accept_rule_suggestion(
+    suggestion_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Accept a rule suggestion — create rule and optionally apply to existing transactions."""
+    user = require_login(request, db)
+    form = await request.form()
+
+    s = db.query(RuleSuggestion).filter(
+        RuleSuggestion.id == suggestion_id, RuleSuggestion.user_id == user.id
+    ).first()
+    if not s:
+        return RedirectResponse("/rules", status_code=302)
+
+    # Read editable fields from form (user may have changed them)
+    match_value = (form.get("match_value") or s.match_value).strip()
+    counterparty_clean = (form.get("counterparty_clean") or s.counterparty_clean or "").strip()
+    category_id_raw = (form.get("category_id") or "").strip()
+    category_id = int(category_id_raw) if category_id_raw else s.category_id
+    apply_existing = form.get("apply_existing") == "1"
+
+    # Validate category ownership
+    if category_id:
+        cat = db.query(Category).filter(Category.id == category_id, Category.user_id == user.id).first()
+        if not cat:
+            category_id = None
+
+    # Create the rule
+    rule = Rule(
+        user_id=user.id,
+        name=f"{counterparty_clean or match_value}",
+        match_field="description",
+        match_type="contains",
+        match_value=match_value,
+        assign_category_id=category_id,
+        action_rename_counterparty=counterparty_clean or None,
+        action_set_reviewed=1,
+    )
+    db.add(rule)
+    db.flush()
+
+    # Apply to transactions
+    applied = 0
+    all_txs = (
+        db.query(Transaction)
+        .join(Account)
+        .filter(Account.user_id == user.id, Transaction.is_excluded == 0, Transaction.is_projected == 0)
+        .all()
+    )
+    for tx in all_txs:
+        desc = (tx.description or "").lower()
+        cp = (tx.counterparty or "").lower()
+        if match_value.lower() not in desc and match_value.lower() not in cp:
+            continue
+        # Skip already categorized unless apply_existing is checked
+        if tx.category_id and not apply_existing:
+            continue
+        if category_id:
+            tx.category_id = category_id
+        if counterparty_clean:
+            tx.counterparty = counterparty_clean
+        tx.is_reviewed = 1
+        applied += 1
+
+    # Delete the suggestion
+    db.delete(s)
+    db.commit()
+
+    return RedirectResponse(f"/rules?applied={applied}", status_code=302)
+
+
+@router.post("/rules/suggestion/{suggestion_id}/dismiss")
+def dismiss_rule_suggestion(suggestion_id: int, request: Request, db: Session = Depends(get_db)):
+    """Dismiss a rule suggestion."""
+    user = require_login(request, db)
+    s = db.query(RuleSuggestion).filter(
+        RuleSuggestion.id == suggestion_id, RuleSuggestion.user_id == user.id
+    ).first()
+    if s:
+        db.delete(s)
+        db.commit()
+    return RedirectResponse("/rules", status_code=302)
 
 
 @router.post("/rules/suggest")

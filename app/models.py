@@ -192,6 +192,25 @@ class RecurringTransaction(Base):
     category = relationship("Category")
 
 
+class RuleSuggestion(Base):
+    __tablename__ = "rule_suggestions"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    match_value = Column(String(255), nullable=False)
+    match_field = Column(String(20), nullable=False, default="description")
+    counterparty_clean = Column(String(255), nullable=True)
+    category_id = Column(Integer, ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)
+    category_name = Column(String(100), nullable=True)
+    reasoning = Column(Text, nullable=True)
+    uncat_count = Column(Integer, default=0)
+    cat_count = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    user = relationship("User")
+    category = relationship("Category")
+
+
 class RecurringSuggestion(Base):
     __tablename__ = "recurring_suggestions"
 
