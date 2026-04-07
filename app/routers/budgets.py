@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, case
 
 from app.database import get_db
-from app.models import Account, Budget, BudgetPreset, BudgetPresetLine, Category, Transaction
+from app.models import Account, Budget, BudgetPreset, BudgetPresetLine, Category, RecurringTransaction, Transaction
 from app.auth import require_login
 from app.template_config import templates
 
@@ -314,8 +314,47 @@ def budget_overview(
         income_query = income_query.filter(Transaction.account_id == account_id)
 
     income_result = income_query.first()
-    total_income = income_result.income or Decimal("0")
-    unallocated = total_income - total_budgeted
+    total_income_received = income_result.income or Decimal("0")
+
+    # Expected remaining income from recurring items not yet matched this month
+    from app.routers.recurring import _is_active_in_month
+    active_recurring = (
+        db.query(RecurringTransaction)
+        .filter(
+            RecurringTransaction.user_id == user.id,
+            RecurringTransaction.is_active == 1,
+            RecurringTransaction.amount_expected > 0,
+        )
+        .all()
+    )
+    expected_income = Decimal("0")
+    for item in active_recurring:
+        if not _is_active_in_month(item, current_year, current_month):
+            continue
+        if item.frequency != "monthly":
+            continue
+        # Check if already matched this month
+        match_filter = [
+            Account.user_id == user.id,
+            func.extract("year", Transaction.date) == current_year,
+            func.extract("month", Transaction.date) == current_month,
+            Transaction.is_excluded == 0,
+            Transaction.amount > 0,
+        ]
+        if item.counterparty:
+            match_filter.append(Transaction.counterparty.ilike(f"%{item.counterparty}%"))
+        if item.category_id:
+            match_filter.append(Transaction.category_id == item.category_id)
+        if account_id:
+            match_filter.append(Transaction.account_id == account_id)
+        matched = db.query(Transaction).join(Account).filter(*match_filter).first()
+        if not matched:
+            expected_income += item.amount_expected
+
+    # Budget-based: budgeted income vs budgeted expenses
+    budget_unallocated = total_income_budgeted - total_budgeted
+    # Actual-based: received + expected vs budgeted expenses
+    actual_unallocated = total_income_received + expected_income - total_budgeted
 
     # Load presets for this user
     presets = (
@@ -350,11 +389,13 @@ def budget_overview(
             "total_budgeted": total_budgeted,
             "total_spent": total_spent,
             "total_remaining": total_budgeted - total_spent,
-            "total_income": total_income,
+            "total_income_received": total_income_received,
+            "expected_income": expected_income,
             "income_budget_data": income_budget_data,
             "total_income_budgeted": total_income_budgeted,
             "total_income_actual": total_income_actual,
-            "unallocated": unallocated,
+            "budget_unallocated": budget_unallocated,
+            "actual_unallocated": actual_unallocated,
             "total_rollover": total_rollover,
             "prev_year": prev_year,
             "prev_month": prev_month,

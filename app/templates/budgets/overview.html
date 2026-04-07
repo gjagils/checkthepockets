@@ -39,30 +39,51 @@
     </div>
 </div>
 
-<!-- Left to budget bar -->
-{% set pct_allocated = ((total_budgeted / total_income) * 100)|int if total_income > 0 else 0 %}
+<!-- Budget bars -->
 <div class="card" style="padding:1rem 1.25rem;">
+    <!-- Bar 1: Budget — gebudgetteerd inkomen vs gebudgetteerde uitgaven -->
+    {% set pct_budget = ((total_budgeted / total_income_budgeted) * 100)|int if total_income_budgeted > 0 else 0 %}
     <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:0.5rem;">
         <span style="font-family:'Syne',sans-serif; font-weight:700; font-size:0.78rem; text-transform:uppercase; letter-spacing:0.07em; color:var(--muted);">
-            Nog toe te wijzen
+            Budget — nog toe te wijzen
         </span>
-        <span style="font-family:'Syne',sans-serif; font-weight:700; font-size:1.1rem; {% if unallocated >= 0 %}color:var(--green);{% else %}color:var(--red);{% endif %}">
-            {% if unallocated >= 0 %}+{% endif %}&euro;&nbsp;{{ unallocated|euro }}
+        <span style="font-family:'Syne',sans-serif; font-weight:700; font-size:1.1rem; {% if budget_unallocated >= 0 %}color:var(--green);{% else %}color:var(--red);{% endif %}">
+            {% if budget_unallocated >= 0 %}+{% endif %}&euro;&nbsp;{{ budget_unallocated|euro }}
         </span>
     </div>
     <div style="background:var(--bg); border-radius:6px; height:10px; overflow:hidden;">
-        <div style="height:100%; width:{{ [pct_allocated, 100]|min }}%; border-radius:6px; transition:width .4s ease;
-            background: {% if pct_allocated > 100 %}var(--red){% elif pct_allocated > 90 %}var(--gold){% else %}var(--navy-mid){% endif %};"></div>
+        <div style="height:100%; width:{{ [pct_budget, 100]|min }}%; border-radius:6px; transition:width .4s ease;
+            background: {% if pct_budget > 100 %}var(--red){% elif pct_budget > 90 %}var(--gold){% else %}var(--navy-mid){% endif %};"></div>
     </div>
     <div style="display:flex; justify-content:space-between; margin-top:0.35rem; font-size:0.78rem; color:var(--muted);">
         <span>&euro;&nbsp;{{ total_budgeted|euro }} gebudgetteerd</span>
-        <span>&euro;&nbsp;{{ total_income|euro }} inkomen · {{ pct_allocated }}%</span>
+        <span>&euro;&nbsp;{{ total_income_budgeted|euro }} begroot inkomen · {{ pct_budget }}%</span>
     </div>
-    {% if unallocated < 0 %}
+    {% if budget_unallocated < 0 %}
     <div class="alert alert-error" style="margin-top:0.75rem; padding:0.5rem 0.85rem; font-size:0.83rem;">
-        <strong>Overbudgeted!</strong> Je hebt &euro;&nbsp;{{ (unallocated * -1)|euro }} meer gebudgetteerd dan je inkomen.
+        <strong>Overbudgeted!</strong> Je hebt &euro;&nbsp;{{ (budget_unallocated * -1)|euro }} meer gebudgetteerd dan je begrote inkomen.
     </div>
     {% endif %}
+
+    <!-- Bar 2: Werkelijk — ontvangen + verwacht vs gebudgetteerde uitgaven -->
+    {% set total_expected = total_income_received + expected_income %}
+    {% set pct_actual = ((total_budgeted / total_expected) * 100)|int if total_expected > 0 else 0 %}
+    <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:0.5rem; margin-top:1.5rem;">
+        <span style="font-family:'Syne',sans-serif; font-weight:700; font-size:0.78rem; text-transform:uppercase; letter-spacing:0.07em; color:var(--muted);">
+            Werkelijk — ruimte over
+        </span>
+        <span style="font-family:'Syne',sans-serif; font-weight:700; font-size:1.1rem; {% if actual_unallocated >= 0 %}color:var(--green);{% else %}color:var(--red);{% endif %}">
+            {% if actual_unallocated >= 0 %}+{% endif %}&euro;&nbsp;{{ actual_unallocated|euro }}
+        </span>
+    </div>
+    <div style="background:var(--bg); border-radius:6px; height:10px; overflow:hidden;">
+        <div style="height:100%; width:{{ [pct_actual, 100]|min }}%; border-radius:6px; transition:width .4s ease;
+            background: {% if pct_actual > 100 %}var(--red){% elif pct_actual > 90 %}var(--gold){% else %}var(--navy-mid){% endif %};"></div>
+    </div>
+    <div style="display:flex; justify-content:space-between; margin-top:0.35rem; font-size:0.78rem; color:var(--muted);">
+        <span>&euro;&nbsp;{{ total_budgeted|euro }} gebudgetteerd</span>
+        <span>&euro;&nbsp;{{ total_income_received|euro }} ontvangen{% if expected_income > 0 %} + &euro;&nbsp;{{ expected_income|euro }} verwacht{% endif %} · {{ pct_actual }}%</span>
+    </div>
 </div>
 
 <!-- Filters -->
@@ -104,8 +125,8 @@
 <!-- Summary -->
 <div class="import-summary">
     <div class="summary-card">
-        <div class="value amount-positive">&euro;&nbsp;{{ total_income|euro }}</div>
-        <div class="label">Inkomen</div>
+        <div class="value amount-positive">&euro;&nbsp;{{ total_income_received|euro }}</div>
+        <div class="label">Ontvangen</div>
     </div>
     <div class="summary-card">
         <div class="value">&euro;&nbsp;{{ total_budgeted|euro }}</div>
@@ -122,8 +143,8 @@
         <div class="label">Resterend</div>
     </div>
     <div class="summary-card">
-        <div class="value {% if unallocated >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
-            &euro;&nbsp;{{ unallocated|euro }}
+        <div class="value {% if actual_unallocated >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
+            &euro;&nbsp;{{ actual_unallocated|euro }}
         </div>
         <div class="label">Niet toegewezen</div>
     </div>

@@ -169,16 +169,18 @@ async def import_preview(
 async def import_confirm(
     request: Request,
     raw_json: str = Form(...),
+    strategy: str = Form("overwrite"),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
+    skip_existing = strategy == "skip"
 
     try:
         data = json.loads(raw_json)
     except Exception:
         return RedirectResponse("/settings?error=json", status_code=302)
 
-    stats = {"categories": 0, "tags": 0, "rules": 0, "recurring": 0, "budgets": 0}
+    stats = {"categories": 0, "tags": 0, "rules": 0, "recurring": 0, "budgets": 0, "skipped": 0}
 
     # --- Categories ---
     # Build local name→id map as we upsert (parents first)
@@ -199,6 +201,10 @@ async def import_confirm(
             Category.user_id == user.id, Category.name == name
         ).first()
         if existing:
+            if skip_existing:
+                cat_name_to_id[name] = existing.id
+                stats["skipped"] += 1
+                continue
             existing.color = cat.get("color") or existing.color
             existing.is_income = cat.get("is_income", existing.is_income)
             existing.sort_order = cat.get("sort_order", existing.sort_order)
@@ -246,6 +252,10 @@ async def import_confirm(
             continue
         existing = db.query(Tag).filter(Tag.user_id == user.id, Tag.name == name).first()
         if existing:
+            if skip_existing:
+                tag_name_to_id[name] = existing.id
+                stats["skipped"] += 1
+                continue
             existing.color = tag.get("color") or existing.color
             existing.is_archived = tag.get("is_archived", existing.is_archived)
             db.flush()
@@ -280,6 +290,9 @@ async def import_confirm(
         ).first()
 
         if existing:
+            if skip_existing:
+                stats["skipped"] += 1
+                continue
             existing.match_type = rule.get("match_type", existing.match_type)
             existing.is_active = rule.get("is_active", existing.is_active)
             existing.assign_category_id = cat_id
@@ -334,6 +347,9 @@ async def import_confirm(
                 pass
 
         if existing:
+            if skip_existing:
+                stats["skipped"] += 1
+                continue
             existing.amount_expected = Decimal(str(rt.get("amount_expected", existing.amount_expected)))
             existing.frequency = rt.get("frequency", existing.frequency)
             existing.category_id = cat_id
@@ -384,6 +400,9 @@ async def import_confirm(
 
         amount = Decimal(str(b.get("amount", "0")))
         if existing:
+            if skip_existing:
+                stats["skipped"] += 1
+                continue
             existing.amount = amount
         else:
             db.add(Budget(
@@ -402,6 +421,8 @@ async def import_confirm(
         f"{stats['tags']} tag(s), {stats['rules']} regel(s), "
         f"{stats['recurring']} terugkerend, {stats['budgets']} budget(ten) nieuw toegevoegd."
     )
+    if stats["skipped"]:
+        msg += f" {stats['skipped']} bestaande item(s) overgeslagen."
 
     return templates.TemplateResponse(
         "auth/settings.html",

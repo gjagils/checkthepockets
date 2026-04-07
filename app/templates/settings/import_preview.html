@@ -37,6 +37,19 @@
 
     <form method="post" action="/settings/import/confirm">
         <input type="hidden" name="raw_json" value="{{ raw_json | e }}">
+
+        <div style="margin-bottom:1.5rem;">
+            <p style="font-weight:600; margin-bottom:0.5rem;">Bij bestaande items:</p>
+            <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; margin-bottom:0.4rem;">
+                <input type="radio" name="strategy" value="overwrite" checked>
+                <span>Overschrijven — bestaande items bijwerken met de geïmporteerde waarden</span>
+            </label>
+            <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+                <input type="radio" name="strategy" value="skip">
+                <span>Overslaan — alleen nieuwe items toevoegen, bestaande ongemoeid laten</span>
+            </label>
+        </div>
+
         <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
             <button type="submit" class="btn btn-primary">✓ Importeren</button>
             <a href="/settings" class="btn">← Annuleren</a>

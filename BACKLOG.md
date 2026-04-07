@@ -8,49 +8,30 @@ Sprints zijn gegroepeerd op gedeelde bestanden voor maximale efficiëntie per se
 
 ---
 
-## Sprint 17 — Slimme regelanalyse (Claude API)
-*Beschrijvingen opknippen + automatische categorie-suggestie bij het aanmaken van regels.*
+## Sprint 17 — Slimme regelanalyse (Claude API) ✅ (2026-04-07)
 
-**Bestanden:** `app/routers/rules.py`, `app/templates/rules/list.html`, nieuw `app/ai_suggest.py`
-
-**Vereisten:** `ANTHROPIC_API_KEY` als environment variable, `anthropic` package in requirements.txt
-
-**Flow:**
-1. Gebruiker opent regelformulier (vanuit transactie of handmatig)
-2. "✨ Analyseer" knop → `POST /rules/suggest` met beschrijving + transactie-id
-3. Claude extraheert merchant-naam, stelt match-waarde en categorie voor op basis van jouw categorieënlijst
-4. Formulier wordt pre-filled — gebruiker bevestigt of past aan
-
-**Taken:**
-- [ ] `anthropic` toevoegen aan `requirements.txt`
-- [ ] `app/ai_suggest.py` — `suggest_rule(description, counterparty, categories)` → `{match_value, counterparty_clean, category_id, reasoning}`
-- [ ] Regex-parser voor bekende bankformaten (ABN AMRO BEA/PIN, SEPA, iDEAL) als snelle pre-parse vóór AI-call
-- [ ] `POST /rules/suggest` endpoint — geeft JSON terug
-- [ ] "✨ Analyseer" knop in regelformulier — fetch-aanroep, pre-fill velden via JS
-- [ ] Fallback: als `ANTHROPIC_API_KEY` niet ingesteld, toon knop niet
+- [x] `anthropic>=0.39.0` in `requirements.txt`
+- [x] `app/ai_suggest.py` — `suggest_rule()`, `suggest_rules_bulk()`, `parse_description()`, `ai_available()`
+- [x] Regex-parsers voor ABN AMRO BEA/GEA, SEPA, iDEAL, TRTP (ING/Rabobank)
+- [x] `POST /rules/suggest` endpoint met AI + regex fallback
+- [x] "✨ Analyseer" knop in regelformulier — pre-fill via JS
+- [x] Fallback: knop verborgen als `ANTHROPIC_API_KEY` niet ingesteld
+- [x] **Bonus:** Bulk regelanalyse (`POST /rules/analyze`) — groepeert ongecategoriseerde transacties, AI-suggesties in `RuleSuggestion` tabel
+- [x] **Bonus:** Recurring detectie (`detect_recurring_patterns()` + `enrich_recurring_with_ai()`)
+- [x] **Bonus:** Interactieve suggestie-UI met klikbare aantallen, inline bewerken, toevoegen/verwijderen
 
 ---
 
-## Sprint 18 — Google login (OAuth2)
-*Inloggen met Google-account naast bestaand gebruikersnaam/wachtwoord.*
+## Sprint 18 — Google login (OAuth2) ✅ (2026-04-07)
 
-**Bestanden:** `app/routers/auth.py`, `app/templates/auth/login.html`, `app/config.py`
-
-**Vereisten:** Google Cloud project met OAuth2 client ID + secret (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`), `authlib` package
-
-**Flow:**
-1. "Inloggen met Google" knop op loginpagina → `/auth/google` → redirect naar Google consent
-2. Google redirect naar `/auth/google/callback` met auth code
-3. Wissel code in voor user-info (e-mail, naam)
-4. Zoek bestaand account op e-mail — log in; geen account → maak aan (als REGISTRATION_OPEN of invite geldig)
-
-**Taken:**
-- [ ] `authlib` toevoegen aan `requirements.txt`
-- [ ] `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` in `app/config.py`
-- [ ] `GET /auth/google` — redirect naar Google OAuth consent screen
-- [ ] `GET /auth/google/callback` — verwerk callback, zoek/maak user, zet sessie-cookie
-- [ ] "Inloggen met Google" knop op `auth/login.html`
-- [ ] Fallback: als Google credentials niet ingesteld, knop niet tonen
+- [x] `authlib>=1.3.0` + `httpx>=0.27.0` in `requirements.txt`
+- [x] `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` in `app/config.py`
+- [x] `GET /auth/google` — redirect naar Google OAuth consent screen
+- [x] `GET /auth/google/callback` — verwerk callback, zoek/maak user, zet sessie-cookie
+- [x] "Inloggen met Google" knop op `auth/login.html` met Google SVG-icoon
+- [x] Fallback: knop verborgen als Google credentials niet ingesteld
+- [x] Automatische user-aanmaak bij eerste Google login (respecteert `REGISTRATION_OPEN`)
+- [x] SessionMiddleware cookie hernoemd naar `oauth_state` om conflict te voorkomen
 
 ---
 
@@ -201,22 +182,14 @@ Sprints zijn gegroepeerd op gedeelde bestanden voor maximale efficiëntie per se
 
 ---
 
-## Sprint 13 — Setup export & import (configuratie-backup)
-*Exporteer de volledige app-configuratie als JSON, importeer met één druk op de knop.*
+## Sprint 13 — Setup export & import (configuratie-backup) ✅ (2026-04-07)
 
-**Bestanden:** nieuw `app/routers/settings.py`, `app/templates/settings/index.html`
-
-**Context voor nieuwe sessie:**
-- Exporteren: Rules, RecurringTransactions, Categories (incl. hiërarchie + kleuren), Budgets (per maand), Tags
-- Geen transactie-data in de export — alleen de "setup"
-- Import: JSON uploaden → preview wat er geladen wordt → bevestigen → upsert naar database
-
-**Taken:**
-- [ ] `GET /settings/export` — genereert JSON met alle configuratie-entiteiten voor de ingelogde gebruiker
-- [ ] `POST /settings/import` — parseert JSON, toont preview (aantallen per type), bevestig-knop
-- [ ] Conflict-strategie bij import: bestaande items overslaan of overschrijven (keuze via radio)
-- [ ] Downloadknop in settings-pagina + upload-formulier
-- [ ] Versienummer in export-JSON zodat toekomstige formaat-wijzigingen te detecteren zijn
+- [x] `GET /settings/export` — JSON met categorieën, tags, regels, recurring, budgetten (versie 1)
+- [x] `POST /settings/import/preview` — upload JSON, toont preview met aantallen per type
+- [x] `POST /settings/import/confirm` — importeert met conflict-strategie (overschrijven of overslaan)
+- [x] Conflict-strategie via radio-knoppen op preview-pagina
+- [x] Downloadknop + upload-formulier op settings-pagina
+- [x] Versienummer in export-JSON (version: 1) met validatie bij import
 
 ---
 
