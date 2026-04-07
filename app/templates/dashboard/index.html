@@ -151,21 +151,26 @@ function initChart() {
     var muted = getCSS('--muted') || '#888';
     var fontFamily = "'Plus Jakarta Sans', sans-serif";
 
-    // 3 groups: Inkomen (green), Uitgaven (red), Niet gecategoriseerd (gray)
-    // Budget = wide bar (light), Werkelijk = narrower bar (dark) overlaid
+    // 3 visual groups per label: Inkomen, Uitgaven, Niet gecategoriseerd
+    // Budget bars = wide + light (background), Werkelijk = narrow + dark (foreground)
+    // Trick: use xAxisID to create paired groups that overlap on the same position
+    // Budget bars render first (higher order = behind), actual bars on top (lower order = front)
+
     var datasets = [
+        // --- Inkomen: budget (wide, light, behind) ---
         {
             label: 'Inkomen budget',
             data: overviewData.map(function(r) { return r.income_budget; }),
-            backgroundColor: green + '44',
+            backgroundColor: green + '40',
             borderColor: green + '66',
             borderWidth: 1,
             borderRadius: 4,
-            barPercentage: 0.85,
-            categoryPercentage: 0.8,
-            stack: 'inkomen',
-            order: 2,
+            xAxisID: 'x',
+            barPercentage: 0.95,
+            categoryPercentage: 0.85,
+            order: 4,
         },
+        // --- Inkomen: werkelijk (narrow, dark, in front) ---
         {
             label: 'Inkomen werkelijk',
             data: overviewData.map(function(r) { return r.income_actual; }),
@@ -173,23 +178,25 @@ function initChart() {
             borderColor: green,
             borderWidth: 0,
             borderRadius: 3,
+            xAxisID: 'x',
             barPercentage: 0.55,
-            categoryPercentage: 0.8,
-            stack: 'inkomen',
+            categoryPercentage: 0.85,
             order: 1,
         },
+        // --- Uitgaven: budget (wide, light, behind) ---
         {
             label: 'Uitgaven budget',
             data: overviewData.map(function(r) { return r.expense_budget; }),
-            backgroundColor: red + '44',
+            backgroundColor: red + '40',
             borderColor: red + '66',
             borderWidth: 1,
             borderRadius: 4,
-            barPercentage: 0.85,
-            categoryPercentage: 0.8,
-            stack: 'uitgaven',
-            order: 2,
+            xAxisID: 'x2',
+            barPercentage: 0.95,
+            categoryPercentage: 0.85,
+            order: 4,
         },
+        // --- Uitgaven: werkelijk (narrow, dark, in front) ---
         {
             label: 'Uitgaven werkelijk',
             data: overviewData.map(function(r) { return r.expense_actual; }),
@@ -197,21 +204,22 @@ function initChart() {
             borderColor: red,
             borderWidth: 0,
             borderRadius: 3,
+            xAxisID: 'x2',
             barPercentage: 0.55,
-            categoryPercentage: 0.8,
-            stack: 'uitgaven',
+            categoryPercentage: 0.85,
             order: 1,
         },
+        // --- Niet gecategoriseerd (single bar) ---
         {
             label: 'Niet gecategoriseerd',
             data: overviewData.map(function(r) { return r.uncat_amount || 0; }),
-            backgroundColor: muted + '66',
-            borderColor: muted + '88',
+            backgroundColor: muted + '55',
+            borderColor: muted + '77',
             borderWidth: 1,
             borderRadius: 4,
-            barPercentage: 0.85,
-            categoryPercentage: 0.8,
-            stack: 'uncat',
+            xAxisID: 'x3',
+            barPercentage: 0.9,
+            categoryPercentage: 0.85,
             order: 3,
         },
     ];
@@ -257,7 +265,23 @@ function initChart() {
             },
             scales: {
                 x: {
+                    type: 'category',
+                    offset: true,
                     ticks: { color: getCSS('--muted') || '#888', font: { family: fontFamily } },
+                    grid: { display: false },
+                },
+                x2: {
+                    type: 'category',
+                    labels: labels,
+                    offset: true,
+                    display: false,
+                    grid: { display: false },
+                },
+                x3: {
+                    type: 'category',
+                    labels: labels,
+                    offset: true,
+                    display: false,
                     grid: { display: false },
                 },
                 y: {
