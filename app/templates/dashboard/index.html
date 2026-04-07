@@ -1,332 +1,292 @@
 {% extends "base.html" %}
-{% block title %}Dashboard - Check Your Pockets{% endblock %}
+{% block title %}{{ title }} - Check Your Pockets{% endblock %}
 {% block content %}
-<div class="page-header">
-    <h1>Dashboard {% if current_month %}{{ months_full[current_month] }} {% endif %}{{ current_year }}</h1>
-</div>
 
-<!-- Filters -->
-<div class="card">
-    <form method="get" action="/dashboard" class="filter-bar">
-        <div class="form-group">
-            <label for="year">Jaar</label>
-            <select name="year" id="year" onchange="this.form.submit()">
+<!-- Header with breadcrumbs, title, toggle and year selector -->
+<div class="page-header" style="flex-wrap:wrap; gap:0.75rem;">
+    <div>
+        {% if breadcrumbs %}
+        <nav style="font-size:0.8rem; margin-bottom:0.25rem;">
+            {% for bc in breadcrumbs %}
+            <a href="{{ bc.url }}" style="color:var(--muted);">{{ bc.label }}</a>
+            <span style="color:var(--muted); margin:0 0.25rem;">&rsaquo;</span>
+            {% endfor %}
+        </nav>
+        {% endif %}
+        <h1>{{ title }}</h1>
+    </div>
+    <div style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap;">
+        <!-- Tabel / Grafiek toggle -->
+        <div class="view-toggle">
+            <button class="view-toggle-btn" data-view="tabel" onclick="switchView('tabel')">Tabel</button>
+            <button class="view-toggle-btn" data-view="grafiek" onclick="switchView('grafiek')">Grafiek</button>
+        </div>
+        <!-- Year selector (only on level 1) -->
+        {% if not current_month %}
+        <form method="get" action="/dashboard" style="margin:0;">
+            <select name="year" onchange="this.form.submit()" style="padding:0.4rem 0.6rem; border-radius:6px; border:1px solid var(--border); background:var(--card-bg); color:var(--text); font-size:0.85rem;">
                 {% for y in years %}
                 <option value="{{ y }}" {% if y == current_year %}selected{% endif %}>{{ y }}</option>
                 {% endfor %}
             </select>
-        </div>
-        <div class="form-group">
-            <label for="month">Periode</label>
-            <select name="month" id="month" onchange="this.form.submit()">
-                {% for m in range(0, 13) %}
-                <option value="{{ m }}" {% if m == current_month %}selected{% endif %}>{{ months_full[m] }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="form-group">
-            <label for="account_id">Rekening</label>
-            <select name="account_id" id="account_id" onchange="this.form.submit()">
-                <option value="0">Alle rekeningen</option>
-                {% for acc in accounts %}
-                <option value="{{ acc.id }}" {% if current_account_id == acc.id %}selected{% endif %}>
-                    {{ acc.name }}
-                </option>
-                {% endfor %}
-            </select>
-        </div>
-    </form>
-</div>
-
-<!-- Summary cards -->
-<div class="import-summary">
-    <div class="summary-card">
-        <div class="label">Inkomen</div>
-        <div class="value amount-positive">&euro;&nbsp;{{ income|euro }}</div>
-    </div>
-    <div class="summary-card">
-        <div class="label">Uitgaven</div>
-        <div class="value amount-negative">&euro;&nbsp;{{ expenses|euro }}</div>
-    </div>
-    <div class="summary-card">
-        <div class="label">Resultaat</div>
-        <div class="value {% if balance >= 0 %}amount-positive{% else %}amount-negative{% endif %}">&euro;&nbsp;{{ balance|euro }}</div>
-    </div>
-    <div class="summary-card" style="border-left: 3px solid {% if savings_rate >= 20 %}var(--green){% elif savings_rate >= 0 %}var(--gold){% else %}var(--red){% endif %};">
-        <div class="label">Spaarquote</div>
-        <div class="value {% if savings_rate >= 0 %}amount-positive{% else %}amount-negative{% endif %}" style="font-size:1.6rem;">{{ savings_rate }}%</div>
-        <div style="margin-top:0.3rem; height:4px; background:var(--bg); border-radius:2px; overflow:hidden;">
-            <div style="width:{{ [savings_rate|abs, 100]|min }}%; height:100%; border-radius:2px; background:{% if savings_rate >= 20 %}var(--green){% elif savings_rate >= 0 %}var(--gold){% else %}var(--red){% endif %};"></div>
-        </div>
-    </div>
-    {% if recurring_due %}
-    {% set projected_balance = balance + projected_expenses + projected_income %}
-    <div class="summary-card" style="border-left: 3px solid var(--sky);">
-        <div class="label">Verwacht resultaat</div>
-        <div class="value {% if projected_balance >= 0 %}amount-positive{% else %}amount-negative{% endif %}">&euro;&nbsp;{{ projected_balance|euro }}</div>
-        <div class="muted" style="font-size:0.75rem; margin-top:0.2rem;">na {{ recurring_due|length }} terugkerend</div>
-    </div>
-    {% endif %}
-    <div class="summary-card">
-        <div class="label">Transacties</div>
-        <div class="value">{{ tx_count }}</div>
+        </form>
+        {% endif %}
     </div>
 </div>
 
-<!-- Monthly overview (only for full year) -->
-{% if not current_month %}
-<div class="card">
-    <h2>Maandoverzicht</h2>
+<!-- TABLE VIEW -->
+<div id="view-tabel" class="card" style="display:none;">
     <div class="table-wrap">
         <table>
             <thead>
                 <tr>
-                    <th>Maand</th>
-                    <th class="text-right">Inkomen</th>
-                    <th class="text-right">Uitgaven</th>
-                    <th class="text-right">Resultaat</th>
-                    <th class="text-right">Spaarquote</th>
+                    <th style="text-align:left;">
+                        {% if not current_month %}Maand{% elif not current_category_id %}Categorie{% else %}Subcategorie{% endif %}
+                    </th>
+                    <th class="text-right">Ink. budget</th>
+                    <th class="text-right">Ink. werkelijk</th>
+                    <th class="text-right">Uitg. budget</th>
+                    <th class="text-right">Uitg. werkelijk</th>
+                    <th class="text-right">Niet gecat.</th>
                 </tr>
             </thead>
             <tbody>
-                {% for m in range(1, 13) %}
-                {% set data = monthly_data.get(m, {}) %}
-                {% set inc = data.get('income', 0) %}
-                {% set exp = data.get('expenses', 0) %}
-                {% set res = inc + exp %}
-                {% if inc > 0 %}
-                    {% set rate = ((res / inc) * 100)|round(1) %}
-                {% else %}
-                    {% set rate = 0 %}
-                {% endif %}
-                <tr>
-                    <td><a href="/dashboard?year={{ current_year }}&month={{ m }}{% if current_account_id %}&account_id={{ current_account_id }}{% endif %}" style="text-decoration:none;">{{ months[m] }}</a></td>
-                    <td class="text-right nowrap amount-positive">&euro;&nbsp;{{ inc|euro }}</td>
-                    <td class="text-right nowrap amount-negative">&euro;&nbsp;{{ exp|euro }}</td>
-                    <td class="text-right nowrap {% if res >= 0 %}amount-positive{% else %}amount-negative{% endif %}">&euro;&nbsp;{{ res|euro }}</td>
-                    <td class="text-right nowrap {% if rate >= 0 %}amount-positive{% else %}amount-negative{% endif %}">{{ "%.1f"|format(rate) }}%</td>
+                {% set ns = namespace(tot_ib=0, tot_ia=0, tot_eb=0, tot_ea=0, tot_uc=0) %}
+                {% for row in overview_rows %}
+                <tr class="{% if row.is_current %}current-month-row{% endif %}">
+                    <td>
+                        {% if row.get('color') %}<span class="color-dot" style="background:{{ row.color }};"></span> {% endif %}
+                        {% if row.link %}<a href="{{ row.link }}" style="font-weight:600;">{{ row.label }}</a>{% else %}<span style="font-weight:600;">{{ row.label }}</span>{% endif %}
+                        {% if row.is_current %}<span style="color:var(--gold); font-size:0.75rem; margin-left:0.3rem;">&bull;</span>{% endif %}
+                    </td>
+                    <td class="text-right nowrap">
+                        {% if row.income_budget %}&euro;&nbsp;{{ row.income_budget|euro }}{% else %}<span class="muted">&mdash;</span>{% endif %}
+                    </td>
+                    <td class="text-right nowrap {% if row.income_actual %}amount-positive{% endif %}">
+                        {% if row.income_actual %}&euro;&nbsp;{{ row.income_actual|euro }}{% else %}<span class="muted">&mdash;</span>{% endif %}
+                    </td>
+                    <td class="text-right nowrap">
+                        {% if row.expense_budget %}&euro;&nbsp;{{ row.expense_budget|euro }}{% else %}<span class="muted">&mdash;</span>{% endif %}
+                    </td>
+                    <td class="text-right nowrap {% if row.expense_actual > row.expense_budget and row.expense_budget %}amount-negative{% elif row.expense_actual %}amount-positive{% endif %}">
+                        {% if row.expense_actual %}&euro;&nbsp;{{ row.expense_actual|euro }}{% else %}<span class="muted">&mdash;</span>{% endif %}
+                    </td>
+                    <td class="text-right nowrap">
+                        {% if row.uncategorized %}
+                        <a href="/transactions?year={{ current_year }}&month={{ row.key if not current_month else current_month }}&uncategorized=1" class="amount-negative" style="font-weight:600;">{{ row.uncategorized }}</a>
+                        {% else %}<span class="muted">&mdash;</span>{% endif %}
+                    </td>
                 </tr>
+                {% set ns.tot_ib = ns.tot_ib + (row.income_budget|float) %}
+                {% set ns.tot_ia = ns.tot_ia + (row.income_actual|float) %}
+                {% set ns.tot_eb = ns.tot_eb + (row.expense_budget|float) %}
+                {% set ns.tot_ea = ns.tot_ea + (row.expense_actual|float) %}
+                {% set ns.tot_uc = ns.tot_uc + row.uncategorized %}
                 {% endfor %}
             </tbody>
             <tfoot>
-                <tr>
-                    <td><strong>Totaal</strong></td>
-                    <td class="text-right nowrap amount-positive"><strong>&euro;&nbsp;{{ income|euro }}</strong></td>
-                    <td class="text-right nowrap amount-negative"><strong>&euro;&nbsp;{{ expenses|euro }}</strong></td>
-                    <td class="text-right nowrap {% if balance >= 0 %}amount-positive{% else %}amount-negative{% endif %}"><strong>&euro;&nbsp;{{ balance|euro }}</strong></td>
-                    <td class="text-right nowrap {% if savings_rate >= 0 %}amount-positive{% else %}amount-negative{% endif %}"><strong>{{ savings_rate }}%</strong></td>
+                <tr style="font-weight:700; border-top:2px solid var(--border);">
+                    <td>Totaal</td>
+                    <td class="text-right nowrap">&euro;&nbsp;{{ "%.2f"|format(ns.tot_ib)|replace(".", ",") }}</td>
+                    <td class="text-right nowrap amount-positive">&euro;&nbsp;{{ "%.2f"|format(ns.tot_ia)|replace(".", ",") }}</td>
+                    <td class="text-right nowrap">&euro;&nbsp;{{ "%.2f"|format(ns.tot_eb)|replace(".", ",") }}</td>
+                    <td class="text-right nowrap {% if ns.tot_ea > ns.tot_eb %}amount-negative{% else %}amount-positive{% endif %}">&euro;&nbsp;{{ "%.2f"|format(ns.tot_ea)|replace(".", ",") }}</td>
+                    <td class="text-right nowrap">{% if ns.tot_uc %}<span class="amount-negative" style="font-weight:700;">{{ ns.tot_uc }}</span>{% else %}&mdash;{% endif %}</td>
                 </tr>
             </tfoot>
         </table>
     </div>
 </div>
-{% endif %}
 
-<!-- Recurring projections -->
-{% if recurring_due or recurring_confirmed %}
-<div class="card">
-    <h2>Terugkerende posten</h2>
-    {% if recurring_due %}
-    <h3 style="font-size:0.95rem; margin-bottom:0.5rem; color:var(--ctp-warning, #e67e22);">Verwacht (nog niet geboekt)</h3>
-    <div class="table-wrap" style="margin-bottom:1.5rem;">
-        <table>
-            <thead>
-                <tr>
-                    <th>Naam</th>
-                    <th>Categorie</th>
-                    <th class="text-right">Verwacht bedrag</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item in recurring_due %}
-                <tr>
-                    <td>{{ item.name }}</td>
-                    <td class="muted">{{ item.category or '-' }}</td>
-                    <td class="text-right nowrap {% if item.amount >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
-                        &euro;&nbsp;{{ item.amount|euro }}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-            <tfoot>
-                <tr>
-                    <td colspan="2"><strong>Verwachte uitgaven</strong></td>
-                    <td class="text-right nowrap amount-negative"><strong>&euro;&nbsp;{{ projected_expenses|euro }}</strong></td>
-                </tr>
-                {% if projected_income > 0 %}
-                <tr>
-                    <td colspan="2"><strong>Verwacht inkomen</strong></td>
-                    <td class="text-right nowrap amount-positive"><strong>&euro;&nbsp;{{ projected_income|euro }}</strong></td>
-                </tr>
-                {% endif %}
-                <tr>
-                    <td colspan="2"><strong>Verwacht resultaat na boeking</strong></td>
-                    {% set projected_balance = balance + projected_expenses + projected_income %}
-                    <td class="text-right nowrap {% if projected_balance >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
-                        <strong>&euro;&nbsp;{{ projected_balance|euro }}</strong>
-                    </td>
-                </tr>
-            </tfoot>
-        </table>
+<!-- CHART VIEW -->
+<div id="view-grafiek" class="card" style="padding:1.25rem;">
+    <div style="position:relative; height:420px;">
+        <canvas id="overviewChart"></canvas>
     </div>
-    {% endif %}
-
-    {% if recurring_confirmed %}
-    <h3 style="font-size:0.95rem; margin-bottom:0.5rem; color:var(--ctp-success, #27ae60);">Bevestigd (al geboekt)</h3>
-    <div class="table-wrap">
-        <table>
-            <tbody>
-                {% for item in recurring_confirmed %}
-                <tr>
-                    <td>{{ item.name }}</td>
-                    <td class="muted">{{ item.category or '-' }}</td>
-                    <td class="text-right nowrap {% if item.amount >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
-                        &euro;&nbsp;{{ item.amount|euro }}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+    {% if not current_month %}
+    <p style="font-size:0.78rem; color:var(--muted); margin-top:0.75rem; margin-bottom:0;">
+        Klik op een maand om door te zoomen naar categorie&euml;n.
+    </p>
+    {% elif not current_category_id %}
+    <p style="font-size:0.78rem; color:var(--muted); margin-top:0.75rem; margin-bottom:0;">
+        Klik op een categorie om subcategorie&euml;n te zien.
+    </p>
     {% endif %}
 </div>
-{% endif %}
 
-<!-- Category breakdown (month view) -->
-{% if category_breakdown %}
-<div class="card">
-    <h2>Overzicht per categorie</h2>
-    <div class="table-wrap">
-        <table>
-            <thead>
-                <tr>
-                    <th>Categorie</th>
-                    <th class="text-right">Bedrag</th>
-                    <th class="text-right">Budget</th>
-                    <th>Voortgang</th>
-                    <th class="text-right">Transacties</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for group in category_breakdown %}
-                <tr class="cat-parent-row" onclick="toggleChildren({{ group.parent_id }})" style="cursor:pointer;">
-                    <td>
-                        <strong>
-                            {% if group.parent_color %}<span class="color-dot" style="background:{{ group.parent_color }};"></span>{% endif %}
-                            {% if group.is_income %}<span style="color:var(--ctp-check);">&#9650;</span>{% endif %}
-                            {{ group.parent_name }}
-                        </strong>
-                        {% if group.children %}<span class="muted cat-toggle" id="toggle-{{ group.parent_id }}">&#9654;</span>{% endif %}
-                    </td>
-                    <td class="text-right nowrap">
-                        <strong class="{% if group.group_total >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
-                            &euro;&nbsp;{{ group.group_total|euro }}
-                        </strong>
-                    </td>
-                    <td class="text-right nowrap">
-                        {% if group.group_budget > 0 %}
-                        <span class="muted">&euro;&nbsp;{{ group.group_budget|euro }}</span>
-                        {% else %}-{% endif %}
-                    </td>
-                    <td>
-                        {% if group.group_budget > 0 %}
-                            {% if group.is_income %}
-                                {% set pct = ((group.group_total / group.group_budget) * 100)|int %}
-                                <div class="budget-bar" style="width:120px;">
-                                    <div class="budget-bar-fill {% if pct >= 100 %}bar-ok{% elif pct >= 80 %}{% else %}bar-warn{% endif %}" style="width:{{ [pct, 100]|min }}%"></div>
-                                </div>
-                                <span class="muted">{{ pct }}%</span>
-                            {% else %}
-                                {% set spent = group.group_total|abs %}
-                                {% set pct = ((spent / group.group_budget) * 100)|int %}
-                                <div class="budget-bar" style="width:120px;">
-                                    <div class="budget-bar-fill {% if pct > 100 %}bar-over{% elif pct > 80 %}bar-warn{% endif %}" style="width:{{ [pct, 100]|min }}%"></div>
-                                </div>
-                                <span class="muted">{{ pct }}%</span>
-                            {% endif %}
-                        {% else %}-{% endif %}
-                    </td>
-                    <td class="text-right nowrap">
-                        <a href="/transactions?category_id={{ group.parent_id }}{% if current_account_id %}&account_id={{ current_account_id }}{% endif %}" class="muted" style="text-decoration:none;">
-                            {{ group.group_count }}
-                        </a>
-                    </td>
-                </tr>
-
-                {% for child in group.children %}
-                <tr class="cat-child-row cat-children-{{ group.parent_id }}" style="display:none;">
-                    <td style="padding-left:2rem;">
-                        {% if child.color %}<span class="color-dot" style="background:{{ child.color }};"></span>{% endif %}
-                        {{ child.name }}
-                    </td>
-                    <td class="text-right nowrap {% if child.total >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
-                        &euro;&nbsp;{{ child.total|euro }}
-                    </td>
-                    <td class="text-right nowrap">
-                        {% if child.budget > 0 %}
-                        <span class="muted">&euro;&nbsp;{{ child.budget|euro }}</span>
-                        {% else %}-{% endif %}
-                    </td>
-                    <td>
-                        {% if child.budget > 0 %}
-                            {% if group.is_income %}
-                                {% set cpct = ((child.total / child.budget) * 100)|int %}
-                            {% else %}
-                                {% set cpct = ((child.total|abs / child.budget) * 100)|int %}
-                            {% endif %}
-                            <div class="budget-bar" style="width:120px;">
-                                <div class="budget-bar-fill {% if group.is_income %}{% if cpct >= 100 %}bar-ok{% elif cpct < 50 %}bar-warn{% endif %}{% else %}{% if cpct > 100 %}bar-over{% elif cpct > 80 %}bar-warn{% endif %}{% endif %}" style="width:{{ [cpct, 100]|min }}%"></div>
-                            </div>
-                            <span class="muted">{{ cpct }}%</span>
-                        {% else %}-{% endif %}
-                    </td>
-                    <td class="text-right nowrap">
-                        <a href="/transactions?category_id={{ child.id }}{% if current_account_id %}&account_id={{ current_account_id }}{% endif %}" class="muted" style="text-decoration:none;">
-                            {{ child.tx_count }}
-                        </a>
-                    </td>
-                </tr>
-                {% endfor %}
-
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
-
-{% elif top_categories %}
-<!-- Top categories with visual bars (full year view) -->
-<div class="card">
-    <h2>Uitgaven per categorie</h2>
-    {% set max_amount = top_categories[0].total|abs if top_categories else 1 %}
-    {% for cat in top_categories %}
-    {% set pct = ((cat.total / expenses) * 100)|round(1) if expenses < 0 else 0 %}
-    {% set bar_width = ((cat.total|abs / max_amount) * 100)|round(0)|int if max_amount else 0 %}
-    <div style="margin-bottom:0.75rem;">
-        <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:0.25rem;">
-            <span style="font-weight:600; font-size:0.9rem;">{{ cat.name }}</span>
-            <span class="amount-negative nowrap" style="font-size:0.9rem;">&euro;&nbsp;{{ cat.total|euro }} <span class="muted">({{ pct }}%)</span></span>
-        </div>
-        <div style="width:100%; height:10px; background:var(--ctp-border); border-radius:5px; overflow:hidden;">
-            <div style="width:{{ bar_width }}%; height:100%; background:var(--ctp-danger); border-radius:5px; transition:width 0.3s;"></div>
-        </div>
-        <span class="muted" style="font-size:0.75rem;">{{ cat.tx_count }} transactie{{ 's' if cat.tx_count != 1 else '' }}</span>
-    </div>
-    {% endfor %}
-</div>
-{% endif %}
-
-{% endblock %}
-
-{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script>
-function toggleChildren(parentId) {
-    var rows = document.querySelectorAll('.cat-children-' + parentId);
-    var toggle = document.getElementById('toggle-' + parentId);
-    if (!rows.length) return;
-    var show = rows[0].style.display === 'none';
-    rows.forEach(function(r) { r.style.display = show ? '' : 'none'; });
-    if (toggle) toggle.innerHTML = show ? '&#9660;' : '&#9654;';
+var overviewData = {{ overview_json | safe }};
+var drillLinks = {
+    {% for row in overview_rows %}
+    {% if row.link %}"{{ row.label }}": "{{ row.link }}",{% endif %}
+    {% endfor %}
+};
+
+function switchView(view) {
+    document.getElementById('view-tabel').style.display = view === 'tabel' ? '' : 'none';
+    document.getElementById('view-grafiek').style.display = view === 'grafiek' ? '' : 'none';
+    document.querySelectorAll('.view-toggle-btn').forEach(function(btn) {
+        btn.classList.toggle('active', btn.dataset.view === view);
+    });
+    localStorage.setItem('dashboard-view', view);
+    if (view === 'grafiek' && !window._chartReady) {
+        initChart();
+        window._chartReady = true;
+    }
 }
+
+function getCSS(v) {
+    return getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+}
+
+function initChart() {
+    var ctx = document.getElementById('overviewChart').getContext('2d');
+    var labels = overviewData.map(function(r) { return r.label; });
+
+    var green = getCSS('--green') || '#22c55e';
+    var red = getCSS('--red') || '#ef4444';
+    var muted = getCSS('--muted') || '#888';
+
+    var datasets = [
+        {
+            label: 'Inkomen budget',
+            data: overviewData.map(function(r) { return r.income_budget; }),
+            backgroundColor: green + '44',
+            borderColor: green + '88',
+            borderWidth: 1,
+            borderRadius: 3,
+            order: 2,
+        },
+        {
+            label: 'Inkomen werkelijk',
+            data: overviewData.map(function(r) { return r.income_actual; }),
+            backgroundColor: green,
+            borderColor: green,
+            borderWidth: 0,
+            borderRadius: 3,
+            order: 1,
+        },
+        {
+            label: 'Uitgaven budget',
+            data: overviewData.map(function(r) { return r.expense_budget; }),
+            backgroundColor: red + '44',
+            borderColor: red + '88',
+            borderWidth: 1,
+            borderRadius: 3,
+            order: 2,
+        },
+        {
+            label: 'Uitgaven werkelijk',
+            data: overviewData.map(function(r) { return r.expense_actual; }),
+            backgroundColor: red,
+            borderColor: red,
+            borderWidth: 0,
+            borderRadius: 3,
+            order: 1,
+        },
+    ];
+
+    // Add uncategorized as points if any exist
+    var hasUncat = overviewData.some(function(r) { return r.uncategorized > 0; });
+    if (hasUncat) {
+        datasets.push({
+            label: 'Niet gecategoriseerd',
+            data: overviewData.map(function(r) { return r.uncategorized || null; }),
+            type: 'line',
+            borderColor: muted,
+            backgroundColor: muted,
+            pointRadius: 5,
+            pointStyle: 'circle',
+            showLine: false,
+            yAxisID: 'y2',
+            order: 0,
+        });
+    }
+
+    window._chart = new Chart(ctx, {
+        type: 'bar',
+        data: { labels: labels, datasets: datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            onClick: function(evt, elements) {
+                if (elements.length > 0) {
+                    var idx = elements[0].index;
+                    var label = labels[idx];
+                    if (drillLinks[label]) {
+                        window.location.href = drillLinks[label];
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: {
+                        color: getCSS('--text') || '#ccc',
+                        font: { size: 12, family: "'Plus Jakarta Sans', sans-serif" },
+                        usePointStyle: true,
+                        pointStyle: 'rectRounded',
+                        padding: 16,
+                    },
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            if (context.dataset.yAxisID === 'y2') {
+                                return context.dataset.label + ': ' + context.raw;
+                            }
+                            return context.dataset.label + ': \u20AC ' +
+                                context.raw.toLocaleString('nl-NL', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                        }
+                    }
+                },
+            },
+            scales: {
+                x: {
+                    ticks: { color: getCSS('--muted') || '#888', font: { family: "'Plus Jakarta Sans', sans-serif" } },
+                    grid: { display: false },
+                },
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        color: getCSS('--muted') || '#888',
+                        callback: function(v) { return '\u20AC ' + v.toLocaleString('nl-NL'); },
+                        font: { family: "'Plus Jakarta Sans', sans-serif" },
+                    },
+                    grid: { color: (getCSS('--border') || '#333') + '44' },
+                },
+                y2: {
+                    display: hasUncat,
+                    position: 'right',
+                    beginAtZero: true,
+                    ticks: {
+                        color: getCSS('--muted') || '#888',
+                        stepSize: 1,
+                        font: { family: "'Plus Jakarta Sans', sans-serif" },
+                    },
+                    grid: { display: false },
+                    title: {
+                        display: hasUncat,
+                        text: 'Niet gecategoriseerd',
+                        color: getCSS('--muted') || '#888',
+                        font: { size: 11, family: "'Plus Jakarta Sans', sans-serif" },
+                    },
+                },
+            },
+        },
+    });
+}
+
+// Init on page load — default to grafiek
+(function() {
+    var saved = localStorage.getItem('dashboard-view') || 'grafiek';
+    switchView(saved);
+})();
 </script>
+
 {% endblock %}

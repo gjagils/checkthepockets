@@ -1234,3 +1234,33 @@ tfoot td { background: var(--surface-2); border-top: 1px solid var(--border); fo
     .accounts-grid { grid-template-columns: 1fr; }
     .desc-cell { min-width: 150px; }
 }
+
+/* ===== Dashboard: view toggle + current month ===== */
+.view-toggle {
+    display: inline-flex;
+    border: 1px solid var(--border);
+    border-radius: var(--ctp-radius-sm);
+    overflow: hidden;
+}
+.view-toggle-btn {
+    padding: 0.4rem 1.2rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    font-family: var(--font-body);
+    background: transparent;
+    color: var(--muted);
+    border: none;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+.view-toggle-btn:hover {
+    background: var(--surface-2);
+    color: var(--text);
+}
+.view-toggle-btn.active {
+    background: var(--sky);
+    color: #fff;
+}
+.current-month-row {
+    background: var(--sky-bg);
+}
