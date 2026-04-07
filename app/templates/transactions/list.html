@@ -12,6 +12,24 @@
     </div>
 </div>
 
+{% set _recurring_proposals = request.query_params.get('recurring_proposals', '') %}
+{% set _recurring_item_id = request.query_params.get('recurring_item', '') %}
+{% set _recurring_name = request.query_params.get('recurring_name', '') %}
+{% if _recurring_proposals %}
+<div class="alert" style="background:var(--green-bg); border:1px solid var(--green); padding:0.75rem 1rem; border-radius:var(--ctp-radius-sm); margin-bottom:1rem;">
+    <strong>🔄 {{ _recurring_proposals.split(',')|length }} transactie(s) gevonden</strong> die ook bij <em>{{ _recurring_name }}</em> lijken te horen.
+    <div style="margin-top:0.5rem; display:flex; gap:0.5rem;">
+        <form method="post" action="/transactions/accept-recurring-proposals" style="display:inline;">
+            <input type="hidden" name="transaction_ids" value="{{ _recurring_proposals }}">
+            <input type="hidden" name="recurring_id" value="{{ _recurring_item_id }}">
+            <input type="hidden" name="redirect_to" value="/transactions?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}">
+            <button type="submit" class="btn btn-sm btn-accent">Allemaal koppelen</button>
+        </form>
+        <a href="/transactions?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}" class="btn btn-sm">Negeren</a>
+    </div>
+</div>
+{% endif %}
+
 {% set _suggest_tx = request.query_params.get('suggest_rule_tx') %}
 {% if _suggest_tx %}
 <div class="alert alert-info" id="rule-suggestion-banner" style="display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap;">

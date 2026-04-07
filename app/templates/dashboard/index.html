@@ -280,29 +280,25 @@ function initChart() {
                 mode: 'index',
                 intersect: false,
             },
-            onHover: function(evt, elements, chart) {
-                var rect = chart.canvas.getBoundingClientRect();
-                var y = evt.native ? evt.native.clientY - rect.top : evt.y;
-                chart.canvas.style.cursor = (y > chart.scales.y.bottom) ? 'pointer' : 'default';
-            },
             onClick: function(evt, elements, chart) {
-                // Get native mouse position relative to canvas
-                var rect = chart.canvas.getBoundingClientRect();
-                var nativeX = evt.native ? evt.native.clientX - rect.left : evt.x;
-                var nativeY = evt.native ? evt.native.clientY - rect.top : evt.y;
-                // Only act on label area clicks (below the plot area)
-                if (nativeY <= chart.scales.y.bottom) return;
-                // Find which label was clicked
+                // Use Chart.js built-in event coordinates (already in chart space)
                 var xScale = chart.scales.x;
+                var xPos = evt.x;
+                // Find nearest label
+                var bestIdx = -1;
+                var bestDist = Infinity;
                 for (var i = 0; i < labels.length; i++) {
                     var px = xScale.getPixelForValue(i);
-                    var halfStep = (xScale.width / labels.length) / 2;
-                    if (nativeX >= px - halfStep && nativeX <= px + halfStep) {
-                        var label = labels[i];
-                        if (drillLinks[label]) {
-                            window.location.href = drillLinks[label];
-                            return;
-                        }
+                    var dist = Math.abs(xPos - px);
+                    if (dist < bestDist) {
+                        bestDist = dist;
+                        bestIdx = i;
+                    }
+                }
+                if (bestIdx >= 0 && bestDist < (xScale.width / labels.length)) {
+                    var label = labels[bestIdx];
+                    if (drillLinks[label]) {
+                        window.location.href = drillLinks[label];
                     }
                 }
             },

@@ -514,8 +514,18 @@ def link_recurring(
         if item:
             tx.recurring_id = item.id
             db.flush()
-            # Learn from this link and auto-match other months
-            _auto_match_from_linked_transaction(db, user.id, item, tx)
+            # Find candidates for auto-matching (don't link yet — propose)
+            candidates = _find_recurring_candidates(db, user.id, item, tx)
+            db.commit()
+
+            if candidates:
+                # Redirect back with proposal banner
+                candidate_ids = ",".join(str(c.id) for c in candidates)
+                sep = "&" if "?" in redirect_to else "?"
+                return RedirectResponse(
+                    f"{redirect_to}{sep}recurring_proposals={candidate_ids}&recurring_item={item.id}&recurring_name={item.name}",
+                    status_code=302,
+                )
     else:
         # Unlink
         tx.recurring_id = None
@@ -524,54 +534,79 @@ def link_recurring(
     return RedirectResponse(redirect_to, status_code=302)
 
 
-def _auto_match_from_linked_transaction(
-    db: Session, user_id: int, item: RecurringTransaction, linked_tx: Transaction
+@router.post("/transactions/accept-recurring-proposals")
+def accept_recurring_proposals(
+    request: Request,
+    transaction_ids: str = Form(""),
+    recurring_id: int = Form(0),
+    redirect_to: str = Form("/transactions"),
+    db: Session = Depends(get_db),
 ):
-    """After a manual link, learn from the transaction's description/counterparty
-    and try to auto-match unlinked transactions in other months.
-    Description is more important than amount (amounts can vary due to promotions).
-    """
-    from sqlalchemy import or_, func, extract
+    """Accept proposed recurring matches — link all proposed transactions."""
+    user = require_login(request, db)
 
+    if not transaction_ids or not recurring_id:
+        return RedirectResponse(redirect_to, status_code=302)
+
+    item = db.query(RecurringTransaction).filter(
+        RecurringTransaction.id == recurring_id,
+        RecurringTransaction.user_id == user.id,
+    ).first()
+    if not item:
+        return RedirectResponse(redirect_to, status_code=302)
+
+    tx_ids = [int(tid) for tid in transaction_ids.split(",") if tid.strip().isdigit()]
+    txs = (
+        db.query(Transaction)
+        .join(Account)
+        .filter(
+            Transaction.id.in_(tx_ids),
+            Account.user_id == user.id,
+            Transaction.recurring_id.is_(None),
+        )
+        .all()
+    )
+    for tx in txs:
+        tx.recurring_id = item.id
+
+    db.commit()
+    return RedirectResponse(redirect_to, status_code=302)
+
+
+def _find_recurring_candidates(
+    db: Session, user_id: int, item: RecurringTransaction, linked_tx: Transaction
+) -> list[Transaction]:
+    """After a manual link, learn from the transaction's description/counterparty
+    and find candidate transactions in other months that could be matched.
+    Returns candidates (does NOT link them — caller decides to propose or auto-link).
+    """
     # Build search terms from the linked transaction
     search_terms = []
     desc = (linked_tx.description or "").strip()
     cp = (linked_tx.counterparty or "").strip()
 
-    # Extract meaningful keywords from description
-    # For bank descriptions like "SEPA .../NAME/Simpel/REMI/Hannah..."
-    # we want to find the most distinctive parts
     if desc:
-        # Try to find the best substring to match on
-        # Look for recurring item name parts in the description
         item_words = item.name.lower().split()
         desc_lower = desc.lower()
-
-        # Find which words from the item name appear in the description
         matching_words = [w for w in item_words if len(w) > 2 and w in desc_lower]
 
         if matching_words:
-            # Use ALL matching words as AND conditions
             for word in matching_words:
                 search_terms.append(Transaction.description.ilike(f"%{word}%"))
         elif cp:
-            # Fallback: use counterparty
             search_terms.append(Transaction.counterparty.ilike(f"%{cp}%"))
         else:
-            # Last resort: use first 30 meaningful chars of description
             snippet = desc[:30].strip()
             if len(snippet) > 5:
                 search_terms.append(Transaction.description.ilike(f"%{snippet}%"))
-
     elif cp:
         search_terms.append(Transaction.counterparty.ilike(f"%{cp}%"))
 
     if not search_terms:
-        return
+        return []
 
-    # Also update the recurring item's description_match if empty
+    # Update the recurring item's description_match if empty
     if not item.description_match and desc:
-        # Use the most specific matching word(s)
         item_words = item.name.lower().split()
         desc_lower = desc.lower()
         matching = [w for w in item_words if len(w) > 2 and w in desc_lower]
@@ -579,7 +614,7 @@ def _auto_match_from_linked_transaction(
             item.description_match = " ".join(matching)
 
     # Find all unlinked transactions that match this pattern
-    candidates = (
+    all_candidates = (
         db.query(Transaction)
         .join(Account)
         .filter(
@@ -594,25 +629,78 @@ def _auto_match_from_linked_transaction(
         .all()
     )
 
-    # Group candidates by year-month and link one per period (if no existing match)
+    # Filter: one per period, same sign, no existing match
     from app.routers.recurring import _get_period_range, _find_matching_transaction
 
-    linked_count = 0
-    for candidate in candidates:
-        period_start, period_end = _get_period_range(
-            item.frequency, candidate.date
-        )
-        # Check if this period already has a match
-        existing = _find_matching_transaction(db, user_id, item, period_start, period_end)
-        if existing:
+    result = []
+    seen_periods = set()
+    for candidate in all_candidates:
+        period_start, period_end = _get_period_range(item.frequency, candidate.date)
+        period_key = (period_start, period_end)
+        if period_key in seen_periods:
             continue
 
-        # Same sign (both income or both expense)?
+        existing = _find_matching_transaction(db, user_id, item, period_start, period_end)
+        if existing:
+            seen_periods.add(period_key)
+            continue
+
         if (candidate.amount > 0) != (linked_tx.amount > 0):
             continue
 
-        candidate.recurring_id = item.id
-        linked_count += 1
+        result.append(candidate)
+        seen_periods.add(period_key)
+
+    return result
+
+
+def auto_link_recurring_after_import(db: Session, user_id: int):
+    """Called after CSV import — automatically link new transactions to recurring items
+    based on counterparty/description matching. No user confirmation needed."""
+    from app.routers.recurring import _get_period_range, _find_matching_transaction
+
+    recurring_items = (
+        db.query(RecurringTransaction)
+        .filter(RecurringTransaction.user_id == user_id, RecurringTransaction.is_active == 1)
+        .all()
+    )
+
+    for item in recurring_items:
+        if not item.counterparty and not item.description_match:
+            continue
+
+        # Find unlinked transactions matching this item
+        conditions = []
+        if item.counterparty:
+            conditions.append(Transaction.counterparty.ilike(f"%{item.counterparty}%"))
+        if item.description_match:
+            for word in item.description_match.split():
+                if len(word) > 2:
+                    conditions.append(Transaction.description.ilike(f"%{word}%"))
+
+        if not conditions:
+            continue
+
+        candidates = (
+            db.query(Transaction)
+            .join(Account)
+            .filter(
+                Account.user_id == user_id,
+                Transaction.is_excluded == 0,
+                Transaction.is_projected == 0,
+                Transaction.recurring_id.is_(None),
+                *conditions,
+            )
+            .order_by(Transaction.date)
+            .all()
+        )
+
+        for candidate in candidates:
+            period_start, period_end = _get_period_range(item.frequency, candidate.date)
+            existing = _find_matching_transaction(db, user_id, item, period_start, period_end)
+            if existing:
+                continue
+            candidate.recurring_id = item.id
 
 
 @router.post("/transactions/{transaction_id}/reviewed")
@@ -1260,6 +1348,10 @@ async def import_confirm(request: Request, db: Session = Depends(get_db)):
 
     from app.routers.recurring import cleanup_matched_projected
     cleanup_matched_projected(user.id, db)
+
+    # Auto-link new transactions to recurring items
+    auto_link_recurring_after_import(db, user.id)
+    db.commit()
 
     return templates.TemplateResponse(
         "transactions/import_result.html",
