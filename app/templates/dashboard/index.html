@@ -218,7 +218,10 @@ function initChart() {
         {
             label: 'Inkomen verwacht',
             data: overviewData.map(function(r) { return r.income_expected; }),
-            backgroundColor: green + '66',
+            backgroundColor: green + '88',
+            borderColor: green,
+            borderWidth: { top: 2, right: 0, bottom: 0, left: 0 },
+            borderDash: [4, 2],
             stack: 'inkomen',
             borderRadius: 3,
             barPercentage: 0.6,
@@ -238,7 +241,10 @@ function initChart() {
         {
             label: 'Uitgaven verwacht',
             data: overviewData.map(function(r) { return r.expense_expected; }),
-            backgroundColor: red + '66',
+            backgroundColor: red + '88',
+            borderColor: red,
+            borderWidth: { top: 2, right: 0, bottom: 0, left: 0 },
+            borderDash: [4, 2],
             stack: 'uitgaven',
             borderRadius: 3,
             barPercentage: 0.6,
@@ -312,12 +318,9 @@ function initChart() {
                         // Add custom legend items for budget
                         generateLabels: function(chart) {
                             var items = [
-                                { text: 'Inkomen budget', fillStyle: green + '35', strokeStyle: green + '55', lineWidth: 1, pointStyle: 'rectRounded' },
-                                { text: 'Inkomen gerealiseerd', fillStyle: green, strokeStyle: green, lineWidth: 0, pointStyle: 'rectRounded' },
-                                { text: 'Inkomen verwacht', fillStyle: green + '66', strokeStyle: green + '66', lineWidth: 0, pointStyle: 'rectRounded' },
-                                { text: 'Uitgaven budget', fillStyle: red + '35', strokeStyle: red + '55', lineWidth: 1, pointStyle: 'rectRounded' },
-                                { text: 'Uitgaven gerealiseerd', fillStyle: red, strokeStyle: red, lineWidth: 0, pointStyle: 'rectRounded' },
-                                { text: 'Uitgaven verwacht', fillStyle: red + '66', strokeStyle: red + '66', lineWidth: 0, pointStyle: 'rectRounded' },
+                                { text: 'Budget', fillStyle: green + '30', strokeStyle: green + '50', lineWidth: 1, pointStyle: 'rectRounded' },
+                                { text: 'Gerealiseerd', fillStyle: green, strokeStyle: green, lineWidth: 0, pointStyle: 'rectRounded' },
+                                { text: 'Verwacht', fillStyle: green + '88', strokeStyle: green, lineWidth: 2, lineDash: [4,2], pointStyle: 'rectRounded' },
                             ];
                             {% if not current_month %}
                             if (hasUncat) {

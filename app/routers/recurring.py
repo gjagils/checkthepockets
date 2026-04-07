@@ -167,6 +167,7 @@ def sync_projected_transactions(user_id: int, year: int, month: int, db: Session
     For the given month:
     - Create projected Transaction placeholders for active recurring items with no real match.
     - Delete projected placeholders where a real transaction now exists.
+    - Skip months before the user's first real transaction (no data yet).
     """
     ref = date(year, month, 1)
 
@@ -184,6 +185,33 @@ def sync_projected_transactions(user_id: int, year: int, month: int, db: Session
         .first()
     )
     if not default_account:
+        return
+
+    # Find the first real transaction date — don't create projections before this
+    first_tx = (
+        db.query(func.min(Transaction.date))
+        .join(Account)
+        .filter(Account.user_id == user_id, Transaction.is_projected == 0)
+        .scalar()
+    )
+    # If no transactions at all, or this month is before the first transaction month: skip
+    if first_tx and date(year, month, calendar.monthrange(year, month)[1]) < date(first_tx.year, first_tx.month, 1):
+        # Clean up any stale projections for months before first data
+        stale_projected = (
+            db.query(Transaction)
+            .join(Account)
+            .filter(
+                Account.user_id == user_id,
+                Transaction.is_projected == 1,
+                func.extract("year", Transaction.date) == year,
+                func.extract("month", Transaction.date) == month,
+            )
+            .all()
+        )
+        for sp in stale_projected:
+            db.delete(sp)
+        if stale_projected:
+            db.commit()
         return
 
     changed = False
@@ -394,6 +422,14 @@ def _render_recurring_page(
         .all()
     )
 
+    # Find earliest real transaction — don't flag "missed" before this date
+    first_tx_date = (
+        db.query(func.min(Transaction.date))
+        .join(Account)
+        .filter(Account.user_id == user.id, Transaction.is_projected == 0)
+        .scalar()
+    )
+
     items_active = []
     items_due = []
     items_missed = []
@@ -416,6 +452,9 @@ def _render_recurring_page(
         prev_start, prev_end = _get_previous_period_range(item.frequency, today)
         prev_match = _find_matching_transaction(db, user.id, item, prev_start, prev_end)
 
+        # If previous period is before first transaction, treat as "not missed"
+        prev_before_data = first_tx_date and prev_end < first_tx_date
+
         entry = {
             "item": item, "period_start": cur_start, "period_end": cur_end,
             "matched_transaction": cur_match,
@@ -426,7 +465,7 @@ def _render_recurring_page(
 
         if cur_match:
             items_active.append(entry)
-        elif prev_match is None:
+        elif prev_match is None and not prev_before_data:
             items_missed.append(entry)
         else:
             items_due.append(entry)

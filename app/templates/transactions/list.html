@@ -234,6 +234,28 @@
                                 </span>
                                 {% endif %}
                                 <span class="tx-panel-footer-sep">·</span>
+                                {% if tx.recurring_id %}
+                                <form method="post" action="/transactions/{{ tx.id }}/link-recurring" style="display:inline;">
+                                    <input type="hidden" name="redirect_to" value="/transactions?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}">
+                                    <input type="hidden" name="recurring_id" value="0">
+                                    <button type="submit" class="tx-panel-footer-btn">🔄 Ontkoppel terugkerend</button>
+                                </form>
+                                {% else %}
+                                <button type="button" class="tx-panel-footer-btn"
+                                        onclick="document.getElementById('rc-{{ tx.id }}').style.display='inline-flex'">🔄 Koppel terugkerend</button>
+                                <span id="rc-{{ tx.id }}" style="display:none; gap:0.3rem; align-items:center; margin-left:0.3rem;">
+                                    <form method="post" action="/transactions/{{ tx.id }}/link-recurring" style="display:inline-flex; gap:0.3rem; align-items:center;">
+                                        <input type="hidden" name="redirect_to" value="/transactions?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}">
+                                        <select name="recurring_id" style="padding:0.2rem 0.4rem; font-size:0.8rem; max-width:200px;">
+                                            {% for ri in recurring_items %}
+                                            <option value="{{ ri.id }}">{{ ri.name }} (€{{ ri.amount_expected|euro }})</option>
+                                            {% endfor %}
+                                        </select>
+                                        <button type="submit" class="btn btn-sm btn-accent">OK</button>
+                                    </form>
+                                </span>
+                                {% endif %}
+                                <span class="tx-panel-footer-sep">·</span>
                                 <form method="post" action="/transactions/{{ tx.id }}/exclude" style="display:inline;">
                                     <input type="hidden" name="redirect_to" value="/transactions?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}">
                                     <button type="submit" class="tx-panel-footer-btn tx-panel-footer-danger" onclick="return confirm('Transactie uitsluiten?')">Uitsluiten</button>

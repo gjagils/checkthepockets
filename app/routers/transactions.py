@@ -385,6 +385,14 @@ def transaction_list(
         else:
             cats_by_account[aid]["children"].setdefault(c.parent_id, []).append(c)
 
+    # Active recurring items for linking
+    recurring_items = (
+        db.query(RecurringTransaction)
+        .filter(RecurringTransaction.user_id == user.id, RecurringTransaction.is_active == 1)
+        .order_by(RecurringTransaction.name)
+        .all()
+    )
+
     return templates.TemplateResponse(
         "transactions/list.html",
         {
@@ -394,6 +402,7 @@ def transaction_list(
             "accounts": accounts,
             "categories": categories,
             "tags": tags,
+            "recurring_items": recurring_items,
             "current_account_id": account_id,
             "current_category_id": category_id,
             "current_tag_id": tag_id,
@@ -470,6 +479,42 @@ def exclude_transaction(
     tx.is_excluded = 1 if not tx.is_excluded else 0
     db.commit()
 
+    return RedirectResponse(redirect_to, status_code=302)
+
+
+@router.post("/transactions/{transaction_id}/link-recurring")
+def link_recurring(
+    request: Request,
+    transaction_id: int,
+    recurring_id: int = Form(0),
+    redirect_to: str = Form("/transactions"),
+    db: Session = Depends(get_db),
+):
+    """Link or unlink a transaction to/from a recurring item."""
+    user = require_login(request, db)
+
+    tx = (
+        db.query(Transaction)
+        .join(Account)
+        .filter(Transaction.id == transaction_id, Account.user_id == user.id)
+        .first()
+    )
+    if not tx:
+        return RedirectResponse(redirect_to, status_code=302)
+
+    if recurring_id:
+        # Verify recurring item belongs to user
+        item = db.query(RecurringTransaction).filter(
+            RecurringTransaction.id == recurring_id,
+            RecurringTransaction.user_id == user.id,
+        ).first()
+        if item:
+            tx.recurring_id = item.id
+    else:
+        # Unlink
+        tx.recurring_id = None
+
+    db.commit()
     return RedirectResponse(redirect_to, status_code=302)
 
 
