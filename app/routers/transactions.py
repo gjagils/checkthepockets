@@ -490,7 +490,10 @@ def link_recurring(
     redirect_to: str = Form("/transactions"),
     db: Session = Depends(get_db),
 ):
-    """Link or unlink a transaction to/from a recurring item."""
+    """Link or unlink a transaction to/from a recurring item.
+    When linking, learn from the transaction's description and try to
+    auto-match similar transactions in other months.
+    """
     user = require_login(request, db)
 
     tx = (
@@ -510,12 +513,106 @@ def link_recurring(
         ).first()
         if item:
             tx.recurring_id = item.id
+            db.flush()
+            # Learn from this link and auto-match other months
+            _auto_match_from_linked_transaction(db, user.id, item, tx)
     else:
         # Unlink
         tx.recurring_id = None
 
     db.commit()
     return RedirectResponse(redirect_to, status_code=302)
+
+
+def _auto_match_from_linked_transaction(
+    db: Session, user_id: int, item: RecurringTransaction, linked_tx: Transaction
+):
+    """After a manual link, learn from the transaction's description/counterparty
+    and try to auto-match unlinked transactions in other months.
+    Description is more important than amount (amounts can vary due to promotions).
+    """
+    from sqlalchemy import or_, func, extract
+
+    # Build search terms from the linked transaction
+    search_terms = []
+    desc = (linked_tx.description or "").strip()
+    cp = (linked_tx.counterparty or "").strip()
+
+    # Extract meaningful keywords from description
+    # For bank descriptions like "SEPA .../NAME/Simpel/REMI/Hannah..."
+    # we want to find the most distinctive parts
+    if desc:
+        # Try to find the best substring to match on
+        # Look for recurring item name parts in the description
+        item_words = item.name.lower().split()
+        desc_lower = desc.lower()
+
+        # Find which words from the item name appear in the description
+        matching_words = [w for w in item_words if len(w) > 2 and w in desc_lower]
+
+        if matching_words:
+            # Use ALL matching words as AND conditions
+            for word in matching_words:
+                search_terms.append(Transaction.description.ilike(f"%{word}%"))
+        elif cp:
+            # Fallback: use counterparty
+            search_terms.append(Transaction.counterparty.ilike(f"%{cp}%"))
+        else:
+            # Last resort: use first 30 meaningful chars of description
+            snippet = desc[:30].strip()
+            if len(snippet) > 5:
+                search_terms.append(Transaction.description.ilike(f"%{snippet}%"))
+
+    elif cp:
+        search_terms.append(Transaction.counterparty.ilike(f"%{cp}%"))
+
+    if not search_terms:
+        return
+
+    # Also update the recurring item's description_match if empty
+    if not item.description_match and desc:
+        # Use the most specific matching word(s)
+        item_words = item.name.lower().split()
+        desc_lower = desc.lower()
+        matching = [w for w in item_words if len(w) > 2 and w in desc_lower]
+        if matching:
+            item.description_match = " ".join(matching)
+
+    # Find all unlinked transactions that match this pattern
+    candidates = (
+        db.query(Transaction)
+        .join(Account)
+        .filter(
+            Account.user_id == user_id,
+            Transaction.is_excluded == 0,
+            Transaction.is_projected == 0,
+            Transaction.recurring_id.is_(None),
+            Transaction.id != linked_tx.id,
+            *search_terms,
+        )
+        .order_by(Transaction.date)
+        .all()
+    )
+
+    # Group candidates by year-month and link one per period (if no existing match)
+    from app.routers.recurring import _get_period_range, _find_matching_transaction
+
+    linked_count = 0
+    for candidate in candidates:
+        period_start, period_end = _get_period_range(
+            item.frequency, candidate.date
+        )
+        # Check if this period already has a match
+        existing = _find_matching_transaction(db, user_id, item, period_start, period_end)
+        if existing:
+            continue
+
+        # Same sign (both income or both expense)?
+        if (candidate.amount > 0) != (linked_tx.amount > 0):
+            continue
+
+        candidate.recurring_id = item.id
+        linked_count += 1
 
 
 @router.post("/transactions/{transaction_id}/reviewed")
