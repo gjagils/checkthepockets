@@ -301,7 +301,10 @@ function initChart() {
             },
             scales: {
                 x: {
-                    ticks: { color: getCSS('--muted') || '#888', font: { family: fontFamily } },
+                    ticks: {
+                        color: getCSS('--sky') || '#40C4FF',
+                        font: { family: fontFamily, weight: 600 },
+                    },
                     grid: { display: false },
                 },
                 y: {
