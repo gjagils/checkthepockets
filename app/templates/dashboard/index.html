@@ -72,8 +72,10 @@
                         {% if row.expense_actual %}&euro;&nbsp;{{ row.expense_actual|euro }}{% else %}<span class="muted">&mdash;</span>{% endif %}
                     </td>
                     <td class="text-right nowrap">
-                        {% if row.uncategorized %}
-                        <a href="/transactions?year={{ current_year }}&month={{ row.key if not current_month else current_month }}&uncategorized=1" class="amount-negative" style="font-weight:600;">{{ row.uncategorized }}</a>
+                        {% if row.uncat_count %}
+                        <a href="/transactions?year={{ current_year }}&month={{ row.key if not current_month else current_month }}&uncategorized=1" class="amount-negative" style="font-weight:600;">
+                            &euro;&nbsp;{{ row.uncat_amount|euro }} <span class="muted" style="font-weight:400;">({{ row.uncat_count }})</span>
+                        </a>
                         {% else %}<span class="muted">&mdash;</span>{% endif %}
                     </td>
                 </tr>
@@ -81,7 +83,7 @@
                 {% set ns.tot_ia = ns.tot_ia + (row.income_actual|float) %}
                 {% set ns.tot_eb = ns.tot_eb + (row.expense_budget|float) %}
                 {% set ns.tot_ea = ns.tot_ea + (row.expense_actual|float) %}
-                {% set ns.tot_uc = ns.tot_uc + row.uncategorized %}
+                {% set ns.tot_uc = ns.tot_uc + (row.uncat_amount|float) %}
                 {% endfor %}
             </tbody>
             <tfoot>
@@ -91,7 +93,7 @@
                     <td class="text-right nowrap amount-positive">&euro;&nbsp;{{ "%.2f"|format(ns.tot_ia)|replace(".", ",") }}</td>
                     <td class="text-right nowrap">&euro;&nbsp;{{ "%.2f"|format(ns.tot_eb)|replace(".", ",") }}</td>
                     <td class="text-right nowrap {% if ns.tot_ea > ns.tot_eb %}amount-negative{% else %}amount-positive{% endif %}">&euro;&nbsp;{{ "%.2f"|format(ns.tot_ea)|replace(".", ",") }}</td>
-                    <td class="text-right nowrap">{% if ns.tot_uc %}<span class="amount-negative" style="font-weight:700;">{{ ns.tot_uc }}</span>{% else %}&mdash;{% endif %}</td>
+                    <td class="text-right nowrap">{% if ns.tot_uc %}<span class="amount-negative" style="font-weight:700;">&euro;&nbsp;{{ "%.2f"|format(ns.tot_uc)|replace(".", ",") }}</span>{% else %}&mdash;{% endif %}</td>
                 </tr>
             </tfoot>
         </table>
@@ -147,15 +149,21 @@ function initChart() {
     var green = getCSS('--green') || '#22c55e';
     var red = getCSS('--red') || '#ef4444';
     var muted = getCSS('--muted') || '#888';
+    var fontFamily = "'Plus Jakarta Sans', sans-serif";
 
+    // 3 groups: Inkomen (green), Uitgaven (red), Niet gecategoriseerd (gray)
+    // Budget = wide bar (light), Werkelijk = narrower bar (dark) overlaid
     var datasets = [
         {
             label: 'Inkomen budget',
             data: overviewData.map(function(r) { return r.income_budget; }),
             backgroundColor: green + '44',
-            borderColor: green + '88',
+            borderColor: green + '66',
             borderWidth: 1,
-            borderRadius: 3,
+            borderRadius: 4,
+            barPercentage: 0.85,
+            categoryPercentage: 0.8,
+            stack: 'inkomen',
             order: 2,
         },
         {
@@ -165,15 +173,21 @@ function initChart() {
             borderColor: green,
             borderWidth: 0,
             borderRadius: 3,
+            barPercentage: 0.55,
+            categoryPercentage: 0.8,
+            stack: 'inkomen',
             order: 1,
         },
         {
             label: 'Uitgaven budget',
             data: overviewData.map(function(r) { return r.expense_budget; }),
             backgroundColor: red + '44',
-            borderColor: red + '88',
+            borderColor: red + '66',
             borderWidth: 1,
-            borderRadius: 3,
+            borderRadius: 4,
+            barPercentage: 0.85,
+            categoryPercentage: 0.8,
+            stack: 'uitgaven',
             order: 2,
         },
         {
@@ -183,26 +197,24 @@ function initChart() {
             borderColor: red,
             borderWidth: 0,
             borderRadius: 3,
+            barPercentage: 0.55,
+            categoryPercentage: 0.8,
+            stack: 'uitgaven',
             order: 1,
         },
-    ];
-
-    // Add uncategorized as points if any exist
-    var hasUncat = overviewData.some(function(r) { return r.uncategorized > 0; });
-    if (hasUncat) {
-        datasets.push({
+        {
             label: 'Niet gecategoriseerd',
-            data: overviewData.map(function(r) { return r.uncategorized || null; }),
-            type: 'line',
-            borderColor: muted,
-            backgroundColor: muted,
-            pointRadius: 5,
-            pointStyle: 'circle',
-            showLine: false,
-            yAxisID: 'y2',
-            order: 0,
-        });
-    }
+            data: overviewData.map(function(r) { return r.uncat_amount || 0; }),
+            backgroundColor: muted + '66',
+            borderColor: muted + '88',
+            borderWidth: 1,
+            borderRadius: 4,
+            barPercentage: 0.85,
+            categoryPercentage: 0.8,
+            stack: 'uncat',
+            order: 3,
+        },
+    ];
 
     window._chart = new Chart(ctx, {
         type: 'bar',
@@ -228,7 +240,7 @@ function initChart() {
                     position: 'top',
                     labels: {
                         color: getCSS('--text') || '#ccc',
-                        font: { size: 12, family: "'Plus Jakarta Sans', sans-serif" },
+                        font: { size: 12, family: fontFamily },
                         usePointStyle: true,
                         pointStyle: 'rectRounded',
                         padding: 16,
@@ -237,9 +249,6 @@ function initChart() {
                 tooltip: {
                     callbacks: {
                         label: function(context) {
-                            if (context.dataset.yAxisID === 'y2') {
-                                return context.dataset.label + ': ' + context.raw;
-                            }
                             return context.dataset.label + ': \u20AC ' +
                                 context.raw.toLocaleString('nl-NL', {minimumFractionDigits: 2, maximumFractionDigits: 2});
                         }
@@ -248,7 +257,7 @@ function initChart() {
             },
             scales: {
                 x: {
-                    ticks: { color: getCSS('--muted') || '#888', font: { family: "'Plus Jakarta Sans', sans-serif" } },
+                    ticks: { color: getCSS('--muted') || '#888', font: { family: fontFamily } },
                     grid: { display: false },
                 },
                 y: {
@@ -256,26 +265,9 @@ function initChart() {
                     ticks: {
                         color: getCSS('--muted') || '#888',
                         callback: function(v) { return '\u20AC ' + v.toLocaleString('nl-NL'); },
-                        font: { family: "'Plus Jakarta Sans', sans-serif" },
+                        font: { family: fontFamily },
                     },
                     grid: { color: (getCSS('--border') || '#333') + '44' },
-                },
-                y2: {
-                    display: hasUncat,
-                    position: 'right',
-                    beginAtZero: true,
-                    ticks: {
-                        color: getCSS('--muted') || '#888',
-                        stepSize: 1,
-                        font: { family: "'Plus Jakarta Sans', sans-serif" },
-                    },
-                    grid: { display: false },
-                    title: {
-                        display: hasUncat,
-                        text: 'Niet gecategoriseerd',
-                        color: getCSS('--muted') || '#888',
-                        font: { size: 11, family: "'Plus Jakarta Sans', sans-serif" },
-                    },
                 },
             },
         },

@@ -152,18 +152,22 @@ def _level1_yearly(request, db, user, current_year, years, base_tx_filter, today
         for row in actual_monthly
     }
 
-    # Uncategorized per month
+    # Uncategorized per month (count + amount)
     uncat_monthly = (
         db.query(
             func.extract("month", Transaction.date).label("month"),
             func.count(Transaction.id).label("count"),
+            func.sum(func.abs(Transaction.amount)).label("amount"),
         )
         .join(Account)
         .filter(*base_tx_filter, Transaction.category_id.is_(None))
         .group_by(func.extract("month", Transaction.date))
         .all()
     )
-    uncat_by_month = {int(row.month): row.count for row in uncat_monthly}
+    uncat_by_month = {
+        int(row.month): {"count": row.count, "amount": row.amount or Decimal("0")}
+        for row in uncat_monthly
+    }
 
     # Build rows
     overview_rows = []
@@ -178,7 +182,8 @@ def _level1_yearly(request, db, user, current_year, years, base_tx_filter, today
             "income_actual": ad.get("income", Decimal("0")),
             "expense_budget": bd.get("expense_budget", Decimal("0")),
             "expense_actual": ad.get("expenses", Decimal("0")),
-            "uncategorized": uncat_by_month.get(m, 0),
+            "uncat_count": uncat_by_month.get(m, {}).get("count", 0),
+            "uncat_amount": uncat_by_month.get(m, {}).get("amount", Decimal("0")),
             "is_current": (m == today.month and current_year == today.year),
         })
 
@@ -190,7 +195,8 @@ def _level1_yearly(request, db, user, current_year, years, base_tx_filter, today
             "income_actual": _decimal_to_float(r["income_actual"]),
             "expense_budget": _decimal_to_float(r["expense_budget"]),
             "expense_actual": _decimal_to_float(r["expense_actual"]),
-            "uncategorized": r["uncategorized"],
+            "uncat_count": r["uncat_count"],
+            "uncat_amount": _decimal_to_float(r["uncat_amount"]),
         }
         for r in overview_rows
     ])
@@ -270,13 +276,18 @@ def _level2_categories(request, db, user, current_year, month, years, base_tx_fi
         for row in cat_spending
     }
 
-    # Uncategorized count this month
-    uncat = (
-        db.query(func.count(Transaction.id).label("count"))
+    # Uncategorized count + amount this month
+    uncat_result = (
+        db.query(
+            func.count(Transaction.id).label("count"),
+            func.sum(func.abs(Transaction.amount)).label("amount"),
+        )
         .join(Account)
         .filter(*month_filter, Transaction.category_id.is_(None))
-        .scalar()
-    ) or 0
+        .first()
+    )
+    uncat_count = uncat_result.count or 0 if uncat_result else 0
+    uncat_amount = uncat_result.amount or Decimal("0") if uncat_result else Decimal("0")
 
     # Build rows per parent category (aggregate children)
     overview_rows = []
@@ -320,13 +331,14 @@ def _level2_categories(request, db, user, current_year, month, years, base_tx_fi
             "income_actual": income_actual,
             "expense_budget": expense_budget,
             "expense_actual": expense_actual,
-            "uncategorized": 0,
+            "uncat_count": 0,
+            "uncat_amount": Decimal("0"),
             "is_current": False,
             "color": parent.color,
         })
 
     # Add uncategorized row if any
-    if uncat > 0:
+    if uncat_count > 0:
         overview_rows.append({
             "label": "Niet gecategoriseerd",
             "key": -1,
@@ -335,7 +347,8 @@ def _level2_categories(request, db, user, current_year, month, years, base_tx_fi
             "income_actual": Decimal("0"),
             "expense_budget": Decimal("0"),
             "expense_actual": Decimal("0"),
-            "uncategorized": uncat,
+            "uncat_count": uncat_count,
+            "uncat_amount": uncat_amount,
             "is_current": False,
         })
 
@@ -347,7 +360,8 @@ def _level2_categories(request, db, user, current_year, month, years, base_tx_fi
             "income_actual": _decimal_to_float(r["income_actual"]),
             "expense_budget": _decimal_to_float(r["expense_budget"]),
             "expense_actual": _decimal_to_float(r["expense_actual"]),
-            "uncategorized": r["uncategorized"],
+            "uncat_count": r["uncat_count"],
+            "uncat_amount": _decimal_to_float(r["uncat_amount"]),
         }
         for r in overview_rows
     ])
@@ -463,7 +477,8 @@ def _level3_subcategories(request, db, user, current_year, month, category_id,
             "income_actual": income_actual,
             "expense_budget": expense_budget,
             "expense_actual": expense_actual,
-            "uncategorized": 0,
+            "uncat_count": 0,
+            "uncat_amount": Decimal("0"),
             "is_current": False,
             "color": cat.color,
         })
@@ -476,7 +491,8 @@ def _level3_subcategories(request, db, user, current_year, month, category_id,
             "income_actual": _decimal_to_float(r["income_actual"]),
             "expense_budget": _decimal_to_float(r["expense_budget"]),
             "expense_actual": _decimal_to_float(r["expense_actual"]),
-            "uncategorized": r["uncategorized"],
+            "uncat_count": r["uncat_count"],
+            "uncat_amount": _decimal_to_float(r["uncat_amount"]),
         }
         for r in overview_rows
     ])
