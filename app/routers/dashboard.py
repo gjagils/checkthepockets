@@ -175,19 +175,57 @@ def _level1_yearly(request, db, user, current_year, years, base_tx_filter, today
         for row in uncat_monthly
     }
 
+    # Expected (projected) income/expenses per month from unmatched recurring items
+    projected_monthly = (
+        db.query(
+            func.extract("month", Transaction.date).label("month"),
+            func.sum(
+                case(
+                    (Transaction.amount > 0, Transaction.amount),
+                    else_=Decimal("0"),
+                )
+            ).label("income"),
+            func.sum(
+                case(
+                    (Transaction.amount < 0, func.abs(Transaction.amount)),
+                    else_=Decimal("0"),
+                )
+            ).label("expenses"),
+        )
+        .join(Account)
+        .filter(
+            Account.user_id == user.id,
+            func.extract("year", Transaction.date) == current_year,
+            Transaction.is_projected == 1,
+            Transaction.is_excluded == 0,
+        )
+        .group_by(func.extract("month", Transaction.date))
+        .all()
+    )
+    projected_by_month = {
+        int(row.month): {
+            "income": row.income or Decimal("0"),
+            "expenses": row.expenses or Decimal("0"),
+        }
+        for row in projected_monthly
+    }
+
     # Build rows
     overview_rows = []
     for m in range(1, 13):
         bd = budget_by_month.get(m, {})
         ad = actual_by_month.get(m, {})
+        pd = projected_by_month.get(m, {})
         overview_rows.append({
             "label": MONTH_NAMES_NL[m],
             "key": m,
             "link": f"/dashboard?year={current_year}&month={m}",
             "income_budget": bd.get("income_budget", Decimal("0")),
             "income_actual": ad.get("income", Decimal("0")),
+            "income_expected": pd.get("income", Decimal("0")),
             "expense_budget": bd.get("expense_budget", Decimal("0")),
             "expense_actual": ad.get("expenses", Decimal("0")),
+            "expense_expected": pd.get("expenses", Decimal("0")),
             "uncat_count": uncat_by_month.get(m, {}).get("count", 0),
             "uncat_amount": uncat_by_month.get(m, {}).get("amount", Decimal("0")),
             "is_current": (m == today.month and current_year == today.year),
@@ -199,8 +237,10 @@ def _level1_yearly(request, db, user, current_year, years, base_tx_filter, today
             "label": r["label"],
             "income_budget": _decimal_to_float(r["income_budget"]),
             "income_actual": _decimal_to_float(r["income_actual"]),
+            "income_expected": _decimal_to_float(r.get("income_expected", Decimal("0"))),
             "expense_budget": _decimal_to_float(r["expense_budget"]),
             "expense_actual": _decimal_to_float(r["expense_actual"]),
+            "expense_expected": _decimal_to_float(r.get("expense_expected", Decimal("0"))),
             "uncat_count": r["uncat_count"],
             "uncat_amount": _decimal_to_float(r["uncat_amount"]),
         }
@@ -369,8 +409,10 @@ def _level2_categories(request, db, user, current_year, month, years, base_tx_fi
             "label": r["label"],
             "income_budget": _decimal_to_float(r["income_budget"]),
             "income_actual": _decimal_to_float(r["income_actual"]),
+            "income_expected": _decimal_to_float(r.get("income_expected", Decimal("0"))),
             "expense_budget": _decimal_to_float(r["expense_budget"]),
             "expense_actual": _decimal_to_float(r["expense_actual"]),
+            "expense_expected": _decimal_to_float(r.get("expense_expected", Decimal("0"))),
             "uncat_count": r["uncat_count"],
             "uncat_amount": _decimal_to_float(r["uncat_amount"]),
         }
@@ -500,8 +542,10 @@ def _level3_subcategories(request, db, user, current_year, month, category_id,
             "label": r["label"],
             "income_budget": _decimal_to_float(r["income_budget"]),
             "income_actual": _decimal_to_float(r["income_actual"]),
+            "income_expected": _decimal_to_float(r.get("income_expected", Decimal("0"))),
             "expense_budget": _decimal_to_float(r["expense_budget"]),
             "expense_actual": _decimal_to_float(r["expense_actual"]),
+            "expense_expected": _decimal_to_float(r.get("expense_expected", Decimal("0"))),
             "uncat_count": r["uncat_count"],
             "uncat_amount": _decimal_to_float(r["uncat_amount"]),
         }

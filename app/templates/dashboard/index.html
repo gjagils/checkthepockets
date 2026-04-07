@@ -153,51 +153,47 @@ function initChart() {
     var muted = getCSS('--muted') || '#888';
     var fontFamily = "'Plus Jakarta Sans', sans-serif";
 
-    // Plugin: draw budget bars as wide background rectangles behind the actual bars
-    // This way budget is ALWAYS fully visible, whether actual is higher or lower
+    // Plugin: draw budget bars as wide background rectangles behind the stacked bars
+    // Budget is always fully visible whether actual+expected is higher or lower
     var budgetBgPlugin = {
         id: 'budgetBg',
         beforeDatasetsDraw: function(chart) {
             var c = chart.ctx;
             var yScale = chart.scales.y;
             var bottom = yScale.getPixelForValue(0);
-            var r = 4; // border radius
+            var r = 4;
 
-            // dataset 0 = inkomen actual, dataset 1 = uitgaven actual, dataset 2 = uncat
+            // dataset 0 = inkomen gerealiseerd, 2 = uitgaven gerealiseerd
             var metaInk = chart.getDatasetMeta(0);
-            var metaUitg = chart.getDatasetMeta(1);
+            var metaUitg = chart.getDatasetMeta(2);
 
             overviewData.forEach(function(d, i) {
-                // Inkomen budget background (wide, light green)
+                // Inkomen budget background
                 if (d.income_budget > 0 && metaInk.data[i]) {
                     var bar = metaInk.data[i];
                     var top = yScale.getPixelForValue(d.income_budget);
-                    var w = bar.width * 1.5;
-                    var x = bar.x - w / 2;
-                    var h = bottom - top;
+                    var w = bar.width * 1.6;
                     c.save();
-                    c.fillStyle = green + '35';
-                    c.strokeStyle = green + '55';
+                    c.fillStyle = green + '30';
+                    c.strokeStyle = green + '50';
                     c.lineWidth = 1;
                     c.beginPath();
-                    c.roundRect(x, top, w, h, r);
+                    c.roundRect(bar.x - w / 2, top, w, bottom - top, r);
                     c.fill();
                     c.stroke();
                     c.restore();
                 }
-                // Uitgaven budget background (wide, light red)
+                // Uitgaven budget background
                 if (d.expense_budget > 0 && metaUitg.data[i]) {
                     var bar = metaUitg.data[i];
                     var top = yScale.getPixelForValue(d.expense_budget);
-                    var w = bar.width * 1.5;
-                    var x = bar.x - w / 2;
-                    var h = bottom - top;
+                    var w = bar.width * 1.6;
                     c.save();
-                    c.fillStyle = red + '35';
-                    c.strokeStyle = red + '55';
+                    c.fillStyle = red + '30';
+                    c.strokeStyle = red + '50';
                     c.lineWidth = 1;
                     c.beginPath();
-                    c.roundRect(x, top, w, h, r);
+                    c.roundRect(bar.x - w / 2, top, w, bottom - top, r);
                     c.fill();
                     c.stroke();
                     c.restore();
@@ -206,27 +202,51 @@ function initChart() {
         }
     };
 
-    // Datasets: inkomen actual + uitgaven actual (always), niet-gecat only on year level
+    // Stacked bars: gerealiseerd (donker) + verwacht (lichter) per groep
+    // Income: stack 'inkomen', Expenses: stack 'uitgaven'
     var datasets = [
         {
-            label: 'Inkomen werkelijk',
+            label: 'Inkomen gerealiseerd',
             data: overviewData.map(function(r) { return r.income_actual; }),
             backgroundColor: green,
-            borderRadius: 3,
+            stack: 'inkomen',
+            borderRadius: 0,
             barPercentage: 0.6,
             categoryPercentage: 0.7,
+            order: 1,
         },
         {
-            label: 'Uitgaven werkelijk',
-            data: overviewData.map(function(r) { return r.expense_actual; }),
-            backgroundColor: red,
+            label: 'Inkomen verwacht',
+            data: overviewData.map(function(r) { return r.income_expected; }),
+            backgroundColor: green + '66',
+            stack: 'inkomen',
             borderRadius: 3,
             barPercentage: 0.6,
             categoryPercentage: 0.7,
+            order: 1,
+        },
+        {
+            label: 'Uitgaven gerealiseerd',
+            data: overviewData.map(function(r) { return r.expense_actual; }),
+            backgroundColor: red,
+            stack: 'uitgaven',
+            borderRadius: 0,
+            barPercentage: 0.6,
+            categoryPercentage: 0.7,
+            order: 1,
+        },
+        {
+            label: 'Uitgaven verwacht',
+            data: overviewData.map(function(r) { return r.expense_expected; }),
+            backgroundColor: red + '66',
+            stack: 'uitgaven',
+            borderRadius: 3,
+            barPercentage: 0.6,
+            categoryPercentage: 0.7,
+            order: 1,
         },
     ];
     {% if not current_month %}
-    // Only show uncategorized on year level
     var hasUncat = overviewData.some(function(r) { return r.uncat_amount > 0; });
     if (hasUncat) {
         datasets.push({
@@ -238,6 +258,7 @@ function initChart() {
             borderRadius: 4,
             barPercentage: 0.6,
             categoryPercentage: 0.7,
+            order: 2,
         });
     }
     {% endif %}
@@ -292,9 +313,11 @@ function initChart() {
                         generateLabels: function(chart) {
                             var items = [
                                 { text: 'Inkomen budget', fillStyle: green + '35', strokeStyle: green + '55', lineWidth: 1, pointStyle: 'rectRounded' },
-                                { text: 'Inkomen werkelijk', fillStyle: green, strokeStyle: green, lineWidth: 0, pointStyle: 'rectRounded' },
+                                { text: 'Inkomen gerealiseerd', fillStyle: green, strokeStyle: green, lineWidth: 0, pointStyle: 'rectRounded' },
+                                { text: 'Inkomen verwacht', fillStyle: green + '66', strokeStyle: green + '66', lineWidth: 0, pointStyle: 'rectRounded' },
                                 { text: 'Uitgaven budget', fillStyle: red + '35', strokeStyle: red + '55', lineWidth: 1, pointStyle: 'rectRounded' },
-                                { text: 'Uitgaven werkelijk', fillStyle: red, strokeStyle: red, lineWidth: 0, pointStyle: 'rectRounded' },
+                                { text: 'Uitgaven gerealiseerd', fillStyle: red, strokeStyle: red, lineWidth: 0, pointStyle: 'rectRounded' },
+                                { text: 'Uitgaven verwacht', fillStyle: red + '66', strokeStyle: red + '66', lineWidth: 0, pointStyle: 'rectRounded' },
                             ];
                             {% if not current_month %}
                             if (hasUncat) {
@@ -328,6 +351,7 @@ function initChart() {
             },
             scales: {
                 x: {
+                    stacked: true,
                     ticks: {
                         color: getCSS('--sky') || '#40C4FF',
                         font: { family: fontFamily, weight: 600 },
@@ -335,6 +359,7 @@ function initChart() {
                     grid: { display: false },
                 },
                 y: {
+                    stacked: true,
                     beginAtZero: true,
                     ticks: {
                         color: getCSS('--muted') || '#888',
