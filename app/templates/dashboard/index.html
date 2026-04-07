@@ -213,16 +213,16 @@ function initChart() {
             data: overviewData.map(function(r) { return r.income_actual; }),
             backgroundColor: green,
             borderRadius: 3,
-            barPercentage: 0.7,
-            categoryPercentage: 0.8,
+            barPercentage: 0.6,
+            categoryPercentage: 0.7,
         },
         {
             label: 'Uitgaven werkelijk',
             data: overviewData.map(function(r) { return r.expense_actual; }),
             backgroundColor: red,
             borderRadius: 3,
-            barPercentage: 0.7,
-            categoryPercentage: 0.8,
+            barPercentage: 0.6,
+            categoryPercentage: 0.7,
         },
     ];
     {% if not current_month %}
@@ -236,8 +236,8 @@ function initChart() {
             borderColor: muted + '77',
             borderWidth: 1,
             borderRadius: 4,
-            barPercentage: 0.7,
-            categoryPercentage: 0.8,
+            barPercentage: 0.6,
+            categoryPercentage: 0.7,
         });
     }
     {% endif %}
@@ -253,22 +253,29 @@ function initChart() {
                 mode: 'index',
                 intersect: false,
             },
-            onHover: function(evt) {
-                // Show pointer cursor only in the label area
-                var canvas = evt.native ? evt.native.target : evt.chart.canvas;
-                var yScale = window._chart.scales.y;
-                canvas.style.cursor = (evt.y > yScale.bottom) ? 'pointer' : 'default';
+            onHover: function(evt, elements, chart) {
+                var rect = chart.canvas.getBoundingClientRect();
+                var y = evt.native ? evt.native.clientY - rect.top : evt.y;
+                chart.canvas.style.cursor = (y > chart.scales.y.bottom) ? 'pointer' : 'default';
             },
-            onClick: function(evt) {
-                // Only navigate when clicking on the x-axis label area (below the chart)
-                var yScale = window._chart.scales.y;
-                if (evt.y <= yScale.bottom) return;
-                var xScale = window._chart.scales.x;
-                var idx = xScale.getValueForPixel(evt.x);
-                if (idx >= 0 && idx < labels.length) {
-                    var label = labels[idx];
-                    if (drillLinks[label]) {
-                        window.location.href = drillLinks[label];
+            onClick: function(evt, elements, chart) {
+                // Get native mouse position relative to canvas
+                var rect = chart.canvas.getBoundingClientRect();
+                var nativeX = evt.native ? evt.native.clientX - rect.left : evt.x;
+                var nativeY = evt.native ? evt.native.clientY - rect.top : evt.y;
+                // Only act on label area clicks (below the plot area)
+                if (nativeY <= chart.scales.y.bottom) return;
+                // Find which label was clicked
+                var xScale = chart.scales.x;
+                for (var i = 0; i < labels.length; i++) {
+                    var px = xScale.getPixelForValue(i);
+                    var halfStep = (xScale.width / labels.length) / 2;
+                    if (nativeX >= px - halfStep && nativeX <= px + halfStep) {
+                        var label = labels[i];
+                        if (drillLinks[label]) {
+                            window.location.href = drillLinks[label];
+                            return;
+                        }
                     }
                 }
             },

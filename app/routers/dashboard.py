@@ -58,6 +58,7 @@ def dashboard(
         Account.user_id == user.id,
         func.extract("year", Transaction.date) == current_year,
         Transaction.is_excluded == 0,
+        Transaction.is_projected == 0,
         Transaction.transfer_id.is_(None),
     ]
 
