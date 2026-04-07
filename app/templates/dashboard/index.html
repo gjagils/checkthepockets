@@ -47,7 +47,7 @@
                     <th class="text-right">Ink. werkelijk</th>
                     <th class="text-right">Uitg. budget</th>
                     <th class="text-right">Uitg. werkelijk</th>
-                    <th class="text-right">Niet gecat.</th>
+                    {% if not current_month %}<th class="text-right">Niet gecat.</th>{% endif %}
                 </tr>
             </thead>
             <tbody>
@@ -71,19 +71,21 @@
                     <td class="text-right nowrap {% if row.expense_actual > row.expense_budget and row.expense_budget %}amount-negative{% elif row.expense_actual %}amount-positive{% endif %}">
                         {% if row.expense_actual %}&euro;&nbsp;{{ row.expense_actual|euro }}{% else %}<span class="muted">&mdash;</span>{% endif %}
                     </td>
+                    {% if not current_month %}
                     <td class="text-right nowrap">
                         {% if row.uncat_count %}
-                        <a href="/transactions?year={{ current_year }}&month={{ row.key if not current_month else current_month }}&uncategorized=1" class="amount-negative" style="font-weight:600;">
+                        <a href="/transactions?year={{ current_year }}&month={{ row.key }}&uncategorized=1" class="amount-negative" style="font-weight:600;">
                             &euro;&nbsp;{{ row.uncat_amount|euro }} <span class="muted" style="font-weight:400;">({{ row.uncat_count }})</span>
                         </a>
                         {% else %}<span class="muted">&mdash;</span>{% endif %}
                     </td>
+                    {% endif %}
                 </tr>
                 {% set ns.tot_ib = ns.tot_ib + (row.income_budget|float) %}
                 {% set ns.tot_ia = ns.tot_ia + (row.income_actual|float) %}
                 {% set ns.tot_eb = ns.tot_eb + (row.expense_budget|float) %}
                 {% set ns.tot_ea = ns.tot_ea + (row.expense_actual|float) %}
-                {% set ns.tot_uc = ns.tot_uc + (row.uncat_amount|float) %}
+                {% if not current_month %}{% set ns.tot_uc = ns.tot_uc + (row.uncat_amount|float) %}{% endif %}
                 {% endfor %}
             </tbody>
             <tfoot>
@@ -93,7 +95,7 @@
                     <td class="text-right nowrap amount-positive">&euro;&nbsp;{{ "%.2f"|format(ns.tot_ia)|replace(".", ",") }}</td>
                     <td class="text-right nowrap">&euro;&nbsp;{{ "%.2f"|format(ns.tot_eb)|replace(".", ",") }}</td>
                     <td class="text-right nowrap {% if ns.tot_ea > ns.tot_eb %}amount-negative{% else %}amount-positive{% endif %}">&euro;&nbsp;{{ "%.2f"|format(ns.tot_ea)|replace(".", ",") }}</td>
-                    <td class="text-right nowrap">{% if ns.tot_uc %}<span class="amount-negative" style="font-weight:700;">&euro;&nbsp;{{ "%.2f"|format(ns.tot_uc)|replace(".", ",") }}</span>{% else %}&mdash;{% endif %}</td>
+                    {% if not current_month %}<td class="text-right nowrap">{% if ns.tot_uc %}<span class="amount-negative" style="font-weight:700;">&euro;&nbsp;{{ "%.2f"|format(ns.tot_uc)|replace(".", ",") }}</span>{% else %}&mdash;{% endif %}</td>{% endif %}
                 </tr>
             </tfoot>
         </table>
@@ -103,7 +105,7 @@
 <!-- CHART VIEW -->
 <div id="view-grafiek" class="card" style="padding:1.25rem;">
     <div style="position:relative; height:420px;">
-        <canvas id="overviewChart" style="cursor:pointer;"></canvas>
+        <canvas id="overviewChart"></canvas>
     </div>
     {% if not current_month %}
     <p style="font-size:0.78rem; color:var(--muted); margin-top:0.75rem; margin-bottom:0;">
@@ -204,8 +206,7 @@ function initChart() {
         }
     };
 
-    // 3 real datasets: inkomen actual, uitgaven actual, niet gecategoriseerd
-    // Budget is drawn by the plugin as background rectangles
+    // Datasets: inkomen actual + uitgaven actual (always), niet-gecat only on year level
     var datasets = [
         {
             label: 'Inkomen werkelijk',
@@ -223,7 +224,12 @@ function initChart() {
             barPercentage: 0.7,
             categoryPercentage: 0.8,
         },
-        {
+    ];
+    {% if not current_month %}
+    // Only show uncategorized on year level
+    var hasUncat = overviewData.some(function(r) { return r.uncat_amount > 0; });
+    if (hasUncat) {
+        datasets.push({
             label: 'Niet gecategoriseerd',
             data: overviewData.map(function(r) { return r.uncat_amount || 0; }),
             backgroundColor: muted + '55',
@@ -232,8 +238,9 @@ function initChart() {
             borderRadius: 4,
             barPercentage: 0.7,
             categoryPercentage: 0.8,
-        },
-    ];
+        });
+    }
+    {% endif %}
 
     window._chart = new Chart(ctx, {
         type: 'bar',
@@ -246,8 +253,16 @@ function initChart() {
                 mode: 'index',
                 intersect: false,
             },
+            onHover: function(evt) {
+                // Show pointer cursor only in the label area
+                var canvas = evt.native ? evt.native.target : evt.chart.canvas;
+                var yScale = window._chart.scales.y;
+                canvas.style.cursor = (evt.y > yScale.bottom) ? 'pointer' : 'default';
+            },
             onClick: function(evt) {
-                // Get the label index from click position (works even on empty space)
+                // Only navigate when clicking on the x-axis label area (below the chart)
+                var yScale = window._chart.scales.y;
+                if (evt.y <= yScale.bottom) return;
                 var xScale = window._chart.scales.x;
                 var idx = xScale.getValueForPixel(evt.x);
                 if (idx >= 0 && idx < labels.length) {
@@ -268,13 +283,18 @@ function initChart() {
                         padding: 16,
                         // Add custom legend items for budget
                         generateLabels: function(chart) {
-                            return [
+                            var items = [
                                 { text: 'Inkomen budget', fillStyle: green + '35', strokeStyle: green + '55', lineWidth: 1, pointStyle: 'rectRounded' },
                                 { text: 'Inkomen werkelijk', fillStyle: green, strokeStyle: green, lineWidth: 0, pointStyle: 'rectRounded' },
                                 { text: 'Uitgaven budget', fillStyle: red + '35', strokeStyle: red + '55', lineWidth: 1, pointStyle: 'rectRounded' },
                                 { text: 'Uitgaven werkelijk', fillStyle: red, strokeStyle: red, lineWidth: 0, pointStyle: 'rectRounded' },
-                                { text: 'Niet gecategoriseerd', fillStyle: muted + '55', strokeStyle: muted + '77', lineWidth: 1, pointStyle: 'rectRounded' },
                             ];
+                            {% if not current_month %}
+                            if (hasUncat) {
+                                items.push({ text: 'Niet gecategoriseerd', fillStyle: muted + '55', strokeStyle: muted + '77', lineWidth: 1, pointStyle: 'rectRounded' });
+                            }
+                            {% endif %}
+                            return items;
                         },
                     },
                 },
