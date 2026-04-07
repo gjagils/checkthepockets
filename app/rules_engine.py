@@ -55,6 +55,7 @@ def apply_rule_to_transaction(rule: Rule, transaction: Transaction, db: Session)
 
     if rule.assign_category_id and transaction.category_id != rule.assign_category_id:
         transaction.category_id = rule.assign_category_id
+        transaction.is_reviewed = 1
         changed = True
 
     if rule.assign_tag_id:
@@ -69,7 +70,7 @@ def apply_rule_to_transaction(rule: Rule, transaction: Transaction, db: Session)
             transaction.counterparty = new_name
             changed = True
 
-    if rule.action_set_reviewed and not transaction.is_reviewed:
+    if rule.action_set_reviewed and not transaction.is_reviewed and not rule.assign_category_id:
         transaction.is_reviewed = 1
         changed = True
 

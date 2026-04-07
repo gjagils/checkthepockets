@@ -438,6 +438,7 @@ def set_category(
         return RedirectResponse(redirect_to, status_code=302)
 
     tx.category_id = category_id if category_id else None
+    tx.is_reviewed = 1 if tx.category_id else 0
     db.commit()
 
     # Suggest creating a rule if a category was assigned and tx has a counterparty
@@ -559,6 +560,7 @@ async def edit_transaction(
     transaction.counterparty = (form.get("counterparty") or "").strip() or None
     cat_id = (form.get("category_id") or "").strip()
     transaction.category_id = int(cat_id) if cat_id else None
+    transaction.is_reviewed = 1 if transaction.category_id else 0
 
     # Handle tags
     tag_ids = form.getlist("tag_ids")
@@ -760,6 +762,7 @@ async def bulk_action(request: Request, db: Session = Depends(get_db)):
         cat_id = int(category_id_raw) if category_id_raw.strip() else None
         for tx in transactions:
             tx.category_id = cat_id
+            tx.is_reviewed = 1 if cat_id else 0
 
     elif action == "tag":
         tg_id = int(tag_id_raw) if tag_id_raw.strip() else None

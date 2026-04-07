@@ -293,7 +293,7 @@ async def accept_rule_suggestion(
         match_value=match_value,
         assign_category_id=category_id,
         action_rename_counterparty=counterparty_clean or None,
-        action_set_reviewed=1,
+        action_set_reviewed=0,
     )
     db.add(rule)
     db.flush()
@@ -316,9 +316,9 @@ async def accept_rule_suggestion(
             continue
         if category_id:
             tx.category_id = category_id
+            tx.is_reviewed = 1
         if counterparty_clean:
             tx.counterparty = counterparty_clean
-        tx.is_reviewed = 1
         applied += 1
 
     # Delete the suggestion
