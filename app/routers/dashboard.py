@@ -152,12 +152,17 @@ def _level1_yearly(request, db, user, current_year, years, base_tx_filter, today
         for row in actual_monthly
     }
 
-    # Uncategorized per month (count + amount)
+    # Uncategorized per month (count + amount of expenses only)
     uncat_monthly = (
         db.query(
             func.extract("month", Transaction.date).label("month"),
             func.count(Transaction.id).label("count"),
-            func.sum(func.abs(Transaction.amount)).label("amount"),
+            func.sum(
+                case(
+                    (Transaction.amount < 0, func.abs(Transaction.amount)),
+                    else_=Decimal("0"),
+                )
+            ).label("amount"),
         )
         .join(Account)
         .filter(*base_tx_filter, Transaction.category_id.is_(None))
@@ -276,11 +281,16 @@ def _level2_categories(request, db, user, current_year, month, years, base_tx_fi
         for row in cat_spending
     }
 
-    # Uncategorized count + amount this month
+    # Uncategorized count + amount (expenses only) this month
     uncat_result = (
         db.query(
             func.count(Transaction.id).label("count"),
-            func.sum(func.abs(Transaction.amount)).label("amount"),
+            func.sum(
+                case(
+                    (Transaction.amount < 0, func.abs(Transaction.amount)),
+                    else_=Decimal("0"),
+                )
+            ).label("amount"),
         )
         .join(Account)
         .filter(*month_filter, Transaction.category_id.is_(None))
