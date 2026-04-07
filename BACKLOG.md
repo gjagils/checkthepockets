@@ -8,6 +8,25 @@ Sprints zijn gegroepeerd op gedeelde bestanden voor maximale efficiëntie per se
 
 ---
 
+## Sprint 19 — Dashboard grafiek & recurring koppeling (vervolg)
+*Openstaande punten uit sessie 2026-04-07. Dashboard jaaroverzicht is live maar heeft nog aandachtspunten.*
+
+**Dashboard grafiek:**
+- [ ] Klikken op maand in grafiek navigeert niet naar maandview (onClick werkt nog niet betrouwbaar)
+- [ ] Budget-achtergrond en gestapelde bars (gerealiseerd + verwacht) visueel finetunen
+- [ ] Maandview (level 2) en categorie-view (level 3) testen en finetunen
+
+**Recurring koppeling in transacties:**
+- [ ] Voorstel-banner bij koppelen testen (verschijnt na redirect met query params)
+- [ ] Bij "verwacht" transactie in maandview: koppelknop tonen + kandidaten voor andere maanden voorstellen
+- [ ] Auto-link na import testen met echte CSV data
+
+**Recurring verwachtingen:**
+- [ ] Eerste-transactiedatum logica testen (geen verwachtingen vóór eerste import)
+- [ ] Recurring pagina: "gemist" items correct filteren op basis van eerste transactie
+
+---
+
 ## Sprint 17 — Slimme regelanalyse (Claude API) ✅ (2026-04-07)
 
 - [x] `anthropic>=0.39.0` in `requirements.txt`
