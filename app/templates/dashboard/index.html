@@ -151,65 +151,78 @@ function initChart() {
     var muted = getCSS('--muted') || '#888';
     var fontFamily = "'Plus Jakarta Sans', sans-serif";
 
-    // 3 visual groups per label: Inkomen, Uitgaven, Niet gecategoriseerd
-    // Budget bars = wide + light (background), Werkelijk = narrow + dark (foreground)
-    // Trick: use xAxisID to create paired groups that overlap on the same position
-    // Budget bars render first (higher order = behind), actual bars on top (lower order = front)
+    // Plugin: draw budget bars as wide background rectangles behind the actual bars
+    // This way budget is ALWAYS fully visible, whether actual is higher or lower
+    var budgetBgPlugin = {
+        id: 'budgetBg',
+        beforeDatasetsDraw: function(chart) {
+            var c = chart.ctx;
+            var yScale = chart.scales.y;
+            var bottom = yScale.getPixelForValue(0);
+            var r = 4; // border radius
 
+            // dataset 0 = inkomen actual, dataset 1 = uitgaven actual, dataset 2 = uncat
+            var metaInk = chart.getDatasetMeta(0);
+            var metaUitg = chart.getDatasetMeta(1);
+
+            overviewData.forEach(function(d, i) {
+                // Inkomen budget background (wide, light green)
+                if (d.income_budget > 0 && metaInk.data[i]) {
+                    var bar = metaInk.data[i];
+                    var top = yScale.getPixelForValue(d.income_budget);
+                    var w = bar.width * 1.5;
+                    var x = bar.x - w / 2;
+                    var h = bottom - top;
+                    c.save();
+                    c.fillStyle = green + '35';
+                    c.strokeStyle = green + '55';
+                    c.lineWidth = 1;
+                    c.beginPath();
+                    c.roundRect(x, top, w, h, r);
+                    c.fill();
+                    c.stroke();
+                    c.restore();
+                }
+                // Uitgaven budget background (wide, light red)
+                if (d.expense_budget > 0 && metaUitg.data[i]) {
+                    var bar = metaUitg.data[i];
+                    var top = yScale.getPixelForValue(d.expense_budget);
+                    var w = bar.width * 1.5;
+                    var x = bar.x - w / 2;
+                    var h = bottom - top;
+                    c.save();
+                    c.fillStyle = red + '35';
+                    c.strokeStyle = red + '55';
+                    c.lineWidth = 1;
+                    c.beginPath();
+                    c.roundRect(x, top, w, h, r);
+                    c.fill();
+                    c.stroke();
+                    c.restore();
+                }
+            });
+        }
+    };
+
+    // 3 real datasets: inkomen actual, uitgaven actual, niet gecategoriseerd
+    // Budget is drawn by the plugin as background rectangles
     var datasets = [
-        // --- Inkomen: budget (wide, light, behind) ---
-        {
-            label: 'Inkomen budget',
-            data: overviewData.map(function(r) { return r.income_budget; }),
-            backgroundColor: green + '40',
-            borderColor: green + '66',
-            borderWidth: 1,
-            borderRadius: 4,
-            xAxisID: 'x',
-            barPercentage: 0.95,
-            categoryPercentage: 0.85,
-            order: 4,
-        },
-        // --- Inkomen: werkelijk (narrow, dark, in front) ---
         {
             label: 'Inkomen werkelijk',
             data: overviewData.map(function(r) { return r.income_actual; }),
             backgroundColor: green,
-            borderColor: green,
-            borderWidth: 0,
             borderRadius: 3,
-            xAxisID: 'x',
-            barPercentage: 0.55,
-            categoryPercentage: 0.85,
-            order: 1,
+            barPercentage: 0.7,
+            categoryPercentage: 0.8,
         },
-        // --- Uitgaven: budget (wide, light, behind) ---
-        {
-            label: 'Uitgaven budget',
-            data: overviewData.map(function(r) { return r.expense_budget; }),
-            backgroundColor: red + '40',
-            borderColor: red + '66',
-            borderWidth: 1,
-            borderRadius: 4,
-            xAxisID: 'x2',
-            barPercentage: 0.95,
-            categoryPercentage: 0.85,
-            order: 4,
-        },
-        // --- Uitgaven: werkelijk (narrow, dark, in front) ---
         {
             label: 'Uitgaven werkelijk',
             data: overviewData.map(function(r) { return r.expense_actual; }),
             backgroundColor: red,
-            borderColor: red,
-            borderWidth: 0,
             borderRadius: 3,
-            xAxisID: 'x2',
-            barPercentage: 0.55,
-            categoryPercentage: 0.85,
-            order: 1,
+            barPercentage: 0.7,
+            categoryPercentage: 0.8,
         },
-        // --- Niet gecategoriseerd (single bar) ---
         {
             label: 'Niet gecategoriseerd',
             data: overviewData.map(function(r) { return r.uncat_amount || 0; }),
@@ -217,16 +230,15 @@ function initChart() {
             borderColor: muted + '77',
             borderWidth: 1,
             borderRadius: 4,
-            xAxisID: 'x3',
-            barPercentage: 0.9,
-            categoryPercentage: 0.85,
-            order: 3,
+            barPercentage: 0.7,
+            categoryPercentage: 0.8,
         },
     ];
 
     window._chart = new Chart(ctx, {
         type: 'bar',
         data: { labels: labels, datasets: datasets },
+        plugins: [budgetBgPlugin],
         options: {
             responsive: true,
             maintainAspectRatio: false,
@@ -252,10 +264,32 @@ function initChart() {
                         usePointStyle: true,
                         pointStyle: 'rectRounded',
                         padding: 16,
+                        // Add custom legend items for budget
+                        generateLabels: function(chart) {
+                            return [
+                                { text: 'Inkomen budget', fillStyle: green + '35', strokeStyle: green + '55', lineWidth: 1, pointStyle: 'rectRounded' },
+                                { text: 'Inkomen werkelijk', fillStyle: green, strokeStyle: green, lineWidth: 0, pointStyle: 'rectRounded' },
+                                { text: 'Uitgaven budget', fillStyle: red + '35', strokeStyle: red + '55', lineWidth: 1, pointStyle: 'rectRounded' },
+                                { text: 'Uitgaven werkelijk', fillStyle: red, strokeStyle: red, lineWidth: 0, pointStyle: 'rectRounded' },
+                                { text: 'Niet gecategoriseerd', fillStyle: muted + '55', strokeStyle: muted + '77', lineWidth: 1, pointStyle: 'rectRounded' },
+                            ];
+                        },
                     },
                 },
                 tooltip: {
                     callbacks: {
+                        afterBody: function(tooltipItems) {
+                            var idx = tooltipItems[0].dataIndex;
+                            var d = overviewData[idx];
+                            var lines = [];
+                            if (d.income_budget > 0) {
+                                lines.push('Inkomen budget: \u20AC ' + d.income_budget.toLocaleString('nl-NL', {minimumFractionDigits: 2}));
+                            }
+                            if (d.expense_budget > 0) {
+                                lines.push('Uitgaven budget: \u20AC ' + d.expense_budget.toLocaleString('nl-NL', {minimumFractionDigits: 2}));
+                            }
+                            return lines;
+                        },
                         label: function(context) {
                             return context.dataset.label + ': \u20AC ' +
                                 context.raw.toLocaleString('nl-NL', {minimumFractionDigits: 2, maximumFractionDigits: 2});
@@ -265,23 +299,7 @@ function initChart() {
             },
             scales: {
                 x: {
-                    type: 'category',
-                    offset: true,
                     ticks: { color: getCSS('--muted') || '#888', font: { family: fontFamily } },
-                    grid: { display: false },
-                },
-                x2: {
-                    type: 'category',
-                    labels: labels,
-                    offset: true,
-                    display: false,
-                    grid: { display: false },
-                },
-                x3: {
-                    type: 'category',
-                    labels: labels,
-                    offset: true,
-                    display: false,
                     grid: { display: false },
                 },
                 y: {
