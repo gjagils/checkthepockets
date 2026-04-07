@@ -160,7 +160,7 @@
                     </td>
                     <td style="text-align:center;">
                         <form method="post" action="/transactions/{{ tx.id }}/reviewed" style="display:inline;">
-                            <input type="hidden" name="redirect_to" value="/?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}">
+                            <input type="hidden" name="redirect_to" value="/transactions?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}">
                             <button type="submit" class="btn-reviewed {% if tx.is_reviewed %}reviewed{% endif %}" title="{% if tx.is_reviewed %}Gecontroleerd{% else %}Markeer als gecontroleerd{% endif %}">✓</button>
                         </form>
                     </td>
@@ -170,7 +170,7 @@
                     <td class="nowrap">
                         {% set acct_cats = cats_by_account.get(tx.account_id, {"parents": [], "children": {}}) %}
                         <form method="post" action="/transactions/{{ tx.id }}/category" class="inline-cat-form">
-                            <input type="hidden" name="redirect_to" value="/?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}">
+                            <input type="hidden" name="redirect_to" value="/transactions?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}">
                             <select name="category_id" class="select-sm" onchange="this.form.submit()">
                                 <option value="0">-</option>
                                 {% for parent in acct_cats["parents"] %}
@@ -219,7 +219,7 @@
                                 <span class="tx-panel-footer-sep">·</span>
                                 {% if tx.transfer_id %}
                                 <form method="post" action="/transactions/{{ tx.id }}/unlink-transfer" style="display:inline;">
-                                    <input type="hidden" name="redirect_to" value="/?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}">
+                                    <input type="hidden" name="redirect_to" value="/transactions?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}">
                                     <button type="submit" class="tx-panel-footer-btn" onclick="return confirm('Transfer koppeling verwijderen?')">⇄ Transfer ontkoppelen</button>
                                 </form>
                                 {% else %}
@@ -227,7 +227,7 @@
                                         onclick="document.getElementById('tf2-{{ tx.id }}').style.display='inline-flex'">⇄ Koppel als transfer</button>
                                 <span id="tf2-{{ tx.id }}" style="display:none; gap:0.3rem; align-items:center; margin-left:0.3rem;">
                                     <form method="post" action="/transactions/{{ tx.id }}/link-transfer" style="display:inline-flex; gap:0.3rem; align-items:center;">
-                                        <input type="hidden" name="redirect_to" value="/?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}">
+                                        <input type="hidden" name="redirect_to" value="/transactions?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}">
                                         <input type="number" name="partner_id" placeholder="Transactie ID" style="width:110px; padding:0.2rem 0.4rem; font-size:0.8rem;">
                                         <button type="submit" class="btn btn-sm btn-accent">OK</button>
                                     </form>
@@ -235,7 +235,7 @@
                                 {% endif %}
                                 <span class="tx-panel-footer-sep">·</span>
                                 <form method="post" action="/transactions/{{ tx.id }}/exclude" style="display:inline;">
-                                    <input type="hidden" name="redirect_to" value="/?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}">
+                                    <input type="hidden" name="redirect_to" value="/transactions?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}">
                                     <button type="submit" class="tx-panel-footer-btn tx-panel-footer-danger" onclick="return confirm('Transactie uitsluiten?')">Uitsluiten</button>
                                 </form>
                             </div>
@@ -253,7 +253,7 @@
     <span class="bulk-count"><span id="bulkCount">0</span> geselecteerd</span>
     <div class="bulk-actions">
         <form id="bulkForm" method="post" action="/transactions/bulk">
-            <input type="hidden" name="redirect_to" value="/?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}">
+            <input type="hidden" name="redirect_to" value="/transactions?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}">
             <input type="hidden" name="action" id="bulkAction">
             <div id="bulkCatWrap" style="display:none; align-items:center; gap:0.4rem;">
                 <select name="bulk_category_id" id="bulkCatSelect" class="select-sm">
