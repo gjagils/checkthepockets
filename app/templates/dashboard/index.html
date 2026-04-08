@@ -104,29 +104,26 @@
 
 <!-- CHART VIEW -->
 <div id="view-grafiek" class="card" style="padding:1.25rem;">
-    <div style="position:relative; height:420px;">
+    <div style="height:420px;">
         <canvas id="overviewChart"></canvas>
-        <div id="chartOverlay" style="position:absolute; top:0; left:0; right:0; bottom:0; cursor:pointer; z-index:10;"></div>
     </div>
-    {% if not current_month %}
-    <p style="font-size:0.78rem; color:var(--muted); margin-top:0.75rem; margin-bottom:0;">
-        Klik op een maand om door te zoomen naar categorie&euml;n.
-    </p>
-    {% elif not current_category_id %}
-    <p style="font-size:0.78rem; color:var(--muted); margin-top:0.75rem; margin-bottom:0;">
-        Klik op een categorie om subcategorie&euml;n te zien.
-    </p>
+    {% if overview_rows %}
+    <div style="display:flex; justify-content:space-around; margin-top:0.5rem; flex-wrap:wrap; gap:0.25rem;">
+        {% for row in overview_rows %}
+        {% if row.link %}
+        <a href="{{ row.link }}" style="font-size:0.82rem; font-weight:600; color:var(--sky); padding:0.3rem 0.5rem; border-radius:4px; text-decoration:none; transition:background 0.15s;"
+           onmouseover="this.style.background='var(--sky-bg)'" onmouseout="this.style.background='transparent'">{{ row.label }}</a>
+        {% else %}
+        <span style="font-size:0.82rem; font-weight:600; color:var(--muted); padding:0.3rem 0.5rem;">{{ row.label }}</span>
+        {% endif %}
+        {% endfor %}
+    </div>
     {% endif %}
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script>
 var overviewData = {{ overview_json | safe }};
-var drillLinks = {
-    {% for row in overview_rows %}
-    {% if row.link %}"{{ row.label }}": "{{ row.link }}",{% endif %}
-    {% endfor %}
-};
 
 function switchView(view) {
     document.getElementById('view-tabel').style.display = view === 'tabel' ? '' : 'none';
@@ -330,10 +327,7 @@ function initChart() {
             scales: {
                 x: {
                     stacked: true,
-                    ticks: {
-                        color: getCSS('--sky') || '#40C4FF',
-                        font: { family: fontFamily, weight: 600 },
-                    },
+                    ticks: { display: false },
                     grid: { display: false },
                 },
                 y: {
@@ -350,41 +344,6 @@ function initChart() {
         },
     });
 
-    // Overlay click listener for drill-down navigation
-    // Uses a hidden <a> tag to force real navigation (not pushState)
-    var overlay = document.getElementById('chartOverlay');
-    var canvas = document.getElementById('overviewChart');
-    var navLink = document.createElement('a');
-    navLink.style.display = 'none';
-    document.body.appendChild(navLink);
-
-    overlay.addEventListener('click', function(e) {
-        var chart = window._chart;
-        if (!chart) return;
-        var rect = canvas.getBoundingClientRect();
-        var x = e.clientX - rect.left;
-        var xScale = chart.scales.x;
-
-        // Find nearest label
-        var bestIdx = -1;
-        var bestDist = Infinity;
-        for (var i = 0; i < labels.length; i++) {
-            var px = xScale.getPixelForValue(i);
-            var dist = Math.abs(x - px);
-            if (dist < bestDist) {
-                bestDist = dist;
-                bestIdx = i;
-            }
-        }
-        if (bestIdx >= 0 && bestDist < (xScale.width / labels.length)) {
-            var label = labels[bestIdx];
-            if (drillLinks[label]) {
-                navLink.href = drillLinks[label];
-                navLink.click();
-                return;
-            }
-        }
-    });
 }
 
 // Init on page load — default to grafiek
