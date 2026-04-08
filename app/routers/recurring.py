@@ -70,6 +70,14 @@ def _get_previous_period_range(frequency: str, ref_date: date) -> tuple[date, da
     return _get_period_range(frequency, prev_date)
 
 
+def link_transaction_to_recurring(tx: Transaction, item: RecurringTransaction):
+    """Link a transaction to a recurring item and apply category if missing."""
+    tx.recurring_id = item.id
+    if item.category_id and not tx.category_id:
+        tx.category_id = item.category_id
+        tx.is_reviewed = 1
+
+
 def _find_matching_transaction(
     db: Session, user_id: int, recurring: RecurringTransaction, start: date, end: date
 ) -> Transaction | None:
@@ -661,7 +669,7 @@ def accept_suggestion(suggestion_id: int, request: Request, db: Session = Depend
                 if period_key in seen_periods:
                     continue
                 seen_periods.add(period_key)
-                tx.recurring_id = item.id
+                link_transaction_to_recurring(tx, item)
 
         db.delete(s)
         db.commit()
@@ -767,7 +775,7 @@ def create_recurring(
                 .all()
             )
             for tx in txs:
-                tx.recurring_id = item.id
+                link_transaction_to_recurring(tx, item)
 
     db.commit()
 
@@ -799,7 +807,7 @@ def link_selected_transactions(
             .all()
         )
         for tx in txs:
-            tx.recurring_id = item.id
+            link_transaction_to_recurring(tx, item)
         db.commit()
 
     return RedirectResponse("/recurring", status_code=302)
@@ -892,7 +900,7 @@ def link_transaction(
         .first()
     )
     if tx:
-        tx.recurring_id = item.id
+        link_transaction_to_recurring(tx, item)
         db.commit()
 
     return RedirectResponse("/recurring", status_code=302)

@@ -512,7 +512,8 @@ def link_recurring(
             RecurringTransaction.user_id == user.id,
         ).first()
         if item:
-            tx.recurring_id = item.id
+            from app.routers.recurring import link_transaction_to_recurring
+            link_transaction_to_recurring(tx, item)
             db.flush()
             # Find candidates for auto-matching (don't link yet — propose)
             candidates = _find_recurring_candidates(db, user.id, item, tx)
@@ -566,8 +567,9 @@ def accept_recurring_proposals(
         )
         .all()
     )
+    from app.routers.recurring import link_transaction_to_recurring
     for tx in txs:
-        tx.recurring_id = item.id
+        link_transaction_to_recurring(tx, item)
 
     db.commit()
     return RedirectResponse(redirect_to, status_code=302)
@@ -714,7 +716,8 @@ def auto_link_recurring_after_import(db: Session, user_id: int):
             existing = _find_matching_transaction(db, user_id, item, period_start, period_end)
             if existing:
                 continue
-            candidate.recurring_id = item.id
+            from app.routers.recurring import link_transaction_to_recurring
+            link_transaction_to_recurring(candidate, item)
 
 
 @router.post("/transactions/{transaction_id}/reviewed")
