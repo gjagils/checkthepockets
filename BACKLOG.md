@@ -145,7 +145,7 @@ Sprints zijn gegroepeerd op gedeelde bestanden voor maximale efficiëntie per se
 - [x] `cleanup_matched_projected()` — ruimt projected op na import
 - [x] Transactielijst: projected rijen bovenaan bij maandweergave (gestreept, "Verwacht" badge)
 - [x] `_build_tx_query` filtert altijd `is_projected == 0`
-- [ ] **Fase 3 (nog te doen)**: budget-prognose — "Verwacht nog €Y" per categorie op budgetpagina
+- [x] **Fase 3**: budget-prognose — "Verwacht nog €Y" per categorie + sync_projected op budgetpagina
 
 ---
 
@@ -269,7 +269,7 @@ Sprints zijn gegroepeerd op gedeelde bestanden voor maximale efficiëntie per se
 - [x] **Tag kleuren**: `color` veld op Tag + migratie + kleurkiezer + gekleurde pill weergave
 - [x] **Tags archiveren**: `is_archived` op Tag + toggle + show_archived filter
 
-> **Nog te doen (follow-up):** transfers uitsluiten van dashboard/analytics-totalen (`Transaction.transfer_id.is_(None)` filter toevoegen in `dashboard.py` + `analytics.py`)
+> **Follow-up afgerond (2026-04-08):** transfers uitgesloten van dashboard, analytics en budgetten via `Transaction.transfer_id.is_(None)` filter
 
 ---
 
