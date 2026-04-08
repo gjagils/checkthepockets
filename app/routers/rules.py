@@ -526,9 +526,13 @@ def create_rule(
         action_set_reviewed=1 if action_set_reviewed else 0,
     )
     db.add(rule)
+    db.flush()
+
+    # Automatically apply the new rule to existing transactions
+    affected = apply_single_rule(db, user.id, rule.id)
     db.commit()
 
-    return RedirectResponse("/rules", status_code=302)
+    return RedirectResponse(f"/rules?applied={affected}", status_code=302)
 
 
 @router.post("/rules/{rule_id}/edit")
