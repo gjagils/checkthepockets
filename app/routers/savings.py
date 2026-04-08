@@ -345,6 +345,17 @@ def plan_detail(
 
     db.commit()
 
+    # Parse AI suggestions from query param (if coming from analyze)
+    import json, base64
+    ai_suggestions = []
+    suggestions_b64 = request.query_params.get("suggestions", "")
+    if suggestions_b64:
+        try:
+            ai_suggestions = json.loads(base64.b64decode(suggestions_b64).decode())
+        except Exception:
+            pass
+    analyze_status = request.query_params.get("analyze", "")
+
     return templates.TemplateResponse(
         "savings/detail.html",
         {
@@ -361,6 +372,8 @@ def plan_detail(
             "categories": categories,
             "frequency_labels": FREQUENCY_LABELS,
             "today": today,
+            "ai_suggestions": ai_suggestions,
+            "analyze_status": analyze_status,
         },
     )
 
@@ -612,6 +625,172 @@ def delete_plan(
     db.commit()
 
     return RedirectResponse(f"/savings?year={year}", status_code=302)
+
+
+@router.post("/{plan_id}/accept-suggestion")
+def accept_ai_suggestion(
+    plan_id: int,
+    request: Request,
+    name: str = Form(...),
+    amount: str = Form(...),
+    frequency: str = Form("monthly"),
+    is_income: str = Form("0"),
+    db: Session = Depends(get_db),
+):
+    """Accept an AI suggestion and create a savings line with auto-filled entries."""
+    user = require_login(request, db)
+    plan = db.query(SavingsPlan).filter(
+        SavingsPlan.id == plan_id, SavingsPlan.user_id == user.id
+    ).first()
+    if not plan:
+        return RedirectResponse("/savings", status_code=302)
+
+    try:
+        parsed_amount = Decimal(amount.strip().replace(",", "."))
+    except (InvalidOperation, ValueError):
+        return RedirectResponse(f"/savings/{plan_id}", status_code=302)
+
+    income = is_income == "1" or is_income == "true"
+    freq = frequency if frequency in FREQUENCY_LABELS else "monthly"
+
+    # Create savings line
+    line = SavingsLine(
+        plan_id=plan.id,
+        name=name.strip(),
+        is_income=1 if income else 0,
+        frequency=freq,
+        default_amount=parsed_amount,
+    )
+    db.add(line)
+    db.flush()
+
+    # Create entries and fill from transactions
+    _smart_fill_entries(db, line)
+
+    # Try to fill with actual transaction data
+    tx_totals = _get_transaction_totals_by_month(
+        db, plan.account_id, plan.year, category_id=None
+    )
+    # For this line, match by searching transactions with the line name in counterparty
+    search_name = name.strip().lower()
+    all_txs = (
+        db.query(Transaction)
+        .filter(
+            Transaction.account_id == plan.account_id,
+            func.extract("year", Transaction.date) == plan.year,
+            Transaction.is_excluded == 0,
+            Transaction.is_projected == 0,
+        )
+        .all()
+    )
+    monthly_totals = {}
+    for tx in all_txs:
+        cp = (tx.counterparty or "").lower()
+        desc = (tx.description or "").lower()
+        if search_name in cp or search_name in desc:
+            m = tx.date.month
+            if m not in monthly_totals:
+                monthly_totals[m] = Decimal("0")
+            if income:
+                if tx.amount > 0:
+                    monthly_totals[m] += tx.amount
+            else:
+                if tx.amount < 0:
+                    monthly_totals[m] += abs(tx.amount)
+
+    for entry in line.entries:
+        if entry.month in monthly_totals:
+            entry.amount = monthly_totals[entry.month]
+
+    db.commit()
+    return RedirectResponse(f"/savings/{plan_id}", status_code=302)
+
+
+@router.post("/{plan_id}/analyze")
+def analyze_savings(
+    plan_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Analyze transactions on the savings account and suggest savings plan lines."""
+    user = require_login(request, db)
+    plan = (
+        db.query(SavingsPlan)
+        .options(joinedload(SavingsPlan.account), joinedload(SavingsPlan.lines))
+        .filter(SavingsPlan.id == plan_id, SavingsPlan.user_id == user.id)
+        .first()
+    )
+    if not plan:
+        return RedirectResponse("/savings", status_code=302)
+
+    # Get all transactions for this account in the plan year
+    transactions = (
+        db.query(Transaction)
+        .filter(
+            Transaction.account_id == plan.account_id,
+            func.extract("year", Transaction.date) == plan.year,
+            Transaction.is_excluded == 0,
+            Transaction.is_projected == 0,
+        )
+        .order_by(Transaction.date)
+        .all()
+    )
+
+    if not transactions:
+        return RedirectResponse(f"/savings/{plan_id}?analyze=empty", status_code=302)
+
+    # Transform for AI
+    tx_data = [
+        {
+            "counterparty": tx.counterparty or "",
+            "description": tx.description or "",
+            "amount": tx.amount,
+            "date": tx.date,
+            "category_id": tx.category_id,
+            "category_name": tx.category.name if tx.category else None,
+        }
+        for tx in transactions
+    ]
+
+    # Get existing line names
+    existing_lines = [line.name for line in plan.lines]
+
+    # Call AI analysis
+    from app.ai_suggest import analyze_savings_with_ai, ai_available
+    suggestions = None
+    if ai_available():
+        suggestions = analyze_savings_with_ai(
+            tx_data, plan.account.name, plan.year, existing_lines
+        )
+
+    if not suggestions:
+        # Fallback: use pattern detection without AI
+        from app.ai_suggest import detect_recurring_patterns
+        candidates = detect_recurring_patterns(tx_data)
+        suggestions = [
+            {
+                "name": c["counterparty"][:50],
+                "amount": abs(c["avg_amount"]),
+                "frequency": c["frequency"] if c["frequency"] in FREQUENCY_LABELS else "monthly",
+                "is_income": c["avg_amount"] > 0,
+                "reasoning": f"{c['count']}x gevonden, gem. elke {c['avg_days']:.0f} dagen",
+            }
+            for c in candidates
+            if c["counterparty"][:50] not in existing_lines
+        ]
+
+    if not suggestions:
+        return RedirectResponse(f"/savings/{plan_id}?analyze=empty", status_code=302)
+
+    # Store suggestions in session via query params (simple approach)
+    import json
+    import base64
+    suggestions_b64 = base64.b64encode(json.dumps(suggestions).encode()).decode()
+
+    return RedirectResponse(
+        f"/savings/{plan_id}?suggestions={suggestions_b64}",
+        status_code=302,
+    )
 
 
 @router.post("/lines/{line_id}/fill-from-transactions")

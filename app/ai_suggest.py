@@ -474,3 +474,108 @@ def enrich_recurring_with_ai(
     except Exception as exc:
         logger.error("AI recurring analysis failed: %s", exc)
         return None
+
+
+def analyze_savings_with_ai(
+    transactions: list[dict],
+    account_name: str,
+    year: int,
+    existing_lines: list[str],
+) -> list[dict] | None:
+    """
+    Use Claude to analyze transactions on a savings account and propose
+    savings plan lines (recurring deposits, withdrawals, patterns).
+
+    Args:
+        transactions: List of transaction dicts with counterparty, description, amount, date
+        account_name: Name of the savings account
+        year: Plan year
+        existing_lines: Names of existing savings lines (to avoid duplicates)
+
+    Returns list of proposed savings lines or None on failure.
+    """
+    if not ANTHROPIC_API_KEY or not transactions:
+        return None
+
+    # First detect patterns using existing function
+    candidates = detect_recurring_patterns(transactions)
+
+    # Build transaction summary for AI
+    # Group by counterparty for a compact overview
+    cp_summary = {}
+    for tx in transactions:
+        cp = (tx.get("counterparty") or tx.get("description") or "Onbekend")
+        if isinstance(cp, str):
+            cp = cp.strip()[:50]
+        if cp not in cp_summary:
+            cp_summary[cp] = {"count": 0, "total": 0, "amounts": []}
+        cp_summary[cp]["count"] += 1
+        cp_summary[cp]["total"] += float(tx["amount"])
+        cp_summary[cp]["amounts"].append(float(tx["amount"]))
+
+    summary_text = "\n".join(
+        f"- {cp} | {d['count']}x | totaal €{d['total']:.2f} | "
+        f"bedragen: {', '.join(f'€{a:.2f}' for a in d['amounts'][:5])}"
+        f"{'...' if len(d['amounts']) > 5 else ''}"
+        for cp, d in sorted(cp_summary.items(), key=lambda x: x[1]["total"])
+    )
+
+    patterns_text = ""
+    if candidates:
+        patterns_text = "\nGedetecteerde patronen:\n" + "\n".join(
+            f"- {c['counterparty']} | {c['count']}x | gem. €{c['avg_amount']:.2f} | "
+            f"{c['frequency']} (elke ~{c['avg_days']:.0f} dagen)"
+            for c in candidates
+        )
+
+    existing_text = ", ".join(existing_lines) if existing_lines else "(geen)"
+
+    try:
+        import anthropic
+
+        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        resp = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=1500,
+            messages=[
+                {
+                    "role": "user",
+                    "content": (
+                        f"Analyseer de transacties op de spaarrekening '{account_name}' "
+                        f"voor het jaar {year}. Stel een spaarplan voor.\n\n"
+                        f"Transactie-overzicht per tegenpartij:\n{summary_text}\n"
+                        f"{patterns_text}\n\n"
+                        f"Al bestaande spaarregels: {existing_text}\n\n"
+                        "Stel spaarregels voor die passen bij deze transacties. Denk aan:\n"
+                        "- Maandelijkse stortingen (inkomen op spaarrekening)\n"
+                        "- Maandelijkse opnames (uitgaven vanaf spaarrekening)\n"
+                        "- Kwartaal/jaarlijkse patronen\n"
+                        "- Eenmalige grote bedragen\n\n"
+                        "Antwoord UITSLUITEND als JSON array (geen markdown).\n"
+                        "Filter regels die al bestaan.\n"
+                        "Per item:\n"
+                        "[\n"
+                        "  {\n"
+                        '    "name": "beschrijvende naam voor spaarregel",\n'
+                        '    "amount": gemiddeld bedrag per keer (altijd positief),\n'
+                        '    "frequency": "monthly|quarterly|biannual|yearly|one-off",\n'
+                        '    "is_income": true als geld binnenkomt (storting), false als het uitgaat (opname),\n'
+                        '    "reasoning": "korte uitleg in het Nederlands"\n'
+                        "  }\n"
+                        "]\n"
+                        "Sorteer op belangrijkheid (grootste impact eerst)."
+                    ),
+                }
+            ],
+        )
+
+        text = resp.content[0].text.strip()
+        if text.startswith("```"):
+            text = text.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+
+        results = json.loads(text)
+        return results
+
+    except Exception as exc:
+        logger.error("AI savings analysis failed: %s", exc)
+        return None

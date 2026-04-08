@@ -95,8 +95,42 @@
         <h1>{{ plan.account.name }} - {{ plan.year }}</h1>
         <p class="muted">Startsaldo: &euro;&nbsp;{{ plan.starting_balance|euro }}{% if plan.account.iban %} &middot; {{ plan.account.iban }}{% endif %}</p>
     </div>
-    <a href="/savings?year={{ plan.year }}" class="btn btn-sm">Terug naar overzicht</a>
+    <div style="display:flex; gap:0.5rem;">
+        <form method="post" action="/savings/{{ plan.id }}/analyze" style="margin:0;">
+            <button type="submit" class="btn btn-accent">✨ Analyseer transacties</button>
+        </form>
+        <a href="/savings?year={{ plan.year }}" class="btn btn-sm">Terug naar overzicht</a>
+    </div>
 </div>
+
+{% if analyze_status == 'empty' %}
+<div class="alert alert-info" style="margin-bottom:1rem;">Geen patronen gevonden in de transacties van deze rekening.</div>
+{% endif %}
+
+{% if ai_suggestions %}
+<div class="card" style="margin-bottom:1rem; border-left:4px solid var(--gold);">
+    <h3 style="margin-bottom:0.75rem;">✨ AI-voorstellen voor spaarplan</h3>
+    <p class="muted" style="font-size:0.82rem; margin-bottom:0.75rem;">Op basis van je transacties. Accepteer of verwerp per regel.</p>
+    {% for s in ai_suggestions %}
+    <div style="display:flex; align-items:center; justify-content:space-between; padding:0.5rem 0; border-bottom:1px solid var(--border);">
+        <div>
+            <strong>{{ s.name }}</strong>
+            <span class="pill" style="margin-left:0.4rem;">{{ frequency_labels.get(s.frequency, s.frequency) }}</span>
+            {% if s.is_income %}<span class="badge-income" style="margin-left:0.3rem;">Inkomen</span>{% else %}<span class="badge-expense" style="margin-left:0.3rem;">Uitgave</span>{% endif %}
+            <span class="muted" style="margin-left:0.5rem; font-size:0.82rem;">&euro;&nbsp;{{ "%.2f"|format(s.amount)|replace(".", ",") }}</span>
+            {% if s.reasoning %}<br><span class="muted" style="font-size:0.78rem;">{{ s.reasoning }}</span>{% endif %}
+        </div>
+        <form method="post" action="/savings/{{ plan.id }}/accept-suggestion" style="margin:0;">
+            <input type="hidden" name="name" value="{{ s.name }}">
+            <input type="hidden" name="amount" value="{{ s.amount }}">
+            <input type="hidden" name="frequency" value="{{ s.frequency }}">
+            <input type="hidden" name="is_income" value="{{ '1' if s.is_income else '0' }}">
+            <button type="submit" class="btn btn-sm btn-accent">Toevoegen</button>
+        </form>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
 
 <!-- Savings grid table -->
 <div class="card" style="padding:0; overflow:visible;">
