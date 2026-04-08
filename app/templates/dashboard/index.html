@@ -16,12 +16,11 @@
         <h1>{{ title }}</h1>
     </div>
     <div style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap;">
-        <!-- Tabel / Grafiek toggle -->
         <div class="view-toggle">
             <button class="view-toggle-btn" data-view="tabel" onclick="switchView('tabel')">Tabel</button>
             <button class="view-toggle-btn" data-view="grafiek" onclick="switchView('grafiek')">Grafiek</button>
+            <button class="view-toggle-btn" data-view="spiegel" onclick="switchView('spiegel')">Spiegel</button>
         </div>
-        <!-- Year selector (only on level 1) -->
         {% if not current_month %}
         <form method="get" action="/dashboard" style="margin:0;">
             <select name="year" onchange="this.form.submit()" style="padding:0.4rem 0.6rem; border-radius:6px; border:1px solid var(--border); background:var(--card-bg); color:var(--text); font-size:0.85rem;">
@@ -74,7 +73,7 @@
                     {% if not current_month %}
                     <td class="text-right nowrap">
                         {% if row.uncat_count %}
-                        <a href="/transactions?year={{ current_year }}&month={{ row.key }}&uncategorized=1" class="amount-negative" style="font-weight:600;">
+                        <a href="{{ row.tx_link_uncat }}" class="amount-negative" style="font-weight:600;">
                             &euro;&nbsp;{{ row.uncat_amount|euro }} <span class="muted" style="font-weight:400;">({{ row.uncat_count }})</span>
                         </a>
                         {% else %}<span class="muted">&mdash;</span>{% endif %}
@@ -102,10 +101,10 @@
     </div>
 </div>
 
-<!-- CHART VIEW -->
-<div id="view-grafiek" class="card" style="padding:1.25rem;">
+<!-- VERTICAL BAR CHART VIEW -->
+<div id="view-grafiek" class="card" style="display:none; padding:1.25rem;">
     <div style="height:420px;">
-        <canvas id="overviewChart"></canvas>
+        <canvas id="overviewChart" style="cursor:pointer;"></canvas>
     </div>
     {% if overview_rows %}
     <div id="chartLabels" style="display:grid; grid-template-columns:repeat({{ overview_rows|length }}, 1fr); margin-top:0.25rem;">
@@ -121,246 +120,321 @@
     {% endif %}
 </div>
 
+<!-- MIRROR CHART VIEW (Spiegelgrafiek) -->
+<div id="view-spiegel" class="card" style="display:none; padding:1.25rem;">
+    <div style="height:{{ [overview_rows|length * 50, 300]|max }}px;">
+        <canvas id="mirrorChart" style="cursor:pointer;"></canvas>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script>
+// ===== SHARED DATA & HELPERS =====
 var overviewData = {{ overview_json | safe }};
-
-function switchView(view) {
-    document.getElementById('view-tabel').style.display = view === 'tabel' ? '' : 'none';
-    document.getElementById('view-grafiek').style.display = view === 'grafiek' ? '' : 'none';
-    document.querySelectorAll('.view-toggle-btn').forEach(function(btn) {
-        btn.classList.toggle('active', btn.dataset.view === view);
-    });
-    localStorage.setItem('dashboard-view', view);
-    if (view === 'grafiek' && !window._chartReady) {
-        initChart();
-        window._chartReady = true;
-    }
-}
+var labels = overviewData.map(function(r) { return r.label; });
 
 function getCSS(v) {
     return getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 }
 
-function initChart() {
-    var ctx = document.getElementById('overviewChart').getContext('2d');
-    var labels = overviewData.map(function(r) { return r.label; });
+// Colors (read once from CSS vars)
+var C = {
+    green: getCSS('--green') || '#22c55e',
+    red: getCSS('--red') || '#ef4444',
+    muted: getCSS('--muted') || '#888',
+    text: getCSS('--text') || '#ccc',
+    border: getCSS('--border') || '#333',
+    font: "'Plus Jakarta Sans', sans-serif",
+};
 
-    var green = getCSS('--green') || '#22c55e';
-    var red = getCSS('--red') || '#ef4444';
-    var muted = getCSS('--muted') || '#888';
-    var fontFamily = "'Plus Jakarta Sans', sans-serif";
+// Format euro for tooltips
+function fmtEuro(val) {
+    return '\u20AC ' + Math.abs(val).toLocaleString('nl-NL', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+}
 
-    // Plugin: draw budget bars as wide background rectangles behind the stacked bars
-    // Budget is always fully visible whether actual+expected is higher or lower
-    var budgetBgPlugin = {
-        id: 'budgetBg',
+// Navigate to transactions for a bar click
+function handleBarClick(chart, evt, isHorizontal) {
+    var rect = chart.canvas.getBoundingClientRect();
+    var pos = isHorizontal
+        ? (evt.clientY - rect.top)
+        : (evt.clientX - rect.left);
+    var scale = isHorizontal ? chart.scales.y : chart.scales.x;
+
+    var bestIdx = -1, bestDist = Infinity;
+    for (var i = 0; i < labels.length; i++) {
+        var px = scale.getPixelForValue(i);
+        var dist = Math.abs(pos - px);
+        if (dist < bestDist) { bestDist = dist; bestIdx = i; }
+    }
+    var threshold = (isHorizontal ? scale.height : scale.width) / labels.length;
+    if (bestIdx >= 0 && bestDist < threshold) {
+        var d = overviewData[bestIdx];
+        if (d.tx_link) {
+            window.location.href = d.tx_link;
+        }
+    }
+}
+
+// Budget background plugin factory (works for both vertical and horizontal)
+function createBudgetPlugin(id, isHorizontal) {
+    return {
+        id: id,
         beforeDatasetsDraw: function(chart) {
             var c = chart.ctx;
-            var yScale = chart.scales.y;
-            var bottom = yScale.getPixelForValue(0);
             var r = 4;
-
-            // dataset 0 = inkomen gerealiseerd, 2 = uitgaven gerealiseerd
+            // dataset 0 = inkomen, 1 or 2 = uitgaven (depends on chart)
             var metaInk = chart.getDatasetMeta(0);
-            var metaUitg = chart.getDatasetMeta(2);
+            var metaUitg = chart.getDatasetMeta(isHorizontal ? 1 : 2);
 
             overviewData.forEach(function(d, i) {
-                // Inkomen budget background
-                if (d.income_budget > 0 && metaInk.data[i]) {
-                    var bar = metaInk.data[i];
-                    var top = yScale.getPixelForValue(d.income_budget);
-                    var w = bar.width * 1.6;
-                    c.save();
-                    c.fillStyle = green + '30';
-                    c.strokeStyle = green + '50';
-                    c.lineWidth = 1;
-                    c.beginPath();
-                    c.roundRect(bar.x - w / 2, top, w, bottom - top, r);
-                    c.fill();
-                    c.stroke();
-                    c.restore();
-                }
-                // Uitgaven budget background
-                if (d.expense_budget > 0 && metaUitg.data[i]) {
-                    var bar = metaUitg.data[i];
-                    var top = yScale.getPixelForValue(d.expense_budget);
-                    var w = bar.width * 1.6;
-                    c.save();
-                    c.fillStyle = red + '30';
-                    c.strokeStyle = red + '50';
-                    c.lineWidth = 1;
-                    c.beginPath();
-                    c.roundRect(bar.x - w / 2, top, w, bottom - top, r);
-                    c.fill();
-                    c.stroke();
-                    c.restore();
+                if (isHorizontal) {
+                    var xScale = chart.scales.x;
+                    var zero = xScale.getPixelForValue(0);
+                    // Income budget (right side)
+                    if (d.income_budget > 0 && metaInk.data[i]) {
+                        var bar = metaInk.data[i];
+                        var right = xScale.getPixelForValue(d.income_budget);
+                        var h = bar.height * 1.5;
+                        c.save();
+                        c.fillStyle = C.green + '25';
+                        c.strokeStyle = C.green + '40';
+                        c.lineWidth = 1;
+                        c.beginPath();
+                        c.roundRect(zero, bar.y - h/2, right - zero, h, r);
+                        c.fill(); c.stroke(); c.restore();
+                    }
+                    // Expense budget (left side)
+                    if (d.expense_budget > 0 && metaUitg.data[i]) {
+                        var bar = metaUitg.data[i];
+                        var left = xScale.getPixelForValue(-d.expense_budget);
+                        var h = bar.height * 1.5;
+                        c.save();
+                        c.fillStyle = C.red + '25';
+                        c.strokeStyle = C.red + '40';
+                        c.lineWidth = 1;
+                        c.beginPath();
+                        c.roundRect(left, bar.y - h/2, zero - left, h, r);
+                        c.fill(); c.stroke(); c.restore();
+                    }
+                } else {
+                    var yScale = chart.scales.y;
+                    var bottom = yScale.getPixelForValue(0);
+                    // Income budget
+                    if (d.income_budget > 0 && metaInk.data[i]) {
+                        var bar = metaInk.data[i];
+                        var top = yScale.getPixelForValue(d.income_budget);
+                        var w = bar.width * 1.6;
+                        c.save();
+                        c.fillStyle = C.green + '30';
+                        c.strokeStyle = C.green + '50';
+                        c.lineWidth = 1;
+                        c.beginPath();
+                        c.roundRect(bar.x - w/2, top, w, bottom - top, r);
+                        c.fill(); c.stroke(); c.restore();
+                    }
+                    // Expense budget
+                    if (d.expense_budget > 0 && metaUitg.data[i]) {
+                        var bar = metaUitg.data[i];
+                        var top = yScale.getPixelForValue(d.expense_budget);
+                        var w = bar.width * 1.6;
+                        c.save();
+                        c.fillStyle = C.red + '30';
+                        c.strokeStyle = C.red + '50';
+                        c.lineWidth = 1;
+                        c.beginPath();
+                        c.roundRect(bar.x - w/2, top, w, bottom - top, r);
+                        c.fill(); c.stroke(); c.restore();
+                    }
                 }
             });
         }
     };
+}
 
-    // Stacked bars: gerealiseerd (donker) + verwacht (lichter) per groep
-    // Income: stack 'inkomen', Expenses: stack 'uitgaven'
-    var datasets = [
-        {
-            label: 'Inkomen gerealiseerd',
-            data: overviewData.map(function(r) { return r.income_actual; }),
-            backgroundColor: green,
-            stack: 'inkomen',
-            borderRadius: 0,
-            barPercentage: 0.6,
-            categoryPercentage: 0.7,
-            order: 1,
-        },
-        {
-            label: 'Inkomen verwacht',
-            data: overviewData.map(function(r) { return r.income_expected; }),
-            backgroundColor: green + '88',
-            borderColor: green,
-            borderWidth: { top: 2, right: 0, bottom: 0, left: 0 },
-            borderDash: [4, 2],
-            stack: 'inkomen',
-            borderRadius: 3,
-            barPercentage: 0.6,
-            categoryPercentage: 0.7,
-            order: 1,
-        },
-        {
-            label: 'Uitgaven gerealiseerd',
-            data: overviewData.map(function(r) { return r.expense_actual; }),
-            backgroundColor: red,
-            stack: 'uitgaven',
-            borderRadius: 0,
-            barPercentage: 0.6,
-            categoryPercentage: 0.7,
-            order: 1,
-        },
-        {
-            label: 'Uitgaven verwacht',
-            data: overviewData.map(function(r) { return r.expense_expected; }),
-            backgroundColor: red + '88',
-            borderColor: red,
-            borderWidth: { top: 2, right: 0, bottom: 0, left: 0 },
-            borderDash: [4, 2],
-            stack: 'uitgaven',
-            borderRadius: 3,
-            barPercentage: 0.6,
-            categoryPercentage: 0.7,
-            order: 1,
-        },
+// Shared legend items
+function getLegendItems() {
+    var items = [
+        { text: 'Budget', fillStyle: C.green + '30', strokeStyle: C.green + '50', lineWidth: 1, pointStyle: 'rectRounded' },
+        { text: 'Gerealiseerd', fillStyle: C.green, strokeStyle: C.green, lineWidth: 0, pointStyle: 'rectRounded' },
+        { text: 'Verwacht', fillStyle: C.green + '88', strokeStyle: C.green, lineWidth: 2, lineDash: [4,2], pointStyle: 'rectRounded' },
     ];
     {% if not current_month %}
+    if (overviewData.some(function(r) { return r.uncat_amount > 0; })) {
+        items.push({ text: 'Niet gecategoriseerd', fillStyle: C.muted + '55', strokeStyle: C.muted + '77', lineWidth: 1, pointStyle: 'rectRounded' });
+    }
+    {% endif %}
+    return items;
+}
+
+// Shared tooltip callbacks
+var sharedTooltipCallbacks = {
+    afterBody: function(tooltipItems) {
+        var idx = tooltipItems[0].dataIndex;
+        var d = overviewData[idx];
+        var lines = [];
+        if (d.income_budget > 0) lines.push('Inkomen budget: ' + fmtEuro(d.income_budget));
+        if (d.expense_budget > 0) lines.push('Uitgaven budget: ' + fmtEuro(d.expense_budget));
+        return lines;
+    },
+    label: function(ctx) {
+        return ctx.dataset.label + ': ' + fmtEuro(ctx.raw);
+    }
+};
+
+// ===== VIEW SWITCHING =====
+function switchView(view) {
+    ['tabel', 'grafiek', 'spiegel'].forEach(function(v) {
+        var el = document.getElementById('view-' + v);
+        if (el) el.style.display = (v === view) ? '' : 'none';
+    });
+    document.querySelectorAll('.view-toggle-btn').forEach(function(btn) {
+        btn.classList.toggle('active', btn.dataset.view === view);
+    });
+    localStorage.setItem('dashboard-view', view);
+    if (view === 'grafiek' && !window._barChartReady) {
+        initBarChart();
+        window._barChartReady = true;
+    }
+    if (view === 'spiegel' && !window._mirrorChartReady) {
+        initMirrorChart();
+        window._mirrorChartReady = true;
+    }
+}
+
+// ===== VERTICAL BAR CHART =====
+function initBarChart() {
+    var ctx = document.getElementById('overviewChart').getContext('2d');
     var hasUncat = overviewData.some(function(r) { return r.uncat_amount > 0; });
+
+    var datasets = [
+        { label: 'Inkomen gerealiseerd', data: overviewData.map(function(r) { return r.income_actual; }),
+          backgroundColor: C.green, stack: 'inkomen', borderRadius: 0, barPercentage: 0.6, categoryPercentage: 0.7, order: 1 },
+        { label: 'Inkomen verwacht', data: overviewData.map(function(r) { return r.income_expected; }),
+          backgroundColor: C.green + '88', borderColor: C.green, borderWidth: {top:2,right:0,bottom:0,left:0},
+          stack: 'inkomen', borderRadius: 3, barPercentage: 0.6, categoryPercentage: 0.7, order: 1 },
+        { label: 'Uitgaven gerealiseerd', data: overviewData.map(function(r) { return r.expense_actual; }),
+          backgroundColor: C.red, stack: 'uitgaven', borderRadius: 0, barPercentage: 0.6, categoryPercentage: 0.7, order: 1 },
+        { label: 'Uitgaven verwacht', data: overviewData.map(function(r) { return r.expense_expected; }),
+          backgroundColor: C.red + '88', borderColor: C.red, borderWidth: {top:2,right:0,bottom:0,left:0},
+          stack: 'uitgaven', borderRadius: 3, barPercentage: 0.6, categoryPercentage: 0.7, order: 1 },
+    ];
+    {% if not current_month %}
     if (hasUncat) {
+        datasets.push({ label: 'Niet gecategoriseerd', data: overviewData.map(function(r) { return r.uncat_amount || 0; }),
+          backgroundColor: C.muted + '55', borderColor: C.muted + '77', borderWidth: 1,
+          borderRadius: 4, barPercentage: 0.6, categoryPercentage: 0.7, order: 2 });
+    }
+    {% endif %}
+
+    window._barChart = new Chart(ctx, {
+        type: 'bar',
+        data: { labels: labels, datasets: datasets },
+        plugins: [createBudgetPlugin('budgetBgBar', false)],
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { position: 'top', labels: { color: C.text, font: {size:12, family:C.font}, usePointStyle: true, pointStyle: 'rectRounded', padding: 16, generateLabels: function() { return getLegendItems(); } } },
+                tooltip: { callbacks: sharedTooltipCallbacks },
+            },
+            scales: {
+                x: { stacked: true, ticks: { display: false }, grid: { display: false } },
+                y: { stacked: true, beginAtZero: true,
+                    suggestedMax: Math.max.apply(null, overviewData.map(function(d) {
+                        return Math.max(d.income_budget, d.income_actual + d.income_expected, d.expense_budget, d.expense_actual + d.expense_expected);
+                    })) * 1.05,
+                    ticks: { color: C.muted, callback: function(v) { return fmtEuro(v); }, font: {family:C.font} },
+                    grid: { color: C.border + '44' },
+                },
+            },
+        },
+    });
+
+    // Click handler for bar chart
+    document.getElementById('overviewChart').addEventListener('click', function(e) {
+        handleBarClick(window._barChart, e, false);
+    });
+
+    // Align labels
+    var cl = document.getElementById('chartLabels');
+    if (cl && window._barChart) {
+        var ca = window._barChart.chartArea;
+        cl.style.marginLeft = ca.left + 'px';
+        cl.style.marginRight = (window._barChart.width - ca.right) + 'px';
+    }
+}
+
+// ===== MIRROR CHART (Spiegelgrafiek) =====
+function initMirrorChart() {
+    var ctx = document.getElementById('mirrorChart').getContext('2d');
+
+    // Mirror: expenses negative (left), income positive (right)
+    var datasets = [
+        { label: 'Inkomen gerealiseerd',
+          data: overviewData.map(function(r) { return r.income_actual; }),
+          backgroundColor: C.green, borderRadius: 3, barPercentage: 0.6, categoryPercentage: 0.8 },
+        { label: 'Uitgaven gerealiseerd',
+          data: overviewData.map(function(r) { return -r.expense_actual; }),
+          backgroundColor: C.red, borderRadius: 3, barPercentage: 0.6, categoryPercentage: 0.8 },
+    ];
+    {% if not current_month %}
+    if (overviewData.some(function(r) { return r.uncat_amount > 0; })) {
         datasets.push({
             label: 'Niet gecategoriseerd',
-            data: overviewData.map(function(r) { return r.uncat_amount || 0; }),
-            backgroundColor: muted + '55',
-            borderColor: muted + '77',
-            borderWidth: 1,
-            borderRadius: 4,
-            barPercentage: 0.6,
-            categoryPercentage: 0.7,
-            order: 2,
+            data: overviewData.map(function(r) { return r.uncat_amount ? -r.uncat_amount : 0; }),
+            backgroundColor: C.muted + '66', borderColor: C.muted + '88', borderWidth: 1,
+            borderRadius: 3, barPercentage: 0.6, categoryPercentage: 0.8,
         });
     }
     {% endif %}
 
-    window._chart = new Chart(ctx, {
+    window._mirrorChart = new Chart(ctx, {
         type: 'bar',
         data: { labels: labels, datasets: datasets },
-        plugins: [budgetBgPlugin],
+        plugins: [createBudgetPlugin('budgetBgMirror', true)],
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            interaction: {
-                mode: 'index',
-                intersect: false,
-            },
+            indexAxis: 'y',
+            responsive: true, maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
             plugins: {
-                legend: {
-                    position: 'top',
-                    labels: {
-                        color: getCSS('--text') || '#ccc',
-                        font: { size: 12, family: fontFamily },
-                        usePointStyle: true,
-                        pointStyle: 'rectRounded',
-                        padding: 16,
-                        // Add custom legend items for budget
-                        generateLabels: function(chart) {
-                            var items = [
-                                { text: 'Budget', fillStyle: green + '30', strokeStyle: green + '50', lineWidth: 1, pointStyle: 'rectRounded' },
-                                { text: 'Gerealiseerd', fillStyle: green, strokeStyle: green, lineWidth: 0, pointStyle: 'rectRounded' },
-                                { text: 'Verwacht', fillStyle: green + '88', strokeStyle: green, lineWidth: 2, lineDash: [4,2], pointStyle: 'rectRounded' },
-                            ];
-                            {% if not current_month %}
-                            if (hasUncat) {
-                                items.push({ text: 'Niet gecategoriseerd', fillStyle: muted + '55', strokeStyle: muted + '77', lineWidth: 1, pointStyle: 'rectRounded' });
-                            }
-                            {% endif %}
-                            return items;
-                        },
-                    },
-                },
+                legend: { position: 'top', labels: { color: C.text, font: {size:12, family:C.font}, usePointStyle: true, pointStyle: 'rectRounded', padding: 16, generateLabels: function() { return getLegendItems(); } } },
                 tooltip: {
                     callbacks: {
-                        afterBody: function(tooltipItems) {
-                            var idx = tooltipItems[0].dataIndex;
-                            var d = overviewData[idx];
-                            var lines = [];
-                            if (d.income_budget > 0) {
-                                lines.push('Inkomen budget: \u20AC ' + d.income_budget.toLocaleString('nl-NL', {minimumFractionDigits: 2}));
-                            }
-                            if (d.expense_budget > 0) {
-                                lines.push('Uitgaven budget: \u20AC ' + d.expense_budget.toLocaleString('nl-NL', {minimumFractionDigits: 2}));
-                            }
-                            return lines;
-                        },
-                        label: function(context) {
-                            return context.dataset.label + ': \u20AC ' +
-                                context.raw.toLocaleString('nl-NL', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                        afterBody: sharedTooltipCallbacks.afterBody,
+                        label: function(ctx) {
+                            return ctx.dataset.label + ': ' + fmtEuro(ctx.raw);
                         }
                     }
                 },
             },
             scales: {
                 x: {
-                    stacked: true,
-                    ticks: { display: false },
-                    grid: { display: false },
+                    beginAtZero: true,
+                    ticks: {
+                        color: C.muted,
+                        callback: function(v) { return fmtEuro(v); },
+                        font: { family: C.font },
+                    },
+                    grid: { color: C.border + '44' },
                 },
                 y: {
-                    stacked: true,
-                    beginAtZero: true,
-                    // Ensure y-axis includes budget values (drawn by plugin, not in datasets)
-                    suggestedMax: Math.max.apply(null, overviewData.map(function(d) {
-                        return Math.max(
-                            d.income_budget, d.income_actual + d.income_expected,
-                            d.expense_budget, d.expense_actual + d.expense_expected
-                        );
-                    })) * 1.05,
                     ticks: {
-                        color: getCSS('--muted') || '#888',
-                        callback: function(v) { return '\u20AC ' + v.toLocaleString('nl-NL'); },
-                        font: { family: fontFamily },
+                        color: getCSS('--sky') || '#40C4FF',
+                        font: { family: C.font, weight: 600 },
                     },
-                    grid: { color: (getCSS('--border') || '#333') + '44' },
+                    grid: { display: false },
                 },
             },
         },
     });
 
-    // Align HTML labels with chart area (offset for y-axis width)
-    var chartLabels = document.getElementById('chartLabels');
-    if (chartLabels && window._chart) {
-        var chartArea = window._chart.chartArea;
-        chartLabels.style.marginLeft = chartArea.left + 'px';
-        chartLabels.style.marginRight = (window._chart.width - chartArea.right) + 'px';
-    }
+    // Click handler for mirror chart
+    document.getElementById('mirrorChart').addEventListener('click', function(e) {
+        handleBarClick(window._mirrorChart, e, true);
+    });
 }
 
-// Init on page load — default to grafiek
+// ===== INIT =====
 (function() {
     var saved = localStorage.getItem('dashboard-view') || 'grafiek';
     switchView(saved);

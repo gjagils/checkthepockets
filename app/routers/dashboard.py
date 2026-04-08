@@ -229,6 +229,8 @@ def _level1_yearly(request, db, user, current_year, years, base_tx_filter, today
             "uncat_count": uncat_by_month.get(m, {}).get("count", 0),
             "uncat_amount": uncat_by_month.get(m, {}).get("amount", Decimal("0")),
             "is_current": (m == today.month and current_year == today.year),
+            "tx_link": f"/transactions?month={current_year}-{m:02d}",
+            "tx_link_uncat": f"/transactions?month={current_year}-{m:02d}&uncategorized=1",
         })
 
     # JSON for Chart.js
@@ -243,6 +245,8 @@ def _level1_yearly(request, db, user, current_year, years, base_tx_filter, today
             "expense_expected": _decimal_to_float(r.get("expense_expected", Decimal("0"))),
             "uncat_count": r["uncat_count"],
             "uncat_amount": _decimal_to_float(r["uncat_amount"]),
+            "tx_link": r.get("tx_link", ""),
+            "tx_link_uncat": r.get("tx_link_uncat", ""),
         }
         for r in overview_rows
     ])
@@ -386,6 +390,8 @@ def _level2_categories(request, db, user, current_year, month, years, base_tx_fi
             "uncat_amount": Decimal("0"),
             "is_current": False,
             "color": parent.color,
+            "tx_link": f"/transactions?month={current_year}-{month:02d}&category_id={parent.id}",
+            "tx_link_uncat": "",
         })
 
     # Add uncategorized row if any — show amount as expenses
@@ -401,6 +407,8 @@ def _level2_categories(request, db, user, current_year, month, years, base_tx_fi
             "uncat_count": uncat_count,
             "uncat_amount": uncat_amount,
             "is_current": False,
+            "tx_link": f"/transactions?month={current_year}-{month:02d}&uncategorized=1",
+            "tx_link_uncat": f"/transactions?month={current_year}-{month:02d}&uncategorized=1",
         })
 
     # JSON for Chart.js
@@ -415,6 +423,8 @@ def _level2_categories(request, db, user, current_year, month, years, base_tx_fi
             "expense_expected": _decimal_to_float(r.get("expense_expected", Decimal("0"))),
             "uncat_count": r["uncat_count"],
             "uncat_amount": _decimal_to_float(r["uncat_amount"]),
+            "tx_link": r.get("tx_link", ""),
+            "tx_link_uncat": r.get("tx_link_uncat", ""),
         }
         for r in overview_rows
     ])
@@ -534,6 +544,8 @@ def _level3_subcategories(request, db, user, current_year, month, category_id,
             "uncat_amount": Decimal("0"),
             "is_current": False,
             "color": cat.color,
+            "tx_link": f"/transactions?month={current_year}-{month:02d}&category_id={cat.id}",
+            "tx_link_uncat": "",
         })
 
     # JSON for Chart.js
@@ -548,6 +560,8 @@ def _level3_subcategories(request, db, user, current_year, month, category_id,
             "expense_expected": _decimal_to_float(r.get("expense_expected", Decimal("0"))),
             "uncat_count": r["uncat_count"],
             "uncat_amount": _decimal_to_float(r["uncat_amount"]),
+            "tx_link": r.get("tx_link", ""),
+            "tx_link_uncat": r.get("tx_link_uncat", ""),
         }
         for r in overview_rows
     ])
