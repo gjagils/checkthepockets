@@ -40,6 +40,10 @@ def budget_overview(
         .all()
     )
 
+    # Ensure projected transactions are synced for this month
+    from app.routers.recurring import sync_projected_transactions
+    sync_projected_transactions(user.id, current_year, current_month, db)
+
     # Get all categories with hierarchy
     cat_query = db.query(Category).filter(Category.user_id == user.id)
     if account_id:
@@ -97,6 +101,7 @@ def budget_overview(
             func.extract("month", Transaction.date) == prev_month,
             Transaction.amount < 0,
             Transaction.is_excluded == 0,
+            Transaction.transfer_id.is_(None),
             Category.exclude_from_budget == 0,
         )
     )
@@ -126,6 +131,7 @@ def budget_overview(
             func.extract("month", Transaction.date) == current_month,
             Transaction.amount < 0,
             Transaction.is_excluded == 0,
+            Transaction.transfer_id.is_(None),
             Category.exclude_from_budget == 0,
         )
     )
@@ -308,6 +314,7 @@ def budget_overview(
             func.extract("year", Transaction.date) == current_year,
             func.extract("month", Transaction.date) == current_month,
             Transaction.is_excluded == 0,
+            Transaction.transfer_id.is_(None),
         )
     )
     if account_id:
