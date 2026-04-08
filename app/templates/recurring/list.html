@@ -306,19 +306,20 @@
             {% if suggestion_transactions %}
             <details open style="margin-bottom:1rem;">
                 <summary style="font-size:0.85rem; cursor:pointer; font-weight:600; margin-bottom:0.5rem;">
-                    Gebaseerd op {{ suggestion_transactions|length }} transacties
+                    ▼ {{ suggestion_transactions|length }} transacties gevonden — vink aan om te koppelen
                 </summary>
-                <div class="table-wrapper" style="max-height:250px; overflow-y:auto;">
+                <div class="table-wrapper" style="max-height:400px; overflow-y:auto;">
                     <table class="data-table" style="font-size:.8rem;">
                         <thead>
-                            <tr><th>Datum</th><th>Tegenpartij</th><th>Omschrijving</th><th class="text-right">Bedrag</th></tr>
+                            <tr><th style="width:30px;"></th><th>Datum</th><th>Tegenpartij</th><th>Omschrijving</th><th class="text-right">Bedrag</th></tr>
                         </thead>
                         <tbody>
                         {% for tx in suggestion_transactions %}
                         <tr>
+                            <td><input type="checkbox" name="link_tx_ids" value="{{ tx.id }}" checked form="recurring-form"></td>
                             <td class="nowrap">{{ tx.date.strftime('%d-%m-%Y') }}</td>
                             <td>{{ tx.counterparty or '—' }}</td>
-                            <td class="muted" style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ tx.description or '—' }}</td>
+                            <td class="muted" style="font-size:0.75rem; word-break:break-all;">{{ tx.description or '—' }}</td>
                             <td class="text-right nowrap {% if tx.amount < 0 %}amount-negative{% else %}amount-positive{% endif %}">
                                 &euro;&nbsp;{{ tx.amount|euro }}
                             </td>
@@ -329,7 +330,7 @@
                 </div>
             </details>
             {% endif %}
-            <form method="post" action="/recurring">
+            <form method="post" action="/recurring" id="recurring-form">
                 <div class="form-group">
                     <label for="name">Naam</label>
                     <input type="text" id="name" name="name" required

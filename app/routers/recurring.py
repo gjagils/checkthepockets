@@ -641,6 +641,7 @@ def create_recurring(
     start_date: str = Form(""),
     end_date: str = Form(""),
     active_months: List[str] = Form(default=[]),
+    link_tx_ids: List[str] = Form(default=[]),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
@@ -688,6 +689,24 @@ def create_recurring(
         active_months=_parse_active_months(active_months),
     )
     db.add(item)
+    db.flush()
+
+    # Link selected transactions to this recurring item
+    if link_tx_ids:
+        tx_ids = [int(tid) for tid in link_tx_ids if tid.strip().isdigit()]
+        if tx_ids:
+            txs = (
+                db.query(Transaction)
+                .join(Account)
+                .filter(
+                    Transaction.id.in_(tx_ids),
+                    Account.user_id == user.id,
+                )
+                .all()
+            )
+            for tx in txs:
+                tx.recurring_id = item.id
+
     db.commit()
 
     return RedirectResponse("/recurring", status_code=302)
