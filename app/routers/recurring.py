@@ -834,6 +834,79 @@ async def link_selected_transactions(
     return RedirectResponse("/recurring", status_code=302)
 
 
+@router.post("/recurring/apply-all-categories")
+def apply_all_categories(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Apply categories from ALL recurring items to their linked transactions."""
+    user = require_login(request, db)
+
+    items = (
+        db.query(RecurringTransaction)
+        .filter(
+            RecurringTransaction.user_id == user.id,
+            RecurringTransaction.category_id.isnot(None),
+        )
+        .all()
+    )
+
+    updated = 0
+    for item in items:
+        linked_txs = (
+            db.query(Transaction)
+            .join(Account)
+            .filter(
+                Account.user_id == user.id,
+                Transaction.recurring_id == item.id,
+                Transaction.is_projected == 0,
+                Transaction.category_id.is_(None),
+            )
+            .all()
+        )
+        for tx in linked_txs:
+            tx.category_id = item.category_id
+            tx.is_reviewed = 1
+            updated += 1
+
+    db.commit()
+    return RedirectResponse("/recurring", status_code=302)
+
+
+@router.post("/recurring/{item_id}/apply-category")
+def apply_category_to_linked(
+    item_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Apply the recurring item's category to all linked transactions that don't have one."""
+    user = require_login(request, db)
+
+    item = db.query(RecurringTransaction).filter(
+        RecurringTransaction.id == item_id, RecurringTransaction.user_id == user.id
+    ).first()
+    if not item or not item.category_id:
+        return RedirectResponse("/recurring", status_code=302)
+
+    linked_txs = (
+        db.query(Transaction)
+        .join(Account)
+        .filter(
+            Account.user_id == user.id,
+            Transaction.recurring_id == item.id,
+            Transaction.is_projected == 0,
+            Transaction.category_id.is_(None),
+        )
+        .all()
+    )
+    for tx in linked_txs:
+        tx.category_id = item.category_id
+        tx.is_reviewed = 1
+
+    db.commit()
+    return RedirectResponse("/recurring", status_code=302)
+
+
 @router.post("/recurring/{item_id}/edit")
 def edit_recurring(
     item_id: int,

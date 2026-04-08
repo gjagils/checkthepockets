@@ -3,9 +3,14 @@
 {% block content %}
 <div class="page-header">
     <h1>Terugkerende transacties</h1>
-    <form method="post" action="/recurring/analyze" style="margin:0;">
-        <button type="submit" class="btn btn-accent">✨ Analyseer transacties</button>
-    </form>
+    <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+        <form method="post" action="/recurring/apply-all-categories" style="margin:0;">
+            <button type="submit" class="btn" onclick="return confirm('Categorieën toepassen op alle gekoppelde transacties zonder categorie?')">🏷 Categorieën toepassen</button>
+        </form>
+        <form method="post" action="/recurring/analyze" style="margin:0;">
+            <button type="submit" class="btn btn-accent">✨ Analyseer transacties</button>
+        </form>
+    </div>
 </div>
 
 {% if analyze_status == 'empty' %}

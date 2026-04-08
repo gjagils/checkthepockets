@@ -30,6 +30,16 @@
                 </tbody>
             </table>
         </div>
+        {% if item.category and entry.linked_transactions %}
+        {% set uncat_linked = entry.linked_transactions|selectattr('category_id', 'none')|list %}
+        {% if uncat_linked %}
+        <form method="post" action="/recurring/{{ item.id }}/apply-category" style="margin-top:0.4rem;">
+            <button type="submit" class="btn btn-sm btn-accent" style="font-size:0.75rem;">
+                🏷 Categorie "{{ item.category.name }}" toepassen op {{ uncat_linked|length }} transactie(s) zonder categorie
+            </button>
+        </form>
+        {% endif %}
+        {% endif %}
         {% else %}
         <p class="muted" style="font-size:0.78rem; margin:0.3rem 0;">Geen transacties gekoppeld.</p>
         {% endif %}
