@@ -122,12 +122,23 @@
 
 <!-- MIRROR CHART VIEW (Spiegelgrafiek) -->
 <div id="view-spiegel" class="card" style="display:none; padding:1.25rem;">
-    <div style="height:{{ [overview_rows|length * 65, 350]|max }}px;">
-        <canvas id="mirrorChart" style="cursor:pointer;"></canvas>
+    <div style="display:flex; height:{{ [overview_rows|length * 65, 350]|max }}px;">
+        <!-- HTML labels links van de chart -->
+        <div id="mirrorLabels" style="display:flex; flex-direction:column; justify-content:space-around; padding-right:0.5rem; flex-shrink:0; min-width:50px;">
+            {% for row in overview_rows %}
+            {% if row.link %}
+            <a href="{{ row.link }}" style="font-size:0.82rem; font-weight:600; color:var(--sky); text-decoration:none; padding:0.2rem 0.4rem; border-radius:4px; text-align:right; transition:background 0.15s; white-space:nowrap;"
+               onmouseover="this.style.background='var(--sky-bg)'" onmouseout="this.style.background='transparent'">{{ row.label }}</a>
+            {% else %}
+            <span style="font-size:0.82rem; font-weight:600; color:var(--muted); text-align:right; padding:0.2rem 0.4rem; white-space:nowrap;">{{ row.label }}</span>
+            {% endif %}
+            {% endfor %}
+        </div>
+        <!-- Chart canvas -->
+        <div style="flex:1; min-width:0;">
+            <canvas id="mirrorChart" style="cursor:pointer;"></canvas>
+        </div>
     </div>
-    <p style="font-size:0.78rem; color:var(--muted); margin-top:0.5rem; margin-bottom:0;">
-        Klik op een label om door te zoomen. Klik op een balk om transacties te zien.
-    </p>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
@@ -505,20 +516,30 @@ function initMirrorChart() {
                 },
                 y: {
                     stacked: true,
-                    ticks: {
-                        color: getCSS('--sky') || '#40C4FF',
-                        font: { family: C.font, weight: 600 },
-                    },
+                    ticks: { display: false },
                     grid: { display: false },
                 },
             },
         },
     });
 
-    // Click handler for mirror chart (label = drill-down, bar = transactions)
+    // Click handler for mirror chart bars (transactions only, labels are HTML)
     document.getElementById('mirrorChart').addEventListener('click', function(e) {
+        // Only handle bar clicks — labels are handled by HTML links
+        var rect = window._mirrorChart.canvas.getBoundingClientRect();
+        var x = e.clientX - rect.left;
+        // Don't handle clicks in the label area (now handled by HTML)
+        if (x < window._mirrorChart.chartArea.left) return;
         handleChartClick(window._mirrorChart, e, true);
     });
+
+    // Align HTML labels with mirror chart rows
+    var ml = document.getElementById('mirrorLabels');
+    if (ml && window._mirrorChart) {
+        var ca = window._mirrorChart.chartArea;
+        ml.style.paddingTop = ca.top + 'px';
+        ml.style.paddingBottom = (window._mirrorChart.height - ca.bottom) + 'px';
+    }
 }
 
 // ===== INIT =====
