@@ -384,6 +384,7 @@ def add_line(
     plan_id: int = Form(...),
     name: str = Form(...),
     category_id: int = Form(0),
+    is_income: str = Form(""),
     frequency: str = Form("monthly"),
     default_amount: str = Form("0"),
     target_month: int = Form(0),
@@ -413,12 +414,16 @@ def add_line(
 
     cat_id = category_id if category_id else None
 
-    # Determine is_income from linked category
-    line_is_income = 0
-    if cat_id:
+    # Determine is_income: from form field, or fallback to linked category
+    if is_income in ("1", "true"):
+        line_is_income = 1
+    elif is_income in ("0", "false"):
+        line_is_income = 0
+    elif cat_id:
         cat = db.query(Category).filter(Category.id == cat_id).first()
-        if cat:
-            line_is_income = cat.is_income
+        line_is_income = cat.is_income if cat else 0
+    else:
+        line_is_income = 0
 
     line = SavingsLine(
         plan_id=plan_id,
@@ -635,6 +640,7 @@ def accept_ai_suggestion(
     amount: str = Form(...),
     frequency: str = Form("monthly"),
     is_income: str = Form("0"),
+    remaining_suggestions: str = Form(""),
     db: Session = Depends(get_db),
 ):
     """Accept an AI suggestion and create a savings line with auto-filled entries."""
@@ -706,6 +712,10 @@ def accept_ai_suggestion(
             entry.amount = monthly_totals[entry.month]
 
     db.commit()
+
+    # Pass remaining suggestions back so they don't disappear
+    if remaining_suggestions.strip():
+        return RedirectResponse(f"/savings/{plan_id}?suggestions={remaining_suggestions}", status_code=302)
     return RedirectResponse(f"/savings/{plan_id}", status_code=302)
 
 

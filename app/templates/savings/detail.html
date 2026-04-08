@@ -113,6 +113,8 @@
     <p class="muted" style="font-size:0.82rem; margin-bottom:0.75rem;">Op basis van je transacties. Pas aan en voeg toe, of sla over.</p>
     {% for s in ai_suggestions %}
     <form method="post" action="/savings/{{ plan.id }}/accept-suggestion" style="padding:0.75rem 0; border-bottom:1px solid var(--border);">
+        {# Pass the raw suggestions param so remaining survive after accepting one #}
+        <input type="hidden" name="remaining_suggestions" value="{{ request.query_params.get('suggestions', '') }}">
         {% if s.reasoning %}<p class="muted" style="font-size:0.78rem; margin-bottom:0.5rem;">💡 {{ s.reasoning }}</p>{% endif %}
         <div style="display:flex; gap:0.5rem; align-items:end; flex-wrap:wrap;">
             <div class="form-group" style="flex:2; min-width:150px; margin:0;">
@@ -214,6 +216,13 @@
                     {% for cat in categories %}
                     <option value="{{ cat.id }}">{{ cat.name }}{% if cat.is_income %} (inkomen){% endif %}</option>
                     {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="line_type">Type</label>
+                <select name="is_income" id="line_type">
+                    <option value="0">Uitgave</option>
+                    <option value="1">Inkomen</option>
                 </select>
             </div>
             <div class="form-group">
