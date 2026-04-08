@@ -586,29 +586,27 @@ def _find_recurring_candidates(
     and find candidate transactions in other months that could be matched.
     Returns candidates (does NOT link them — caller decides to propose or auto-link).
     """
-    # Build search terms from the linked transaction
-    search_terms = []
+    # Build search words from the linked transaction (for Python filtering)
     desc = (linked_tx.description or "").strip()
     cp = (linked_tx.counterparty or "").strip()
 
+    search_words = []
     if desc:
         item_words = item.name.lower().split()
         desc_lower = desc.lower()
         matching_words = [w for w in item_words if len(w) > 2 and w in desc_lower]
-
         if matching_words:
-            for word in matching_words:
-                search_terms.append(Transaction.description.ilike(f"%{word}%"))
+            search_words = matching_words
         elif cp:
-            search_terms.append(Transaction.counterparty.ilike(f"%{cp}%"))
+            search_words = [cp.lower()]
         else:
-            snippet = desc[:30].strip()
+            snippet = desc[:30].strip().lower()
             if len(snippet) > 5:
-                search_terms.append(Transaction.description.ilike(f"%{snippet}%"))
+                search_words = [snippet]
     elif cp:
-        search_terms.append(Transaction.counterparty.ilike(f"%{cp}%"))
+        search_words = [cp.lower()]
 
-    if not search_terms:
+    if not search_words:
         return []
 
     # Update the recurring item's description_match if empty
@@ -619,8 +617,8 @@ def _find_recurring_candidates(
         if matching:
             item.description_match = " ".join(matching)
 
-    # Find all unlinked transactions that match this pattern
-    all_candidates = (
+    # Find all unlinked transactions and filter in Python (encrypted fields)
+    all_txs = (
         db.query(Transaction)
         .join(Account)
         .filter(
@@ -629,11 +627,16 @@ def _find_recurring_candidates(
             Transaction.is_projected == 0,
             Transaction.recurring_id.is_(None),
             Transaction.id != linked_tx.id,
-            *search_terms,
         )
         .order_by(Transaction.date)
         .all()
     )
+    all_candidates = []
+    for tx in all_txs:
+        tx_desc = (tx.description or "").lower()
+        tx_cp = (tx.counterparty or "").lower()
+        if all(w in tx_desc or w in tx_cp for w in search_words):
+            all_candidates.append(tx)
 
     # Filter: one per period, same sign, no existing match
     from app.routers.recurring import _get_period_range, _find_matching_transaction
