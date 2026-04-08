@@ -506,7 +506,30 @@ function initMirrorChart() {
             scales: {
                 x: {
                     stacked: true,
-                    beginAtZero: true,
+                    // Symmetrisch: nulpunt altijd in het midden
+                    min: -(function() {
+                        var maxLeft = Math.max.apply(null, overviewData.map(function(d) {
+                            return d.expense_actual + d.expense_expected + d.uncat_amount;
+                        }));
+                        var maxRight = Math.max.apply(null, overviewData.map(function(d) {
+                            return d.income_actual + d.income_expected;
+                        }));
+                        // Also include budget values
+                        var maxBudgetLeft = Math.max.apply(null, overviewData.map(function(d) { return d.expense_budget; }));
+                        var maxBudgetRight = Math.max.apply(null, overviewData.map(function(d) { return d.income_budget; }));
+                        return Math.max(maxLeft, maxRight, maxBudgetLeft, maxBudgetRight) * 1.08;
+                    })(),
+                    max: (function() {
+                        var maxLeft = Math.max.apply(null, overviewData.map(function(d) {
+                            return d.expense_actual + d.expense_expected + d.uncat_amount;
+                        }));
+                        var maxRight = Math.max.apply(null, overviewData.map(function(d) {
+                            return d.income_actual + d.income_expected;
+                        }));
+                        var maxBudgetLeft = Math.max.apply(null, overviewData.map(function(d) { return d.expense_budget; }));
+                        var maxBudgetRight = Math.max.apply(null, overviewData.map(function(d) { return d.income_budget; }));
+                        return Math.max(maxLeft, maxRight, maxBudgetLeft, maxBudgetRight) * 1.08;
+                    })(),
                     ticks: {
                         color: C.muted,
                         callback: function(v) { return fmtEuro(v); },
