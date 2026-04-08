@@ -724,8 +724,11 @@ def analyze_savings(
         return RedirectResponse("/savings", status_code=302)
 
     # Get all transactions for this account in the plan year
+    from sqlalchemy.orm import joinedload as jl
+    from app.models import Category as Cat
     transactions = (
         db.query(Transaction)
+        .options(jl(Transaction.category))
         .filter(
             Transaction.account_id == plan.account_id,
             func.extract("year", Transaction.date) == plan.year,
@@ -739,18 +742,20 @@ def analyze_savings(
     if not transactions:
         return RedirectResponse(f"/savings/{plan_id}?analyze=empty", status_code=302)
 
-    # Transform for AI
-    tx_data = [
-        {
-            "counterparty": tx.counterparty or "",
-            "description": tx.description or "",
-            "amount": tx.amount,
-            "date": tx.date,
-            "category_id": tx.category_id,
-            "category_name": tx.category.name if tx.category else None,
-        }
-        for tx in transactions
-    ]
+    # Transform for AI (handle encrypted fields gracefully)
+    tx_data = []
+    for tx in transactions:
+        try:
+            tx_data.append({
+                "counterparty": (tx.counterparty or "").strip(),
+                "description": (tx.description or "").strip(),
+                "amount": float(tx.amount) if tx.amount else 0.0,
+                "date": tx.date,
+                "category_id": tx.category_id,
+                "category_name": tx.category.name if tx.category else None,
+            })
+        except Exception:
+            continue  # Skip transactions with decryption issues
 
     # Get existing line names
     existing_lines = [line.name for line in plan.lines]
