@@ -294,9 +294,12 @@ function createBudgetPlugin(id, isHorizontal) {
 // Shared legend items
 function getLegendItems() {
     var items = [
-        { text: 'Budget', fillStyle: C.green + '30', strokeStyle: C.green + '50', lineWidth: 1, pointStyle: 'rectRounded' },
-        { text: 'Gerealiseerd', fillStyle: C.green, strokeStyle: C.green, lineWidth: 0, pointStyle: 'rectRounded' },
-        { text: 'Verwacht', fillStyle: C.green + '55', strokeStyle: C.green, lineWidth: 2, lineDash: [3,3], pointStyle: 'rectRounded' },
+        { text: 'Ink. budget', fillStyle: C.green + '30', strokeStyle: C.green + '50', lineWidth: 1, pointStyle: 'rectRounded' },
+        { text: 'Ink. gerealiseerd', fillStyle: C.green, strokeStyle: C.green, lineWidth: 0, pointStyle: 'rectRounded' },
+        { text: 'Ink. verwacht', fillStyle: C.green + '55', strokeStyle: C.green, lineWidth: 2, lineDash: [3,3], pointStyle: 'rectRounded' },
+        { text: 'Uitg. budget', fillStyle: C.red + '30', strokeStyle: C.red + '50', lineWidth: 1, pointStyle: 'rectRounded' },
+        { text: 'Uitg. gerealiseerd', fillStyle: C.red, strokeStyle: C.red, lineWidth: 0, pointStyle: 'rectRounded' },
+        { text: 'Uitg. verwacht', fillStyle: C.red + '55', strokeStyle: C.red, lineWidth: 2, lineDash: [3,3], pointStyle: 'rectRounded' },
     ];
     {% if not current_month %}
     if (overviewData.some(function(r) { return r.uncat_amount > 0; })) {
@@ -418,16 +421,16 @@ function initMirrorChart() {
     var datasets = [
         { label: 'Inkomen gerealiseerd',
           data: overviewData.map(function(r) { return r.income_actual; }),
-          backgroundColor: C.green, borderRadius: 3, barPercentage: 0.85, categoryPercentage: 0.85 },
+          backgroundColor: C.green, stack: 'inkomen', borderRadius: 0, barPercentage: 0.85, categoryPercentage: 0.85 },
         { label: 'Inkomen verwacht',
           data: overviewData.map(function(r) { return r.income_expected || 0; }),
-          backgroundColor: greenStripeM, borderRadius: 3, barPercentage: 0.85, categoryPercentage: 0.85 },
+          backgroundColor: greenStripeM, stack: 'inkomen', borderRadius: 3, barPercentage: 0.85, categoryPercentage: 0.85 },
         { label: 'Uitgaven gerealiseerd',
           data: overviewData.map(function(r) { return -r.expense_actual; }),
-          backgroundColor: C.red, borderRadius: 3, barPercentage: 0.85, categoryPercentage: 0.85 },
+          backgroundColor: C.red, stack: 'uitgaven', borderRadius: 0, barPercentage: 0.85, categoryPercentage: 0.85 },
         { label: 'Uitgaven verwacht',
           data: overviewData.map(function(r) { return r.expense_expected ? -r.expense_expected : 0; }),
-          backgroundColor: redStripeM, borderRadius: 3, barPercentage: 0.85, categoryPercentage: 0.85 },
+          backgroundColor: redStripeM, stack: 'uitgaven', borderRadius: 3, barPercentage: 0.85, categoryPercentage: 0.85 },
     ];
     {% if not current_month %}
     if (overviewData.some(function(r) { return r.uncat_amount > 0; })) {
@@ -461,6 +464,7 @@ function initMirrorChart() {
             },
             scales: {
                 x: {
+                    stacked: true,
                     beginAtZero: true,
                     ticks: {
                         color: C.muted,
@@ -470,6 +474,7 @@ function initMirrorChart() {
                     grid: { color: C.border + '44' },
                 },
                 y: {
+                    stacked: true,
                     ticks: {
                         color: getCSS('--sky') || '#40C4FF',
                         font: { family: C.font, weight: 600 },
@@ -490,6 +495,11 @@ function initMirrorChart() {
 (function() {
     var saved = localStorage.getItem('dashboard-view') || 'grafiek';
     switchView(saved);
+    // Scroll to chart view after drill-down navigation
+    if (saved !== 'tabel') {
+        var el = document.getElementById('view-' + saved);
+        if (el) setTimeout(function() { el.scrollIntoView({behavior: 'smooth', block: 'start'}); }, 100);
+    }
 })();
 </script>
 
