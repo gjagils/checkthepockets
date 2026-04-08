@@ -86,6 +86,10 @@ def dashboard(
 def _level1_yearly(request, db, user, current_year, years, base_tx_filter, today):
     """Level 1: Yearly overview — one row per month."""
 
+    # Sync projected transactions for current month
+    from app.routers.recurring import sync_projected_transactions
+    sync_projected_transactions(user.id, current_year, today.month, db)
+
     # Budget per month: income vs expense
     budget_monthly = (
         db.query(

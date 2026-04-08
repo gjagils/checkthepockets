@@ -122,7 +122,7 @@
 
 <!-- MIRROR CHART VIEW (Spiegelgrafiek) -->
 <div id="view-spiegel" class="card" style="display:none; padding:1.25rem;">
-    <div style="height:{{ [overview_rows|length * 50, 300]|max }}px;">
+    <div style="height:{{ [overview_rows|length * 65, 350]|max }}px;">
         <canvas id="mirrorChart" style="cursor:pointer;"></canvas>
     </div>
 </div>
@@ -146,6 +146,25 @@ var C = {
     border: getCSS('--border') || '#333',
     font: "'Plus Jakarta Sans', sans-serif",
 };
+
+// Create diagonal stripe pattern for "verwacht" bars
+function createStripePattern(color, bgAlpha, stripeAlpha) {
+    var canvas = document.createElement('canvas');
+    canvas.width = 10; canvas.height = 10;
+    var ctx = canvas.getContext('2d');
+    // Background
+    ctx.fillStyle = color + (bgAlpha || '33');
+    ctx.fillRect(0, 0, 10, 10);
+    // Diagonal stripes
+    ctx.strokeStyle = color + (stripeAlpha || '88');
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, 10); ctx.lineTo(10, 0);
+    ctx.moveTo(-3, 3); ctx.lineTo(3, -3);
+    ctx.moveTo(7, 13); ctx.lineTo(13, 7);
+    ctx.stroke();
+    return ctx.createPattern(canvas, 'repeat');
+}
 
 // Format euro for tooltips
 function fmtEuro(val) {
@@ -182,9 +201,9 @@ function createBudgetPlugin(id, isHorizontal) {
         beforeDatasetsDraw: function(chart) {
             var c = chart.ctx;
             var r = 4;
-            // dataset 0 = inkomen, 1 or 2 = uitgaven (depends on chart)
+            // dataset 0 = inkomen gerealiseerd, 2 = uitgaven gerealiseerd (both charts)
             var metaInk = chart.getDatasetMeta(0);
-            var metaUitg = chart.getDatasetMeta(isHorizontal ? 1 : 2);
+            var metaUitg = chart.getDatasetMeta(2);
 
             overviewData.forEach(function(d, i) {
                 if (isHorizontal) {
@@ -256,7 +275,7 @@ function getLegendItems() {
     var items = [
         { text: 'Budget', fillStyle: C.green + '30', strokeStyle: C.green + '50', lineWidth: 1, pointStyle: 'rectRounded' },
         { text: 'Gerealiseerd', fillStyle: C.green, strokeStyle: C.green, lineWidth: 0, pointStyle: 'rectRounded' },
-        { text: 'Verwacht', fillStyle: C.green + '88', strokeStyle: C.green, lineWidth: 2, lineDash: [4,2], pointStyle: 'rectRounded' },
+        { text: 'Verwacht', fillStyle: C.green + '55', strokeStyle: C.green, lineWidth: 2, lineDash: [3,3], pointStyle: 'rectRounded' },
     ];
     {% if not current_month %}
     if (overviewData.some(function(r) { return r.uncat_amount > 0; })) {
@@ -306,16 +325,19 @@ function initBarChart() {
     var ctx = document.getElementById('overviewChart').getContext('2d');
     var hasUncat = overviewData.some(function(r) { return r.uncat_amount > 0; });
 
+    var greenStripe = createStripePattern(C.green);
+    var redStripe = createStripePattern(C.red);
+
     var datasets = [
         { label: 'Inkomen gerealiseerd', data: overviewData.map(function(r) { return r.income_actual; }),
           backgroundColor: C.green, stack: 'inkomen', borderRadius: 0, barPercentage: 0.6, categoryPercentage: 0.7, order: 1 },
         { label: 'Inkomen verwacht', data: overviewData.map(function(r) { return r.income_expected; }),
-          backgroundColor: C.green + '88', borderColor: C.green, borderWidth: {top:2,right:0,bottom:0,left:0},
+          backgroundColor: greenStripe,
           stack: 'inkomen', borderRadius: 3, barPercentage: 0.6, categoryPercentage: 0.7, order: 1 },
         { label: 'Uitgaven gerealiseerd', data: overviewData.map(function(r) { return r.expense_actual; }),
           backgroundColor: C.red, stack: 'uitgaven', borderRadius: 0, barPercentage: 0.6, categoryPercentage: 0.7, order: 1 },
         { label: 'Uitgaven verwacht', data: overviewData.map(function(r) { return r.expense_expected; }),
-          backgroundColor: C.red + '88', borderColor: C.red, borderWidth: {top:2,right:0,bottom:0,left:0},
+          backgroundColor: redStripe,
           stack: 'uitgaven', borderRadius: 3, barPercentage: 0.6, categoryPercentage: 0.7, order: 1 },
     ];
     {% if not current_month %}
@@ -369,13 +391,22 @@ function initMirrorChart() {
     var ctx = document.getElementById('mirrorChart').getContext('2d');
 
     // Mirror: expenses negative (left), income positive (right)
+    var greenStripeM = createStripePattern(C.green);
+    var redStripeM = createStripePattern(C.red);
+
     var datasets = [
         { label: 'Inkomen gerealiseerd',
           data: overviewData.map(function(r) { return r.income_actual; }),
-          backgroundColor: C.green, borderRadius: 3, barPercentage: 0.6, categoryPercentage: 0.8 },
+          backgroundColor: C.green, borderRadius: 3, barPercentage: 0.85, categoryPercentage: 0.85 },
+        { label: 'Inkomen verwacht',
+          data: overviewData.map(function(r) { return r.income_expected || 0; }),
+          backgroundColor: greenStripeM, borderRadius: 3, barPercentage: 0.85, categoryPercentage: 0.85 },
         { label: 'Uitgaven gerealiseerd',
           data: overviewData.map(function(r) { return -r.expense_actual; }),
-          backgroundColor: C.red, borderRadius: 3, barPercentage: 0.6, categoryPercentage: 0.8 },
+          backgroundColor: C.red, borderRadius: 3, barPercentage: 0.85, categoryPercentage: 0.85 },
+        { label: 'Uitgaven verwacht',
+          data: overviewData.map(function(r) { return r.expense_expected ? -r.expense_expected : 0; }),
+          backgroundColor: redStripeM, borderRadius: 3, barPercentage: 0.85, categoryPercentage: 0.85 },
     ];
     {% if not current_month %}
     if (overviewData.some(function(r) { return r.uncat_amount > 0; })) {
@@ -383,7 +414,7 @@ function initMirrorChart() {
             label: 'Niet gecategoriseerd',
             data: overviewData.map(function(r) { return r.uncat_amount ? -r.uncat_amount : 0; }),
             backgroundColor: C.muted + '66', borderColor: C.muted + '88', borderWidth: 1,
-            borderRadius: 3, barPercentage: 0.6, categoryPercentage: 0.8,
+            borderRadius: 3, barPercentage: 0.85, categoryPercentage: 0.85,
         });
     }
     {% endif %}
