@@ -388,7 +388,7 @@ def _level2_categories(request, db, user, current_year, month, years, base_tx_fi
             "color": parent.color,
         })
 
-    # Add uncategorized row if any
+    # Add uncategorized row if any — show amount as expenses
     if uncat_count > 0:
         overview_rows.append({
             "label": "Niet gecategoriseerd",
@@ -397,7 +397,7 @@ def _level2_categories(request, db, user, current_year, month, years, base_tx_fi
             "income_budget": Decimal("0"),
             "income_actual": Decimal("0"),
             "expense_budget": Decimal("0"),
-            "expense_actual": Decimal("0"),
+            "expense_actual": uncat_amount,
             "uncat_count": uncat_count,
             "uncat_amount": uncat_amount,
             "is_current": False,
