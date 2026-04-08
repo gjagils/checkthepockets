@@ -280,28 +280,6 @@ function initChart() {
                 mode: 'index',
                 intersect: false,
             },
-            onClick: function(evt, elements, chart) {
-                // Use Chart.js built-in event coordinates (already in chart space)
-                var xScale = chart.scales.x;
-                var xPos = evt.x;
-                // Find nearest label
-                var bestIdx = -1;
-                var bestDist = Infinity;
-                for (var i = 0; i < labels.length; i++) {
-                    var px = xScale.getPixelForValue(i);
-                    var dist = Math.abs(xPos - px);
-                    if (dist < bestDist) {
-                        bestDist = dist;
-                        bestIdx = i;
-                    }
-                }
-                if (bestIdx >= 0 && bestDist < (xScale.width / labels.length)) {
-                    var label = labels[bestIdx];
-                    if (drillLinks[label]) {
-                        window.location.href = drillLinks[label];
-                    }
-                }
-            },
             plugins: {
                 legend: {
                     position: 'top',
@@ -369,6 +347,36 @@ function initChart() {
                 },
             },
         },
+    });
+
+    // Canvas click listener for drill-down navigation
+    // (Chart.js onClick doesn't fire reliably with stacked bars)
+    var canvas = document.getElementById('overviewChart');
+    canvas.style.cursor = 'pointer';
+    canvas.addEventListener('click', function(e) {
+        var chart = window._chart;
+        if (!chart) return;
+        var rect = canvas.getBoundingClientRect();
+        var x = e.clientX - rect.left;
+        var xScale = chart.scales.x;
+
+        // Find nearest label
+        var bestIdx = -1;
+        var bestDist = Infinity;
+        for (var i = 0; i < labels.length; i++) {
+            var px = xScale.getPixelForValue(i);
+            var dist = Math.abs(x - px);
+            if (dist < bestDist) {
+                bestDist = dist;
+                bestIdx = i;
+            }
+        }
+        if (bestIdx >= 0 && bestDist < (xScale.width / labels.length)) {
+            var label = labels[bestIdx];
+            if (drillLinks[label]) {
+                window.location.href = drillLinks[label];
+            }
+        }
     });
 }
 
