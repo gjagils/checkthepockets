@@ -201,18 +201,44 @@ function handleChartClick(chart, evt, isHorizontal) {
 
     var d = overviewData[bestIdx];
     var label = labels[bestIdx];
-
-    // Determine if click was on label area or bar area
     var chartArea = chart.chartArea;
-    var onLabelArea = isHorizontal ? (x < chartArea.left) : (y > chartArea.bottom);
 
+    // Label area = drill-down
+    var onLabelArea = isHorizontal ? (x < chartArea.left) : (y > chartArea.bottom);
     if (onLabelArea && drillLinks[label]) {
-        // Label click → drill-down to categories/subcategories
         window.location.href = drillLinks[label];
-    } else if (!onLabelArea && d.tx_link) {
-        // Bar click → navigate to transactions
-        window.location.href = d.tx_link;
+        return;
     }
+
+    // Bar area = navigate to transactions with specific filter
+    if (onLabelArea || !d.tx_link) return;
+
+    // For uncategorized rows, use the uncat link
+    if (d.tx_link_uncat && label === 'Niet gecategoriseerd') {
+        window.location.href = d.tx_link_uncat;
+        return;
+    }
+
+    var url = d.tx_link;
+    var sep = url.indexOf('?') >= 0 ? '&' : '?';
+
+    if (isHorizontal) {
+        // Spiegel: links = uitgaven (x < zero), rechts = inkomen (x > zero)
+        var zero = chart.scales.x.getPixelForValue(0);
+        url += sep + (x < zero ? 'amount_max=-0.01' : 'amount_min=0.01');
+    } else {
+        // Verticale chart: detect which bar stack was clicked via nearest element
+        var elements = chart.getElementsAtEventForMode(evt, 'nearest', {intersect: true}, false);
+        if (elements.length > 0) {
+            var dsLabel = chart.data.datasets[elements[0].datasetIndex].label || '';
+            if (dsLabel.indexOf('Inkomen') >= 0) {
+                url += sep + 'amount_min=0.01';
+            } else if (dsLabel.indexOf('Uitgaven') >= 0) {
+                url += sep + 'amount_max=-0.01';
+            }
+        }
+    }
+    window.location.href = url;
 }
 
 // Budget background plugin factory (works for both vertical and horizontal)
@@ -292,14 +318,18 @@ function createBudgetPlugin(id, isHorizontal) {
 }
 
 // Shared legend items
+// Pre-create stripe patterns for legend (reused by charts)
+var legendGreenStripe = createStripePattern(C.green);
+var legendRedStripe = createStripePattern(C.red);
+
 function getLegendItems() {
     var items = [
         { text: 'Ink. budget', fillStyle: C.green + '30', strokeStyle: C.green + '50', lineWidth: 1, pointStyle: 'rectRounded' },
         { text: 'Ink. gerealiseerd', fillStyle: C.green, strokeStyle: C.green, lineWidth: 0, pointStyle: 'rectRounded' },
-        { text: 'Ink. verwacht', fillStyle: C.green + '55', strokeStyle: C.green, lineWidth: 2, lineDash: [3,3], pointStyle: 'rectRounded' },
+        { text: 'Ink. verwacht', fillStyle: legendGreenStripe, strokeStyle: C.green, lineWidth: 0, pointStyle: 'rectRounded' },
         { text: 'Uitg. budget', fillStyle: C.red + '30', strokeStyle: C.red + '50', lineWidth: 1, pointStyle: 'rectRounded' },
         { text: 'Uitg. gerealiseerd', fillStyle: C.red, strokeStyle: C.red, lineWidth: 0, pointStyle: 'rectRounded' },
-        { text: 'Uitg. verwacht', fillStyle: C.red + '55', strokeStyle: C.red, lineWidth: 2, lineDash: [3,3], pointStyle: 'rectRounded' },
+        { text: 'Uitg. verwacht', fillStyle: legendRedStripe, strokeStyle: C.red, lineWidth: 0, pointStyle: 'rectRounded' },
     ];
     {% if not current_month %}
     if (overviewData.some(function(r) { return r.uncat_amount > 0; })) {
