@@ -642,6 +642,7 @@ def create_recurring(
     end_date: str = Form(""),
     active_months: List[str] = Form(default=[]),
     link_tx_ids: List[str] = Form(default=[]),
+    dismiss_suggestion_id: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
@@ -690,6 +691,15 @@ def create_recurring(
     )
     db.add(item)
     db.flush()
+
+    # Delete the AI suggestion if this was created from one
+    if dismiss_suggestion_id.strip().isdigit():
+        suggestion = db.query(RecurringSuggestion).filter(
+            RecurringSuggestion.id == int(dismiss_suggestion_id),
+            RecurringSuggestion.user_id == user.id,
+        ).first()
+        if suggestion:
+            db.delete(suggestion)
 
     # Link selected transactions to this recurring item
     if link_tx_ids:

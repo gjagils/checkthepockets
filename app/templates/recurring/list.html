@@ -331,6 +331,9 @@
             </details>
             {% endif %}
             <form method="post" action="/recurring" id="recurring-form">
+                {% if prefill and prefill.suggestion_id %}
+                <input type="hidden" name="dismiss_suggestion_id" value="{{ prefill.suggestion_id }}">
+                {% endif %}
                 <div class="form-group">
                     <label for="name">Naam</label>
                     <input type="text" id="name" name="name" required
