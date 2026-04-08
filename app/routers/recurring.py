@@ -968,6 +968,22 @@ def edit_recurring(
         item.category_id = None
 
     db.commit()
+
+    # Delete ALL projected transactions for this item (frequency may have changed)
+    from app.models import Transaction as Tx
+    stale = (
+        db.query(Tx)
+        .filter(Tx.recurring_id == item.id, Tx.is_projected == 1)
+        .all()
+    )
+    for s in stale:
+        db.delete(s)
+    db.commit()
+
+    # Re-sync projected for current month with new settings
+    today = date.today()
+    sync_projected_transactions(user.id, today.year, today.month, db)
+
     return RedirectResponse("/recurring", status_code=302)
 
 
