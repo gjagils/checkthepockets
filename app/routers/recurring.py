@@ -430,6 +430,22 @@ def _render_recurring_page(
         .scalar()
     )
 
+    # Load all linked transactions per recurring item (for display)
+    linked_txs_by_item = {}
+    all_linked = (
+        db.query(Transaction)
+        .join(Account)
+        .filter(
+            Account.user_id == user.id,
+            Transaction.recurring_id.isnot(None),
+            Transaction.is_projected == 0,
+        )
+        .order_by(Transaction.date.desc())
+        .all()
+    )
+    for tx in all_linked:
+        linked_txs_by_item.setdefault(tx.recurring_id, []).append(tx)
+
     items_active = []
     items_due = []
     items_missed = []
@@ -444,6 +460,7 @@ def _render_recurring_page(
             items_inactive.append({
                 "item": item, "period_start": cur_start, "period_end": cur_end,
                 "matched_transaction": match, "is_due": False, "in_active_period": in_period,
+                "linked_transactions": linked_txs_by_item.get(item.id, []),
             })
             continue
 
@@ -461,6 +478,7 @@ def _render_recurring_page(
             "prev_period_start": prev_start, "prev_period_end": prev_end,
             "prev_matched_transaction": prev_match,
             "is_due": cur_match is None, "in_active_period": True,
+            "linked_transactions": linked_txs_by_item.get(item.id, []),
         }
 
         if cur_match:

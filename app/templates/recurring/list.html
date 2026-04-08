@@ -103,15 +103,7 @@
                 Vorige periode: {{ entry.prev_period_start.strftime('%d-%m') }} t/m {{ entry.prev_period_end.strftime('%d-%m-%Y') }}
             </span>
         </div>
-        <!-- Koppel transactie -->
-        <details style="margin-top:0.5rem;">
-            <summary style="font-size:0.8rem; cursor:pointer; color:var(--navy-mid); font-weight:600;">↩ Handmatig koppelen</summary>
-            <form method="post" action="/recurring/{{ item.id }}/link" style="display:flex; gap:0.4rem; margin-top:0.4rem; align-items:center;">
-                <input type="number" name="transaction_id" placeholder="Transactie ID" style="width:140px;"
-                       title="Vind het ID via de transactiepagina (URL /transactions/{id}/edit)">
-                <button type="submit" class="btn btn-sm btn-accent">Koppelen</button>
-            </form>
-        </details>
+        {% include "recurring/_linked_transactions.html" %}
         <div class="recurring-actions" style="margin-top:0.5rem;">
             <button class="btn btn-sm" onclick="toggleRecurringEdit({{ item.id }})">Bewerken</button>
             <form method="post" action="/recurring/{{ item.id }}/toggle" style="display:inline;">
@@ -159,13 +151,7 @@
                     <span class="muted" style="font-size:0.78rem;">t/m {{ entry.period_end.strftime('%d-%m-%Y') }}</span>
                     <span class="recurring-badge recurring-badge-due">Nog niet gevonden</span>
                 </div>
-                <details style="margin-top:0.4rem;">
-                    <summary style="font-size:0.78rem; cursor:pointer; color:var(--navy-mid); font-weight:600;">↩ Handmatig koppelen</summary>
-                    <form method="post" action="/recurring/{{ item.id }}/link" style="display:flex; gap:0.4rem; margin-top:0.35rem; align-items:center;">
-                        <input type="number" name="transaction_id" placeholder="Transactie ID" style="width:140px;">
-                        <button type="submit" class="btn btn-sm btn-accent">Koppelen</button>
-                    </form>
-                </details>
+                {% include "recurring/_linked_transactions.html" %}
                 <div class="recurring-actions" style="margin-top:0.4rem;">
                     <button class="btn btn-sm" onclick="toggleRecurringEdit({{ item.id }})">Bewerken</button>
                     <form method="post" action="/recurring/{{ item.id }}/toggle" style="display:inline;">
@@ -221,6 +207,7 @@
                     </form>
                     {% endif %}
                 </div>
+                {% include "recurring/_linked_transactions.html" %}
                 <div class="recurring-actions">
                     <button class="btn btn-sm" onclick="toggleRecurringEdit({{ item.id }})">Bewerken</button>
                     <form method="post" action="/recurring/{{ item.id }}/toggle" style="display:inline;">
