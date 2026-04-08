@@ -53,7 +53,7 @@
     </div>
     <div style="background:var(--bg); border-radius:6px; height:10px; overflow:hidden;">
         <div style="height:100%; width:{{ [pct_budget, 100]|min }}%; border-radius:6px; transition:width .4s ease;
-            background: {% if pct_budget > 100 %}var(--red){% elif pct_budget > 90 %}var(--gold){% else %}var(--navy-mid){% endif %};"></div>
+            background: {% if pct_budget > 100 %}var(--red){% elif pct_budget > 90 %}var(--gold){% else %}var(--sky){% endif %};"></div>
     </div>
     <div style="display:flex; justify-content:space-between; margin-top:0.35rem; font-size:0.78rem; color:var(--muted);">
         <span>&euro;&nbsp;{{ total_budgeted|euro }} gebudgetteerd</span>
@@ -78,7 +78,7 @@
     </div>
     <div style="background:var(--bg); border-radius:6px; height:10px; overflow:hidden;">
         <div style="height:100%; width:{{ [pct_actual, 100]|min }}%; border-radius:6px; transition:width .4s ease;
-            background: {% if pct_actual > 100 %}var(--red){% elif pct_actual > 90 %}var(--gold){% else %}var(--navy-mid){% endif %};"></div>
+            background: {% if pct_actual > 100 %}var(--red){% elif pct_actual > 90 %}var(--gold){% else %}var(--sky){% endif %};"></div>
     </div>
     <div style="display:flex; justify-content:space-between; margin-top:0.35rem; font-size:0.78rem; color:var(--muted);">
         <span>&euro;&nbsp;{{ total_budgeted|euro }} gebudgetteerd</span>
