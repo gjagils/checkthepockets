@@ -14,7 +14,10 @@
                 {% for tx in entry.candidates %}
                 <tr>
                     <td><input type="checkbox" name="transaction_ids" value="{{ tx.id }}"></td>
-                    <td class="nowrap">{{ tx.date.strftime('%d-%m-%Y') }}</td>
+                    <td class="nowrap">
+                        <input type="date" name="tx_date_{{ tx.id }}" value="{{ tx.date.strftime('%Y-%m-%d') }}"
+                               style="font-size:0.78rem; padding:0.15rem 0.3rem; border:1px solid var(--border); border-radius:4px; background:var(--surface); color:var(--text); width:130px;">
+                    </td>
                     <td>{{ tx.counterparty or '—' }}</td>
                     <td class="muted" style="font-size:0.72rem; word-break:break-all;">{{ tx.description or '—' }}</td>
                     <td class="text-right nowrap {% if tx.amount < 0 %}amount-negative{% else %}amount-positive{% endif %}">

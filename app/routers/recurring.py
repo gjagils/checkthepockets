@@ -690,7 +690,7 @@ def dismiss_suggestion(suggestion_id: int, request: Request, db: Session = Depen
 
 
 @router.post("/recurring")
-def create_recurring(
+async def create_recurring(
     request: Request,
     name: str = Form(...),
     amount_expected: str = Form(...),
@@ -761,10 +761,12 @@ def create_recurring(
         if suggestion:
             db.delete(suggestion)
 
-    # Link selected transactions to this recurring item
+    # Link selected transactions and update dates if changed
     if link_tx_ids:
         tx_ids = [int(tid) for tid in link_tx_ids if tid.strip().isdigit()]
         if tx_ids:
+            # Read date overrides from form
+            form_data = await request.form()
             txs = (
                 db.query(Transaction)
                 .join(Account)
@@ -776,6 +778,15 @@ def create_recurring(
             )
             for tx in txs:
                 link_transaction_to_recurring(tx, item)
+                # Update date if user changed it
+                new_date_str = form_data.get(f"tx_date_{tx.id}", "")
+                if new_date_str:
+                    try:
+                        new_date = date_type.fromisoformat(new_date_str)
+                        if new_date != tx.date:
+                            tx.date = new_date
+                    except ValueError:
+                        pass
 
     db.commit()
 
@@ -783,13 +794,13 @@ def create_recurring(
 
 
 @router.post("/recurring/{item_id}/link-selected")
-def link_selected_transactions(
+async def link_selected_transactions(
     item_id: int,
     request: Request,
     transaction_ids: List[str] = Form(default=[]),
     db: Session = Depends(get_db),
 ):
-    """Link multiple selected transactions to a recurring item."""
+    """Link multiple selected transactions to a recurring item, with optional date changes."""
     user = require_login(request, db)
 
     item = db.query(RecurringTransaction).filter(
@@ -800,14 +811,24 @@ def link_selected_transactions(
 
     tx_ids = [int(tid) for tid in transaction_ids if tid.strip().isdigit()]
     if tx_ids:
+        form_data = await request.form()
         txs = (
             db.query(Transaction)
             .join(Account)
             .filter(Transaction.id.in_(tx_ids), Account.user_id == user.id)
             .all()
         )
+        from datetime import date as date_type
         for tx in txs:
             link_transaction_to_recurring(tx, item)
+            new_date_str = form_data.get(f"tx_date_{tx.id}", "")
+            if new_date_str:
+                try:
+                    new_date = date_type.fromisoformat(new_date_str)
+                    if new_date != tx.date:
+                        tx.date = new_date
+                except ValueError:
+                    pass
         db.commit()
 
     return RedirectResponse("/recurring", status_code=302)
