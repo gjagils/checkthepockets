@@ -327,27 +327,19 @@ def budget_overview(
         )
         .all()
     )
+    # Use _find_matching_transaction which handles encrypted fields correctly
+    from app.routers.recurring import _find_matching_transaction, _get_period_range
+    import calendar as cal
     expected_income = Decimal("0")
     for item in active_recurring:
         if not _is_active_in_month(item, current_year, current_month):
             continue
         if item.frequency != "monthly":
             continue
-        # Check if already matched this month
-        match_filter = [
-            Account.user_id == user.id,
-            func.extract("year", Transaction.date) == current_year,
-            func.extract("month", Transaction.date) == current_month,
-            Transaction.is_excluded == 0,
-            Transaction.amount > 0,
-        ]
-        if item.counterparty:
-            match_filter.append(Transaction.counterparty.ilike(f"%{item.counterparty}%"))
-        if item.category_id:
-            match_filter.append(Transaction.category_id == item.category_id)
-        if account_id:
-            match_filter.append(Transaction.account_id == account_id)
-        matched = db.query(Transaction).join(Account).filter(*match_filter).first()
+        period_start, period_end = _get_period_range(
+            item.frequency, datetime.date(current_year, current_month, 1)
+        )
+        matched = _find_matching_transaction(db, user.id, item, period_start, period_end)
         if not matched:
             expected_income += item.amount_expected
 

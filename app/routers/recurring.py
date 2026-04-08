@@ -94,16 +94,13 @@ def _find_matching_transaction(
         return linked
 
     # Fall back to auto-matching by counterparty/description
-    conditions = []
-    if recurring.counterparty:
-        conditions.append(Transaction.counterparty.ilike(f"%{recurring.counterparty}%"))
-    if recurring.description_match:
-        conditions.append(Transaction.description.ilike(f"%{recurring.description_match}%"))
-
-    if not conditions:
+    # Note: these fields are encrypted, so ILIKE won't work — filter in Python
+    search_cp = (recurring.counterparty or "").lower()
+    search_desc = (recurring.description_match or "").lower()
+    if not search_cp and not search_desc:
         return None
 
-    return (
+    candidates = (
         db.query(Transaction)
         .join(Account)
         .filter(
@@ -112,11 +109,20 @@ def _find_matching_transaction(
             Transaction.date <= end,
             Transaction.is_excluded == 0,
             Transaction.is_projected == 0,
-            or_(*conditions),
         )
         .order_by(Transaction.date.desc())
-        .first()
+        .all()
     )
+    for tx in candidates:
+        cp = (tx.counterparty or "").lower()
+        desc = (tx.description or "").lower()
+        if search_cp and search_cp in cp:
+            return tx
+        if search_cp and search_cp in desc:
+            return tx
+        if search_desc and search_desc in desc:
+            return tx
+    return None
 
 
 def _parse_active_months(values: List[str]) -> str | None:
