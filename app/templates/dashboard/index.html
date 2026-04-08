@@ -354,6 +354,8 @@ function initChart() {
     var canvas = document.getElementById('overviewChart');
     canvas.style.cursor = 'pointer';
     canvas.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
         var chart = window._chart;
         if (!chart) return;
         var rect = canvas.getBoundingClientRect();
@@ -374,7 +376,7 @@ function initChart() {
         if (bestIdx >= 0 && bestDist < (xScale.width / labels.length)) {
             var label = labels[bestIdx];
             if (drillLinks[label]) {
-                window.location.href = drillLinks[label];
+                window.location.assign(drillLinks[label]);
             }
         }
     });
