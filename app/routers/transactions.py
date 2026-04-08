@@ -204,12 +204,16 @@ def _build_tx_query(db, user, account_id, category_id, tag_id, search,
         query = query.filter(Transaction.tags.any(Tag.id == tag_id))
 
     if search:
-        term = f"%{search.strip()}%"
-        query = query.filter(or_(
-            Transaction.description.ilike(term),
-            Transaction.counterparty.ilike(term),
-            Transaction.counterparty_iban.ilike(term),
-        ))
+        # Encrypted fields don't support ILIKE — filter in Python, then use IDs
+        search_lower = search.strip().lower()
+        all_tx_for_search = query.all()
+        matching_ids = [
+            tx.id for tx in all_tx_for_search
+            if search_lower in (tx.description or "").lower()
+            or search_lower in (tx.counterparty or "").lower()
+            or search_lower in (tx.counterparty_iban or "").lower()
+        ]
+        query = query.filter(Transaction.id.in_(matching_ids) if matching_ids else Transaction.id == -1)
 
     if date_from:
         try:
