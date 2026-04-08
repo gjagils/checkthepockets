@@ -8,22 +8,17 @@ Sprints zijn gegroepeerd op gedeelde bestanden voor maximale efficiëntie per se
 
 ---
 
-## Sprint 19 — Dashboard grafiek & recurring koppeling (vervolg)
-*Openstaande punten uit sessie 2026-04-07. Dashboard jaaroverzicht is live maar heeft nog aandachtspunten.*
+## Sprint 19 — Dashboard grafiek & recurring koppeling ✅ (2026-04-08)
 
-**Dashboard grafiek:**
-- [ ] Klikken op maand in grafiek navigeert niet naar maandview (onClick werkt nog niet betrouwbaar)
-- [ ] Budget-achtergrond en gestapelde bars (gerealiseerd + verwacht) visueel finetunen
-- [ ] Maandview (level 2) en categorie-view (level 3) testen en finetunen
-
-**Recurring koppeling in transacties:**
-- [ ] Voorstel-banner bij koppelen testen (verschijnt na redirect met query params)
-- [ ] Bij "verwacht" transactie in maandview: koppelknop tonen + kandidaten voor andere maanden voorstellen
-- [ ] Auto-link na import testen met echte CSV data
-
-**Recurring verwachtingen:**
-- [ ] Eerste-transactiedatum logica testen (geen verwachtingen vóór eerste import)
-- [ ] Recurring pagina: "gemist" items correct filteren op basis van eerste transactie
+- [x] Klik-navigatie in grafiek via HTML links onder chart (Chart.js onClick was onbetrouwbaar)
+- [x] Budget-achtergrond als plugin + gestapelde bars (gerealiseerd + verwacht)
+- [x] Y-as schaal inclusief budget-waarden + label-uitlijning met chartArea
+- [x] Niet-gecategoriseerd balk gevuld met eurobedrag in maandview
+- [x] Maandview (level 2) en categorie-view (level 3) werkend met drill-down
+- [x] Recurring koppelknop in transactie-panel met dropdown
+- [x] Voorstel-banner na koppelen (zoekt vergelijkbare transacties, toont accept/negeer)
+- [x] Auto-link na CSV import (`auto_link_recurring_after_import`)
+- [x] Eerste-transactiedatum logica: geen projected transacties vóór eerste import, "gemist" gefilterd
 
 ---
 
