@@ -108,13 +108,13 @@
         <canvas id="overviewChart"></canvas>
     </div>
     {% if overview_rows %}
-    <div style="display:flex; justify-content:space-around; margin-top:0.5rem; flex-wrap:wrap; gap:0.25rem;">
+    <div id="chartLabels" style="display:grid; grid-template-columns:repeat({{ overview_rows|length }}, 1fr); margin-top:0.25rem;">
         {% for row in overview_rows %}
         {% if row.link %}
-        <a href="{{ row.link }}" style="font-size:0.82rem; font-weight:600; color:var(--sky); padding:0.3rem 0.5rem; border-radius:4px; text-decoration:none; transition:background 0.15s;"
+        <a href="{{ row.link }}" style="font-size:0.82rem; font-weight:600; color:var(--sky); text-align:center; padding:0.3rem 0; border-radius:4px; text-decoration:none; transition:background 0.15s;"
            onmouseover="this.style.background='var(--sky-bg)'" onmouseout="this.style.background='transparent'">{{ row.label }}</a>
         {% else %}
-        <span style="font-size:0.82rem; font-weight:600; color:var(--muted); padding:0.3rem 0.5rem;">{{ row.label }}</span>
+        <span style="font-size:0.82rem; font-weight:600; color:var(--muted); text-align:center; padding:0.3rem 0;">{{ row.label }}</span>
         {% endif %}
         {% endfor %}
     </div>
@@ -333,6 +333,13 @@ function initChart() {
                 y: {
                     stacked: true,
                     beginAtZero: true,
+                    // Ensure y-axis includes budget values (drawn by plugin, not in datasets)
+                    suggestedMax: Math.max.apply(null, overviewData.map(function(d) {
+                        return Math.max(
+                            d.income_budget, d.income_actual + d.income_expected,
+                            d.expense_budget, d.expense_actual + d.expense_expected
+                        );
+                    })) * 1.05,
                     ticks: {
                         color: getCSS('--muted') || '#888',
                         callback: function(v) { return '\u20AC ' + v.toLocaleString('nl-NL'); },
@@ -344,6 +351,13 @@ function initChart() {
         },
     });
 
+    // Align HTML labels with chart area (offset for y-axis width)
+    var chartLabels = document.getElementById('chartLabels');
+    if (chartLabels && window._chart) {
+        var chartArea = window._chart.chartArea;
+        chartLabels.style.marginLeft = chartArea.left + 'px';
+        chartLabels.style.marginRight = (window._chart.width - chartArea.right) + 'px';
+    }
 }
 
 // Init on page load — default to grafiek
