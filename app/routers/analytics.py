@@ -198,19 +198,31 @@ def analytics_stats(
         base_filter.append(Transaction.account_id == account_id)
 
     # Top merchants by total spending (expenses only)
-    top_merchants = (
-        db.query(
-            Transaction.counterparty,
-            func.sum(Transaction.amount).label("total"),
-            func.count(Transaction.id).label("tx_count"),
-        )
+    # Note: counterparty is encrypted, so GROUP BY won't work — aggregate in Python
+    merchant_txs = (
+        db.query(Transaction)
         .join(Account)
-        .filter(*base_filter, Transaction.amount < 0, Transaction.counterparty.isnot(None), Transaction.counterparty != "")
-        .group_by(Transaction.counterparty)
-        .order_by(func.sum(Transaction.amount))
-        .limit(15)
+        .filter(*base_filter, Transaction.amount < 0)
         .all()
     )
+    merchant_agg = {}
+    for tx in merchant_txs:
+        cp = (tx.counterparty or "").strip()
+        if not cp:
+            continue
+        if cp not in merchant_agg:
+            merchant_agg[cp] = {"total": Decimal("0"), "tx_count": 0}
+        merchant_agg[cp]["total"] += tx.amount
+        merchant_agg[cp]["tx_count"] += 1
+    top_merchants_list = sorted(merchant_agg.items(), key=lambda x: x[1]["total"])[:15]
+
+    class MerchantRow:
+        def __init__(self, counterparty, total, tx_count):
+            self.counterparty = counterparty
+            self.total = total
+            self.tx_count = tx_count
+
+    top_merchants = [MerchantRow(cp, d["total"], d["tx_count"]) for cp, d in top_merchants_list]
 
     # Top categories by spending
     top_categories = (
@@ -229,75 +241,70 @@ def analytics_stats(
         .all()
     )
 
-    # New counterparties this period (not seen in any previous month of this year)
-    # Find all counterparties that appear this month but NOT before this period
+    # New counterparties this period (not seen before)
+    # Note: counterparty is encrypted — must compare in Python
     if current_month:
-        # Counterparties seen before this month in the same year
-        seen_before = db.query(Transaction.counterparty).join(Account).filter(
-            Account.user_id == user.id,
-            Transaction.counterparty.isnot(None),
-            Transaction.counterparty != "",
-            func.extract("year", Transaction.date) == current_year,
-            func.extract("month", Transaction.date) < current_month,
-        ).distinct().subquery()
-
-        new_counterparties_q = (
-            db.query(
-                Transaction.counterparty,
-                func.sum(Transaction.amount).label("total"),
-                func.count(Transaction.id).label("tx_count"),
-            )
+        prev_txs = (
+            db.query(Transaction)
             .join(Account)
             .filter(
-                *base_filter,
-                Transaction.counterparty.isnot(None),
-                Transaction.counterparty != "",
-                Transaction.counterparty.notin_(
-                    db.query(seen_before.c.counterparty)
-                ),
+                Account.user_id == user.id,
+                func.extract("year", Transaction.date) == current_year,
+                func.extract("month", Transaction.date) < current_month,
             )
-            .group_by(Transaction.counterparty)
-            .order_by(func.count(Transaction.id).desc())
-            .limit(10)
             .all()
         )
     else:
-        # For full year: counterparties not seen in any previous year
-        seen_before_year = db.query(Transaction.counterparty).join(Account).filter(
-            Account.user_id == user.id,
-            Transaction.counterparty.isnot(None),
-            Transaction.counterparty != "",
-            func.extract("year", Transaction.date) < current_year,
-        ).distinct().subquery()
-
-        new_counterparties_q = (
-            db.query(
-                Transaction.counterparty,
-                func.sum(Transaction.amount).label("total"),
-                func.count(Transaction.id).label("tx_count"),
-            )
+        prev_txs = (
+            db.query(Transaction)
             .join(Account)
             .filter(
-                *base_filter,
-                Transaction.counterparty.isnot(None),
-                Transaction.counterparty != "",
-                Transaction.counterparty.notin_(
-                    db.query(seen_before_year.c.counterparty)
-                ),
+                Account.user_id == user.id,
+                func.extract("year", Transaction.date) < current_year,
             )
-            .group_by(Transaction.counterparty)
-            .order_by(func.count(Transaction.id).desc())
-            .limit(10)
             .all()
         )
+    seen_before_set = {(tx.counterparty or "").strip().lower() for tx in prev_txs if tx.counterparty}
+
+    # Current period counterparties
+    current_cp_agg = {}
+    for tx in merchant_txs:  # reuse from top_merchants query above (all expense txs)
+        cp = (tx.counterparty or "").strip()
+        if not cp:
+            continue
+        cp_lower = cp.lower()
+        if cp_lower in seen_before_set:
+            continue
+        if cp not in current_cp_agg:
+            current_cp_agg[cp] = {"total": Decimal("0"), "tx_count": 0}
+        current_cp_agg[cp]["total"] += tx.amount
+        current_cp_agg[cp]["tx_count"] += 1
+
+    # Also include positive (income) new counterparties
+    income_txs = (
+        db.query(Transaction)
+        .join(Account)
+        .filter(*base_filter, Transaction.amount > 0)
+        .all()
+    )
+    for tx in income_txs:
+        cp = (tx.counterparty or "").strip()
+        if not cp or cp.lower() in seen_before_set:
+            continue
+        if cp not in current_cp_agg:
+            current_cp_agg[cp] = {"total": Decimal("0"), "tx_count": 0}
+        current_cp_agg[cp]["total"] += tx.amount
+        current_cp_agg[cp]["tx_count"] += 1
+
+    new_counterparties_sorted = sorted(current_cp_agg.items(), key=lambda x: x[1]["tx_count"], reverse=True)[:10]
 
     new_counterparties = [
         {
-            "counterparty": r.counterparty,
-            "total": r.total or Decimal("0"),
-            "tx_count": r.tx_count or 0,
+            "counterparty": cp,
+            "total": d["total"],
+            "tx_count": d["tx_count"],
         }
-        for r in new_counterparties_q
+        for cp, d in new_counterparties_sorted
     ]
 
     # Total income/expenses for context
@@ -429,21 +436,23 @@ def analytics_query(
                                  "total": uncat[0], "tx_count": uncat[1] or 0})
 
         elif group_by == "counterparty":
-            rows = (
-                db.query(
-                    Transaction.counterparty.label("label"),
-                    func.sum(Transaction.amount).label("total"),
-                    func.count(Transaction.id).label("tx_count"),
-                )
+            # Encrypted field — aggregate in Python
+            all_txs = (
+                db.query(Transaction)
                 .join(Account)
-                .filter(*base_filter, Transaction.counterparty.isnot(None), Transaction.counterparty != "")
-                .group_by(Transaction.counterparty)
-                .order_by(func.sum(Transaction.amount))
-                .limit(100)
+                .filter(*base_filter)
                 .all()
             )
-            results = [{"label": r.label or "—", "color": "#888",
-                        "total": r.total or Decimal("0"), "tx_count": r.tx_count} for r in rows]
+            cp_agg = {}
+            for tx in all_txs:
+                cp = (tx.counterparty or "").strip() or "—"
+                if cp not in cp_agg:
+                    cp_agg[cp] = {"total": Decimal("0"), "tx_count": 0}
+                cp_agg[cp]["total"] += tx.amount
+                cp_agg[cp]["tx_count"] += 1
+            sorted_cp = sorted(cp_agg.items(), key=lambda x: x[1]["total"])[:100]
+            results = [{"label": cp, "color": "#888",
+                        "total": d["total"], "tx_count": d["tx_count"]} for cp, d in sorted_cp]
 
         elif group_by == "month":
             rows = (
