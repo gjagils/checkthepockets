@@ -472,6 +472,35 @@ def _render_recurring_page(
         # If previous period is before first transaction, treat as "not missed"
         prev_before_data = first_tx_date and prev_end < first_tx_date
 
+        # Find candidate transactions for unmatched items (due/missed)
+        candidates = []
+        if cur_match is None:
+            search_terms = []
+            if item.counterparty:
+                search_terms.append(item.counterparty.lower())
+            if item.description_match:
+                search_terms.extend([w.lower() for w in item.description_match.split() if len(w) > 2])
+            if search_terms:
+                period_txs = (
+                    db.query(Transaction)
+                    .join(Account)
+                    .filter(
+                        Account.user_id == user.id,
+                        Transaction.is_excluded == 0,
+                        Transaction.is_projected == 0,
+                        Transaction.recurring_id.is_(None),
+                        Transaction.date >= cur_start,
+                        Transaction.date <= cur_end,
+                    )
+                    .order_by(Transaction.date.desc())
+                    .all()
+                )
+                for tx in period_txs:
+                    cp = (tx.counterparty or "").lower()
+                    desc = (tx.description or "").lower()
+                    if any(term in cp or term in desc for term in search_terms):
+                        candidates.append(tx)
+
         entry = {
             "item": item, "period_start": cur_start, "period_end": cur_end,
             "matched_transaction": cur_match,
@@ -479,6 +508,7 @@ def _render_recurring_page(
             "prev_matched_transaction": prev_match,
             "is_due": cur_match is None, "in_active_period": True,
             "linked_transactions": linked_txs_by_item.get(item.id, []),
+            "candidates": candidates,
         }
 
         if cur_match:
@@ -734,6 +764,37 @@ def create_recurring(
                 tx.recurring_id = item.id
 
     db.commit()
+
+    return RedirectResponse("/recurring", status_code=302)
+
+
+@router.post("/recurring/{item_id}/link-selected")
+def link_selected_transactions(
+    item_id: int,
+    request: Request,
+    transaction_ids: List[str] = Form(default=[]),
+    db: Session = Depends(get_db),
+):
+    """Link multiple selected transactions to a recurring item."""
+    user = require_login(request, db)
+
+    item = db.query(RecurringTransaction).filter(
+        RecurringTransaction.id == item_id, RecurringTransaction.user_id == user.id
+    ).first()
+    if not item:
+        return RedirectResponse("/recurring", status_code=302)
+
+    tx_ids = [int(tid) for tid in transaction_ids if tid.strip().isdigit()]
+    if tx_ids:
+        txs = (
+            db.query(Transaction)
+            .join(Account)
+            .filter(Transaction.id.in_(tx_ids), Account.user_id == user.id)
+            .all()
+        )
+        for tx in txs:
+            tx.recurring_id = item.id
+        db.commit()
 
     return RedirectResponse("/recurring", status_code=302)
 

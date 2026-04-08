@@ -1,0 +1,31 @@
+{# Shows candidate transactions that could match this recurring item #}
+{% if entry.candidates %}
+<details style="margin-top:0.5rem;">
+    <summary style="font-size:0.8rem; cursor:pointer; color:var(--gold); font-weight:600;">
+        🔍 {{ entry.candidates|length }} mogelijke match{{ 'es' if entry.candidates|length > 1 else '' }} gevonden
+    </summary>
+    <form method="post" action="/recurring/{{ item.id }}/link-selected" style="margin-top:0.4rem;">
+        <div class="table-wrapper" style="max-height:300px; overflow-y:auto;">
+            <table class="data-table" style="font-size:.78rem;">
+                <thead>
+                    <tr><th style="width:30px;"></th><th>Datum</th><th>Tegenpartij</th><th>Omschrijving</th><th class="text-right">Bedrag</th></tr>
+                </thead>
+                <tbody>
+                {% for tx in entry.candidates %}
+                <tr>
+                    <td><input type="checkbox" name="transaction_ids" value="{{ tx.id }}"></td>
+                    <td class="nowrap">{{ tx.date.strftime('%d-%m-%Y') }}</td>
+                    <td>{{ tx.counterparty or '—' }}</td>
+                    <td class="muted" style="font-size:0.72rem; word-break:break-all;">{{ tx.description or '—' }}</td>
+                    <td class="text-right nowrap {% if tx.amount < 0 %}amount-negative{% else %}amount-positive{% endif %}">
+                        &euro;&nbsp;{{ tx.amount|euro }}
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <button type="submit" class="btn btn-sm btn-accent" style="margin-top:0.4rem;">Geselecteerde koppelen</button>
+    </form>
+</details>
+{% endif %}
