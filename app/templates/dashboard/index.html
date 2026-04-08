@@ -106,6 +106,7 @@
 <div id="view-grafiek" class="card" style="padding:1.25rem;">
     <div style="position:relative; height:420px;">
         <canvas id="overviewChart"></canvas>
+        <div id="chartOverlay" style="position:absolute; top:0; left:0; right:0; bottom:0; cursor:pointer; z-index:10;"></div>
     </div>
     {% if not current_month %}
     <p style="font-size:0.78rem; color:var(--muted); margin-top:0.75rem; margin-bottom:0;">
@@ -349,13 +350,11 @@ function initChart() {
         },
     });
 
-    // Canvas click listener for drill-down navigation
-    // (Chart.js onClick doesn't fire reliably with stacked bars)
+    // Overlay click listener for drill-down navigation
+    // Transparent div on top of canvas catches clicks before Chart.js
+    var overlay = document.getElementById('chartOverlay');
     var canvas = document.getElementById('overviewChart');
-    canvas.style.cursor = 'pointer';
-    canvas.addEventListener('click', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
+    overlay.addEventListener('click', function(e) {
         var chart = window._chart;
         if (!chart) return;
         var rect = canvas.getBoundingClientRect();
@@ -376,7 +375,7 @@ function initChart() {
         if (bestIdx >= 0 && bestDist < (xScale.width / labels.length)) {
             var label = labels[bestIdx];
             if (drillLinks[label]) {
-                window.location.assign(drillLinks[label]);
+                window.location.href = drillLinks[label];
             }
         }
     });
