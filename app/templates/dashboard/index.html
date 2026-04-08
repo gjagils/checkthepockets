@@ -351,9 +351,13 @@ function initChart() {
     });
 
     // Overlay click listener for drill-down navigation
-    // Transparent div on top of canvas catches clicks before Chart.js
+    // Uses a hidden <a> tag to force real navigation (not pushState)
     var overlay = document.getElementById('chartOverlay');
     var canvas = document.getElementById('overviewChart');
+    var navLink = document.createElement('a');
+    navLink.style.display = 'none';
+    document.body.appendChild(navLink);
+
     overlay.addEventListener('click', function(e) {
         var chart = window._chart;
         if (!chart) return;
@@ -375,7 +379,9 @@ function initChart() {
         if (bestIdx >= 0 && bestDist < (xScale.width / labels.length)) {
             var label = labels[bestIdx];
             if (drillLinks[label]) {
-                window.location.href = drillLinks[label];
+                navLink.href = drillLinks[label];
+                navLink.click();
+                return;
             }
         }
     });
