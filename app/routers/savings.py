@@ -664,8 +664,11 @@ def accept_ai_suggestion(
     db.add(line)
     db.flush()
 
-    # Create entries and fill from transactions
-    _smart_fill_entries(db, line)
+    # Create entries based on frequency
+    entries = _smart_fill_entries(line)
+    for entry in entries:
+        db.add(entry)
+    db.flush()
 
     # Try to fill with actual transaction data
     tx_totals = _get_transaction_totals_by_month(
