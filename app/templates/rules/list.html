@@ -341,7 +341,7 @@
                     </div>
                     <div class="rule-actions">
                         <button class="btn btn-sm btn-accent"
-                                onclick="openPreview({{ rule.id }}, {{ rule.name|tojson }})">
+                                onclick='openPreview({{ rule.id }}, {{ rule.name|tojson }})'>
                             Toepassen
                         </button>
                         <button class="btn btn-sm" onclick="toggleEdit({{ rule.id }})">Bewerken</button>
