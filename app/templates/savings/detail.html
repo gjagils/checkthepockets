@@ -171,8 +171,18 @@
                 {% endfor %}
                 {% endif %}
 
-                <!-- Saldo rij -->
-                <tr class="balance-row">
+                <!-- Uitgaven -->
+                {% if expense_lines %}
+                <tr class="section-header">
+                    <td class="sticky-col" colspan="14"><strong>Uitgaven</strong></td>
+                </tr>
+                {% for line in expense_lines %}
+                    {{ render_line(line) }}
+                {% endfor %}
+                {% endif %}
+
+                <!-- Saldo rij (onderaan) -->
+                <tr class="balance-row" style="border-top:2px solid var(--border);">
                     <td class="sticky-col"><strong>Saldo</strong></td>
                     {% for m in range(1, 13) %}
                     <td class="text-right nowrap balance-cell" data-month="{{ m }}">
@@ -184,16 +194,6 @@
                     {% endfor %}
                     <td></td>
                 </tr>
-
-                <!-- Uitgaven -->
-                {% if expense_lines %}
-                <tr class="section-header">
-                    <td class="sticky-col" colspan="14"><strong>Uitgaven</strong></td>
-                </tr>
-                {% for line in expense_lines %}
-                    {{ render_line(line) }}
-                {% endfor %}
-                {% endif %}
             </tbody>
         </table>
     </div>

@@ -672,11 +672,8 @@ tfoot td { background: var(--surface-2); border-top: 1px solid var(--border); fo
 .savings-table-wrap { overflow-x: auto; overflow-y: visible; max-height: none; }
 
 .savings-grid thead th {
-    position: sticky;
-    top: 92px; /* 52px nav-main + 40px nav-sub */
     z-index: 4;
     background: var(--surface-2);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
 }
 .savings-grid th.sticky-col,
 .savings-grid td.sticky-col {
@@ -684,12 +681,12 @@ tfoot td { background: var(--surface-2); border-top: 1px solid var(--border); fo
     left: 0;
     background: var(--surface);
     z-index: 2;
-    min-width: 200px;
-    max-width: 280px;
+    min-width: 180px;
+    max-width: 240px;
     border-right: 1px solid var(--border);
 }
 .savings-grid th.sticky-col { background: var(--surface-2); z-index: 5; }
-.savings-grid th.month-col { min-width: 72px; }
+.savings-grid th.month-col { min-width: 90px; white-space: nowrap; }
 
 .savings-cell { cursor: pointer; padding: 0.4rem 0.6rem !important; transition: background 0.1s; position: relative; }
 .savings-cell:hover { background: var(--orange-bg) !important; }
