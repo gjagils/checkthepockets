@@ -656,7 +656,8 @@ def _find_recurring_candidates(
 
 def auto_link_recurring_after_import(db: Session, user_id: int):
     """Called after CSV import — automatically link new transactions to recurring items
-    based on counterparty/description matching. No user confirmation needed."""
+    based on counterparty/description matching. No user confirmation needed.
+    Note: counterparty/description are encrypted, so we filter in Python."""
     from app.routers.recurring import _get_period_range, _find_matching_transaction
 
     recurring_items = (
@@ -665,37 +666,50 @@ def auto_link_recurring_after_import(db: Session, user_id: int):
         .all()
     )
 
+    # Load all unlinked transactions once (avoid N+1 on encrypted fields)
+    all_unlinked = (
+        db.query(Transaction)
+        .join(Account)
+        .filter(
+            Account.user_id == user_id,
+            Transaction.is_excluded == 0,
+            Transaction.is_projected == 0,
+            Transaction.recurring_id.is_(None),
+        )
+        .order_by(Transaction.date)
+        .all()
+    )
+
     for item in recurring_items:
         if not item.counterparty and not item.description_match:
             continue
 
-        # Find unlinked transactions matching this item
-        conditions = []
-        if item.counterparty:
-            conditions.append(Transaction.counterparty.ilike(f"%{item.counterparty}%"))
-        if item.description_match:
-            for word in item.description_match.split():
-                if len(word) > 2:
-                    conditions.append(Transaction.description.ilike(f"%{word}%"))
+        # Build search terms
+        cp_term = (item.counterparty or "").lower()
+        desc_words = [w.lower() for w in (item.description_match or "").split() if len(w) > 2]
 
-        if not conditions:
+        if not cp_term and not desc_words:
             continue
 
-        candidates = (
-            db.query(Transaction)
-            .join(Account)
-            .filter(
-                Account.user_id == user_id,
-                Transaction.is_excluded == 0,
-                Transaction.is_projected == 0,
-                Transaction.recurring_id.is_(None),
-                *conditions,
-            )
-            .order_by(Transaction.date)
-            .all()
-        )
+        for candidate in all_unlinked:
+            if candidate.recurring_id:
+                continue  # Already linked by a previous item in this loop
 
-        for candidate in candidates:
+            cp = (candidate.counterparty or "").lower()
+            desc = (candidate.description or "").lower()
+
+            # Match: counterparty contains search term OR all desc words found
+            match = False
+            if cp_term and cp_term in cp:
+                match = True
+            if not match and cp_term and cp_term in desc:
+                match = True
+            if not match and desc_words and all(w in desc for w in desc_words):
+                match = True
+
+            if not match:
+                continue
+
             period_start, period_end = _get_period_range(item.frequency, candidate.date)
             existing = _find_matching_transaction(db, user_id, item, period_start, period_end)
             if existing:

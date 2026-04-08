@@ -581,8 +581,10 @@ def accept_suggestion(suggestion_id: int, request: Request, db: Session = Depend
         db.flush()  # Get item.id
 
         # Auto-link matching transactions to this new recurring item
+        # Note: counterparty is encrypted, so ILIKE won't work — filter in Python
         if item.counterparty:
-            candidates = (
+            search_term = item.counterparty.lower()
+            all_txs = (
                 db.query(Transaction)
                 .join(Account)
                 .filter(
@@ -590,26 +592,22 @@ def accept_suggestion(suggestion_id: int, request: Request, db: Session = Depend
                     Transaction.is_excluded == 0,
                     Transaction.is_projected == 0,
                     Transaction.recurring_id.is_(None),
-                    Transaction.counterparty.ilike(f"%{item.counterparty}%"),
                 )
+                .order_by(Transaction.date.desc())
                 .all()
             )
-            for tx in candidates:
+            seen_periods = set()
+            for tx in all_txs:
+                cp = (tx.counterparty or "").lower()
+                desc = (tx.description or "").lower()
+                if search_term not in cp and search_term not in desc:
+                    continue
                 period_start, period_end = _get_period_range(item.frequency, tx.date)
-                # Only one per period
-                already = (
-                    db.query(Transaction)
-                    .join(Account)
-                    .filter(
-                        Account.user_id == user.id,
-                        Transaction.recurring_id == item.id,
-                        Transaction.date >= period_start,
-                        Transaction.date <= period_end,
-                    )
-                    .first()
-                )
-                if not already:
-                    tx.recurring_id = item.id
+                period_key = f"{period_start}-{period_end}"
+                if period_key in seen_periods:
+                    continue
+                seen_periods.add(period_key)
+                tx.recurring_id = item.id
 
         db.delete(s)
         db.commit()
