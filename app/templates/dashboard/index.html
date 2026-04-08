@@ -507,28 +507,31 @@ function initMirrorChart() {
                 x: {
                     stacked: true,
                     // Symmetrisch: nulpunt altijd in het midden
+                    // Bereken de maximale breedte per rij (stacks apart, niet opgeteld)
                     min: -(function() {
-                        var maxLeft = Math.max.apply(null, overviewData.map(function(d) {
-                            return d.expense_actual + d.expense_expected + d.uncat_amount;
+                        var absMax = Math.max.apply(null, overviewData.map(function(d) {
+                            // Per rij: max van uitgaven-stack, inkomen-stack, uncat (apart), budgets
+                            return Math.max(
+                                d.expense_actual + d.expense_expected,
+                                d.income_actual + d.income_expected,
+                                d.uncat_amount,
+                                d.expense_budget,
+                                d.income_budget
+                            );
                         }));
-                        var maxRight = Math.max.apply(null, overviewData.map(function(d) {
-                            return d.income_actual + d.income_expected;
-                        }));
-                        // Also include budget values
-                        var maxBudgetLeft = Math.max.apply(null, overviewData.map(function(d) { return d.expense_budget; }));
-                        var maxBudgetRight = Math.max.apply(null, overviewData.map(function(d) { return d.income_budget; }));
-                        return Math.max(maxLeft, maxRight, maxBudgetLeft, maxBudgetRight) * 1.08;
+                        return Math.ceil(absMax / 1000) * 1000; // Rond af naar boven op hele duizendtallen
                     })(),
                     max: (function() {
-                        var maxLeft = Math.max.apply(null, overviewData.map(function(d) {
-                            return d.expense_actual + d.expense_expected + d.uncat_amount;
+                        var absMax = Math.max.apply(null, overviewData.map(function(d) {
+                            return Math.max(
+                                d.expense_actual + d.expense_expected,
+                                d.income_actual + d.income_expected,
+                                d.uncat_amount,
+                                d.expense_budget,
+                                d.income_budget
+                            );
                         }));
-                        var maxRight = Math.max.apply(null, overviewData.map(function(d) {
-                            return d.income_actual + d.income_expected;
-                        }));
-                        var maxBudgetLeft = Math.max.apply(null, overviewData.map(function(d) { return d.expense_budget; }));
-                        var maxBudgetRight = Math.max.apply(null, overviewData.map(function(d) { return d.income_budget; }));
-                        return Math.max(maxLeft, maxRight, maxBudgetLeft, maxBudgetRight) * 1.08;
+                        return Math.ceil(absMax / 1000) * 1000;
                     })(),
                     ticks: {
                         color: C.muted,
