@@ -125,6 +125,9 @@
     <div style="height:{{ [overview_rows|length * 65, 350]|max }}px;">
         <canvas id="mirrorChart" style="cursor:pointer;"></canvas>
     </div>
+    <p style="font-size:0.78rem; color:var(--muted); margin-top:0.5rem; margin-bottom:0;">
+        Klik op een label om door te zoomen. Klik op een balk om transacties te zien.
+    </p>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
@@ -171,26 +174,44 @@ function fmtEuro(val) {
     return '\u20AC ' + Math.abs(val).toLocaleString('nl-NL', {minimumFractionDigits: 2, maximumFractionDigits: 2});
 }
 
-// Navigate to transactions for a bar click
-function handleBarClick(chart, evt, isHorizontal) {
-    var rect = chart.canvas.getBoundingClientRect();
-    var pos = isHorizontal
-        ? (evt.clientY - rect.top)
-        : (evt.clientX - rect.left);
-    var scale = isHorizontal ? chart.scales.y : chart.scales.x;
+// Drill-down links (for navigating to month/category views)
+var drillLinks = {
+    {% for row in overview_rows %}
+    {% if row.link %}"{{ row.label }}": "{{ row.link }}",{% endif %}
+    {% endfor %}
+};
 
+// Handle chart click: label area = drill-down, bar area = transactions
+function handleChartClick(chart, evt, isHorizontal) {
+    var rect = chart.canvas.getBoundingClientRect();
+    var x = evt.clientX - rect.left;
+    var y = evt.clientY - rect.top;
+
+    // Find which row/column was clicked
+    var labelScale = isHorizontal ? chart.scales.y : chart.scales.x;
+    var pos = isHorizontal ? y : x;
     var bestIdx = -1, bestDist = Infinity;
     for (var i = 0; i < labels.length; i++) {
-        var px = scale.getPixelForValue(i);
+        var px = labelScale.getPixelForValue(i);
         var dist = Math.abs(pos - px);
         if (dist < bestDist) { bestDist = dist; bestIdx = i; }
     }
-    var threshold = (isHorizontal ? scale.height : scale.width) / labels.length;
-    if (bestIdx >= 0 && bestDist < threshold) {
-        var d = overviewData[bestIdx];
-        if (d.tx_link) {
-            window.location.href = d.tx_link;
-        }
+    var threshold = (isHorizontal ? labelScale.height : labelScale.width) / labels.length;
+    if (bestIdx < 0 || bestDist >= threshold) return;
+
+    var d = overviewData[bestIdx];
+    var label = labels[bestIdx];
+
+    // Determine if click was on label area or bar area
+    var chartArea = chart.chartArea;
+    var onLabelArea = isHorizontal ? (x < chartArea.left) : (y > chartArea.bottom);
+
+    if (onLabelArea && drillLinks[label]) {
+        // Label click → drill-down to categories/subcategories
+        window.location.href = drillLinks[label];
+    } else if (!onLabelArea && d.tx_link) {
+        // Bar click → navigate to transactions
+        window.location.href = d.tx_link;
     }
 }
 
@@ -372,9 +393,9 @@ function initBarChart() {
         },
     });
 
-    // Click handler for bar chart
+    // Click handler for bar chart (label = drill-down, bar = transactions)
     document.getElementById('overviewChart').addEventListener('click', function(e) {
-        handleBarClick(window._barChart, e, false);
+        handleChartClick(window._barChart, e, false);
     });
 
     // Align labels
@@ -459,9 +480,9 @@ function initMirrorChart() {
         },
     });
 
-    // Click handler for mirror chart
+    // Click handler for mirror chart (label = drill-down, bar = transactions)
     document.getElementById('mirrorChart').addEventListener('click', function(e) {
-        handleBarClick(window._mirrorChart, e, true);
+        handleChartClick(window._mirrorChart, e, true);
     });
 }
 
