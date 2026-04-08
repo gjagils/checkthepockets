@@ -578,6 +578,39 @@ def accept_suggestion(suggestion_id: int, request: Request, db: Session = Depend
             category_id=s.category_id,
         )
         db.add(item)
+        db.flush()  # Get item.id
+
+        # Auto-link matching transactions to this new recurring item
+        if item.counterparty:
+            candidates = (
+                db.query(Transaction)
+                .join(Account)
+                .filter(
+                    Account.user_id == user.id,
+                    Transaction.is_excluded == 0,
+                    Transaction.is_projected == 0,
+                    Transaction.recurring_id.is_(None),
+                    Transaction.counterparty.ilike(f"%{item.counterparty}%"),
+                )
+                .all()
+            )
+            for tx in candidates:
+                period_start, period_end = _get_period_range(item.frequency, tx.date)
+                # Only one per period
+                already = (
+                    db.query(Transaction)
+                    .join(Account)
+                    .filter(
+                        Account.user_id == user.id,
+                        Transaction.recurring_id == item.id,
+                        Transaction.date >= period_start,
+                        Transaction.date <= period_end,
+                    )
+                    .first()
+                )
+                if not already:
+                    tx.recurring_id = item.id
+
         db.delete(s)
         db.commit()
     return RedirectResponse("/recurring", status_code=302)
