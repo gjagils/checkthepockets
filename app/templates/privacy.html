@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="nl" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacybeleid — Check Your Pockets</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16.png">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .legal-body { background: var(--bg); color: var(--text); min-height: 100vh; }
+        .legal-nav {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0.75rem 2rem; background: var(--nav-bg); border-bottom: 1px solid var(--nav-border);
+        }
+        .legal-nav .nav-brand { display: flex; align-items: center; gap: 0.5rem; text-decoration: none; }
+        .legal-nav .nav-brand img { height: 38px; width: auto; }
+        .legal-nav .nav-brand .brand-text { display: flex; flex-direction: column; line-height: 1.05; }
+        .legal-nav .nav-brand .brand-line {
+            font-family: var(--font-heading); font-weight: 800; font-size: 0.72rem;
+            letter-spacing: 0.09em; text-transform: uppercase;
+        }
+        .legal-nav .brand-check   { color: var(--orange); }
+        .legal-nav .brand-the     { color: var(--text-white); }
+        .legal-nav .brand-pockets { color: var(--orange); }
+        .legal-content {
+            max-width: 720px; margin: 0 auto; padding: 3rem 2rem 5rem;
+            line-height: 1.8; font-size: 0.95rem;
+        }
+        .legal-content h1 {
+            font-family: var(--font-heading); font-size: 2rem; font-weight: 800;
+            color: var(--orange); margin-bottom: 0.5rem;
+        }
+        .legal-content .updated { color: var(--muted); font-size: 0.85rem; margin-bottom: 2.5rem; }
+        .legal-content h2 {
+            font-family: var(--font-heading); font-size: 1.15rem; font-weight: 700;
+            color: var(--text); margin: 2rem 0 0.75rem; padding-top: 1rem;
+            border-top: 1px solid var(--border);
+        }
+        .legal-content h2:first-of-type { border-top: none; padding-top: 0; }
+        .legal-content p { margin-bottom: 1rem; color: var(--text); }
+        .legal-content ul { padding-left: 1.5rem; margin-bottom: 1rem; }
+        .legal-content li { margin-bottom: 0.4rem; }
+        .legal-content a { color: var(--orange); text-decoration: underline; }
+    </style>
+    <script>
+        (function() {
+            var t = localStorage.getItem('ctp-theme') || 'light';
+            document.documentElement.setAttribute('data-theme', t);
+        })();
+    </script>
+</head>
+<body class="legal-body">
+
+<nav class="legal-nav">
+    <a href="/" class="nav-brand">
+        <img src="/static/logo.png" alt="Check Your Pockets">
+        <span class="brand-text">
+            <span class="brand-line brand-check">CHECK</span>
+            <span class="brand-line brand-the">YOUR</span>
+            <span class="brand-line brand-pockets">POCKETS</span>
+        </span>
+    </a>
+</nav>
+
+<main class="legal-content">
+    <h1>Privacybeleid</h1>
+    <p class="updated">Laatst bijgewerkt: 13 april 2026</p>
+
+    <h2>1. Wie zijn wij</h2>
+    <p>Check Your Pockets is een persoonlijke financiele applicatie beheerd door Gerd-Jan van Gils. Voor vragen over privacy kun je contact opnemen via <a href="mailto:gerdjanvangils@gmail.com">gerdjanvangils@gmail.com</a>.</p>
+
+    <h2>2. Welke gegevens verzamelen wij</h2>
+    <p>Wij verzamelen en verwerken de volgende persoonsgegevens:</p>
+    <ul>
+        <li><strong>Accountgegevens:</strong> e-mailadres en wachtwoord (gehasht opgeslagen) bij registratie</li>
+        <li><strong>Financiele gegevens:</strong> banktransacties die je zelf importeert (via CSV-upload of bankkoppeling), rekeningnummers (IBAN), saldi en categorisatie</li>
+        <li><strong>Gebruiksgegevens:</strong> sessiegegevens voor inlogstatus</li>
+    </ul>
+
+    <h2>3. Waarvoor gebruiken wij je gegevens</h2>
+    <ul>
+        <li>Het aanbieden en verbeteren van de dienst</li>
+        <li>Het tonen van je financiele overzichten en analyses</li>
+        <li>Authenticatie en beveiliging van je account</li>
+        <li>Het importeren van banktransacties via externe diensten (zoals Enable Banking)</li>
+    </ul>
+
+    <h2>4. Bankkoppeling via Enable Banking</h2>
+    <p>Wanneer je een bankrekening koppelt, maken wij gebruik van Enable Banking (enablebanking.com) als tussenpersoon om via de PSD2-regelgeving toegang te krijgen tot je transactiegegevens. Dit gebeurt uitsluitend met jouw expliciete toestemming. Enable Banking heeft een eigen <a href="https://enablebanking.com/privacy/" target="_blank" rel="noopener">privacybeleid</a>.</p>
+    <ul>
+        <li>Wij vragen alleen leestoegang tot je transacties en saldi</li>
+        <li>Wij kunnen geen betalingen doen namens jou</li>
+        <li>Je kunt de koppeling op elk moment intrekken</li>
+    </ul>
+
+    <h2>5. Opslag en beveiliging</h2>
+    <p>Je gegevens worden opgeslagen op beveiligde servers. Gevoelige velden zoals transactieomschrijvingen en tegenpartijgegevens worden versleuteld opgeslagen (encryption at rest). Wachtwoorden worden gehasht en zijn niet leesbaar.</p>
+
+    <h2>6. Delen met derden</h2>
+    <p>Wij delen je persoonsgegevens niet met derden, behalve:</p>
+    <ul>
+        <li>Enable Banking — uitsluitend voor het ophalen van transactiegegevens met jouw toestemming</li>
+        <li>Wanneer wij wettelijk verplicht zijn</li>
+    </ul>
+
+    <h2>7. Bewaartermijn</h2>
+    <p>Je gegevens worden bewaard zolang je account actief is. Bij verwijdering van je account worden alle persoonsgegevens permanent verwijderd.</p>
+
+    <h2>8. Jouw rechten</h2>
+    <p>Op grond van de AVG heb je het recht om:</p>
+    <ul>
+        <li>Je gegevens in te zien, te corrigeren of te laten verwijderen</li>
+        <li>De verwerking van je gegevens te beperken</li>
+        <li>Je gegevens over te dragen (dataportabiliteit)</li>
+        <li>Een klacht in te dienen bij de Autoriteit Persoonsgegevens</li>
+    </ul>
+
+    <h2>9. Cookies</h2>
+    <p>Wij gebruiken uitsluitend functionele cookies voor sessie- en inlogbeheer. Wij gebruiken geen tracking- of marketingcookies.</p>
+
+    <h2>10. Wijzigingen</h2>
+    <p>Dit privacybeleid kan worden gewijzigd. Wijzigingen worden op deze pagina gepubliceerd met een bijgewerkte datum.</p>
+</main>
+
+</body>
+</html>

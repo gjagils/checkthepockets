@@ -25,3 +25,8 @@ services:
       - FIELD_ENCRYPTION_KEY=${FIELD_ENCRYPTION_KEY:-}
       # Super admin (kan niet worden gedeactiveerd/verwijderd)
       - SUPER_ADMIN_USERNAME=${SUPER_ADMIN_USERNAME:-}
+      # Enable Banking — PSD2 bankkoppeling
+      - ENABLE_BANKING_APP_ID=${ENABLE_BANKING_APP_ID:-}
+      - ENABLE_BANKING_PRIVATE_KEY_PATH=${ENABLE_BANKING_PRIVATE_KEY_PATH:-/app/keys/enable-banking.pem}
+    volumes:
+      - ${ENABLE_BANKING_KEY_DIR:-./keys}:/app/keys:ro

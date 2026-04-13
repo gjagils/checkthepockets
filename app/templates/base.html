@@ -24,7 +24,7 @@
         else 'financien' if path in ['/transactions', '/categories', '/tags', '/rules', '/recurring'] or path.startswith('/transactions')
         else 'budgetten' if path.startswith('/budgets') or path.startswith('/savings')
         else 'analyse' if path.startswith('/analytics') or path.startswith('/portfolio') or path.startswith('/networth')
-        else 'rekeningen' if path.startswith('/accounts') or path.startswith('/import')
+        else 'rekeningen' if path.startswith('/accounts') or path.startswith('/import') or path.startswith('/banking')
         else '' %}
     <div class="navbar-wrapper">
         <nav class="nav-main">
@@ -71,6 +71,7 @@
             {% elif main_active == 'rekeningen' %}
                 <a href="/accounts" class="{{ 'active' if path.startswith('/accounts') }}">Rekeningen</a>
                 <a href="/import" class="{{ 'active' if path.startswith('/import') }}">Importeren</a>
+                <a href="/banking/connect" class="{{ 'active' if path.startswith('/banking') }}">Bankkoppeling</a>
             {% endif %}
         </nav>
     </div>

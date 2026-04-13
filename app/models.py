@@ -447,6 +447,24 @@ class NetWorthSnapshot(Base):
     )
 
 
+class BankConnection(Base):
+    """PSD2 bank connection via Enable Banking."""
+    __tablename__ = "bank_connections"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    bank_name = Column(String(100), nullable=False)        # ASPSP name, e.g. "ING"
+    bank_country = Column(String(2), nullable=False, default="NL")
+    session_id = Column(String(255), nullable=True)        # Enable Banking session ID
+    accounts_json = Column(Text, nullable=True)             # JSON list of {uid, iban, name}
+    valid_until = Column(DateTime, nullable=True)           # consent expiry
+    status = Column(String(20), nullable=False, default="pending")  # pending, active, expired, revoked
+    last_synced_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    user = relationship("User")
+
+
 class PortfolioPriceSnapshot(Base):
     __tablename__ = "portfolio_price_snapshots"
 

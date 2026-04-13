@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Bankkoppeling - Check Your Pockets{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>{% if success %}Bank gekoppeld{% else %}Koppeling mislukt{% endif %}</h1>
+</div>
+
+{% if success %}
+<div class="alert alert-success">
+    <strong>{{ bank_name }}</strong> is succesvol gekoppeld! De volgende rekeningen zijn beschikbaar:
+</div>
+
+{% if accounts %}
+<div class="card">
+    <h2>Gekoppelde rekeningen</h2>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>IBAN</th>
+                <th>BIC</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for acc in accounts %}
+            <tr>
+                <td>{{ acc.iban or '-' }}</td>
+                <td>{{ acc.name or '-' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<div style="display:flex; gap:0.75rem; margin-top:1rem;">
+    {% if connection_id %}
+    <a href="/banking/sync/{{ connection_id }}" class="btn btn-primary">Transacties ophalen</a>
+    {% endif %}
+    <a href="/banking/connect" class="btn">Overzicht koppelingen</a>
+</div>
+
+{% else %}
+<div class="alert alert-error">{{ error }}</div>
+<div style="margin-top:1rem;">
+    <a href="/banking/connect" class="btn btn-primary">Opnieuw proberen</a>
+</div>
+{% endif %}
+{% endblock %}

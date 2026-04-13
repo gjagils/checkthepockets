@@ -2,6 +2,8 @@
 .env
 stack.env
 *.sqlite3
+*.pem
+keys/
 app/static/img/logo.png
 app/static/img/favicon.png
 

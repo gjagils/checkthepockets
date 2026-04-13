@@ -9,7 +9,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.auth import LoginRequired, get_current_user
 from app.database import get_db
-from app.routers import auth, transactions, accounts, categories, tags, rules, budgets, recurring, dashboard, savings, analytics, portfolio, networth, settings, admin
+from app.routers import auth, transactions, accounts, categories, tags, rules, budgets, recurring, dashboard, savings, analytics, portfolio, networth, settings, admin, banking
 from app.scheduler import start_scheduler
 
 from app.config import SECRET_KEY
@@ -46,6 +46,16 @@ def landing(request: Request):
     return _landing_templates.TemplateResponse("landing.html", {"request": request})
 
 
+@app.get("/privacy")
+def privacy(request: Request):
+    return _landing_templates.TemplateResponse("privacy.html", {"request": request})
+
+
+@app.get("/terms")
+def terms(request: Request):
+    return _landing_templates.TemplateResponse("terms.html", {"request": request})
+
+
 app.include_router(auth.router)
 app.include_router(dashboard.router)
 app.include_router(transactions.router)
@@ -61,6 +71,7 @@ app.include_router(portfolio.router)
 app.include_router(networth.router)
 app.include_router(settings.router)
 app.include_router(admin.router)
+app.include_router(banking.router)
 
 
 @app.on_event("startup")
