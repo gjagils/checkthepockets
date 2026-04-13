@@ -10,7 +10,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.auth import require_login
-from app.config import APP_URL, ENABLE_BANKING_APP_ID
+from app.config import APP_URL, ENABLE_BANKING_APP_ID, SUPER_ADMIN_USERNAME
 from app.database import get_db
 from app.models import Account, BankConnection, Transaction, Rule, Category
 from app.parsers.base import ParsedTransaction
@@ -24,6 +24,11 @@ def _is_configured() -> bool:
     return bool(ENABLE_BANKING_APP_ID)
 
 
+def _is_banking_allowed(user) -> bool:
+    """Only super admin can use banking in restricted mode."""
+    return bool(SUPER_ADMIN_USERNAME and user.username == SUPER_ADMIN_USERNAME)
+
+
 # ── Bank selection page ─────────────────────────────────────────────────────
 
 
@@ -31,6 +36,12 @@ def _is_configured() -> bool:
 def connect_page(request: Request, db: Session = Depends(get_db)):
     """Show available banks to connect."""
     user = require_login(request, db)
+
+    if not _is_banking_allowed(user):
+        return templates.TemplateResponse(
+            "banking/connect.html",
+            {"request": request, "user": user, "banks": [], "connections": [], "restricted": True},
+        )
 
     if not _is_configured():
         return templates.TemplateResponse(
@@ -67,6 +78,8 @@ def connect_page(request: Request, db: Session = Depends(get_db)):
 async def start_connect(request: Request, db: Session = Depends(get_db)):
     """Start PSD2 authorization for a selected bank."""
     user = require_login(request, db)
+    if not _is_banking_allowed(user):
+        return RedirectResponse("/banking/connect", status_code=302)
     form = await request.form()
     bank_name = form.get("bank_name", "").strip()
     bank_country = form.get("bank_country", "NL").strip()
@@ -121,6 +134,8 @@ async def start_connect(request: Request, db: Session = Depends(get_db)):
 def callback(request: Request, code: str = "", state: str = "", db: Session = Depends(get_db)):
     """Handle redirect from bank after PSD2 authorization."""
     user = require_login(request, db)
+    if not _is_banking_allowed(user):
+        return RedirectResponse("/banking/connect", status_code=302)
 
     # Verify state
     expected_state = request.session.get("eb_state")
@@ -202,6 +217,8 @@ def callback(request: Request, code: str = "", state: str = "", db: Session = De
 def sync_page(connection_id: int, request: Request, db: Session = Depends(get_db)):
     """Show sync options for a bank connection."""
     user = require_login(request, db)
+    if not _is_banking_allowed(user):
+        return RedirectResponse("/banking/connect", status_code=302)
     conn = db.query(BankConnection).filter(
         BankConnection.id == connection_id,
         BankConnection.user_id == user.id,
@@ -221,6 +238,8 @@ def sync_page(connection_id: int, request: Request, db: Session = Depends(get_db
 async def sync_transactions(connection_id: int, request: Request, db: Session = Depends(get_db)):
     """Fetch and import transactions from a connected bank account."""
     user = require_login(request, db)
+    if not _is_banking_allowed(user):
+        return RedirectResponse("/banking/connect", status_code=302)
     form = await request.form()
 
     conn = db.query(BankConnection).filter(
@@ -351,6 +370,8 @@ async def sync_transactions(connection_id: int, request: Request, db: Session = 
 def disconnect(connection_id: int, request: Request, db: Session = Depends(get_db)):
     """Revoke consent and deactivate a bank connection."""
     user = require_login(request, db)
+    if not _is_banking_allowed(user):
+        return RedirectResponse("/banking/connect", status_code=302)
     conn = db.query(BankConnection).filter(
         BankConnection.id == connection_id,
         BankConnection.user_id == user.id,

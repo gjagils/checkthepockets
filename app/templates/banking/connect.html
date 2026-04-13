@@ -6,6 +6,18 @@
     <p class="subtitle">Koppel je bankrekening via PSD2 om automatisch transacties te importeren.</p>
 </div>
 
+{% if restricted %}
+<div class="card" style="text-align:center; padding:3rem 2rem;">
+    <div style="font-size:2rem; margin-bottom:1rem;">🔒</div>
+    <h2 style="margin-bottom:0.5rem;">Binnenkort beschikbaar</h2>
+    <p style="color:var(--muted); max-width:480px; margin:0 auto 1.5rem;">
+        Automatisch transacties ophalen via je bank wordt binnenkort beschikbaar voor alle gebruikers.
+        Gebruik in de tussentijd de CSV-import om je transacties te importeren.
+    </p>
+    <a href="/import" class="btn btn-primary">Ga naar CSV importeren</a>
+</div>
+{% else %}
+
 {% if error %}
 <div class="alert alert-error">{{ error }}</div>
 {% endif %}
@@ -78,6 +90,8 @@
 <div style="margin-top:1.5rem;">
     <a href="/import" class="btn">Terug naar importeren</a>
 </div>
+
+{% endif %}{# end restricted #}
 
 <style>
 .bank-grid {
