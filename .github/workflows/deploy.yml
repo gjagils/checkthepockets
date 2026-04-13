@@ -11,6 +11,7 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    environment: portainer
     permissions:
       contents: read
       packages: write
@@ -55,87 +56,27 @@ jobs:
           PORTAINER_URL: ${{ secrets.PORTAINER_URL }}
           PORTAINER_API_TOKEN: ${{ secrets.PORTAINER_API_TOKEN }}
           PORTAINER_STACK_ID: ${{ secrets.PORTAINER_STACK_ID }}
-          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
-          SECRET_KEY: ${{ secrets.SECRET_KEY }}
-          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          FIELD_ENCRYPTION_KEY: ${{ secrets.FIELD_ENCRYPTION_KEY }}
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          APP_URL: ${{ secrets.APP_URL }}
-          SUPER_ADMIN_USERNAME: ${{ secrets.SUPER_ADMIN_USERNAME }}
         run: |
           STACK_INFO=$(curl -s -H "X-API-Key: $PORTAINER_API_TOKEN" \
             "$PORTAINER_URL/api/stacks/$PORTAINER_STACK_ID")
           ENDPOINT_ID=$(echo "$STACK_INFO" | jq -r '.EndpointId')
           CURRENT_ENV=$(echo "$STACK_INFO" | jq '.Env // []')
-          echo "Endpoint ID: $ENDPOINT_ID"
 
+          IMAGE_LOWER=$(echo "$IMAGE_NAME" | tr '[:upper:]' '[:lower:]')
           echo "Pulling latest image..."
           curl -s -X POST \
             -H "X-API-Key: $PORTAINER_API_TOKEN" \
-            "$PORTAINER_URL/api/endpoints/$ENDPOINT_ID/docker/images/create?fromImage=ghcr.io%2Fgjagils%2Fcheckthepockets&tag=latest"
+            "$PORTAINER_URL/api/endpoints/$ENDPOINT_ID/docker/images/create?fromImage=ghcr.io%2F${IMAGE_LOWER}&tag=latest"
           echo "Image pulled."
 
-          MERGED_ENV=$(echo "$CURRENT_ENV" | jq \
-            --arg db "$NEON_DATABASE_URL" \
-            --arg sk "$SECRET_KEY" \
-            --arg gc "$GOOGLE_CLIENT_ID" \
-            --arg gs "$GOOGLE_CLIENT_SECRET" \
-            --arg ak "$ANTHROPIC_API_KEY" \
-            --arg fk "$FIELD_ENCRYPTION_KEY" \
-            --arg ra "$RESEND_API_KEY" \
-            --arg au "$APP_URL" \
-            --arg sa "$SUPER_ADMIN_USERNAME" \
-            '[ if $db != "" then {"name":"DATABASE_URL","value":$db} else empty end, if $sk != "" then {"name":"SECRET_KEY","value":$sk} else empty end, if $gc != "" then {"name":"GOOGLE_CLIENT_ID","value":$gc} else empty end, if $gs != "" then {"name":"GOOGLE_CLIENT_SECRET","value":$gs} else empty end, if $ak != "" then {"name":"ANTHROPIC_API_KEY","value":$ak} else empty end, if $fk != "" then {"name":"FIELD_ENCRYPTION_KEY","value":$fk} else empty end, if $ra != "" then {"name":"RESEND_API_KEY","value":$ra} else empty end, if $au != "" then {"name":"APP_URL","value":$au} else empty end, if $sa != "" then {"name":"SUPER_ADMIN_USERNAME","value":$sa} else empty end ] as $new | ($new | map(.name)) as $new_names | [.[] | select(.name as $n | $new_names | index($n) | not)] + $new')
-
           STACK_FILE=$(cat docker-compose.yml)
-          echo "Redeploying stack with $(echo "$MERGED_ENV" | jq length) env vars..."
-          REDEPLOY_RESULT=$(curl -s -X PUT \
+          curl -s -X PUT \
             -H "X-API-Key: $PORTAINER_API_TOKEN" \
             -H "Content-Type: application/json" \
             -d "{
-              \"StackFileContent\": $(echo "$STACK_FILE" | jq -Rs .),
-              \"Env\": $MERGED_ENV,
+              \"StackFileContent\": $(echo \"$STACK_FILE\" | jq -Rs .),
+              \"Env\": $CURRENT_ENV,
               \"Prune\": true
             }" \
-            "$PORTAINER_URL/api/stacks/$PORTAINER_STACK_ID?endpointId=$ENDPOINT_ID")
+            "$PORTAINER_URL/api/stacks/$PORTAINER_STACK_ID?endpointId=$ENDPOINT_ID"
           echo "Deploy complete."
-
-      - name: Sync env vars to Railway
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-          VAR_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
-          VAR_SECRET_KEY: ${{ secrets.SECRET_KEY }}
-          VAR_GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-          VAR_GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-          VAR_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          VAR_FIELD_ENCRYPTION_KEY: ${{ secrets.FIELD_ENCRYPTION_KEY }}
-          VAR_RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          VAR_APP_URL: ${{ secrets.APP_URL }}
-          VAR_SUPER_ADMIN_USERNAME: ${{ secrets.SUPER_ADMIN_USERNAME }}
-        run: |
-          if [ -z "$RAILWAY_TOKEN" ]; then
-            echo "RAILWAY_TOKEN not set, skipping Railway sync."
-            exit 0
-          fi
-
-          npm i -g @railway/cli 2>/dev/null
-
-          for pair in \
-            "DATABASE_URL=$VAR_DATABASE_URL" \
-            "SECRET_KEY=$VAR_SECRET_KEY" \
-            "GOOGLE_CLIENT_ID=$VAR_GOOGLE_CLIENT_ID" \
-            "GOOGLE_CLIENT_SECRET=$VAR_GOOGLE_CLIENT_SECRET" \
-            "ANTHROPIC_API_KEY=$VAR_ANTHROPIC_API_KEY" \
-            "FIELD_ENCRYPTION_KEY=$VAR_FIELD_ENCRYPTION_KEY" \
-            "RESEND_API_KEY=$VAR_RESEND_API_KEY" \
-            "APP_URL=$VAR_APP_URL" \
-            "SUPER_ADMIN_USERNAME=$VAR_SUPER_ADMIN_USERNAME"; do
-            key="${pair%%=*}"
-            val="${pair#*=}"
-            if [ -n "$val" ]; then
-              railway variables set "$key=$val" 2>/dev/null || echo "Warning: could not set $key on Railway"
-            fi
-          done
-          echo "Railway env sync complete."
