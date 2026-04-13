@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Bank koppelen - Check Your Pockets{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Bank koppelen</h1>
+    <p class="subtitle">Koppel je bankrekening via PSD2 om automatisch transacties te importeren.</p>
+</div>
+
+{% if error %}
+<div class="alert alert-error">{{ error }}</div>
+{% endif %}
+
+{% if connections %}
+<div class="card" style="margin-bottom:1.5rem;">
+    <h2>Gekoppelde banken</h2>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Bank</th>
+                <th>Status</th>
+                <th>Geldig tot</th>
+                <th>Laatst gesynchroniseerd</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for conn in connections %}
+            <tr>
+                <td><strong>{{ conn.bank_name }}</strong></td>
+                <td>
+                    {% if conn.status == "active" %}
+                    <span class="badge badge-success">Actief</span>
+                    {% elif conn.status == "pending" %}
+                    <span class="badge badge-warning">In afwachting</span>
+                    {% else %}
+                    <span class="badge">{{ conn.status }}</span>
+                    {% endif %}
+                </td>
+                <td>{{ conn.valid_until.strftime('%d-%m-%Y') if conn.valid_until else '-' }}</td>
+                <td>{{ conn.last_synced_at.strftime('%d-%m-%Y %H:%M') if conn.last_synced_at else 'Nog niet' }}</td>
+                <td style="display:flex; gap:0.5rem;">
+                    {% if conn.status == "active" %}
+                    <a href="/banking/sync/{{ conn.id }}" class="btn btn-sm btn-primary">Synchroniseren</a>
+                    {% endif %}
+                    <form method="post" action="/banking/disconnect/{{ conn.id }}" style="margin:0;">
+                        <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Weet je zeker dat je deze koppeling wilt verwijderen?')">Ontkoppelen</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% if banks %}
+<div class="card">
+    <h2>Nieuwe bank koppelen</h2>
+    <p style="margin-bottom:1rem; color:var(--muted);">Selecteer je bank om de koppeling te starten. Je wordt doorgestuurd naar je bank om in te loggen en toestemming te geven.</p>
+
+    <div class="bank-grid">
+        {% for bank in banks %}
+        <form method="post" action="/banking/connect" class="bank-card-form">
+            <input type="hidden" name="bank_name" value="{{ bank.name }}">
+            <input type="hidden" name="bank_country" value="{{ bank.country }}">
+            <button type="submit" class="bank-card">
+                {% if bank.logo %}
+                <img src="{{ bank.logo }}" alt="{{ bank.name }}" class="bank-logo">
+                {% endif %}
+                <span class="bank-name">{{ bank.name }}</span>
+            </button>
+        </form>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<div style="margin-top:1.5rem;">
+    <a href="/import" class="btn">Terug naar importeren</a>
+</div>
+
+<style>
+.bank-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 0.75rem;
+}
+.bank-card-form { margin: 0; }
+.bank-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1.25rem 1rem;
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    width: 100%;
+    font-family: inherit;
+    font-size: inherit;
+    color: var(--text);
+}
+.bank-card:hover {
+    border-color: var(--orange);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.bank-logo {
+    height: 32px;
+    width: auto;
+    object-fit: contain;
+}
+.bank-name {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+.badge-success { background: var(--green-bg, #e6f4ea); color: var(--green, #1a7f37); padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; }
+.badge-warning { background: var(--orange-bg); color: var(--orange); padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; }
+</style>
+{% endblock %}
