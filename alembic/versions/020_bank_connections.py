@@ -1,7 +1,7 @@
 """Add bank_connections table for Enable Banking PSD2 integration
 
-Revision ID: 019
-Revises: 018
+Revision ID: 020
+Revises: 019
 Create Date: 2026-04-13
 """
 from typing import Sequence, Union
@@ -9,8 +9,8 @@ from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
 
-revision: str = "019"
-down_revision: Union[str, None] = "018"
+revision: str = "020"
+down_revision: Union[str, None] = "019"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
