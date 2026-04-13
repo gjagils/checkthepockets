@@ -338,11 +338,14 @@ async def sync_transactions(connection_id: int, request: Request, db: Session = 
     conn.last_synced_at = datetime.utcnow()
     db.commit()
 
-    # Auto-link recurring
+    # Auto-link recurring and sync projections
     from app.routers.transactions import auto_link_recurring_after_import
-    from app.routers.recurring import cleanup_matched_projected
-    cleanup_matched_projected(user.id, db)
+    from app.routers.recurring import cleanup_matched_projected, sync_projected_transactions
     auto_link_recurring_after_import(db, user.id)
+    cleanup_matched_projected(user.id, db)
+    # Re-sync projected transactions for current month to reflect new imports
+    _today = date_type.today()
+    sync_projected_transactions(user.id, _today.year, _today.month, db)
     db.commit()
 
     return templates.TemplateResponse(

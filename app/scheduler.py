@@ -111,13 +111,15 @@ def _sync_all_bank_connections():
 
         db.commit()
 
-        # Auto-link recurring for all synced users
+        # Auto-link recurring for all synced users, then sync projections
         synced_user_ids = {c.user_id for c in connections}
         from app.routers.transactions import auto_link_recurring_after_import
-        from app.routers.recurring import cleanup_matched_projected
+        from app.routers.recurring import cleanup_matched_projected, sync_projected_transactions
+        today = datetime.utcnow().date()
         for user_id in synced_user_ids:
-            cleanup_matched_projected(user_id, db)
             auto_link_recurring_after_import(db, user_id)
+            cleanup_matched_projected(user_id, db)
+            sync_projected_transactions(user_id, today.year, today.month, db)
         db.commit()
 
         logger.info("Bank sync voltooid voor %d koppelingen", len(connections))

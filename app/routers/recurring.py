@@ -176,12 +176,34 @@ def _is_active_in_month(item: RecurringTransaction, year: int, month: int) -> bo
     return True
 
 
+def _projected_hash(item_id: int, year: int, month: int) -> str:
+    """Canonical hash for a projected transaction. Always use this function."""
+    return f"projected-{item_id}-{year}-{month:02d}"
+
+
+def _cleanup_legacy_projected_hashes(db: Session, item_id: int, year: int, month: int) -> bool:
+    """Delete any projected transactions with the old ISO-date hash format.
+    Returns True if anything was deleted."""
+    ref = date(year, month, 1)
+    # The old format used period_start.isoformat(), e.g. "projected-5-2026-04-01"
+    legacy_hash = f"projected-{item_id}-{ref.isoformat()}"
+    canonical_hash = _projected_hash(item_id, year, month)
+    if legacy_hash == canonical_hash:
+        return False  # Same format, nothing to clean
+    legacy = db.query(Transaction).filter(Transaction.import_hash == legacy_hash).first()
+    if legacy:
+        db.delete(legacy)
+        return True
+    return False
+
+
 def sync_projected_transactions(user_id: int, year: int, month: int, db: Session) -> None:
     """
     For the given month:
     - Create projected Transaction placeholders for active recurring items with no real match.
     - Delete projected placeholders where a real transaction now exists.
     - Skip months before the user's first real transaction (no data yet).
+    Uses canonical hash format and cleans up legacy hashes to avoid duplicates.
     """
     ref = date(year, month, 1)
 
@@ -231,9 +253,13 @@ def sync_projected_transactions(user_id: int, year: int, month: int, db: Session
     changed = False
     with db.no_autoflush:
         for item in recurring_items:
+            # Always clean up legacy hash format first
+            if _cleanup_legacy_projected_hashes(db, item.id, year, month):
+                changed = True
+
             if not _is_active_in_month(item, year, month):
                 # Clean up any stale projected tx for this item+period
-                proj_hash = f"projected-{item.id}-{year}-{month:02d}"
+                proj_hash = _projected_hash(item.id, year, month)
                 stale = db.query(Transaction).filter(Transaction.import_hash == proj_hash).first()
                 if stale:
                     db.delete(stale)
@@ -242,7 +268,7 @@ def sync_projected_transactions(user_id: int, year: int, month: int, db: Session
 
             # Determine the period for this item's frequency in the given month
             period_start, period_end = _get_period_range(item.frequency, ref)
-            proj_hash = f"projected-{item.id}-{period_start.isoformat()}"
+            proj_hash = _projected_hash(item.id, year, month)
 
             # Check if a real (non-projected) transaction already matches
             real_tx = _find_matching_transaction(db, user_id, item, period_start, period_end)
@@ -254,10 +280,17 @@ def sync_projected_transactions(user_id: int, year: int, month: int, db: Session
                     db.delete(proj)
                     changed = True
             else:
-                # No real match — ensure projected placeholder exists
+                # No real match — ensure projected placeholder exists (upsert logic)
                 proj = db.query(Transaction).filter(Transaction.import_hash == proj_hash).first()
-                if not proj:
-                    # Determine account: prefer recurring item's category account, else default
+                if proj:
+                    # Update existing projected transaction in case amount/category changed
+                    proj.amount = item.amount_expected
+                    proj.description = item.name
+                    proj.counterparty = item.counterparty or item.name
+                    proj.category_id = item.category_id
+                    proj.recurring_id = item.id
+                    changed = True
+                else:
                     db.add(Transaction(
                         account_id=default_account.id,
                         date=period_start,
@@ -278,7 +311,8 @@ def sync_projected_transactions(user_id: int, year: int, month: int, db: Session
 
 
 def cleanup_matched_projected(user_id: int, db: Session) -> None:
-    """Delete projected transactions that now have a matching real transaction."""
+    """Delete projected transactions that now have a matching real transaction.
+    Also cleans up orphaned projected transactions (no recurring item, or inactive item)."""
     projected = (
         db.query(Transaction)
         .join(Account)
@@ -296,6 +330,12 @@ def cleanup_matched_projected(user_id: int, db: Session) -> None:
                 RecurringTransaction.id == proj.recurring_id
             ).first()
             if not item:
+                # Recurring item was deleted — remove orphaned projection
+                db.delete(proj)
+                changed = True
+                continue
+            if not item.is_active:
+                # Recurring item was deactivated — remove projection
                 db.delete(proj)
                 changed = True
                 continue

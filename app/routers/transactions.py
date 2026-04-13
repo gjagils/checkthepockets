@@ -1370,11 +1370,14 @@ async def import_confirm(request: Request, db: Session = Depends(get_db)):
 
     db.commit()
 
-    from app.routers.recurring import cleanup_matched_projected
-    cleanup_matched_projected(user.id, db)
-
-    # Auto-link new transactions to recurring items
+    # Auto-link new transactions to recurring items, then clean up projections
     auto_link_recurring_after_import(db, user.id)
+    from app.routers.recurring import cleanup_matched_projected, sync_projected_transactions
+    cleanup_matched_projected(user.id, db)
+    # Re-sync projected transactions for current month to reflect new imports
+    import datetime as _dt
+    _today = _dt.date.today()
+    sync_projected_transactions(user.id, _today.year, _today.month, db)
     db.commit()
 
     return templates.TemplateResponse(
