@@ -74,7 +74,7 @@ jobs:
             -H "X-API-Key: $PORTAINER_API_TOKEN" \
             -H "Content-Type: application/json" \
             -d "{
-              \"StackFileContent\": $(echo \"$STACK_FILE\" | jq -Rs .),
+              \"StackFileContent\": $(echo "$STACK_FILE" | jq -Rs .),
               \"Env\": $CURRENT_ENV,
               \"Prune\": true
             }" \
