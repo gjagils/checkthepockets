@@ -229,48 +229,49 @@ def sync_projected_transactions(user_id: int, year: int, month: int, db: Session
         return
 
     changed = False
-    for item in recurring_items:
-        if not _is_active_in_month(item, year, month):
-            # Clean up any stale projected tx for this item+period
-            proj_hash = f"projected-{item.id}-{year}-{month:02d}"
-            stale = db.query(Transaction).filter(Transaction.import_hash == proj_hash).first()
-            if stale:
-                db.delete(stale)
-                changed = True
-            continue
+    with db.no_autoflush:
+        for item in recurring_items:
+            if not _is_active_in_month(item, year, month):
+                # Clean up any stale projected tx for this item+period
+                proj_hash = f"projected-{item.id}-{year}-{month:02d}"
+                stale = db.query(Transaction).filter(Transaction.import_hash == proj_hash).first()
+                if stale:
+                    db.delete(stale)
+                    changed = True
+                continue
 
-        # Determine the period for this item's frequency in the given month
-        period_start, period_end = _get_period_range(item.frequency, ref)
-        proj_hash = f"projected-{item.id}-{period_start.isoformat()}"
+            # Determine the period for this item's frequency in the given month
+            period_start, period_end = _get_period_range(item.frequency, ref)
+            proj_hash = f"projected-{item.id}-{period_start.isoformat()}"
 
-        # Check if a real (non-projected) transaction already matches
-        real_tx = _find_matching_transaction(db, user_id, item, period_start, period_end)
+            # Check if a real (non-projected) transaction already matches
+            real_tx = _find_matching_transaction(db, user_id, item, period_start, period_end)
 
-        if real_tx:
-            # Real match exists — delete projected placeholder if present
-            proj = db.query(Transaction).filter(Transaction.import_hash == proj_hash).first()
-            if proj:
-                db.delete(proj)
-                changed = True
-        else:
-            # No real match — ensure projected placeholder exists
-            proj = db.query(Transaction).filter(Transaction.import_hash == proj_hash).first()
-            if not proj:
-                # Determine account: prefer recurring item's category account, else default
-                db.add(Transaction(
-                    account_id=default_account.id,
-                    date=period_start,
-                    amount=item.amount_expected,
-                    currency="EUR",
-                    description=item.name,
-                    counterparty=item.counterparty or item.name,
-                    import_hash=proj_hash,
-                    is_projected=1,
-                    is_excluded=0,
-                    category_id=item.category_id,
-                    recurring_id=item.id,
-                ))
-                changed = True
+            if real_tx:
+                # Real match exists — delete projected placeholder if present
+                proj = db.query(Transaction).filter(Transaction.import_hash == proj_hash).first()
+                if proj:
+                    db.delete(proj)
+                    changed = True
+            else:
+                # No real match — ensure projected placeholder exists
+                proj = db.query(Transaction).filter(Transaction.import_hash == proj_hash).first()
+                if not proj:
+                    # Determine account: prefer recurring item's category account, else default
+                    db.add(Transaction(
+                        account_id=default_account.id,
+                        date=period_start,
+                        amount=item.amount_expected,
+                        currency="EUR",
+                        description=item.name,
+                        counterparty=item.counterparty or item.name,
+                        import_hash=proj_hash,
+                        is_projected=1,
+                        is_excluded=0,
+                        category_id=item.category_id,
+                        recurring_id=item.id,
+                    ))
+                    changed = True
 
     if changed:
         db.commit()
@@ -285,23 +286,24 @@ def cleanup_matched_projected(user_id: int, db: Session) -> None:
         .all()
     )
     changed = False
-    for proj in projected:
-        if not proj.recurring_id:
-            db.delete(proj)
-            changed = True
-            continue
-        item = db.query(RecurringTransaction).filter(
-            RecurringTransaction.id == proj.recurring_id
-        ).first()
-        if not item:
-            db.delete(proj)
-            changed = True
-            continue
-        period_start, period_end = _get_period_range(item.frequency, proj.date)
-        real_tx = _find_matching_transaction(db, user_id, item, period_start, period_end)
-        if real_tx:
-            db.delete(proj)
-            changed = True
+    with db.no_autoflush:
+        for proj in projected:
+            if not proj.recurring_id:
+                db.delete(proj)
+                changed = True
+                continue
+            item = db.query(RecurringTransaction).filter(
+                RecurringTransaction.id == proj.recurring_id
+            ).first()
+            if not item:
+                db.delete(proj)
+                changed = True
+                continue
+            period_start, period_end = _get_period_range(item.frequency, proj.date)
+            real_tx = _find_matching_transaction(db, user_id, item, period_start, period_end)
+            if real_tx:
+                db.delete(proj)
+                changed = True
     if changed:
         db.commit()
 
