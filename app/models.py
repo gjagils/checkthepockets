@@ -454,6 +454,7 @@ class BankConnection(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     bank_name = Column(String(100), nullable=False)        # ASPSP name, e.g. "ING"
+    display_name = Column(String(100), nullable=True)      # Custom user-facing name
     bank_country = Column(String(2), nullable=False, default="NL")
     session_id = Column(String(255), nullable=True)        # Enable Banking session ID
     accounts_json = Column(Text, nullable=True)             # JSON list of {uid, iban, name}

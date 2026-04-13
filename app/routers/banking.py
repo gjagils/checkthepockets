@@ -1,11 +1,14 @@
 """Enable Banking PSD2 integration — connect bank accounts and sync transactions."""
 
 import json
+import logging
 import uuid
 from datetime import date as date_type, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Depends, Request
+
+logger = logging.getLogger(__name__)
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -46,17 +49,7 @@ def connect_page(request: Request, db: Session = Depends(get_db)):
     if not _is_configured():
         return templates.TemplateResponse(
             "banking/connect.html",
-            {"request": request, "user": user, "banks": [], "error": "Enable Banking is niet geconfigureerd."},
-        )
-
-    from app import enable_banking
-    try:
-        banks = enable_banking.list_banks("NL")
-    except Exception as e:
-        banks = []
-        return templates.TemplateResponse(
-            "banking/connect.html",
-            {"request": request, "user": user, "banks": [], "error": f"Kan banken niet ophalen: {e}"},
+            {"request": request, "user": user, "connections": [], "error": "Enable Banking is niet geconfigureerd."},
         )
 
     # Get existing connections for this user
@@ -67,7 +60,7 @@ def connect_page(request: Request, db: Session = Depends(get_db)):
 
     return templates.TemplateResponse(
         "banking/connect.html",
-        {"request": request, "user": user, "banks": banks, "connections": connections},
+        {"request": request, "user": user, "connections": connections},
     )
 
 
@@ -263,13 +256,16 @@ async def sync_transactions(connection_id: int, request: Request, db: Session = 
     account_iban = account_info["iban"] if account_info else None
 
     from app import enable_banking
+    logger.info("Bank sync gestart: %s account=%s from=%s to=%s", conn.bank_name, account_uid, date_from, date_to)
     try:
         raw_transactions = enable_banking.get_transactions(
             account_uid,
             date_from=date_from or None,
             date_to=date_to or None,
         )
+        logger.info("Bank sync: %d ruwe transacties opgehaald", len(raw_transactions))
     except Exception as e:
+        logger.error("Bank sync fout: %s", e)
         return templates.TemplateResponse(
             "banking/sync.html",
             {
@@ -361,6 +357,31 @@ async def sync_transactions(connection_id: int, request: Request, db: Session = 
             "connection": conn,
         },
     )
+
+
+# ── Rename connection ──────────────────────────────────────────────────────
+
+
+@router.post("/rename/{connection_id}")
+async def rename_connection(connection_id: int, request: Request, db: Session = Depends(get_db)):
+    """Rename a bank connection (custom display name)."""
+    user = require_login(request, db)
+    if not _is_banking_allowed(user):
+        return RedirectResponse("/banking/connect", status_code=302)
+    form = await request.form()
+    display_name = form.get("display_name", "").strip()
+
+    conn = db.query(BankConnection).filter(
+        BankConnection.id == connection_id,
+        BankConnection.user_id == user.id,
+    ).first()
+    if not conn:
+        return RedirectResponse("/banking/connect", status_code=302)
+
+    conn.display_name = display_name or None
+    db.commit()
+
+    return RedirectResponse("/banking/connect", status_code=302)
 
 
 # ── Disconnect ──────────────────────────────────────────────────────────────

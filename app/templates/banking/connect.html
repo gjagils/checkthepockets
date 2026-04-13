@@ -22,6 +22,10 @@
 <div class="alert alert-error">{{ error }}</div>
 {% endif %}
 
+{% if success %}
+<div class="alert alert-success">{{ success }}</div>
+{% endif %}
+
 {% if connections %}
 <div class="card" style="margin-bottom:1.5rem;">
     <h2>Gekoppelde banken</h2>
@@ -38,7 +42,12 @@
         <tbody>
             {% for conn in connections %}
             <tr>
-                <td><strong>{{ conn.bank_name }}</strong></td>
+                <td>
+                    <strong>{{ conn.display_name or conn.bank_name }}</strong>
+                    {% if conn.display_name %}
+                    <span style="color:var(--muted); font-size:0.8rem;">({{ conn.bank_name }})</span>
+                    {% endif %}
+                </td>
                 <td>
                     {% if conn.status == "active" %}
                     <span class="badge badge-success">Actief</span>
@@ -50,12 +59,22 @@
                 </td>
                 <td>{{ conn.valid_until.strftime('%d-%m-%Y') if conn.valid_until else '-' }}</td>
                 <td>{{ conn.last_synced_at.strftime('%d-%m-%Y %H:%M') if conn.last_synced_at else 'Nog niet' }}</td>
-                <td style="display:flex; gap:0.5rem;">
+                <td style="display:flex; gap:0.5rem; flex-wrap:wrap;">
                     {% if conn.status == "active" %}
                     <a href="/banking/sync/{{ conn.id }}" class="btn btn-sm btn-primary">Synchroniseren</a>
                     {% endif %}
+                    <button type="button" class="btn btn-sm" onclick="toggleRename({{ conn.id }})">Hernoemen</button>
                     <form method="post" action="/banking/disconnect/{{ conn.id }}" style="margin:0;">
                         <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Weet je zeker dat je deze koppeling wilt verwijderen?')">Ontkoppelen</button>
+                    </form>
+                </td>
+            </tr>
+            <tr id="rename-row-{{ conn.id }}" style="display:none;">
+                <td colspan="5">
+                    <form method="post" action="/banking/rename/{{ conn.id }}" style="display:flex; gap:0.5rem; align-items:center;">
+                        <input type="text" name="display_name" placeholder="Nieuwe naam (bijv. Betaalrekening)" value="{{ conn.display_name or '' }}" style="flex:1; max-width:300px;" required>
+                        <button type="submit" class="btn btn-sm btn-primary">Opslaan</button>
+                        <button type="button" class="btn btn-sm" onclick="toggleRename({{ conn.id }})">Annuleren</button>
                     </form>
                 </td>
             </tr>
@@ -65,27 +84,31 @@
 </div>
 {% endif %}
 
-{% if banks %}
 <div class="card">
     <h2>Nieuwe bank koppelen</h2>
-    <p style="margin-bottom:1rem; color:var(--muted);">Selecteer je bank om de koppeling te starten. Je wordt doorgestuurd naar je bank om in te loggen en toestemming te geven.</p>
-
-    <div class="bank-grid">
-        {% for bank in banks %}
-        <form method="post" action="/banking/connect" class="bank-card-form">
-            <input type="hidden" name="bank_name" value="{{ bank.name }}">
-            <input type="hidden" name="bank_country" value="{{ bank.country }}">
-            <button type="submit" class="bank-card">
-                {% if bank.logo %}
-                <img src="{{ bank.logo }}" alt="{{ bank.name }}" class="bank-logo">
-                {% endif %}
-                <span class="bank-name">{{ bank.name }}</span>
-            </button>
-        </form>
-        {% endfor %}
-    </div>
+    <p style="margin-bottom:1rem; color:var(--muted);">
+        Voer de naam van je bank in om de koppeling te starten.
+        Je wordt doorgestuurd naar je bank om in te loggen en toestemming te geven.
+    </p>
+    <form method="post" action="/banking/connect" style="display:flex; gap:0.75rem; align-items:flex-end; flex-wrap:wrap;">
+        <div class="form-group" style="margin-bottom:0; flex:1; min-width:200px;">
+            <label for="bank_name">Banknaam</label>
+            <input type="text" id="bank_name" name="bank_name" placeholder="bijv. ABN AMRO, Bunq, ING..." required>
+        </div>
+        <div class="form-group" style="margin-bottom:0; width:100px;">
+            <label for="bank_country">Land</label>
+            <select id="bank_country" name="bank_country">
+                <option value="NL" selected>NL</option>
+                <option value="BE">BE</option>
+                <option value="DE">DE</option>
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary" style="margin-bottom:0;">Koppelen</button>
+    </form>
+    <p style="margin-top:0.75rem; font-size:0.8rem; color:var(--muted);">
+        Let op: de bank moet eerst geautoriseerd zijn in het Enable Banking Control Panel.
+    </p>
 </div>
-{% endif %}
 
 <div style="margin-top:1.5rem;">
     <a href="/import" class="btn">Terug naar importeren</a>
@@ -94,42 +117,14 @@
 {% endif %}{# end restricted #}
 
 <style>
-.bank-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 0.75rem;
-}
-.bank-card-form { margin: 0; }
-.bank-card {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 1.25rem 1rem;
-    background: var(--surface);
-    border: 1.5px solid var(--border);
-    border-radius: 10px;
-    cursor: pointer;
-    transition: border-color 0.15s, box-shadow 0.15s;
-    width: 100%;
-    font-family: inherit;
-    font-size: inherit;
-    color: var(--text);
-}
-.bank-card:hover {
-    border-color: var(--orange);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-.bank-logo {
-    height: 32px;
-    width: auto;
-    object-fit: contain;
-}
-.bank-name {
-    font-weight: 600;
-    font-size: 0.9rem;
-}
 .badge-success { background: var(--green-bg, #e6f4ea); color: var(--green, #1a7f37); padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; }
 .badge-warning { background: var(--orange-bg); color: var(--orange); padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; }
 </style>
+
+<script>
+function toggleRename(connId) {
+    const row = document.getElementById('rename-row-' + connId);
+    row.style.display = row.style.display === 'none' ? '' : 'none';
+}
+</script>
 {% endblock %}
