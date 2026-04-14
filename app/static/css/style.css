@@ -876,42 +876,50 @@ tfoot td { background: var(--surface-2); border-top: 1px solid var(--border); fo
     color: #fff;
 }
 
-.tx-cat-toggle {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.35rem 0.7rem;
+/* 3-state categorie knoppen (Alle / Niet gecategoriseerd / Gecategoriseerd) */
+.cat-trio {
+    display: flex;
+    flex: 1 1 360px;
+    min-width: 280px;
     border: 1px solid var(--border);
     border-radius: var(--ctp-radius-sm);
-    background: var(--surface);
+    overflow: hidden;
+}
+.cat-trio .cat-btn {
+    flex: 1 1 0;
+    text-align: center;
+    padding: 0.4rem 0.6rem;
     font-size: 0.72rem;
     font-weight: 700;
     font-family: var(--font-heading);
     letter-spacing: 0.04em;
     color: var(--muted);
+    background: var(--surface);
     text-decoration: none;
-    transition: color 0.12s, background 0.12s, border-color 0.12s;
+    border-right: 1px solid var(--border);
+    transition: color 0.12s, background 0.12s;
     white-space: nowrap;
 }
-.tx-cat-toggle:hover { color: var(--text); background: var(--surface-2); }
-.tx-cat-toggle .cat-toggle-dot {
-    display: inline-block;
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    background: var(--border);
-}
-.tx-cat-toggle.is-cat {
-    background: var(--navy, #234C75);
-    color: #fff;
-    border-color: var(--navy, #234C75);
-}
-.tx-cat-toggle.is-cat .cat-toggle-dot { background: #8FE38F; }
-.tx-cat-toggle.is-uncat {
+.cat-trio .cat-btn:last-child { border-right: none; }
+.cat-trio .cat-btn:hover { color: var(--text); background: var(--surface-2); }
+.cat-trio .cat-btn.active {
     background: var(--orange, #FF9800);
     color: #111;
-    border-color: var(--orange, #FF9800);
 }
-.tx-cat-toggle.is-uncat .cat-toggle-dot { background: #111; }
+
+.tx-row-filters { flex-wrap: nowrap; }
+@media (max-width: 900px) { .tx-row-filters { flex-wrap: wrap; } }
+
+.tx-search-form { flex: 1 1 180px; min-width: 140px; }
+.tx-search-input {
+    width: 100%;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: var(--ctp-radius-sm);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 0.8rem;
+}
 .period-nav {
     display: flex;
     align-items: center;

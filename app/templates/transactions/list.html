@@ -80,31 +80,33 @@
         </div>
     </div>
 
-    <!-- Row 2: categorized toggle, category dropdown, account, more -->
-    <div class="tx-toolbar-row">
-        {% set _next_catstate = -2 if (current_category_id is none or current_category_id == 0) else (-1 if current_category_id == -2 else 0) %}
-        {% set _toggle_label = 'Alle transacties' if (current_category_id is none or current_category_id == 0) else ('Gecategoriseerd' if current_category_id == -2 or (current_category_id and current_category_id > 0) else 'Niet gecategoriseerd') %}
-        {% set _toggle_cls = '' if (current_category_id is none or current_category_id == 0) else ('is-cat' if current_category_id == -2 or (current_category_id and current_category_id > 0) else 'is-uncat') %}
+    <!-- Row 2: 3-state category buttons + search + account + more -->
+    {# Helper om params te bouwen met variabele category_id #}
+    {% macro _cat_url(cat_state) -%}
+      {%- set parts = [] -%}
+      {%- if current_month %}{% set _ = parts.append('month=' + current_month) %}{% elif current_year %}{% set _ = parts.append('year=' + current_year) %}{% endif -%}
+      {%- if current_account_id %}{% set _ = parts.append('account_id=' + current_account_id|string) %}{% endif -%}
+      {%- if current_tag_id %}{% set _ = parts.append('tag_id=' + current_tag_id|string) %}{% endif -%}
+      {%- if search %}{% set _ = parts.append('search=' + search) %}{% endif -%}
+      {%- if cat_state is not none %}{% set _ = parts.append('category_id=' + cat_state|string) %}{% endif -%}
+      /transactions?{{ parts|join('&') }}
+    {%- endmacro %}
 
-        {% set _toggle_params = [] %}
-        {% if current_month %}{% set _ = _toggle_params.append('month=' + current_month) %}{% elif current_year %}{% set _ = _toggle_params.append('year=' + current_year) %}{% endif %}
-        {% if current_account_id %}{% set _ = _toggle_params.append('account_id=' + current_account_id|string) %}{% endif %}
-        {% if current_tag_id %}{% set _ = _toggle_params.append('tag_id=' + current_tag_id|string) %}{% endif %}
-        {% if search %}{% set _ = _toggle_params.append('search=' + search) %}{% endif %}
-        {% if _next_catstate != 0 %}{% set _ = _toggle_params.append('category_id=' + _next_catstate|string) %}{% endif %}
+    {% set _is_all = current_category_id is none or current_category_id == 0 %}
+    {% set _is_uncat = current_category_id == -1 %}
+    {% set _is_cat = current_category_id == -2 or (current_category_id and current_category_id > 0) %}
 
-        <a href="/transactions?{{ _toggle_params|join('&') }}"
-           class="tx-cat-toggle {{ _toggle_cls }}"
-           title="Klik om te wisselen">
-            <span class="tx-cat-toggle-dot"></span>
-            {{ _toggle_label }}
-            {% if current_category_id == -1 and uncategorized_count %}
-              &nbsp;<span class="tx-badge">{{ uncategorized_count }}</span>
-            {% endif %}
-        </a>
+    <div class="tx-toolbar-row tx-row-filters">
+        <div class="cat-trio">
+            <a href="{{ _cat_url(none) }}" class="cat-btn {% if _is_all %}active{% endif %}">Alle transacties</a>
+            <a href="{{ _cat_url(-1) }}" class="cat-btn {% if _is_uncat %}active{% endif %}">
+                Niet gecategoriseerd{% if _is_uncat and uncategorized_count %}&nbsp;<span class="tx-badge">{{ uncategorized_count }}</span>{% endif %}
+            </a>
+            <a href="{{ _cat_url(-2) }}" class="cat-btn {% if _is_cat %}active{% endif %}">Gecategoriseerd</a>
+        </div>
 
-        {# Category dropdown — alleen als 'Gecategoriseerd' actief is (of al een specifieke cat) #}
-        {% if current_category_id == -2 or (current_category_id and current_category_id > 0) %}
+        {# Categorie-dropdown verschijnt alleen als 'Gecategoriseerd' actief is #}
+        {% if _is_cat %}
         <form method="get" action="/transactions" class="tx-inline-form">
             {% if current_month %}<input type="hidden" name="month" value="{{ current_month }}">{% elif current_year %}<input type="hidden" name="year" value="{{ current_year }}">{% endif %}
             {% if current_account_id %}<input type="hidden" name="account_id" value="{{ current_account_id }}">{% endif %}
@@ -134,16 +136,21 @@
             </select>
         </form>
 
+        <form method="get" action="/transactions" class="tx-inline-form tx-search-form">
+            {% if current_month %}<input type="hidden" name="month" value="{{ current_month }}">{% elif current_year %}<input type="hidden" name="year" value="{{ current_year }}">{% endif %}
+            {% if current_category_id %}<input type="hidden" name="category_id" value="{{ current_category_id }}">{% endif %}
+            {% if current_account_id %}<input type="hidden" name="account_id" value="{{ current_account_id }}">{% endif %}
+            {% if current_tag_id %}<input type="hidden" name="tag_id" value="{{ current_tag_id }}">{% endif %}
+            <input type="text" name="search" value="{{ search }}" placeholder="Zoeken..." class="tx-search-input">
+        </form>
+
         <details class="tx-more-filters">
             <summary>Meer filters</summary>
             <form method="get" action="/transactions" class="tx-more-panel">
                 {% if current_month %}<input type="hidden" name="month" value="{{ current_month }}">{% elif current_year %}<input type="hidden" name="year" value="{{ current_year }}">{% endif %}
                 {% if current_category_id %}<input type="hidden" name="category_id" value="{{ current_category_id }}">{% endif %}
                 {% if current_account_id %}<input type="hidden" name="account_id" value="{{ current_account_id }}">{% endif %}
-                <div class="form-group">
-                    <label>Zoeken</label>
-                    <input type="text" name="search" value="{{ search }}" placeholder="Omschrijving, tegenpartij, IBAN...">
-                </div>
+                {% if search %}<input type="hidden" name="search" value="{{ search }}">{% endif %}
                 {% if tags %}
                 <div class="form-group">
                     <label>Tag</label>
