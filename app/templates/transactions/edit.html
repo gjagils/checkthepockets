@@ -3,7 +3,7 @@
 {% block content %}
 <div class="page-header">
     <h1>Transactie bewerken</h1>
-    <a href="/transactions" class="btn">Terug naar overzicht</a>
+    <a href="{{ redirect_to or '/transactions' }}" class="btn">Terug naar overzicht</a>
 </div>
 
 <div class="transaction-detail card">
@@ -20,6 +20,7 @@
 
 <div class="card">
     <form method="post" action="/transactions/{{ transaction.id }}/edit">
+        {% if redirect_to %}<input type="hidden" name="redirect_to" value="{{ redirect_to }}">{% endif %}
         <div class="form-group">
             <label for="date">Datum</label>
             <input type="date" id="date" name="date" value="{{ transaction.date.isoformat() }}">
@@ -80,7 +81,7 @@
 
         <div class="form-actions">
             <button type="submit" class="btn btn-primary">Opslaan</button>
-            <a href="/transactions" class="btn">Annuleren</a>
+            <a href="{{ redirect_to or '/transactions' }}" class="btn">Annuleren</a>
         </div>
     </form>
 </div>

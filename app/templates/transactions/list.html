@@ -284,7 +284,7 @@
                                 </a>
                             </div>
                             <div class="tx-panel-footer">
-                                <a href="/transactions/{{ tx.id }}/edit" class="tx-panel-footer-btn">Bewerken</a>
+                                <a href="/transactions/{{ tx.id }}/edit?redirect_to=/transactions?page={{ page }}{% for k, v in filter_params.items() %}%26{{ k }}={{ v }}{% endfor %}" class="tx-panel-footer-btn">Bewerken</a>
                                 <span class="tx-panel-footer-sep">·</span>
                                 {% if tx.transfer_id %}
                                 <form method="post" action="/transactions/{{ tx.id }}/unlink-transfer" style="display:inline;">

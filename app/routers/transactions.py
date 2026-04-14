@@ -823,6 +823,10 @@ def edit_transaction_page(
         .all()
     )
 
+    redirect_to = request.query_params.get("redirect_to", "")
+    if not redirect_to.startswith("/"):
+        redirect_to = ""
+
     return templates.TemplateResponse(
         "transactions/edit.html",
         {
@@ -831,6 +835,7 @@ def edit_transaction_page(
             "transaction": transaction,
             "categories": categories,
             "tags": tags,
+            "redirect_to": redirect_to,
         },
     )
 
@@ -897,7 +902,13 @@ async def edit_transaction(
     transaction.tags = selected_tags
     db.commit()
 
-    return RedirectResponse("/", status_code=302)
+    redirect_to = (form.get("redirect_to") or "").strip()
+    if redirect_to.startswith("/"):
+        return RedirectResponse(redirect_to, status_code=302)
+    referer = request.headers.get("referer") or ""
+    if "/transactions" in referer:
+        return RedirectResponse("/transactions", status_code=302)
+    return RedirectResponse("/transactions", status_code=302)
 
 
 @router.get("/transactions/create")
