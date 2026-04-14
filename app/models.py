@@ -235,6 +235,10 @@ class Transaction(Base):
     id = Column(Integer, primary_key=True)
     account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
     date = Column(Date, nullable=False)
+    # Oorspronkelijke boekingsdatum door de bank; wordt gevuld zodra de
+    # zichtbare datum verplaatst wordt bij koppelen aan een terugkerend item
+    # waarvan de periode afwijkt (bv. hypotheek op 31-12 voor de januari-termijn).
+    original_date = Column(Date, nullable=True)
     amount = Column(Numeric(12, 2), nullable=False)
     currency = Column(String(3), default="EUR")
     description = Column(EncryptedText, nullable=True)        # encrypted when FIELD_ENCRYPTION_KEY is set

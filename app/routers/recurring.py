@@ -1151,9 +1151,16 @@ def link_transaction(
     request: Request,
     transaction_id: int = Form(...),
     redirect_to: str = Form(""),
+    shift_to_date: str = Form(""),
     db: Session = Depends(get_db),
 ):
-    """Manually link a transaction to a recurring item."""
+    """Manually link a transaction to a recurring item.
+
+    Als ``shift_to_date`` wordt meegegeven (YYYY-MM-DD) en de periode van die
+    datum afwijkt van de periode waarin de transactie nu valt, wordt de
+    zichtbare datum verschoven en de originele bankdatum bewaard in
+    ``original_date``.
+    """
     user = require_login(request, db)
 
     item = db.query(RecurringTransaction).filter(
@@ -1169,6 +1176,18 @@ def link_transaction(
         .first()
     )
     if tx:
+        if shift_to_date:
+            try:
+                target_date = date.fromisoformat(shift_to_date)
+            except ValueError:
+                target_date = None
+            if target_date:
+                cur_start, cur_end = _get_period_range(item.frequency, tx.date)
+                if not (cur_start <= target_date <= cur_end):
+                    # Verschuiven: bewaar oorspronkelijke datum eenmalig
+                    if tx.original_date is None:
+                        tx.original_date = tx.date
+                    tx.date = target_date
         link_transaction_to_recurring(tx, item)
         # Remove any projected transactions for this recurring in the same period
         # so the "verwacht" rij verdwijnt zodra je gekoppeld hebt.

@@ -201,6 +201,7 @@
                                         <td>
                                             <form method="post" action="/recurring/{{ tx.recurring_id }}/link" style="margin:0;">
                                                 <input type="hidden" name="transaction_id" value="{{ cand.id }}">
+                                                <input type="hidden" name="shift_to_date" value="{{ tx.date.isoformat() }}">
                                                 <input type="hidden" name="redirect_to" value="/transactions?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}">
                                                 <button type="submit" class="btn btn-primary btn-sm">Koppel</button>
                                             </form>
