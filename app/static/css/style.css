@@ -619,7 +619,7 @@ tfoot td { background: var(--surface-2); border-top: 1px solid var(--border); fo
 .summary-card .value {
     font-size: 1.6rem;
     font-weight: 700;
-    color: var(--text-white);
+    color: var(--text);
     font-variant-numeric: tabular-nums;
     line-height: 1.2;
     font-family: var(--font-heading);
