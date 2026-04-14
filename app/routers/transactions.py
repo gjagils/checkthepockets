@@ -332,6 +332,7 @@ def transaction_list(
 
     # Sync + fetch projected transactions for current month view
     projected_transactions = []
+    projected_candidates = {}
     if current_month:
         from app.routers.recurring import sync_projected_transactions
         y, m = int(current_month[:4]), int(current_month[5:7])
@@ -349,6 +350,12 @@ def transaction_list(
         if proj_date_to:
             proj_q = proj_q.filter(Transaction.date <= proj_date_to)
         projected_transactions = proj_q.order_by(Transaction.date.asc()).all()
+
+        # For each projected tx, find candidate real transactions (match on counterparty + amount)
+        if projected_transactions:
+            from app.routers.recurring import find_candidates_for_projected
+            for ptx in projected_transactions:
+                projected_candidates[ptx.id] = find_candidates_for_projected(db, user.id, ptx)
 
     filter_params = {}
     if current_month:
@@ -445,6 +452,7 @@ def transaction_list(
             "period_label": period_label,
             "uncategorized_count": uncategorized_count,
             "projected_transactions": projected_transactions,
+            "projected_candidates": projected_candidates,
         },
     )
 

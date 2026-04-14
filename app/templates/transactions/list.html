@@ -154,6 +154,7 @@
             </thead>
             <tbody>
                 {% for tx in projected_transactions %}
+                {% set candidates = projected_candidates.get(tx.id, []) %}
                 <tr class="tx-projected">
                     <td></td>
                     <td></td>
@@ -168,8 +169,50 @@
                         {{ tx.amount|euro }}
                     </td>
                     <td class="col-account muted"></td>
-                    <td></td>
+                    <td style="text-align:center; padding:0.3rem;">
+                        {% if candidates and tx.recurring_id %}
+                        <button type="button"
+                                class="tx-action-btn"
+                                id="projbtn-{{ tx.id }}"
+                                onclick="toggleProjPanel({{ tx.id }})"
+                                title="{{ candidates|length }} mogelijke match{% if candidates|length != 1 %}es{% endif %}">›</button>
+                        {% endif %}
+                    </td>
                 </tr>
+                {% if candidates and tx.recurring_id %}
+                <tr class="tx-action-panel" id="projpanel-{{ tx.id }}" style="display:none;">
+                    <td colspan="9" class="tx-panel-cell">
+                        <div class="tx-panel-inner">
+                            <div class="tx-panel-info">
+                                <strong>Mogelijke matches voor "{{ tx.counterparty or tx.description or '—' }}"</strong>
+                                <span class="muted">Transacties binnen 30 dagen met vergelijkbaar bedrag</span>
+                            </div>
+                            <table class="proj-candidates">
+                                <thead>
+                                    <tr><th>Datum</th><th>Tegenpartij</th><th>Omschrijving</th><th class="text-right">Bedrag</th><th></th></tr>
+                                </thead>
+                                <tbody>
+                                {% for cand in candidates %}
+                                    <tr>
+                                        <td class="nowrap">{{ cand.date.strftime('%d-%m-%Y') }}</td>
+                                        <td>{{ cand.counterparty or '-' }}</td>
+                                        <td class="muted">{{ cand.description or '-' }}</td>
+                                        <td class="text-right nowrap {% if cand.amount < 0 %}amount-negative{% else %}amount-positive{% endif %}">&euro;&nbsp;{{ cand.amount|euro }}</td>
+                                        <td>
+                                            <form method="post" action="/recurring/{{ tx.recurring_id }}/link" style="margin:0;">
+                                                <input type="hidden" name="transaction_id" value="{{ cand.id }}">
+                                                <input type="hidden" name="redirect_to" value="/transactions?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}">
+                                                <button type="submit" class="btn btn-primary btn-sm">Koppel</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </td>
+                </tr>
+                {% endif %}
                 {% endfor %}
                 {% for tx in transactions %}
                 <tr data-txid="{{ tx.id }}">
@@ -498,6 +541,19 @@ function toggleTxPanel(id) {
     if (!isOpen) {
         panel.style.display = 'table-row';
         btn.classList.add('active');
+    }
+}
+
+function toggleProjPanel(id) {
+    var panel = document.getElementById('projpanel-' + id);
+    var btn   = document.getElementById('projbtn-' + id);
+    if (!panel) return;
+    var isOpen = panel.style.display !== 'none';
+    document.querySelectorAll('.tx-action-panel').forEach(function(p) { p.style.display = 'none'; });
+    document.querySelectorAll('.tx-action-btn').forEach(function(b) { b.classList.remove('active'); });
+    if (!isOpen) {
+        panel.style.display = 'table-row';
+        if (btn) btn.classList.add('active');
     }
 }
 </script>

@@ -133,6 +133,94 @@ def _find_matching_transaction(
     return None
 
 
+def find_candidates_for_projected(
+    db: Session,
+    user_id: int,
+    projected_tx: Transaction,
+    days: int = 30,
+    amount_tolerance: float = 0.15,
+    limit: int = 10,
+) -> list[Transaction]:
+    """Find real transactions that might correspond to a projected (verwacht) transaction.
+
+    Matches on:
+    - same sign amount within ``amount_tolerance`` (default ±15%)
+    - counterparty of the projected tx (or the linked recurring) is contained in
+      the candidate's counterparty or description (case-insensitive)
+    - within ``days`` (default ±30) of the projected date
+    - same user, not excluded, not itself projected, not already linked to
+      another recurring item
+    """
+    proj_amount = projected_tx.amount
+    if proj_amount is None:
+        return []
+    proj_amount = Decimal(proj_amount)
+    abs_amount = abs(proj_amount)
+    delta = abs_amount * Decimal(str(amount_tolerance))
+    amount_low = abs_amount - delta
+    amount_high = abs_amount + delta
+
+    start = projected_tx.date - timedelta(days=days)
+    end = projected_tx.date + timedelta(days=days)
+
+    # Collect search terms from projected tx + its recurring parent (if any)
+    search_terms: list[str] = []
+    for v in (projected_tx.counterparty, projected_tx.description):
+        if v:
+            search_terms.append(v.lower())
+    if projected_tx.recurring_id:
+        rec = db.query(RecurringTransaction).filter(
+            RecurringTransaction.id == projected_tx.recurring_id
+        ).first()
+        if rec:
+            if rec.counterparty:
+                search_terms.append(rec.counterparty.lower())
+            if rec.description_match:
+                search_terms.append(rec.description_match.lower())
+    # Deduplicate and drop very short terms (avoid matching "a", "bv")
+    search_terms = [t for t in {s.strip() for s in search_terms} if len(t) >= 3]
+    if not search_terms:
+        return []
+
+    # Encrypted fields → filter in Python. Query by date + sign + rough amount window.
+    q = (
+        db.query(Transaction)
+        .join(Account)
+        .filter(
+            Account.user_id == user_id,
+            Transaction.is_projected == 0,
+            Transaction.is_excluded == 0,
+            Transaction.date >= start,
+            Transaction.date <= end,
+        )
+    )
+    if proj_amount < 0:
+        q = q.filter(Transaction.amount < 0)
+    else:
+        q = q.filter(Transaction.amount > 0)
+
+    candidates = q.order_by(Transaction.date.desc()).all()
+
+    matches: list[Transaction] = []
+    for tx in candidates:
+        if tx.amount is None:
+            continue
+        tx_abs = abs(Decimal(tx.amount))
+        if tx_abs < amount_low or tx_abs > amount_high:
+            continue
+        # Skip ones already linked to the same recurring
+        if projected_tx.recurring_id and tx.recurring_id == projected_tx.recurring_id:
+            continue
+        cp = (tx.counterparty or "").lower()
+        desc = (tx.description or "").lower()
+        haystack = cp + " " + desc
+        if any(term in haystack for term in search_terms):
+            matches.append(tx)
+            if len(matches) >= limit:
+                break
+    return matches
+
+
 def _parse_active_months(values: List[str]) -> str | None:
     """Convert list of month number strings to stored comma-separated string, or None for all."""
     nums = sorted({int(v) for v in values if v.isdigit() and 1 <= int(v) <= 12})
@@ -1062,6 +1150,7 @@ def link_transaction(
     item_id: int,
     request: Request,
     transaction_id: int = Form(...),
+    redirect_to: str = Form(""),
     db: Session = Depends(get_db),
 ):
     """Manually link a transaction to a recurring item."""
@@ -1081,9 +1170,13 @@ def link_transaction(
     )
     if tx:
         link_transaction_to_recurring(tx, item)
+        # Remove any projected transactions for this recurring in the same period
+        # so the "verwacht" rij verdwijnt zodra je gekoppeld hebt.
+        cleanup_matched_projected(user.id, db)
         db.commit()
 
-    return RedirectResponse("/recurring", status_code=302)
+    target = redirect_to if redirect_to.startswith("/") else "/recurring"
+    return RedirectResponse(target, status_code=302)
 
 
 @router.post("/recurring/{item_id}/unlink")

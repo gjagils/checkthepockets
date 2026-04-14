@@ -962,6 +962,10 @@ tfoot td { background: var(--surface-2); border-top: 1px solid var(--border); fo
     flex-wrap: wrap;
 }
 .tx-panel-info { flex-shrink: 0; min-width: 160px; }
+.proj-candidates { width: 100%; border-collapse: collapse; font-size: 0.85rem; background: #fff; border-radius: 6px; overflow: hidden; }
+.proj-candidates th { text-align: left; padding: 0.4rem 0.6rem; background: var(--surface-2); font-weight: 600; color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.proj-candidates td { padding: 0.5rem 0.6rem; border-top: 1px solid var(--border); }
+.proj-candidates .btn-sm { padding: 0.3rem 0.75rem; font-size: 0.8rem; }
 .tx-panel-info strong { display: block; font-size: 0.88rem; color: var(--text); margin-bottom: 0.2rem; }
 .tx-panel-actions { display: flex; gap: 0.65rem; flex: 1; flex-wrap: wrap; }
 .tx-panel-btn {
