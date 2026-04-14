@@ -44,23 +44,15 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-      - name: Check if nginx changed
-        id: nginx-check
-        run: |
-          if git diff HEAD~1 --name-only | grep -q '^nginx/'; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Build and push nginx
-        if: steps.nginx-check.outputs.changed == 'true'
         uses: docker/build-push-action@v7
         with:
           context: ./nginx
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ github.repository }}-nginx:latest
+          cache-from: type=gha,scope=nginx
+          cache-to: type=gha,scope=nginx,mode=max
 
       - name: Connect to Tailscale
         uses: tailscale/github-action@v4

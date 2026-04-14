@@ -9,12 +9,14 @@ import logging
 from datetime import datetime
 
 from apscheduler.schedulers.background import BackgroundScheduler
+from pytz import timezone as pytz_timezone
 
 from app.config import ENABLE_BANKING_APP_ID
 
 logger = logging.getLogger(__name__)
 
-scheduler = BackgroundScheduler()
+NL_TZ = pytz_timezone("Europe/Amsterdam")
+scheduler = BackgroundScheduler(timezone=NL_TZ)
 
 
 def _sync_all_bank_connections():
@@ -146,10 +148,11 @@ def start_scheduler():
             "cron",
             hour="1,17",
             minute=0,
+            timezone=NL_TZ,
             id="bank_sync",
             replace_existing=True,
         )
-        logger.info("Bank sync ingepland om 01:00 en 17:00")
+        logger.info("Bank sync ingepland om 01:00 en 17:00 Europe/Amsterdam")
 
     if scheduler.get_jobs():
         scheduler.start()
