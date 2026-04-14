@@ -77,6 +77,7 @@ class Account(Base):
     name = Column(String(255), nullable=False)
     iban = Column(String(34), nullable=True)
     bank = Column(String(50), nullable=False)  # "abn_amro", "bunq", "ics"
+    external_uid = Column(String(255), nullable=True, index=True)  # Enable Banking account_uid
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     user = relationship("User", back_populates="accounts")

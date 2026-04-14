@@ -311,35 +311,37 @@ async def sync_transactions(connection_id: int, request: Request, db: Session = 
             },
         )
 
-    # Find or create the Account record. We matchen ALTIJD op bank, zodat
-    # twee bankkoppelingen zonder IBAN niet per ongeluk op dezelfde rij
-    # landen. Als er wel een IBAN bekend is, matchen we daar primair op.
+    # Find or create the Account record. We matchen primair op external_uid
+    # (de stabiele Enable Banking account_uid) zodat meerdere rekeningen bij
+    # dezelfde bank, of rekeningen zonder IBAN, nooit samenvallen.
     bank_key = conn.bank_name.lower().replace(" ", "_")
-    account = None
-    if account_iban:
+    account = db.query(Account).filter(
+        Account.user_id == user.id,
+        Account.external_uid == account_uid,
+    ).first()
+    if not account and account_iban:
+        # Legacy fallback: account dat eerder is aangemaakt zonder external_uid
         account = db.query(Account).filter(
             Account.user_id == user.id,
             Account.bank == bank_key,
             Account.iban == account_iban,
+            Account.external_uid.is_(None),
         ).first()
-    if not account:
-        # Fallback: hetzelfde bank-key zonder IBAN (eerdere sync zonder IBAN)
-        account = db.query(Account).filter(
-            Account.user_id == user.id,
-            Account.bank == bank_key,
-            Account.iban.is_(None),
-        ).first()
-        # Als we nu wel een IBAN hebben, upgrade het bestaande account
-        if account and account_iban and not account.iban:
+        if account:
+            account.external_uid = account_uid
+    if account:
+        # Upgrade IBAN/naam als we die nu wel hebben
+        if account_iban and not account.iban:
             account.iban = account_iban
             if account.name.endswith(" - account"):
                 account.name = f"{conn.bank_name} - {account_iban}"
-    if not account:
+    else:
         account = Account(
             user_id=user.id,
             name=f"{conn.bank_name} - {account_iban or 'account'}",
             iban=account_iban or None,
             bank=bank_key,
+            external_uid=account_uid,
         )
         db.add(account)
         db.flush()
