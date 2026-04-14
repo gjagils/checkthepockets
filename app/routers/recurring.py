@@ -1189,6 +1189,10 @@ def link_transaction(
                         tx.original_date = tx.date
                     tx.date = target_date
         link_transaction_to_recurring(tx, item)
+        # Flush zodat de verschoven datum + recurring_id zichtbaar zijn voor
+        # cleanup_matched_projected's interne query (die draait met
+        # db.no_autoflush).
+        db.flush()
         # Remove any projected transactions for this recurring in the same period
         # so the "verwacht" rij verdwijnt zodra je gekoppeld hebt.
         cleanup_matched_projected(user.id, db)
