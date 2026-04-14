@@ -449,19 +449,41 @@ async def rename_connection(connection_id: int, request: Request, db: Session = 
         stored_accounts = json.loads(conn.accounts_json or "[]")
     except Exception:
         stored_accounts = []
+    bank_key = conn.bank_name.lower().replace(" ", "_")
     uids = [a.get("uid") for a in stored_accounts if a.get("uid")]
+    ibans = [a.get("iban") for a in stored_accounts if a.get("iban")]
+
+    linked: list[Account] = []
     if uids:
-        linked = db.query(Account).filter(
+        linked += db.query(Account).filter(
             Account.user_id == user.id,
             Account.external_uid.in_(uids),
         ).all()
-        autogen_starts = (
-            f"{old_display} -", f"{old_display}",
-            f"{conn.bank_name} -", f"{conn.bank_name}",
-        )
-        for acc in linked:
-            if any(acc.name.startswith(p) for p in autogen_starts) or acc.name == f"{conn.bank_name} - account":
-                acc.name = f"{new_display} - {acc.iban}" if acc.iban else new_display
+    # Legacy fallback: accounts zonder external_uid (aangemaakt vóór migratie 031)
+    legacy_q = db.query(Account).filter(
+        Account.user_id == user.id,
+        Account.bank == bank_key,
+        Account.external_uid.is_(None),
+    )
+    if ibans:
+        legacy = legacy_q.filter(Account.iban.in_(ibans)).all()
+    else:
+        legacy = legacy_q.all()
+    # Dedup (by id)
+    seen = {a.id for a in linked}
+    for a in legacy:
+        if a.id not in seen:
+            linked.append(a)
+            seen.add(a.id)
+
+    autogen_starts = (
+        f"{old_display} -", f"{old_display}",
+        f"{conn.bank_name} -", f"{conn.bank_name}",
+        f"{bank_key} -", f"{bank_key}",
+    )
+    for acc in linked:
+        if any(acc.name.startswith(p) for p in autogen_starts) or acc.name == f"{conn.bank_name} - account":
+            acc.name = f"{new_display} - {acc.iban}" if acc.iban else new_display
     db.commit()
 
     return RedirectResponse("/banking/connect", status_code=302)
