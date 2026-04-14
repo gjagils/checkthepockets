@@ -279,6 +279,14 @@ async def sync_transactions(connection_id: int, request: Request, db: Session = 
     # Map to ParsedTransaction
     parsed = _map_eb_transactions(raw_transactions)
 
+    # Filter op datum (API geeft soms meer terug dan gevraagd)
+    if date_from:
+        parsed = [p for p in parsed if str(p.date) >= date_from]
+    if date_to:
+        parsed = [p for p in parsed if str(p.date) <= date_to]
+
+    logger.info("Bank sync: %d transacties na datumfilter", len(parsed))
+
     if not parsed:
         return templates.TemplateResponse(
             "banking/sync.html",
