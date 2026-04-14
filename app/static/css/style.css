@@ -1302,6 +1302,20 @@ tfoot td { background: var(--surface-2); border-top: 1px solid var(--border); fo
     vertical-align: middle;
     opacity: 0.8;
 }
+.tx-recurring-label {
+    display: inline-block;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    background: var(--green, #22C55E);
+    color: #fff;
+    border-radius: 3px;
+    padding: 0.1rem 0.35rem;
+    margin-right: 0.35rem;
+    vertical-align: middle;
+    opacity: 0.9;
+}
 
 /* ===== Month Picker (Sprint 11) ===== */
 .month-picker {

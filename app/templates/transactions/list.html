@@ -316,7 +316,10 @@
                         <input type="checkbox" class="tx-select" data-id="{{ tx.id }}" style="cursor:pointer; accent-color:var(--navy-mid);">
                     </td>
                     <td class="nowrap">{{ tx.date.strftime('%d-%m-%Y') }}</td>
-                    <td class="desc-cell">{{ tx.description or '-' }}</td>
+                    <td class="desc-cell">
+                        {% if tx.recurring_id %}<span class="tx-recurring-label" title="Gekoppeld aan terugkerende post">Terugkerend</span>{% endif %}
+                        {{ tx.description or '-' }}
+                    </td>
                     <td class="col-counterparty">{{ tx.counterparty or '-' }}</td>
                     <td class="nowrap">
                         {% set acct_cats = cats_by_account.get(tx.account_id, {"parents": [], "children": {}}) %}
