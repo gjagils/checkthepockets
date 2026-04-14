@@ -58,6 +58,7 @@ def apply_rule_to_transaction(rule: Rule, transaction: Transaction, db: Session)
 
     if rule.assign_category_id and transaction.category_id != rule.assign_category_id:
         transaction.category_id = rule.assign_category_id
+        transaction.assigned_by_rule_id = rule.id
         transaction.is_reviewed = 1
         changed = True
 

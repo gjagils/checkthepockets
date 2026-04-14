@@ -255,12 +255,14 @@ class Transaction(Base):
     is_projected = Column(Integer, default=0)
     recurring_id = Column(Integer, ForeignKey("recurring_transactions.id", ondelete="SET NULL"), nullable=True)
     transfer_id = Column(Integer, ForeignKey("transactions.id", ondelete="SET NULL"), nullable=True)
+    assigned_by_rule_id = Column(Integer, ForeignKey("rules.id", ondelete="SET NULL"), nullable=True, index=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     account = relationship("Account", back_populates="transactions")
     category = relationship("Category", back_populates="transactions")
     tags = relationship("Tag", secondary=transaction_tags, back_populates="transactions")
     parent = relationship("Transaction", remote_side="Transaction.id", foreign_keys="[Transaction.parent_id]", backref="children")
+    assigned_by_rule = relationship("Rule", foreign_keys=[assigned_by_rule_id])
 
 
 class SavingsPlan(Base):

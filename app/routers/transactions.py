@@ -510,6 +510,7 @@ def set_category(
         return RedirectResponse(redirect_to, status_code=302)
 
     tx.category_id = category_id if category_id else None
+    tx.assigned_by_rule_id = None  # handmatig
     tx.is_reviewed = 1 if tx.category_id else 0
     db.commit()
 
@@ -894,6 +895,7 @@ async def edit_transaction(
     transaction.counterparty = (form.get("counterparty") or "").strip() or None
     cat_id = (form.get("category_id") or "").strip()
     transaction.category_id = int(cat_id) if cat_id else None
+    transaction.assigned_by_rule_id = None  # handmatige bewerking
     transaction.is_reviewed = 1 if transaction.category_id else 0
 
     # Datum-wijziging: bewaar oorspronkelijke bankdatum eenmalig als de
@@ -1116,6 +1118,7 @@ async def bulk_action(request: Request, db: Session = Depends(get_db)):
         cat_id = int(category_id_raw) if category_id_raw.strip() else None
         for tx in transactions:
             tx.category_id = cat_id
+            tx.assigned_by_rule_id = None  # bulk handmatig
             tx.is_reviewed = 1 if cat_id else 0
 
     elif action == "tag":
