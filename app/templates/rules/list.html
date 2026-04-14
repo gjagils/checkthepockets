@@ -269,12 +269,6 @@
                             <input type="text" id="action_rename_counterparty" name="action_rename_counterparty"
                                    placeholder="bijv. Albert Heijn BV → Albert Heijn">
                         </div>
-                        <div class="form-group" style="margin-top:0.5rem;">
-                            <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
-                                <input type="checkbox" name="action_set_reviewed" value="1">
-                                Markeer als beoordeeld
-                            </label>
-                        </div>
                     </div>
                 </div>
 
@@ -339,9 +333,6 @@
                             {% endif %}
                             {% if rule.action_rename_counterparty %}
                             <span class="pill" style="background:var(--sky-bg); color:var(--sky); border:1px solid var(--sky);">✎ {{ rule.action_rename_counterparty }}</span>
-                            {% endif %}
-                            {% if rule.action_set_reviewed %}
-                            <span class="pill" style="background:var(--green-bg); color:var(--green); border:1px solid var(--green);">✓ beoordeeld</span>
                             {% endif %}
                         </div>
                     </div>
@@ -450,12 +441,6 @@
                             <input type="text" name="action_rename_counterparty"
                                    value="{{ rule.action_rename_counterparty or '' }}"
                                    placeholder="Leeglaten = niet hernoemen">
-                        </div>
-                        <div class="form-group" style="margin-top:0.5rem;">
-                            <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
-                                <input type="checkbox" name="action_set_reviewed" value="1" {% if rule.action_set_reviewed %}checked{% endif %}>
-                                Markeer als beoordeeld
-                            </label>
                         </div>
                         <div style="margin-top:0.75rem; display:flex; gap:0.5rem;">
                             <button type="submit" class="btn btn-sm btn-primary">Opslaan</button>

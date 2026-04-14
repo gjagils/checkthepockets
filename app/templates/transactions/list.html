@@ -196,7 +196,6 @@
                     <th style="width:2.2rem;">
                         <input type="checkbox" id="selectAll" title="Selecteer alles" style="cursor:pointer; accent-color:var(--navy-mid);">
                     </th>
-                    <th style="width:2rem;"></th>
                     <th>Datum</th>
 
                     <th>Omschrijving</th>
@@ -224,7 +223,6 @@
                 {% set candidates = projected_candidates.get(tx.id, []) %}
                 <tr class="tx-projected">
                     <td></td>
-                    <td></td>
                     <td class="nowrap muted">{{ tx.date.strftime('%m-%Y') }}</td>
                     <td class="desc-cell">
                         <span class="tx-projected-label">Verwacht</span>
@@ -248,7 +246,7 @@
                 </tr>
                 {% if tx.recurring_id %}
                 <tr class="tx-action-panel" id="projpanel-{{ tx.id }}" style="display:none;">
-                    <td colspan="9" class="tx-panel-cell">
+                    <td colspan="8" class="tx-panel-cell">
                         <div class="tx-panel-inner">
                             <div class="tx-panel-info">
                                 <strong>Mogelijke matches voor "{{ tx.counterparty or tx.description or '—' }}"</strong>
@@ -294,12 +292,6 @@
                     <td style="text-align:center;">
                         <input type="checkbox" class="tx-select" data-id="{{ tx.id }}" style="cursor:pointer; accent-color:var(--navy-mid);">
                     </td>
-                    <td style="text-align:center;">
-                        <form method="post" action="/transactions/{{ tx.id }}/reviewed" style="display:inline;">
-                            <input type="hidden" name="redirect_to" value="/transactions?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}">
-                            <button type="submit" class="btn-reviewed {% if tx.is_reviewed %}reviewed{% endif %}" title="{% if tx.is_reviewed %}Gecontroleerd{% else %}Markeer als gecontroleerd{% endif %}">✓</button>
-                        </form>
-                    </td>
                     <td class="nowrap">{{ tx.date.strftime('%d-%m-%Y') }}</td>
                     <td class="desc-cell">{{ tx.description or '-' }}</td>
                     <td class="col-counterparty">{{ tx.counterparty or '-' }}</td>
@@ -332,7 +324,7 @@
                     </td>
                 </tr>
                 <tr class="tx-action-panel" id="txpanel-{{ tx.id }}" style="display:none;">
-                    <td colspan="9" class="tx-panel-cell">
+                    <td colspan="8" class="tx-panel-cell">
                         <div class="tx-panel-inner">
                             <div class="tx-panel-info">
                                 <strong>{{ tx.counterparty or tx.description or '—' }}</strong>
@@ -439,7 +431,6 @@
         </form>
         <button type="button" class="btn btn-sm" onclick="toggleBulkPanel('cat')">Categorie</button>
         <button type="button" class="btn btn-sm" onclick="toggleBulkPanel('tag')">Tag</button>
-        <button type="button" class="btn btn-sm" onclick="submitBulk('reviewed')">✓ Reviewed</button>
         <button type="button" class="btn btn-sm btn-danger" onclick="if(confirm('Geselecteerde transacties uitsluiten?')) submitBulk('exclude')">Uitsluiten</button>
         <button type="button" class="btn btn-sm" id="clearSelection">Selectie wissen</button>
     </div>
