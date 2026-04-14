@@ -831,11 +831,87 @@ tfoot td { background: var(--surface-2); border-top: 1px solid var(--border); fo
 /* ===== Transaction Toolbar ===== */
 .tx-toolbar {
     display: flex;
-    align-items: center;
+    flex-direction: column;
     gap: 0.6rem;
     margin-bottom: 1.25rem;
+}
+.tx-toolbar-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
     flex-wrap: wrap;
 }
+.tx-year-form { display: inline-flex; }
+.tx-year-form .select-sm {
+    font-weight: 700;
+    font-family: var(--font-heading);
+    letter-spacing: 0.04em;
+}
+.tx-inline-form { display: inline-flex; margin: 0; }
+
+.month-btns {
+    display: inline-flex;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--ctp-radius-sm);
+    overflow: hidden;
+    flex-wrap: wrap;
+}
+.month-btn {
+    padding: 0.35rem 0.6rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    font-family: var(--font-heading);
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    text-decoration: none;
+    border-right: 1px solid var(--border);
+    transition: color 0.12s, background 0.12s;
+    white-space: nowrap;
+}
+.month-btn:last-child { border-right: none; }
+.month-btn:hover { color: var(--text); background: var(--surface-2); }
+.month-btn.active {
+    background: var(--navy, #234C75);
+    color: #fff;
+}
+
+.tx-cat-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.7rem;
+    border: 1px solid var(--border);
+    border-radius: var(--ctp-radius-sm);
+    background: var(--surface);
+    font-size: 0.72rem;
+    font-weight: 700;
+    font-family: var(--font-heading);
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    text-decoration: none;
+    transition: color 0.12s, background 0.12s, border-color 0.12s;
+    white-space: nowrap;
+}
+.tx-cat-toggle:hover { color: var(--text); background: var(--surface-2); }
+.tx-cat-toggle .cat-toggle-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--border);
+}
+.tx-cat-toggle.is-cat {
+    background: var(--navy, #234C75);
+    color: #fff;
+    border-color: var(--navy, #234C75);
+}
+.tx-cat-toggle.is-cat .cat-toggle-dot { background: #8FE38F; }
+.tx-cat-toggle.is-uncat {
+    background: var(--orange, #FF9800);
+    color: #111;
+    border-color: var(--orange, #FF9800);
+}
+.tx-cat-toggle.is-uncat .cat-toggle-dot { background: #111; }
 .period-nav {
     display: flex;
     align-items: center;

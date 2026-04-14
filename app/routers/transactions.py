@@ -164,6 +164,20 @@ def _build_preview(parsed: list[ParsedTransaction], existing_hashes: set) -> tup
 PER_PAGE = 50
 
 
+def _available_tx_years(db, user_id: int, current_year_num: int) -> list[int]:
+    """Unieke jaren waarin de gebruiker transacties heeft + huidig jaar."""
+    rows = (
+        db.query(func.extract("year", Transaction.date))
+        .join(Account, Account.id == Transaction.account_id)
+        .filter(Account.user_id == user_id)
+        .distinct()
+        .all()
+    )
+    years = {int(r[0]) for r in rows if r[0] is not None}
+    years.add(current_year_num)
+    return sorted(years, reverse=True)
+
+
 def _build_tx_query(db, user, account_id, category_id, tag_id, search,
                     date_from, date_to, amount_min, amount_max):
     """Shared filter logic used by list view, export, and duplicates."""
@@ -190,6 +204,9 @@ def _build_tx_query(db, user, account_id, category_id, tag_id, search,
     if category_id:
         if category_id == -1:
             query = query.filter(Transaction.category_id.is_(None))
+        elif category_id == -2:
+            # "Heeft een categorie" zonder specifieke categorie
+            query = query.filter(Transaction.category_id.isnot(None))
         else:
             cat = db.query(Category).filter(
                 Category.id == category_id, Category.user_id == user.id
@@ -255,6 +272,7 @@ def transaction_list(
     tag_id: str = Query(""),
     search: str | None = Query(None),
     month: str = Query(""),        # NEW: YYYY-MM shorthand for a full month
+    year: str = Query(""),         # NEW: YYYY filter voor heel jaar
     date_from: str | None = Query(None),
     date_to: str | None = Query(None),
     amount_min: str | None = Query(None),
@@ -268,8 +286,9 @@ def transaction_list(
     category_id = int(category_id) if category_id.strip() else None
     tag_id = int(tag_id) if tag_id.strip() else None
 
-    # Resolve month → date_from / date_to
+    # Resolve month/year → date_from / date_to
     current_month = month.strip()
+    current_year = year.strip()
     today = date_type.today()
     this_month = today.strftime("%Y-%m")
 
@@ -279,8 +298,16 @@ def transaction_list(
             _, last = _calendar.monthrange(y, m)
             date_from = f"{current_month}-01"
             date_to = f"{current_month}-{last:02d}"
+            current_year = str(y)
         except (ValueError, IndexError):
             current_month = ""
+    elif current_year and not date_from and not date_to:
+        try:
+            y = int(current_year)
+            date_from = f"{y}-01-01"
+            date_to = f"{y}-12-31"
+        except ValueError:
+            current_year = ""
 
     # Compute prev/next month for navigation
     if current_month:
@@ -360,6 +387,8 @@ def transaction_list(
     filter_params = {}
     if current_month:
         filter_params["month"] = current_month
+    elif current_year:
+        filter_params["year"] = current_year
     if account_id:
         filter_params["account_id"] = account_id
     if category_id:
@@ -446,6 +475,10 @@ def transaction_list(
             "total": total,
             "cats_by_account": cats_by_account,
             "current_month": current_month,
+            "current_year": current_year,
+            "current_month_num": int(current_month[5:7]) if current_month else None,
+            "current_year_num": int(current_year) if current_year else today.year,
+            "available_years": _available_tx_years(db, user.id, today.year),
             "prev_month": prev_month,
             "next_month": next_month,
             "this_month": this_month,

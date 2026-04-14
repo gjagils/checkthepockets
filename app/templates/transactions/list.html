@@ -42,82 +42,142 @@
 {% endif %}
 
 <!-- Slim transaction toolbar -->
+{% set _months_nl = ['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt','Nov','Dec'] %}
+{% set _yr = current_year_num %}
 <div class="tx-toolbar">
-    <!-- Period navigation -->
-    <div class="period-nav">
-        <a href="/transactions?month={{ prev_month }}{% if current_account_id %}&account_id={{ current_account_id }}{% endif %}{% if current_category_id %}&category_id={{ current_category_id }}{% endif %}" class="period-btn" title="Vorige maand">‹</a>
-        <span class="period-label">{{ period_label }}</span>
-        {% if current_month %}
-        <a href="/transactions?month={{ next_month }}{% if current_account_id %}&account_id={{ current_account_id }}{% endif %}{% if current_category_id %}&category_id={{ current_category_id }}{% endif %}" class="period-btn" title="Volgende maand">›</a>
-        <span class="period-divider"></span>
-        <a href="/transactions" class="period-btn">Alles</a>
-        {% else %}
-        <a href="/transactions?month={{ this_month }}{% if current_account_id %}&account_id={{ current_account_id }}{% endif %}" class="period-btn" title="Ga naar deze maand">Deze maand</a>
-        {% endif %}
+    <!-- Row 1: year + month buttons -->
+    <div class="tx-toolbar-row">
+        <form method="get" action="/transactions" class="tx-year-form" id="yearForm">
+            {% if current_category_id %}<input type="hidden" name="category_id" value="{{ current_category_id }}">{% endif %}
+            {% if current_account_id %}<input type="hidden" name="account_id" value="{{ current_account_id }}">{% endif %}
+            {% if current_tag_id %}<input type="hidden" name="tag_id" value="{{ current_tag_id }}">{% endif %}
+            {% if search %}<input type="hidden" name="search" value="{{ search }}">{% endif %}
+            <select name="year" class="select-sm" onchange="this.form.submit()">
+                {% for yr in available_years %}
+                <option value="{{ yr }}" {% if yr == _yr %}selected{% endif %}>{{ yr }}</option>
+                {% endfor %}
+            </select>
+        </form>
+
+        <div class="month-btns">
+            {% for mname in _months_nl %}
+                {% set mnum = loop.index %}
+                {% set mval = "%04d-%02d"|format(_yr, mnum) %}
+                {% set mparams = "month=" + mval %}
+                {% if current_category_id %}{% set mparams = mparams + "&category_id=" + current_category_id|string %}{% endif %}
+                {% if current_account_id %}{% set mparams = mparams + "&account_id=" + current_account_id|string %}{% endif %}
+                {% if current_tag_id %}{% set mparams = mparams + "&tag_id=" + current_tag_id|string %}{% endif %}
+                {% if search %}{% set mparams = mparams + "&search=" + search %}{% endif %}
+                <a href="/transactions?{{ mparams }}"
+                   class="month-btn {% if current_month_num == mnum %}active{% endif %}">{{ mname }}</a>
+            {% endfor %}
+            {% set allparams = "year=" + _yr|string %}
+            {% if current_category_id %}{% set allparams = allparams + "&category_id=" + current_category_id|string %}{% endif %}
+            {% if current_account_id %}{% set allparams = allparams + "&account_id=" + current_account_id|string %}{% endif %}
+            {% if current_tag_id %}{% set allparams = allparams + "&tag_id=" + current_tag_id|string %}{% endif %}
+            <a href="/transactions?{{ allparams }}"
+               class="month-btn {% if not current_month_num %}active{% endif %}" title="Heel {{ _yr }}">Hele jaar</a>
+        </div>
     </div>
 
-    <!-- Quick filter: uncategorized -->
-    {% set _uncat = "/transactions?category_id=-1" + ("&month=" + current_month if current_month else "") + ("&account_id=" + current_account_id|string if current_account_id else "") %}
-    <a href="{{ _uncat }}"
-       class="btn btn-sm {% if current_category_id == -1 %}btn-primary{% endif %}">
-        Niet gecategoriseerd{% if uncategorized_count %}&nbsp;<span class="tx-badge">{{ uncategorized_count }}</span>{% endif %}
-    </a>
+    <!-- Row 2: categorized toggle, category dropdown, account, more -->
+    <div class="tx-toolbar-row">
+        {% set _next_catstate = -2 if (current_category_id is none or current_category_id == 0) else (-1 if current_category_id == -2 else 0) %}
+        {% set _toggle_label = 'Alle transacties' if (current_category_id is none or current_category_id == 0) else ('Gecategoriseerd' if current_category_id == -2 or (current_category_id and current_category_id > 0) else 'Niet gecategoriseerd') %}
+        {% set _toggle_cls = '' if (current_category_id is none or current_category_id == 0) else ('is-cat' if current_category_id == -2 or (current_category_id and current_category_id > 0) else 'is-uncat') %}
 
-    <!-- More filters (compact dropdown) -->
-    <details class="tx-more-filters">
-        <summary>Meer filters</summary>
-        <form method="get" action="/transactions" class="tx-more-panel">
-            {% if current_month %}<input type="hidden" name="month" value="{{ current_month }}">{% endif %}
-            <div class="form-group">
-                <label>Zoeken</label>
-                <input type="text" name="search" value="{{ search }}" placeholder="Omschrijving, tegenpartij, IBAN...">
-            </div>
-            <div class="form-group">
-                <label>Rekening</label>
-                <select name="account_id">
-                    <option value="">Alle rekeningen</option>
-                    {% for acc in accounts %}
-                    <option value="{{ acc.id }}" {% if current_account_id == acc.id %}selected{% endif %}>{{ acc.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Categorie</label>
-                <select name="category_id">
-                    <option value="">Alle categorieën</option>
-                    <option value="-1" {% if current_category_id == -1 %}selected{% endif %}>Zonder categorie</option>
-                    {% for cat in categories %}{% if not cat.parent_id %}
-                    <option value="{{ cat.id }}" {% if current_category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
-                    {% for child in cat.children|sort(attribute='name') %}
-                    <option value="{{ child.id }}" {% if current_category_id == child.id %}selected{% endif %}>&nbsp;&nbsp;{{ child.name }}</option>
-                    {% endfor %}{% endif %}{% endfor %}
-                </select>
-            </div>
-            {% if tags %}
-            <div class="form-group">
-                <label>Tag</label>
-                <select name="tag_id">
-                    <option value="">Alle tags</option>
-                    {% for tag in tags %}
-                    <option value="{{ tag.id }}" {% if current_tag_id == tag.id %}selected{% endif %}>{{ tag.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
+        {% set _toggle_params = [] %}
+        {% if current_month %}{% set _ = _toggle_params.append('month=' + current_month) %}{% elif current_year %}{% set _ = _toggle_params.append('year=' + current_year) %}{% endif %}
+        {% if current_account_id %}{% set _ = _toggle_params.append('account_id=' + current_account_id|string) %}{% endif %}
+        {% if current_tag_id %}{% set _ = _toggle_params.append('tag_id=' + current_tag_id|string) %}{% endif %}
+        {% if search %}{% set _ = _toggle_params.append('search=' + search) %}{% endif %}
+        {% if _next_catstate != 0 %}{% set _ = _toggle_params.append('category_id=' + _next_catstate|string) %}{% endif %}
+
+        <a href="/transactions?{{ _toggle_params|join('&') }}"
+           class="tx-cat-toggle {{ _toggle_cls }}"
+           title="Klik om te wisselen">
+            <span class="tx-cat-toggle-dot"></span>
+            {{ _toggle_label }}
+            {% if current_category_id == -1 and uncategorized_count %}
+              &nbsp;<span class="tx-badge">{{ uncategorized_count }}</span>
             {% endif %}
-            <div class="form-group">
-                <label>Datum van</label>
-                <input type="date" name="date_from" value="{{ date_from }}">
-            </div>
-            <div class="form-group">
-                <label>Datum t/m</label>
-                <input type="date" name="date_to" value="{{ date_to }}">
-            </div>
-            <div style="display:flex; gap:0.5rem; margin-top:0.25rem;">
-                <button type="submit" class="btn btn-sm btn-primary" style="flex:1;">Toepassen</button>
-                <a href="/transactions" class="btn btn-sm">Wissen</a>
-            </div>
+        </a>
+
+        {# Category dropdown — alleen als 'Gecategoriseerd' actief is (of al een specifieke cat) #}
+        {% if current_category_id == -2 or (current_category_id and current_category_id > 0) %}
+        <form method="get" action="/transactions" class="tx-inline-form">
+            {% if current_month %}<input type="hidden" name="month" value="{{ current_month }}">{% elif current_year %}<input type="hidden" name="year" value="{{ current_year }}">{% endif %}
+            {% if current_account_id %}<input type="hidden" name="account_id" value="{{ current_account_id }}">{% endif %}
+            {% if current_tag_id %}<input type="hidden" name="tag_id" value="{{ current_tag_id }}">{% endif %}
+            {% if search %}<input type="hidden" name="search" value="{{ search }}">{% endif %}
+            <select name="category_id" class="select-sm" onchange="this.form.submit()">
+                <option value="-2" {% if current_category_id == -2 %}selected{% endif %}>— alle categorieën —</option>
+                {% for cat in categories %}{% if not cat.parent_id %}
+                <option value="{{ cat.id }}" {% if current_category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+                {% for child in cat.children|sort(attribute='name') %}
+                <option value="{{ child.id }}" {% if current_category_id == child.id %}selected{% endif %}>&nbsp;&nbsp;{{ child.name }}</option>
+                {% endfor %}{% endif %}{% endfor %}
+            </select>
         </form>
-    </details>
+        {% endif %}
+
+        <form method="get" action="/transactions" class="tx-inline-form">
+            {% if current_month %}<input type="hidden" name="month" value="{{ current_month }}">{% elif current_year %}<input type="hidden" name="year" value="{{ current_year }}">{% endif %}
+            {% if current_category_id %}<input type="hidden" name="category_id" value="{{ current_category_id }}">{% endif %}
+            {% if current_tag_id %}<input type="hidden" name="tag_id" value="{{ current_tag_id }}">{% endif %}
+            {% if search %}<input type="hidden" name="search" value="{{ search }}">{% endif %}
+            <select name="account_id" class="select-sm" onchange="this.form.submit()">
+                <option value="">Alle rekeningen</option>
+                {% for acc in accounts %}
+                <option value="{{ acc.id }}" {% if current_account_id == acc.id %}selected{% endif %}>{{ acc.name }}</option>
+                {% endfor %}
+            </select>
+        </form>
+
+        <details class="tx-more-filters">
+            <summary>Meer filters</summary>
+            <form method="get" action="/transactions" class="tx-more-panel">
+                {% if current_month %}<input type="hidden" name="month" value="{{ current_month }}">{% elif current_year %}<input type="hidden" name="year" value="{{ current_year }}">{% endif %}
+                {% if current_category_id %}<input type="hidden" name="category_id" value="{{ current_category_id }}">{% endif %}
+                {% if current_account_id %}<input type="hidden" name="account_id" value="{{ current_account_id }}">{% endif %}
+                <div class="form-group">
+                    <label>Zoeken</label>
+                    <input type="text" name="search" value="{{ search }}" placeholder="Omschrijving, tegenpartij, IBAN...">
+                </div>
+                {% if tags %}
+                <div class="form-group">
+                    <label>Tag</label>
+                    <select name="tag_id">
+                        <option value="">Alle tags</option>
+                        {% for tag in tags %}
+                        <option value="{{ tag.id }}" {% if current_tag_id == tag.id %}selected{% endif %}>{{ tag.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+                <div class="form-group">
+                    <label>Datum van</label>
+                    <input type="date" name="date_from" value="{{ date_from }}">
+                </div>
+                <div class="form-group">
+                    <label>Datum t/m</label>
+                    <input type="date" name="date_to" value="{{ date_to }}">
+                </div>
+                <div class="form-group">
+                    <label>Bedrag van</label>
+                    <input type="number" step="0.01" name="amount_min" value="{{ amount_min }}">
+                </div>
+                <div class="form-group">
+                    <label>Bedrag t/m</label>
+                    <input type="number" step="0.01" name="amount_max" value="{{ amount_max }}">
+                </div>
+                <div style="display:flex; gap:0.5rem; margin-top:0.25rem;">
+                    <button type="submit" class="btn btn-sm btn-primary" style="flex:1;">Toepassen</button>
+                    <a href="/transactions" class="btn btn-sm">Wissen</a>
+                </div>
+            </form>
+        </details>
+    </div>
 </div>
 
 {% if transactions or projected_transactions %}
