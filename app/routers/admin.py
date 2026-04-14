@@ -157,3 +157,90 @@ def encrypt_data(request: Request, db: Session = Depends(get_db)):
             "encryption_enabled": encryption_enabled(),
         },
     )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Import batches — groepeer transacties per import-moment zodat een verkeerde
+# import in één klik ongedaan gemaakt kan worden.
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _list_import_batches(db: Session, limit: int = 200) -> list[dict]:
+    """Groepeer transacties per account en created_at (afgerond op minuut)."""
+    rows = (
+        db.query(
+            Transaction.account_id,
+            Account.name.label("account_name"),
+            Account.user_id,
+            User.username.label("user_name"),
+            func.date_trunc("minute", Transaction.created_at).label("batch"),
+            func.count(Transaction.id).label("tx_count"),
+            func.min(Transaction.date).label("first_date"),
+            func.max(Transaction.date).label("last_date"),
+            func.min(Transaction.created_at).label("created_from"),
+            func.max(Transaction.created_at).label("created_to"),
+        )
+        .join(Account, Account.id == Transaction.account_id)
+        .join(User, User.id == Account.user_id)
+        .group_by(
+            Transaction.account_id,
+            Account.name,
+            Account.user_id,
+            User.username,
+            func.date_trunc("minute", Transaction.created_at),
+        )
+        .order_by(func.date_trunc("minute", Transaction.created_at).desc())
+        .limit(limit)
+        .all()
+    )
+    return [
+        {
+            "account_id": r.account_id,
+            "account_name": r.account_name,
+            "user_id": r.user_id,
+            "user_name": r.user_name,
+            "batch": r.batch,
+            "tx_count": r.tx_count,
+            "first_date": r.first_date,
+            "last_date": r.last_date,
+            "created_from": r.created_from,
+            "created_to": r.created_to,
+        }
+        for r in rows
+    ]
+
+
+@router.get("/imports")
+def admin_imports(request: Request, db: Session = Depends(get_db)):
+    admin = _require_admin(request, db)
+    batches = _list_import_batches(db)
+    return templates.TemplateResponse(
+        "admin/imports.html",
+        {"request": request, "user": admin, "batches": batches},
+    )
+
+
+@router.post("/imports/delete")
+def admin_imports_delete(
+    request: Request,
+    account_id: int = Form(...),
+    created_from: str = Form(...),
+    created_to: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    _require_admin(request, db)
+    try:
+        ts_from = datetime.datetime.fromisoformat(created_from)
+        ts_to = datetime.datetime.fromisoformat(created_to)
+    except ValueError:
+        return RedirectResponse("/admin/imports", status_code=302)
+    (
+        db.query(Transaction)
+        .filter(
+            Transaction.account_id == account_id,
+            Transaction.created_at >= ts_from,
+            Transaction.created_at <= ts_to,
+        )
+        .delete(synchronize_session=False)
+    )
+    db.commit()
+    return RedirectResponse("/admin/imports", status_code=302)

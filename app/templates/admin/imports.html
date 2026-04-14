@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Admin — Imports - Check Your Pockets{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Import-batches</h1>
+    <a href="/admin/users" class="btn">Terug naar gebruikers</a>
+</div>
+
+<div class="card" style="margin-bottom:1rem;">
+    <p class="muted" style="margin:0;">
+        Elke rij is een groep transacties die binnen dezelfde minuut is
+        aangemaakt (CSV-import of bank-sync). Verwijderen haalt alle
+        transacties uit die batch — ze kunnen daarna opnieuw geïmporteerd
+        worden.
+    </p>
+</div>
+
+{% if batches %}
+<div class="card" style="padding:0;">
+    <table class="detail-table" style="width:100%;">
+        <thead>
+            <tr>
+                <th>Import-moment (UTC)</th>
+                <th>Gebruiker</th>
+                <th>Rekening</th>
+                <th style="text-align:right;">Aantal</th>
+                <th>Periode transacties</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for b in batches %}
+            <tr>
+                <td>{{ b.batch.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td>{{ b.user_name }}</td>
+                <td>{{ b.account_name }}</td>
+                <td style="text-align:right;">{{ b.tx_count }}</td>
+                <td>
+                    {% if b.first_date == b.last_date %}
+                    {{ b.first_date.strftime('%d-%m-%Y') }}
+                    {% else %}
+                    {{ b.first_date.strftime('%d-%m-%Y') }} — {{ b.last_date.strftime('%d-%m-%Y') }}
+                    {% endif %}
+                </td>
+                <td style="text-align:right;">
+                    <form method="post" action="/admin/imports/delete" style="display:inline;"
+                          onsubmit="return confirm('Verwijder {{ b.tx_count }} transacties uit deze import?');">
+                        <input type="hidden" name="account_id" value="{{ b.account_id }}">
+                        <input type="hidden" name="created_from" value="{{ b.created_from.isoformat() }}">
+                        <input type="hidden" name="created_to" value="{{ b.created_to.isoformat() }}">
+                        <button type="submit" class="btn btn-sm btn-danger">Verwijder</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="card" style="text-align:center; padding:2rem;">
+    <p class="muted" style="margin:0;">Nog geen imports gevonden.</p>
+</div>
+{% endif %}
+{% endblock %}
