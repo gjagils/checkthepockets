@@ -21,6 +21,14 @@
 <div class="card">
     <form method="post" action="/transactions/{{ transaction.id }}/edit">
         <div class="form-group">
+            <label for="date">Datum</label>
+            <input type="date" id="date" name="date" value="{{ transaction.date.isoformat() }}">
+            {% if transaction.original_date %}
+            <small class="muted">Oorspronkelijke bankdatum: {{ transaction.original_date.strftime('%d-%m-%Y') }}</small>
+            {% endif %}
+        </div>
+
+        <div class="form-group">
             <label for="description">Omschrijving</label>
             <textarea id="description" name="description" rows="3">{{ transaction.description or '' }}</textarea>
         </div>

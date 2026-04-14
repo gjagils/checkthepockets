@@ -858,6 +858,20 @@ async def edit_transaction(
     transaction.category_id = int(cat_id) if cat_id else None
     transaction.is_reviewed = 1 if transaction.category_id else 0
 
+    # Datum-wijziging: bewaar oorspronkelijke bankdatum eenmalig als de
+    # gebruiker de datum verplaatst (bv. om de transactie in een andere maand
+    # te laten vallen voor recurring/budget tellingen).
+    new_date_str = (form.get("date") or "").strip()
+    if new_date_str:
+        try:
+            new_date = date_type.fromisoformat(new_date_str)
+            if new_date != transaction.date:
+                if transaction.original_date is None:
+                    transaction.original_date = transaction.date
+                transaction.date = new_date
+        except ValueError:
+            pass
+
     # Handle tags
     tag_ids = form.getlist("tag_ids")
     selected_tags = []
