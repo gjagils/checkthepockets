@@ -89,8 +89,9 @@ def rules_list(request: Request, from_tx: int = Query(None), db: Session = Depen
             .first()
         )
         if tx:
+            prefill_name = (tx.counterparty or tx.description or "")[:100]
             prefill = {
-                "name": tx.counterparty or tx.description or "",
+                "name": prefill_name,
                 "match_field": "description",
                 "match_type": "contains",
                 "match_value": tx.description or tx.counterparty or "",
@@ -513,7 +514,7 @@ def create_rule(
 
     rule = Rule(
         user_id=user.id,
-        name=name,
+        name=name.strip()[:100],
         match_field=match_field,
         match_type=match_type,
         match_value=match_value,
@@ -562,7 +563,7 @@ def edit_rule(
     if not name or not match_value:
         return RedirectResponse("/rules", status_code=302)
 
-    rule.name = name
+    rule.name = name[:100]
     rule.match_field = match_field if match_field in MATCH_FIELDS else rule.match_field
     rule.match_type = match_type if match_type in MATCH_TYPES else rule.match_type
     rule.match_value = match_value
