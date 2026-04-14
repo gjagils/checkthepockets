@@ -116,18 +116,19 @@ def apply_rules_to_all(db: Session, user_id: int, only_uncategorized: bool = Fal
     # Debug: log uncategorized transactions and rule matching
     uncategorized = [tx for tx in transactions if tx.category_id is None]
     if uncategorized:
-        logger.info("apply_rules_to_all: %d/%d transacties zonder categorie", len(uncategorized), len(transactions))
-        for tx in uncategorized[:5]:
+        print(f"[RULES DEBUG] {len(uncategorized)}/{len(transactions)} transacties zonder categorie", flush=True)
+        for tx in uncategorized[:10]:
             desc_val = tx.description or ""
             cp_val = tx.counterparty or ""
-            logger.info("  TX id=%s date=%s desc=[%s] cp=[%s] desc_type=%s cp_type=%s",
-                        tx.id, tx.date, desc_val[:80], cp_val[:50], type(tx.description).__name__, type(tx.counterparty).__name__)
+            iban_val = tx.counterparty_iban or ""
+            print(f"  TX id={tx.id} date={tx.date} desc=[{desc_val[:100]}] cp=[{cp_val[:60]}] iban=[{iban_val}]", flush=True)
             for rule in rules:
                 field_val = _get_field_value(tx, rule.match_field)
                 matches = _matches(field_val, rule.match_type, rule.match_value)
-                if rule.match_value.lower() in (desc_val + cp_val).lower():
-                    logger.info("    REGEL '%s': field=%s val=[%s] match_val='%s' → match=%s",
-                                rule.match_value, rule.match_field, field_val[:60], rule.match_value, matches)
+                if not matches and rule.match_value.lower() in (desc_val + cp_val + iban_val).lower():
+                    print(f"    !! SHOULD MATCH but doesn't: rule='{rule.match_value}' field={rule.match_field} type={rule.match_type} field_val=[{field_val[:80]}]", flush=True)
+                elif matches and tx.category_id is None:
+                    print(f"    ✓ MATCHES: rule='{rule.match_value}' field={rule.match_field}", flush=True)
 
     for tx in transactions:
         if apply_rules_to_transaction(rules, tx, db):
