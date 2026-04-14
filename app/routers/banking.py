@@ -376,8 +376,10 @@ async def sync_transactions(connection_id: int, request: Request, db: Session = 
         db.add(db_tx)
         db.flush()
 
-        if active_rules and apply_rules_to_transaction(active_rules, db_tx, db):
-            auto_categorized += 1
+        if active_rules:
+            apply_rules_to_transaction(active_rules, db_tx, db)
+            if db_tx.category_id is not None:
+                auto_categorized += 1
 
         imported += 1
 
