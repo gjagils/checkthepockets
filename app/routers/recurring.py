@@ -179,8 +179,6 @@ def find_candidates_for_projected(
                 search_terms.append(rec.description_match.lower())
     # Deduplicate and drop very short terms (avoid matching "a", "bv")
     search_terms = [t for t in {s.strip() for s in search_terms} if len(t) >= 3]
-    if not search_terms:
-        return []
 
     # Encrypted fields → filter in Python. Query by date + sign + rough amount window.
     q = (
@@ -202,6 +200,7 @@ def find_candidates_for_projected(
     candidates = q.order_by(Transaction.date.desc()).all()
 
     matches: list[Transaction] = []
+    fallback: list[Transaction] = []  # bedrag+datum matcht, tekst niet — tonen als back-up
     for tx in candidates:
         if tx.amount is None:
             continue
@@ -214,10 +213,17 @@ def find_candidates_for_projected(
         cp = (tx.counterparty or "").lower()
         desc = (tx.description or "").lower()
         haystack = cp + " " + desc
-        if any(term in haystack for term in search_terms):
+        if search_terms and any(term in haystack for term in search_terms):
             matches.append(tx)
             if len(matches) >= limit:
                 break
+        else:
+            if len(fallback) < limit:
+                fallback.append(tx)
+
+    # Geen tekst-matches? Toon dan bedrag+datum kandidaten (beperkt)
+    if not matches and fallback:
+        matches = fallback[:limit]
     return matches
 
 
