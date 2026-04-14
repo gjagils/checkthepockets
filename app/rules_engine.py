@@ -56,11 +56,18 @@ def apply_rule_to_transaction(rule: Rule, transaction: Transaction, db: Session)
     """Apply a rule's actions to a transaction. Returns True if something changed."""
     changed = False
 
-    if rule.assign_category_id and transaction.category_id != rule.assign_category_id:
-        transaction.category_id = rule.assign_category_id
-        transaction.assigned_by_rule_id = rule.id
-        transaction.is_reviewed = 1
-        changed = True
+    if rule.assign_category_id:
+        if transaction.category_id != rule.assign_category_id:
+            transaction.category_id = rule.assign_category_id
+            transaction.assigned_by_rule_id = rule.id
+            transaction.is_reviewed = 1
+            changed = True
+        elif transaction.assigned_by_rule_id is None:
+            # Categorie klopt al (bv. eerder handmatig gezet of pre-migratie),
+            # maar markeer alsnog als 'door regel toegewezen' zodat de badge
+            # klopt na een backfill-run.
+            transaction.assigned_by_rule_id = rule.id
+            changed = True
 
     if rule.assign_tag_id:
         tag = db.query(Tag).filter(Tag.id == rule.assign_tag_id).first()

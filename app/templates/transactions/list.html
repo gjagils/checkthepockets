@@ -317,8 +317,9 @@
                     </td>
                     <td class="nowrap">{{ tx.date.strftime('%d-%m-%Y') }}</td>
                     <td class="desc-cell">
-                        {% if tx.recurring_id %}<span class="tx-recurring-label" title="Gekoppeld aan terugkerende post">Terugkerend</span>{% endif %}
-                        {% if tx.category_id %}
+                        {% if tx.recurring_id %}
+                            <span class="tx-recurring-label" title="Gekoppeld aan terugkerende post">Terugkerend</span>
+                        {% elif tx.category_id %}
                             {% if tx.assigned_by_rule_id %}
                                 <span class="tx-rule-label" title="Categorie toegekend door regel #{{ tx.assigned_by_rule_id }}">Regel</span>
                             {% else %}

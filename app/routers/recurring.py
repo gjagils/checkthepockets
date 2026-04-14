@@ -860,6 +860,9 @@ def accept_suggestion(suggestion_id: int, request: Request, db: Session = Depend
         RecurringSuggestion.id == suggestion_id, RecurringSuggestion.user_id == user.id
     ).first()
     if s:
+        if not s.category_id:
+            # Categorie is verplicht bij een terugkerende post
+            return RedirectResponse("/recurring?error=category_required&from=suggestion", status_code=302)
         item = RecurringTransaction(
             user_id=user.id,
             name=s.name,
@@ -954,6 +957,9 @@ async def create_recurring(
         ).first()
         if not cat:
             cat_id = None
+    if not cat_id:
+        # Categorie is verplicht bij een terugkerende post
+        return RedirectResponse("/recurring?error=category_required", status_code=302)
 
     from datetime import date as date_type
     parsed_start = None
@@ -1216,13 +1222,15 @@ def edit_recurring(
     item.active_months = _parse_active_months(active_months)
 
     cat_id = int(category_id) if category_id.strip() else None
+    resolved_cat = None
     if cat_id:
-        cat = db.query(Category).filter(
+        resolved_cat = db.query(Category).filter(
             Category.id == cat_id, Category.user_id == user.id
         ).first()
-        item.category_id = cat.id if cat else None
-    else:
-        item.category_id = None
+    if not resolved_cat:
+        # Categorie is verplicht bij een terugkerende post — behoud bestaande waarde
+        return RedirectResponse(f"/recurring?error=category_required&item={item.id}", status_code=302)
+    item.category_id = resolved_cat.id
 
     db.commit()
 

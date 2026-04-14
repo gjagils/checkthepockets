@@ -20,9 +20,9 @@
     </div>
     <div class="rule-condition">
         <div class="form-group">
-            <label>Categorie</label>
-            <select name="category_id">
-                <option value="">Geen</option>
+            <label>Categorie <span style="color:var(--ctp-danger);">*</span></label>
+            <select name="category_id" required>
+                <option value="" disabled {% if not item.category_id %}selected{% endif %}>Kies een categorie…</option>
                 {% for cat in categories %}
                 {% if not cat.parent_id %}
                 <optgroup label="{{ cat.name }}">
