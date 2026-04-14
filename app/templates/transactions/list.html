@@ -113,11 +113,9 @@
         <a href="/transactions?{{ allparams }}"
            class="year-btn {% if not current_month_num %}active{% endif %}" title="Heel {{ _yr }}">Hele jaar</a>
         <div class="cat-trio">
-            <a href="{{ _cat_url(none) }}" class="cat-btn {% if _is_all %}active{% endif %}">Alle transacties</a>
-            <a href="{{ _cat_url(-1) }}" class="cat-btn {% if _is_uncat %}active{% endif %}">
-                Niet gecategoriseerd{% if _is_uncat and uncategorized_count %}&nbsp;<span class="tx-badge">{{ uncategorized_count }}</span>{% endif %}
-            </a>
-            <a href="{{ _cat_url(-2) }}" class="cat-btn {% if _is_cat %}active{% endif %}">Gecategoriseerd</a>
+            <a href="{{ _cat_url(none) }}" class="cat-btn {% if _is_all %}active{% endif %}">Alle transacties ({{ all_count }})</a>
+            <a href="{{ _cat_url(-1) }}" class="cat-btn {% if _is_uncat %}active{% endif %}">Niet gecategoriseerd ({{ uncategorized_count }})</a>
+            <a href="{{ _cat_url(-2) }}" class="cat-btn {% if _is_cat %}active{% endif %}">Gecategoriseerd ({{ categorized_count }})</a>
         </div>
 
         {# Categorie-dropdown verschijnt alleen als 'Gecategoriseerd' actief is #}

@@ -356,6 +356,8 @@ def transaction_list(
         db, user, account_id, None, None, None, date_from, date_to, None, None
     )
     uncategorized_count = uncat_base.filter(Transaction.category_id.is_(None)).count()
+    all_count = uncat_base.count()
+    categorized_count = all_count - uncategorized_count
 
     # Sync + fetch projected transactions for current month view
     projected_transactions = []
@@ -484,6 +486,8 @@ def transaction_list(
             "this_month": this_month,
             "period_label": period_label,
             "uncategorized_count": uncategorized_count,
+            "all_count": all_count,
+            "categorized_count": categorized_count,
             "projected_transactions": projected_transactions,
             "projected_candidates": projected_candidates,
         },
