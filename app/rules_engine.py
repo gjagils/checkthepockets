@@ -134,7 +134,32 @@ def apply_rules_to_all(db: Session, user_id: int, only_uncategorized: bool = Fal
         if apply_rules_to_transaction(rules, tx, db):
             affected += 1
 
+    # Debug: check dirty state before commit
+    dirty = db.dirty
+    new = db.new
+    print(f"[RULES DEBUG] affected={affected} dirty={len(dirty)} new={len(new)}", flush=True)
+    if dirty:
+        for obj in list(dirty)[:5]:
+            if hasattr(obj, 'category_id'):
+                print(f"  DIRTY: TX id={obj.id} cat={obj.category_id} cp={str(obj.counterparty)[:40]}", flush=True)
+
     db.commit()
+
+    # Debug: verify changes persisted after commit
+    if affected > 0:
+        from app.models import Account
+        db.expire_all()
+        sample_tx = (
+            db.query(Transaction)
+            .join(Account)
+            .filter(Account.user_id == user_id, Transaction.category_id.is_(None))
+            .limit(5)
+            .all()
+        )
+        print(f"[RULES DEBUG] Na commit: {len(sample_tx)} transacties nog zonder categorie", flush=True)
+        for tx in sample_tx[:3]:
+            print(f"  TX id={tx.id} date={tx.date} cat={tx.category_id} desc=[{(tx.description or '')[:60]}]", flush=True)
+
     return affected
 
 
