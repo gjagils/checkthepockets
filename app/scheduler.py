@@ -111,8 +111,15 @@ def _sync_all_bank_connections():
 
         db.commit()
 
-        # Auto-link recurring for all synced users, then sync projections
+        # Draai alle regels nogmaals (vangt rename → match ketens)
         synced_user_ids = {c.user_id for c in connections}
+        from app.rules_engine import apply_rules_to_all
+        for user_id in synced_user_ids:
+            extra = apply_rules_to_all(db, user_id)
+            if extra:
+                logger.info("Bank sync: %d extra transacties gecategoriseerd voor user %d", extra, user_id)
+
+        # Auto-link recurring, then sync projections
         from app.routers.transactions import auto_link_recurring_after_import
         from app.routers.recurring import cleanup_matched_projected, sync_projected_transactions
         today = datetime.utcnow().date()

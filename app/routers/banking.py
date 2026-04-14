@@ -346,6 +346,13 @@ async def sync_transactions(connection_id: int, request: Request, db: Session = 
     conn.last_synced_at = datetime.utcnow()
     db.commit()
 
+    # Draai alle regels nogmaals over alle transacties (vangt rename → match ketens)
+    from app.rules_engine import apply_rules_to_all
+    extra = apply_rules_to_all(db, user.id)
+    if extra:
+        auto_categorized += extra
+        logger.info("Bank sync: %d extra transacties gecategoriseerd via apply_rules_to_all", extra)
+
     # Auto-link recurring and sync projections
     from app.routers.transactions import auto_link_recurring_after_import
     from app.routers.recurring import cleanup_matched_projected, sync_projected_transactions
