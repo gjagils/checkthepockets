@@ -42,61 +42,63 @@
 {% endif %}
 
 <!-- Slim transaction toolbar -->
-{% set _months_nl = ['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt','Nov','Dec'] %}
+{% set _months_nl = ['Januari','Februari','Maart','April','Mei','Juni','Juli','Augustus','September','Oktober','November','December'] %}
 {% set _yr = current_year_num %}
+
+{# Helper om params te bouwen met variabele category_id #}
+{% macro _cat_url(cat_state) -%}
+  {%- set parts = [] -%}
+  {%- if current_month %}{% set _ = parts.append('month=' + current_month) %}{% elif current_year %}{% set _ = parts.append('year=' + current_year) %}{% endif -%}
+  {%- if current_account_id %}{% set _ = parts.append('account_id=' + current_account_id|string) %}{% endif -%}
+  {%- if current_tag_id %}{% set _ = parts.append('tag_id=' + current_tag_id|string) %}{% endif -%}
+  {%- if search %}{% set _ = parts.append('search=' + search) %}{% endif -%}
+  {%- if cat_state is not none %}{% set _ = parts.append('category_id=' + cat_state|string) %}{% endif -%}
+  /transactions?{{ parts|join('&') }}
+{%- endmacro %}
+
+{% set _is_all = current_category_id is none or current_category_id == 0 %}
+{% set _is_uncat = current_category_id == -1 %}
+{% set _is_cat = current_category_id == -2 or (current_category_id and current_category_id > 0) %}
+
 <div class="tx-toolbar">
-    <!-- Row 1: year + month buttons -->
-    <div class="tx-toolbar-row">
-        <form method="get" action="/transactions" class="tx-year-form" id="yearForm">
+    <div class="tx-toolbar-row tx-row-filters">
+        <!-- Jaar -->
+        <form method="get" action="/transactions" class="tx-inline-form">
             {% if current_category_id %}<input type="hidden" name="category_id" value="{{ current_category_id }}">{% endif %}
             {% if current_account_id %}<input type="hidden" name="account_id" value="{{ current_account_id }}">{% endif %}
             {% if current_tag_id %}<input type="hidden" name="tag_id" value="{{ current_tag_id }}">{% endif %}
             {% if search %}<input type="hidden" name="search" value="{{ search }}">{% endif %}
-            <select name="year" class="select-sm" onchange="this.form.submit()">
+            <select name="year" class="select-sm select-year" onchange="this.form.submit()" title="Jaar">
                 {% for yr in available_years %}
                 <option value="{{ yr }}" {% if yr == _yr %}selected{% endif %}>{{ yr }}</option>
                 {% endfor %}
             </select>
         </form>
 
-        <div class="month-btns">
-            {% for mname in _months_nl %}
-                {% set mnum = loop.index %}
-                {% set mval = "%04d-%02d"|format(_yr, mnum) %}
-                {% set mparams = "month=" + mval %}
-                {% if current_category_id %}{% set mparams = mparams + "&category_id=" + current_category_id|string %}{% endif %}
-                {% if current_account_id %}{% set mparams = mparams + "&account_id=" + current_account_id|string %}{% endif %}
-                {% if current_tag_id %}{% set mparams = mparams + "&tag_id=" + current_tag_id|string %}{% endif %}
-                {% if search %}{% set mparams = mparams + "&search=" + search %}{% endif %}
-                <a href="/transactions?{{ mparams }}"
-                   class="month-btn {% if current_month_num == mnum %}active{% endif %}">{{ mname }}</a>
-            {% endfor %}
-            {% set allparams = "year=" + _yr|string %}
-            {% if current_category_id %}{% set allparams = allparams + "&category_id=" + current_category_id|string %}{% endif %}
-            {% if current_account_id %}{% set allparams = allparams + "&account_id=" + current_account_id|string %}{% endif %}
-            {% if current_tag_id %}{% set allparams = allparams + "&tag_id=" + current_tag_id|string %}{% endif %}
-            <a href="/transactions?{{ allparams }}"
-               class="month-btn {% if not current_month_num %}active{% endif %}" title="Heel {{ _yr }}">Hele jaar</a>
-        </div>
-    </div>
+        <!-- Maand dropdown -->
+        <form method="get" action="/transactions" class="tx-inline-form" id="monthForm">
+            {% if current_category_id %}<input type="hidden" name="category_id" value="{{ current_category_id }}">{% endif %}
+            {% if current_account_id %}<input type="hidden" name="account_id" value="{{ current_account_id }}">{% endif %}
+            {% if current_tag_id %}<input type="hidden" name="tag_id" value="{{ current_tag_id }}">{% endif %}
+            {% if search %}<input type="hidden" name="search" value="{{ search }}">{% endif %}
+            <select name="month" class="select-sm select-month" onchange="monthFormSubmit(this)" title="Maand">
+                <option value="">— kies maand —</option>
+                {% for mname in _months_nl %}
+                    {% set mnum = loop.index %}
+                    {% set mval = "%04d-%02d"|format(_yr, mnum) %}
+                    <option value="{{ mval }}" {% if current_month_num == mnum %}selected{% endif %}>{{ mname }}</option>
+                {% endfor %}
+            </select>
+        </form>
 
-    <!-- Row 2: 3-state category buttons + search + account + more -->
-    {# Helper om params te bouwen met variabele category_id #}
-    {% macro _cat_url(cat_state) -%}
-      {%- set parts = [] -%}
-      {%- if current_month %}{% set _ = parts.append('month=' + current_month) %}{% elif current_year %}{% set _ = parts.append('year=' + current_year) %}{% endif -%}
-      {%- if current_account_id %}{% set _ = parts.append('account_id=' + current_account_id|string) %}{% endif -%}
-      {%- if current_tag_id %}{% set _ = parts.append('tag_id=' + current_tag_id|string) %}{% endif -%}
-      {%- if search %}{% set _ = parts.append('search=' + search) %}{% endif -%}
-      {%- if cat_state is not none %}{% set _ = parts.append('category_id=' + cat_state|string) %}{% endif -%}
-      /transactions?{{ parts|join('&') }}
-    {%- endmacro %}
-
-    {% set _is_all = current_category_id is none or current_category_id == 0 %}
-    {% set _is_uncat = current_category_id == -1 %}
-    {% set _is_cat = current_category_id == -2 or (current_category_id and current_category_id > 0) %}
-
-    <div class="tx-toolbar-row tx-row-filters">
+        <!-- Hele jaar knop -->
+        {% set allparams = "year=" + _yr|string %}
+        {% if current_category_id %}{% set allparams = allparams + "&category_id=" + current_category_id|string %}{% endif %}
+        {% if current_account_id %}{% set allparams = allparams + "&account_id=" + current_account_id|string %}{% endif %}
+        {% if current_tag_id %}{% set allparams = allparams + "&tag_id=" + current_tag_id|string %}{% endif %}
+        {% if search %}{% set allparams = allparams + "&search=" + search %}{% endif %}
+        <a href="/transactions?{{ allparams }}"
+           class="year-btn {% if not current_month_num %}active{% endif %}" title="Heel {{ _yr }}">Hele jaar</a>
         <div class="cat-trio">
             <a href="{{ _cat_url(none) }}" class="cat-btn {% if _is_all %}active{% endif %}">Alle transacties</a>
             <a href="{{ _cat_url(-1) }}" class="cat-btn {% if _is_uncat %}active{% endif %}">
@@ -608,6 +610,11 @@ function toggleTxPanel(id) {
         panel.style.display = 'table-row';
         btn.classList.add('active');
     }
+}
+
+function monthFormSubmit(sel) {
+    if (!sel.value) return; // placeholder gekozen → niets doen
+    sel.form.submit();
 }
 
 function toggleProjPanel(id) {
