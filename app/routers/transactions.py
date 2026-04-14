@@ -685,7 +685,7 @@ def auto_link_recurring_after_import(db: Session, user_id: int):
     """Called after CSV import — automatically link new transactions to recurring items
     based on counterparty/description matching. No user confirmation needed.
     Note: counterparty/description are encrypted, so we filter in Python."""
-    from app.routers.recurring import _get_period_range, _find_matching_transaction
+    from app.routers.recurring import _get_period_range
 
     recurring_items = (
         db.query(RecurringTransaction)
@@ -738,9 +738,25 @@ def auto_link_recurring_after_import(db: Session, user_id: int):
                 continue
 
             period_start, period_end = _get_period_range(item.frequency, candidate.date)
-            existing = _find_matching_transaction(db, user_id, item, period_start, period_end)
-            if existing:
+
+            # Check if there's already a LINKED transaction for this recurring item
+            # in this period. Don't use _find_matching_transaction here because it
+            # auto-matches and would find the candidate itself, skipping it forever.
+            already_linked = (
+                db.query(Transaction)
+                .join(Account)
+                .filter(
+                    Account.user_id == user_id,
+                    Transaction.recurring_id == item.id,
+                    Transaction.date >= period_start,
+                    Transaction.date <= period_end,
+                    Transaction.is_projected == 0,
+                )
+                .first()
+            )
+            if already_linked:
                 continue
+
             from app.routers.recurring import link_transaction_to_recurring
             link_transaction_to_recurring(candidate, item)
 

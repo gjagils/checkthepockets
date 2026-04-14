@@ -36,13 +36,21 @@ jobs:
             type=raw,value=latest
             type=sha,prefix=
 
-      - name: Build and push
+      - name: Build and push app
         uses: docker/build-push-action@v7
         with:
           context: .
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Build and push nginx
+        uses: docker/build-push-action@v7
+        with:
+          context: ./nginx
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ github.repository }}-nginx:latest
 
       - name: Connect to Tailscale
         uses: tailscale/github-action@v4
@@ -63,11 +71,15 @@ jobs:
           CURRENT_ENV=$(echo "$STACK_INFO" | jq '.Env // []')
 
           IMAGE_LOWER=$(echo "$IMAGE_NAME" | tr '[:upper:]' '[:lower:]')
-          echo "Pulling latest image..."
+          echo "Pulling latest app image..."
           curl -s -X POST \
             -H "X-API-Key: $PORTAINER_API_TOKEN" \
             "$PORTAINER_URL/api/endpoints/$ENDPOINT_ID/docker/images/create?fromImage=ghcr.io%2F${IMAGE_LOWER}&tag=latest"
-          echo "Image pulled."
+          echo "Pulling latest nginx image..."
+          curl -s -X POST \
+            -H "X-API-Key: $PORTAINER_API_TOKEN" \
+            "$PORTAINER_URL/api/endpoints/$ENDPOINT_ID/docker/images/create?fromImage=ghcr.io%2F${IMAGE_LOWER}-nginx&tag=latest"
+          echo "Images pulled."
 
           STACK_FILE=$(cat docker-compose.yml)
           curl -s -X PUT \

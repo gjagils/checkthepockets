@@ -1,10 +1,17 @@
 services:
+  nginx:
+    image: ghcr.io/gjagils/checkthepockets-nginx:latest
+    container_name: checkthepockets-nginx
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8368}:8000"
+    depends_on:
+      - app
+
   app:
     image: ghcr.io/gjagils/checkthepockets:latest
     container_name: checkthepockets
     restart: unless-stopped
-    ports:
-      - "${APP_PORT:-8368}:8000"
     environment:
       # Database
       - DATABASE_URL=${DATABASE_URL}

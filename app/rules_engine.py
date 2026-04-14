@@ -113,53 +113,11 @@ def apply_rules_to_all(db: Session, user_id: int, only_uncategorized: bool = Fal
     transactions = query.all()
     affected = 0
 
-    # Debug: log uncategorized transactions and rule matching
-    uncategorized = [tx for tx in transactions if tx.category_id is None]
-    if uncategorized:
-        print(f"[RULES DEBUG] {len(uncategorized)}/{len(transactions)} transacties zonder categorie", flush=True)
-        for tx in uncategorized[:10]:
-            desc_val = tx.description or ""
-            cp_val = tx.counterparty or ""
-            iban_val = tx.counterparty_iban or ""
-            print(f"  TX id={tx.id} date={tx.date} desc=[{desc_val[:100]}] cp=[{cp_val[:60]}] iban=[{iban_val}]", flush=True)
-            for rule in rules:
-                field_val = _get_field_value(tx, rule.match_field)
-                matches = _matches(field_val, rule.match_type, rule.match_value)
-                if not matches and rule.match_value.lower() in (desc_val + cp_val + iban_val).lower():
-                    print(f"    !! SHOULD MATCH but doesn't: rule='{rule.match_value}' field={rule.match_field} type={rule.match_type} field_val=[{field_val[:80]}]", flush=True)
-                elif matches and tx.category_id is None:
-                    print(f"    ✓ MATCHES: rule='{rule.match_value}' field={rule.match_field}", flush=True)
-
     for tx in transactions:
         if apply_rules_to_transaction(rules, tx, db):
             affected += 1
 
-    # Debug: check dirty state before commit
-    dirty = db.dirty
-    new = db.new
-    print(f"[RULES DEBUG] affected={affected} dirty={len(dirty)} new={len(new)}", flush=True)
-    if dirty:
-        for obj in list(dirty)[:5]:
-            if hasattr(obj, 'category_id'):
-                print(f"  DIRTY: TX id={obj.id} cat={obj.category_id} cp={str(obj.counterparty)[:40]}", flush=True)
-
     db.commit()
-
-    # Debug: verify changes persisted after commit
-    if affected > 0:
-        from app.models import Account
-        db.expire_all()
-        sample_tx = (
-            db.query(Transaction)
-            .join(Account)
-            .filter(Account.user_id == user_id, Transaction.category_id.is_(None))
-            .limit(5)
-            .all()
-        )
-        print(f"[RULES DEBUG] Na commit: {len(sample_tx)} transacties nog zonder categorie", flush=True)
-        for tx in sample_tx[:3]:
-            print(f"  TX id={tx.id} date={tx.date} cat={tx.category_id} desc=[{(tx.description or '')[:60]}]", flush=True)
-
     return affected
 
 
