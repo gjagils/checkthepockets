@@ -876,6 +876,25 @@ async def link_selected_transactions(
     return RedirectResponse("/recurring", status_code=302)
 
 
+@router.post("/recurring/relink-all")
+def relink_all(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Re-run auto-linking: match unlinked transactions to recurring items,
+    then cleanup and sync projected transactions."""
+    user = require_login(request, db)
+
+    from app.routers.transactions import auto_link_recurring_after_import
+    auto_link_recurring_after_import(db, user.id)
+
+    cleanup_matched_projected(db, user.id)
+    sync_projected_transactions(db, user.id)
+    db.commit()
+
+    return RedirectResponse("/recurring", status_code=302)
+
+
 @router.post("/recurring/apply-all-categories")
 def apply_all_categories(
     request: Request,

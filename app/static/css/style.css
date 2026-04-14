@@ -1062,6 +1062,8 @@ tfoot td { background: var(--surface-2); border-top: 1px solid var(--border); fo
 
 /* ===== Rules ===== */
 .rules-layout { display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; align-items: start; }
+.new-rule-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+@media (max-width: 768px) { .new-rule-grid { grid-template-columns: 1fr; } }
 .rule-section { margin-bottom: 1.25rem; }
 .rule-section-header {
     display: flex;

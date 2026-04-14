@@ -4,6 +4,9 @@
 <div class="page-header">
     <h1>Terugkerende transacties</h1>
     <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+        <form method="post" action="/recurring/relink-all" style="margin:0;">
+            <button type="submit" class="btn btn-primary" onclick="return confirm('Alle transacties opnieuw koppelen aan terugkerende items?')">🔗 Opnieuw koppelen</button>
+        </form>
         <form method="post" action="/recurring/apply-all-categories" style="margin:0;">
             <button type="submit" class="btn" onclick="return confirm('Categorieën toepassen op alle gekoppelde transacties zonder categorie?')">🏷 Categorieën toepassen</button>
         </form>
