@@ -59,7 +59,37 @@ jobs:
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:ci
 
-      - name: Deploy via Portainer API
+      - name: Deploy nginx stack via Portainer API
+        env:
+          PORTAINER_URL: ${{ secrets.PORTAINER_URL }}
+          PORTAINER_API_TOKEN: ${{ secrets.PORTAINER_API_TOKEN }}
+          PORTAINER_NGINX_STACK_ID: ${{ secrets.PORTAINER_NGINX_STACK_ID }}
+        run: |
+          STACK_INFO=$(curl -s -H "X-API-Key: $PORTAINER_API_TOKEN" \
+            "$PORTAINER_URL/api/stacks/$PORTAINER_NGINX_STACK_ID")
+          ENDPOINT_ID=$(echo "$STACK_INFO" | jq -r '.EndpointId')
+          CURRENT_ENV=$(echo "$STACK_INFO" | jq '.Env // []')
+
+          IMAGE_LOWER=$(echo "$IMAGE_NAME" | tr '[:upper:]' '[:lower:]')
+          echo "Pulling latest nginx image..."
+          curl -s -X POST \
+            -H "X-API-Key: $PORTAINER_API_TOKEN" \
+            "$PORTAINER_URL/api/endpoints/$ENDPOINT_ID/docker/images/create?fromImage=ghcr.io%2F${IMAGE_LOWER}-nginx&tag=latest"
+          echo "Nginx image pulled."
+
+          STACK_FILE=$(cat docker-compose.nginx.yml)
+          curl -s -X PUT \
+            -H "X-API-Key: $PORTAINER_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"StackFileContent\": $(echo "$STACK_FILE" | jq -Rs .),
+              \"Env\": $CURRENT_ENV,
+              \"Prune\": true
+            }" \
+            "$PORTAINER_URL/api/stacks/$PORTAINER_NGINX_STACK_ID?endpointId=$ENDPOINT_ID"
+          echo "Nginx deploy complete."
+
+      - name: Deploy app stack via Portainer API
         env:
           PORTAINER_URL: ${{ secrets.PORTAINER_URL }}
           PORTAINER_API_TOKEN: ${{ secrets.PORTAINER_API_TOKEN }}
@@ -75,7 +105,7 @@ jobs:
           curl -s -X POST \
             -H "X-API-Key: $PORTAINER_API_TOKEN" \
             "$PORTAINER_URL/api/endpoints/$ENDPOINT_ID/docker/images/create?fromImage=ghcr.io%2F${IMAGE_LOWER}&tag=latest"
-          echo "Image pulled."
+          echo "App image pulled."
 
           STACK_FILE=$(cat docker-compose.yml)
           curl -s -X PUT \
@@ -87,4 +117,4 @@ jobs:
               \"Prune\": true
             }" \
             "$PORTAINER_URL/api/stacks/$PORTAINER_STACK_ID?endpointId=$ENDPOINT_ID"
-          echo "Deploy complete."
+          echo "App deploy complete."
