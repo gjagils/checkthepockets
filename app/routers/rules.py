@@ -11,7 +11,7 @@ from decimal import Decimal
 logger = logging.getLogger(__name__)
 
 from app.database import get_db
-from app.models import Rule, Category, Tag, Transaction, Account, RuleSuggestion
+from app.models import Rule, Category, Transaction, Account, RuleSuggestion
 from app.auth import require_login
 from app.rules_engine import apply_rules_to_all, apply_single_rule, preview_single_rule, suggest_rules
 from app.template_config import templates
@@ -45,12 +45,6 @@ def rules_list(request: Request, from_tx: int = Query(None), db: Session = Depen
         db.query(Category)
         .filter(Category.user_id == user.id)
         .order_by(Category.name)
-        .all()
-    )
-    tags = (
-        db.query(Tag)
-        .filter(Tag.user_id == user.id)
-        .order_by(Tag.name)
         .all()
     )
     accounts = (
@@ -106,7 +100,6 @@ def rules_list(request: Request, from_tx: int = Query(None), db: Session = Depen
             "user": user,
             "rules": rules,
             "categories": categories,
-            "tags": tags,
             "accounts": accounts,
             "suggestions": suggestions,
             "match_fields": MATCH_FIELDS,
@@ -463,7 +456,6 @@ def create_rule(
     amount_max: str = Form(""),
     condition_account_id: str = Form(""),
     assign_category_id: str = Form(""),
-    assign_tag_id: str = Form(""),
     action_rename_counterparty: str = Form(""),
     action_set_reviewed: str = Form(""),
     db: Session = Depends(get_db),
@@ -481,7 +473,6 @@ def create_rule(
 
     # Parse optional IDs
     cat_id = int(assign_category_id) if assign_category_id.strip() else None
-    tag_id = int(assign_tag_id) if assign_tag_id.strip() else None
     acc_id = int(condition_account_id) if condition_account_id.strip() else None
 
     # Validate ownership
@@ -489,10 +480,6 @@ def create_rule(
         cat = db.query(Category).filter(Category.id == cat_id, Category.user_id == user.id).first()
         if not cat:
             cat_id = None
-    if tag_id:
-        tag = db.query(Tag).filter(Tag.id == tag_id, Tag.user_id == user.id).first()
-        if not tag:
-            tag_id = None
     if acc_id:
         acc = db.query(Account).filter(Account.id == acc_id, Account.user_id == user.id).first()
         if not acc:
@@ -522,7 +509,6 @@ def create_rule(
         amount_max=parsed_max,
         condition_account_id=acc_id,
         assign_category_id=cat_id,
-        assign_tag_id=tag_id,
         action_rename_counterparty=action_rename_counterparty.strip() or None,
         action_set_reviewed=1 if action_set_reviewed else 0,
     )
@@ -548,7 +534,6 @@ def edit_rule(
     amount_max: str = Form(""),
     condition_account_id: str = Form(""),
     assign_category_id: str = Form(""),
-    assign_tag_id: str = Form(""),
     action_rename_counterparty: str = Form(""),
     action_set_reviewed: str = Form(""),
     db: Session = Depends(get_db),
@@ -586,7 +571,6 @@ def edit_rule(
 
     # Parse optional IDs
     cat_id = int(assign_category_id) if assign_category_id.strip() else None
-    tag_id = int(assign_tag_id) if assign_tag_id.strip() else None
     acc_id = int(condition_account_id) if condition_account_id.strip() else None
 
     if cat_id:
@@ -594,12 +578,6 @@ def edit_rule(
         rule.assign_category_id = cat.id if cat else None
     else:
         rule.assign_category_id = None
-
-    if tag_id:
-        tag = db.query(Tag).filter(Tag.id == tag_id, Tag.user_id == user.id).first()
-        rule.assign_tag_id = tag.id if tag else None
-    else:
-        rule.assign_tag_id = None
 
     if acc_id:
         acc = db.query(Account).filter(Account.id == acc_id, Account.user_id == user.id).first()

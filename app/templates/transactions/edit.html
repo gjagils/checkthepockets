@@ -63,22 +63,6 @@
             </select>
         </div>
 
-        <div class="form-group">
-            <label>Tags</label>
-            <div class="tag-selector">
-                {% for tag in tags %}
-                <label class="tag-option">
-                    <input type="checkbox" name="tag_ids" value="{{ tag.id }}"
-                        {% if tag in transaction.tags %}checked{% endif %}>
-                    <span class="tag-label">{{ tag.name }}</span>
-                </label>
-                {% endfor %}
-            </div>
-            <div style="margin-top:0.5rem;">
-                <input type="text" name="new_tag" placeholder="Nieuwe tag toevoegen..." class="input-inline">
-            </div>
-        </div>
-
         <div class="form-actions">
             <button type="submit" class="btn btn-primary">Opslaan</button>
             <a href="{{ redirect_to or '/transactions' }}" class="btn">Annuleren</a>

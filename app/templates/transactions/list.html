@@ -50,7 +50,6 @@
   {%- set parts = [] -%}
   {%- if current_month %}{% set _ = parts.append('month=' + current_month) %}{% elif current_year %}{% set _ = parts.append('year=' + current_year) %}{% endif -%}
   {%- if current_account_id %}{% set _ = parts.append('account_id=' + current_account_id|string) %}{% endif -%}
-  {%- if current_tag_id %}{% set _ = parts.append('tag_id=' + current_tag_id|string) %}{% endif -%}
   {%- if search %}{% set _ = parts.append('search=' + search) %}{% endif -%}
   {%- if cat_state is not none %}{% set _ = parts.append('category_id=' + cat_state|string) %}{% endif -%}
   /transactions?{{ parts|join('&') }}
@@ -66,7 +65,6 @@
         <form method="get" action="/transactions" class="tx-inline-form">
             {% if current_category_id %}<input type="hidden" name="category_id" value="{{ current_category_id }}">{% endif %}
             {% if current_account_id %}<input type="hidden" name="account_id" value="{{ current_account_id }}">{% endif %}
-            {% if current_tag_id %}<input type="hidden" name="tag_id" value="{{ current_tag_id }}">{% endif %}
             {% if search %}<input type="hidden" name="search" value="{{ search }}">{% endif %}
             <select name="year" class="select-sm select-year" onchange="this.form.submit()" title="Jaar">
                 {% for yr in available_years %}
@@ -79,7 +77,6 @@
         {% set _nav_params = [] %}
         {% if current_category_id %}{% set _ = _nav_params.append('category_id=' + current_category_id|string) %}{% endif %}
         {% if current_account_id %}{% set _ = _nav_params.append('account_id=' + current_account_id|string) %}{% endif %}
-        {% if current_tag_id %}{% set _ = _nav_params.append('tag_id=' + current_tag_id|string) %}{% endif %}
         {% if search %}{% set _ = _nav_params.append('search=' + search) %}{% endif %}
         {% set _nav_suffix = ('&' + _nav_params|join('&')) if _nav_params else '' %}
 
@@ -89,8 +86,7 @@
             <form method="get" action="/transactions" class="tx-inline-form" id="monthForm">
                 {% if current_category_id %}<input type="hidden" name="category_id" value="{{ current_category_id }}">{% endif %}
                 {% if current_account_id %}<input type="hidden" name="account_id" value="{{ current_account_id }}">{% endif %}
-                {% if current_tag_id %}<input type="hidden" name="tag_id" value="{{ current_tag_id }}">{% endif %}
-                {% if search %}<input type="hidden" name="search" value="{{ search }}">{% endif %}
+                    {% if search %}<input type="hidden" name="search" value="{{ search }}">{% endif %}
                 <select name="month" class="select-sm select-month" onchange="monthFormSubmit(this)" title="Maand">
                     <option value="">— kies maand —</option>
                     {% for mname in _months_nl %}
@@ -108,7 +104,6 @@
         {% set allparams = "year=" + _yr|string %}
         {% if current_category_id %}{% set allparams = allparams + "&category_id=" + current_category_id|string %}{% endif %}
         {% if current_account_id %}{% set allparams = allparams + "&account_id=" + current_account_id|string %}{% endif %}
-        {% if current_tag_id %}{% set allparams = allparams + "&tag_id=" + current_tag_id|string %}{% endif %}
         {% if search %}{% set allparams = allparams + "&search=" + search %}{% endif %}
         <a href="/transactions?{{ allparams }}"
            class="year-btn {% if not current_month_num %}active{% endif %}" title="Heel {{ _yr }}">Hele jaar</a>
@@ -123,7 +118,6 @@
         <form method="get" action="/transactions" class="tx-inline-form">
             {% if current_month %}<input type="hidden" name="month" value="{{ current_month }}">{% elif current_year %}<input type="hidden" name="year" value="{{ current_year }}">{% endif %}
             {% if current_account_id %}<input type="hidden" name="account_id" value="{{ current_account_id }}">{% endif %}
-            {% if current_tag_id %}<input type="hidden" name="tag_id" value="{{ current_tag_id }}">{% endif %}
             {% if search %}<input type="hidden" name="search" value="{{ search }}">{% endif %}
             <select name="category_id" class="select-sm" onchange="this.form.submit()">
                 <option value="-2" {% if current_category_id == -2 %}selected{% endif %}>— alle categorieën —</option>
@@ -139,7 +133,6 @@
         <form method="get" action="/transactions" class="tx-inline-form">
             {% if current_month %}<input type="hidden" name="month" value="{{ current_month }}">{% elif current_year %}<input type="hidden" name="year" value="{{ current_year }}">{% endif %}
             {% if current_category_id %}<input type="hidden" name="category_id" value="{{ current_category_id }}">{% endif %}
-            {% if current_tag_id %}<input type="hidden" name="tag_id" value="{{ current_tag_id }}">{% endif %}
             {% if search %}<input type="hidden" name="search" value="{{ search }}">{% endif %}
             <select name="account_id" class="select-sm" onchange="this.form.submit()">
                 <option value="">Alle rekeningen</option>
@@ -153,7 +146,6 @@
             {% if current_month %}<input type="hidden" name="month" value="{{ current_month }}">{% elif current_year %}<input type="hidden" name="year" value="{{ current_year }}">{% endif %}
             {% if current_category_id %}<input type="hidden" name="category_id" value="{{ current_category_id }}">{% endif %}
             {% if current_account_id %}<input type="hidden" name="account_id" value="{{ current_account_id }}">{% endif %}
-            {% if current_tag_id %}<input type="hidden" name="tag_id" value="{{ current_tag_id }}">{% endif %}
             <input type="text" name="search" value="{{ search }}" placeholder="Zoeken..." class="tx-search-input">
         </form>
 
@@ -164,17 +156,6 @@
                 {% if current_category_id %}<input type="hidden" name="category_id" value="{{ current_category_id }}">{% endif %}
                 {% if current_account_id %}<input type="hidden" name="account_id" value="{{ current_account_id }}">{% endif %}
                 {% if search %}<input type="hidden" name="search" value="{{ search }}">{% endif %}
-                {% if tags %}
-                <div class="form-group">
-                    <label>Tag</label>
-                    <select name="tag_id">
-                        <option value="">Alle tags</option>
-                        {% for tag in tags %}
-                        <option value="{{ tag.id }}" {% if current_tag_id == tag.id %}selected{% endif %}>{{ tag.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                {% endif %}
                 <div class="form-group">
                     <label>Datum van</label>
                     <input type="date" name="date_from" value="{{ date_from }}">
@@ -451,18 +432,8 @@
                 </select>
                 <button type="button" class="btn btn-sm btn-primary" onclick="submitBulk('category')">Toewijzen</button>
             </div>
-            <div id="bulkTagWrap" style="display:none; align-items:center; gap:0.4rem;">
-                <select name="bulk_tag_id" id="bulkTagSelect" class="select-sm">
-                    <option value="">— tag —</option>
-                    {% for tag in tags %}
-                    <option value="{{ tag.id }}">{{ tag.name }}</option>
-                    {% endfor %}
-                </select>
-                <button type="button" class="btn btn-sm btn-primary" onclick="submitBulk('tag')">Toevoegen</button>
-            </div>
         </form>
         <button type="button" class="btn btn-sm" onclick="toggleBulkPanel('cat')">Categorie</button>
-        <button type="button" class="btn btn-sm" onclick="toggleBulkPanel('tag')">Tag</button>
         <button type="button" class="btn btn-sm btn-danger" onclick="if(confirm('Geselecteerde transacties uitsluiten?')) submitBulk('exclude')">Uitsluiten</button>
         <button type="button" class="btn btn-sm" id="clearSelection">Selectie wissen</button>
     </div>
@@ -564,20 +535,14 @@ function submitBulk(action) {
 
 function hideBulkPanels() {
     document.getElementById('bulkCatWrap').style.display = 'none';
-    document.getElementById('bulkTagWrap').style.display = 'none';
 }
 
 function toggleBulkPanel(type) {
     var catWrap = document.getElementById('bulkCatWrap');
-    var tagWrap = document.getElementById('bulkTagWrap');
     if (type === 'cat') {
         var open = catWrap.style.display === 'flex';
         hideBulkPanels();
         catWrap.style.display = open ? 'none' : 'flex';
-    } else {
-        var open = tagWrap.style.display === 'flex';
-        hideBulkPanels();
-        tagWrap.style.display = open ? 'none' : 'flex';
     }
 }
 

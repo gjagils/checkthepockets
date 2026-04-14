@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 import io
 
 from app.database import get_db
-from app.models import Category, Tag, Rule, RecurringTransaction, Budget
+from app.models import Category, Rule, RecurringTransaction, Budget
 from app.auth import require_login
 from app.template_config import templates
 
@@ -50,13 +50,7 @@ def export_settings(request: Request, db: Session = Depends(get_db)):
             "is_archived": c.is_archived,
         })
 
-    # Tags
-    tags_export = [
-        {"name": t.name, "color": t.color, "is_archived": t.is_archived}
-        for t in db.query(Tag).filter(Tag.user_id == user.id).order_by(Tag.name).all()
-    ]
-
-    # Rules (store category/tag by name, not ID)
+    # Rules (store category by name, not ID)
     rules_export = []
     for r in db.query(Rule).filter(Rule.user_id == user.id).order_by(Rule.id).all():
         rules_export.append({
@@ -68,7 +62,6 @@ def export_settings(request: Request, db: Session = Depends(get_db)):
             "amount_min": r.amount_min,
             "amount_max": r.amount_max,
             "assign_category_name": r.assign_category.name if r.assign_category else None,
-            "assign_tag_name": r.assign_tag.name if r.assign_tag else None,
         })
 
     # Recurring transactions
@@ -106,7 +99,6 @@ def export_settings(request: Request, db: Session = Depends(get_db)):
     payload = {
         "version": 1,
         "categories": categories_export,
-        "tags": tags_export,
         "rules": rules_export,
         "recurring": recurring_export,
         "budgets": budgets_export,
@@ -145,7 +137,6 @@ async def import_preview(
 
     counts = {
         "categories": len(data.get("categories", [])),
-        "tags": len(data.get("tags", [])),
         "rules": len(data.get("rules", [])),
         "recurring": len(data.get("recurring", [])),
         "budgets": len(data.get("budgets", [])),
@@ -180,7 +171,7 @@ async def import_confirm(
     except Exception:
         return RedirectResponse("/settings?error=json", status_code=302)
 
-    stats = {"categories": 0, "tags": 0, "rules": 0, "recurring": 0, "budgets": 0, "skipped": 0}
+    stats = {"categories": 0, "rules": 0, "recurring": 0, "budgets": 0, "skipped": 0}
 
     # --- Categories ---
     # Build local name→id map as we upsert (parents first)
@@ -240,47 +231,12 @@ async def import_confirm(
         for c in db.query(Category).filter(Category.user_id == user.id).all()
     }
 
-    # --- Tags ---
-    tag_name_to_id = {
-        t.name: t.id
-        for t in db.query(Tag).filter(Tag.user_id == user.id).all()
-    }
-
-    for tag in data.get("tags", []):
-        name = tag.get("name", "").strip()
-        if not name:
-            continue
-        existing = db.query(Tag).filter(Tag.user_id == user.id, Tag.name == name).first()
-        if existing:
-            if skip_existing:
-                tag_name_to_id[name] = existing.id
-                stats["skipped"] += 1
-                continue
-            existing.color = tag.get("color") or existing.color
-            existing.is_archived = tag.get("is_archived", existing.is_archived)
-            db.flush()
-            tag_name_to_id[name] = existing.id
-        else:
-            new_tag = Tag(
-                user_id=user.id,
-                name=name,
-                color=tag.get("color"),
-                is_archived=tag.get("is_archived", 0),
-            )
-            db.add(new_tag)
-            db.flush()
-            tag_name_to_id[name] = new_tag.id
-            stats["tags"] += 1
-
-    db.commit()
-
     # --- Rules ---
     for rule in data.get("rules", []):
         name = rule.get("name", "").strip()
         if not name:
             continue
         cat_id = cat_name_to_id.get(rule.get("assign_category_name")) if rule.get("assign_category_name") else None
-        tag_id = tag_name_to_id.get(rule.get("assign_tag_name")) if rule.get("assign_tag_name") else None
 
         existing = db.query(Rule).filter(
             Rule.user_id == user.id,
@@ -296,7 +252,6 @@ async def import_confirm(
             existing.match_type = rule.get("match_type", existing.match_type)
             existing.is_active = rule.get("is_active", existing.is_active)
             existing.assign_category_id = cat_id
-            existing.assign_tag_id = tag_id
             amount_min = rule.get("amount_min")
             amount_max = rule.get("amount_max")
             existing.amount_min = Decimal(str(amount_min)) if amount_min is not None else None
@@ -314,7 +269,6 @@ async def import_confirm(
                 amount_min=Decimal(str(amount_min)) if amount_min is not None else None,
                 amount_max=Decimal(str(amount_max)) if amount_max is not None else None,
                 assign_category_id=cat_id,
-                assign_tag_id=tag_id,
             )
             db.add(new_rule)
             stats["rules"] += 1
@@ -418,7 +372,7 @@ async def import_confirm(
 
     msg = (
         f"Import voltooid: {stats['categories']} categorie(ën), "
-        f"{stats['tags']} tag(s), {stats['rules']} regel(s), "
+        f"{stats['rules']} regel(s), "
         f"{stats['recurring']} terugkerend, {stats['budgets']} budget(ten) nieuw toegevoegd."
     )
     if stats["skipped"]:

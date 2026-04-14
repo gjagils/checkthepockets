@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import case, func, or_, and_
 
 from app.database import get_db
-from app.models import Account, Transaction, Category, Tag, transaction_tags
+from app.models import Account, Transaction, Category
 from app.auth import require_login
 from app.template_config import templates
 
@@ -471,25 +471,6 @@ def analytics_query(
             results = [{"label": f"{NL_MONTHS_SHORT[int(r.mo)]} {int(r.yr)}",
                         "color": "#888", "total": r.total or Decimal("0"), "tx_count": r.tx_count}
                        for r in rows]
-
-        elif group_by == "tag":
-            rows = (
-                db.query(
-                    Tag.name.label("label"),
-                    Tag.color.label("color"),
-                    func.sum(Transaction.amount).label("total"),
-                    func.count(Transaction.id).label("tx_count"),
-                )
-                .join(transaction_tags, transaction_tags.c.tag_id == Tag.id)
-                .join(Transaction, Transaction.id == transaction_tags.c.transaction_id)
-                .join(Account, Account.id == Transaction.account_id)
-                .filter(*base_filter, Tag.user_id == user.id)
-                .group_by(Tag.id, Tag.name, Tag.color)
-                .order_by(func.sum(Transaction.amount))
-                .all()
-            )
-            results = [{"label": r.label, "color": r.color or "#888",
-                        "total": r.total or Decimal("0"), "tx_count": r.tx_count} for r in rows]
 
         grand_total = sum(abs(r["total"]) for r in results)
 

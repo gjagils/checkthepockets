@@ -17,7 +17,7 @@ from sqlalchemy import func, or_, tuple_
 from sqlalchemy.exc import IntegrityError
 
 from app.database import get_db
-from app.models import Account, Transaction, Category, Tag, Rule, RecurringTransaction
+from app.models import Account, Transaction, Category, Rule, RecurringTransaction
 from app.auth import require_login
 from app.parsers import abn_amro, bunq, ics, ing, rabobank
 from app.parsers.base import ParseError, ParsedTransaction
@@ -180,11 +180,13 @@ def _available_tx_years(db, user_id: int, current_year_num: int) -> list[int]:
 
 def _build_tx_query(db, user, account_id, category_id, tag_id, search,
                     date_from, date_to, amount_min, amount_max):
-    """Shared filter logic used by list view, export, and duplicates."""
+    """Shared filter logic used by list view, export, and duplicates.
+    Note: tag_id parameter is retained for backward call compatibility but ignored.
+    """
     query = (
         db.query(Transaction)
         .join(Account)
-        .options(joinedload(Transaction.category), joinedload(Transaction.tags))
+        .options(joinedload(Transaction.category))
         .filter(Account.user_id == user.id)
     )
 
@@ -216,9 +218,6 @@ def _build_tx_query(db, user, account_id, category_id, tag_id, search,
                 query = query.filter(
                     Transaction.category_id.in_([category_id] + child_ids)
                 )
-
-    if tag_id:
-        query = query.filter(Transaction.tags.any(Tag.id == tag_id))
 
     if search:
         # Encrypted fields don't support ILIKE — filter in Python, then use IDs
@@ -269,7 +268,6 @@ def transaction_list(
     page: int = Query(1, ge=1),
     account_id: str = Query(""),
     category_id: str = Query(""),
-    tag_id: str = Query(""),
     search: str | None = Query(None),
     month: str = Query(""),        # NEW: YYYY-MM shorthand for a full month
     year: str = Query(""),         # NEW: YYYY filter voor heel jaar
@@ -284,7 +282,6 @@ def transaction_list(
     # Parse optional int query params (HTML forms send "" for empty selects)
     account_id = int(account_id) if account_id.strip() else None
     category_id = int(category_id) if category_id.strip() else None
-    tag_id = int(tag_id) if tag_id.strip() else None
 
     # Resolve month/year → date_from / date_to
     current_month = month.strip()
@@ -324,7 +321,7 @@ def transaction_list(
         period_label = "Alle periodes"
 
     query = _build_tx_query(
-        db, user, account_id, category_id, tag_id,
+        db, user, account_id, category_id, None,
         search, date_from, date_to, amount_min, amount_max,
     )
 
@@ -341,12 +338,6 @@ def transaction_list(
         db.query(Category)
         .filter(Category.user_id == user.id)
         .order_by(Category.name)
-        .all()
-    )
-    tags = (
-        db.query(Tag)
-        .filter(Tag.user_id == user.id)
-        .order_by(Tag.name)
         .all()
     )
     total_pages = max(1, (total + PER_PAGE - 1) // PER_PAGE)
@@ -395,8 +386,6 @@ def transaction_list(
         filter_params["account_id"] = account_id
     if category_id:
         filter_params["category_id"] = category_id
-    if tag_id:
-        filter_params["tag_id"] = tag_id
     if search:
         filter_params["search"] = search
     if not current_month:
@@ -461,11 +450,9 @@ def transaction_list(
             "transactions": transactions,
             "accounts": accounts,
             "categories": categories,
-            "tags": tags,
             "recurring_items": recurring_items,
             "current_account_id": account_id,
             "current_category_id": category_id,
-            "current_tag_id": tag_id,
             "search": search or "",
             "date_from": date_from or "",
             "date_to": date_to or "",
@@ -841,7 +828,6 @@ def edit_transaction_page(
     transaction = (
         db.query(Transaction)
         .join(Account)
-        .options(joinedload(Transaction.tags))
         .filter(Transaction.id == transaction_id, Account.user_id == user.id)
         .first()
     )
@@ -852,12 +838,6 @@ def edit_transaction_page(
         db.query(Category)
         .filter(Category.user_id == user.id)
         .order_by(Category.name)
-        .all()
-    )
-    tags = (
-        db.query(Tag)
-        .filter(Tag.user_id == user.id)
-        .order_by(Tag.name)
         .all()
     )
 
@@ -872,7 +852,6 @@ def edit_transaction_page(
             "user": user,
             "transaction": transaction,
             "categories": categories,
-            "tags": tags,
             "redirect_to": redirect_to,
         },
     )
@@ -916,29 +895,6 @@ async def edit_transaction(
         except ValueError:
             pass
 
-    # Handle tags
-    tag_ids = form.getlist("tag_ids")
-    selected_tags = []
-    for tid in tag_ids:
-        tag = db.query(Tag).filter(Tag.id == int(tid), Tag.user_id == user.id).first()
-        if tag:
-            selected_tags.append(tag)
-
-    # Create new tag if provided
-    new_tag_name = (form.get("new_tag") or "").strip()
-    if new_tag_name:
-        existing = db.query(Tag).filter(
-            Tag.user_id == user.id, Tag.name == new_tag_name
-        ).first()
-        if existing:
-            selected_tags.append(existing)
-        else:
-            tag_obj = Tag(user_id=user.id, name=new_tag_name)
-            db.add(tag_obj)
-            db.flush()
-            selected_tags.append(tag_obj)
-
-    transaction.tags = selected_tags
     db.commit()
 
     redirect_to = (form.get("redirect_to") or "").strip()
@@ -1037,7 +993,6 @@ def export_transactions(
     request: Request,
     account_id: str = Query(""),
     category_id: str = Query(""),
-    tag_id: str = Query(""),
     search: str | None = Query(None),
     date_from: str | None = Query(None),
     date_to: str | None = Query(None),
@@ -1049,10 +1004,9 @@ def export_transactions(
 
     acc_id = int(account_id) if account_id.strip() else None
     cat_id = int(category_id) if category_id.strip() else None
-    tg_id  = int(tag_id) if tag_id.strip() else None
 
     transactions = (
-        _build_tx_query(db, user, acc_id, cat_id, tg_id,
+        _build_tx_query(db, user, acc_id, cat_id, None,
                         search, date_from, date_to, amount_min, amount_max)
         .order_by(Transaction.date.desc(), Transaction.id.desc())
         .all()
@@ -1061,7 +1015,7 @@ def export_transactions(
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(["datum", "bedrag", "omschrijving", "tegenpartij", "iban_tegenpartij",
-                     "categorie", "tags", "rekening", "gecontroleerd"])
+                     "categorie", "rekening", "gecontroleerd"])
     for tx in transactions:
         writer.writerow([
             tx.date.isoformat(),
@@ -1070,7 +1024,6 @@ def export_transactions(
             tx.counterparty or "",
             tx.counterparty_iban or "",
             tx.category.name if tx.category else "",
-            ";".join(t.name for t in tx.tags),
             tx.account.name,
             "ja" if tx.is_reviewed else "nee",
         ])
@@ -1095,7 +1048,6 @@ async def bulk_action(request: Request, db: Session = Depends(get_db)):
     action = form.get("action", "")
     redirect_to = form.get("redirect_to", "/transactions")
     category_id_raw = form.get("bulk_category_id", "")
-    tag_id_raw = form.get("bulk_tag_id", "")
 
     if not tx_ids_raw:
         return RedirectResponse(redirect_to, status_code=302)
@@ -1124,15 +1076,6 @@ async def bulk_action(request: Request, db: Session = Depends(get_db)):
             tx.category_id = cat_id
             tx.assigned_by_rule_id = None  # bulk handmatig
             tx.is_reviewed = 1 if cat_id else 0
-
-    elif action == "tag":
-        tg_id = int(tag_id_raw) if tag_id_raw.strip() else None
-        if tg_id:
-            tag = db.query(Tag).filter(Tag.id == tg_id, Tag.user_id == user.id).first()
-            if tag:
-                for tx in transactions:
-                    if tag not in tx.tags:
-                        tx.tags.append(tag)
 
     elif action == "reviewed":
         for tx in transactions:

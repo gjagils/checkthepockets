@@ -254,15 +254,6 @@
                                     {% endfor %}
                                 </select>
                             </div>
-                            <div class="form-group">
-                                <label for="assign_tag_id">Tag toewijzen</label>
-                                <select name="assign_tag_id" id="assign_tag_id">
-                                    <option value="">Geen</option>
-                                    {% for tag in tags %}
-                                    <option value="{{ tag.id }}">{{ tag.name }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
                         </div>
                         <div class="form-group" style="margin-top:0.5rem;">
                             <label for="action_rename_counterparty">Tegenpartij hernoemen naar <span class="muted">(optioneel)</span></label>
@@ -327,9 +318,6 @@
                             <span class="category-pill" style="--cat-color: {{ rule.assign_category.color or '#1F6FB2' }}">
                                 {{ rule.assign_category.name }}
                             </span>
-                            {% endif %}
-                            {% if rule.assign_tag %}
-                            <span class="tag-pill">{{ rule.assign_tag.name }}</span>
                             {% endif %}
                             {% if rule.action_rename_counterparty %}
                             <span class="pill" style="background:var(--sky-bg); color:var(--sky); border:1px solid var(--sky);">✎ {{ rule.action_rename_counterparty }}</span>
@@ -423,15 +411,6 @@
                                         <option value="{{ cat.id }}" {% if rule.assign_category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
                                         {% endif %}
                                     {% endif %}
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label>Tag</label>
-                                <select name="assign_tag_id">
-                                    <option value="">Geen</option>
-                                    {% for tag in tags %}
-                                    <option value="{{ tag.id }}" {% if rule.assign_tag_id == tag.id %}selected{% endif %}>{{ tag.name }}</option>
                                     {% endfor %}
                                 </select>
                             </div>

@@ -25,7 +25,6 @@
                     <option value="category"     {% if group_by == 'category'     %}selected{% endif %}>Categorie</option>
                     <option value="counterparty" {% if group_by == 'counterparty' %}selected{% endif %}>Tegenpartij</option>
                     <option value="month"        {% if group_by == 'month'        %}selected{% endif %}>Maand</option>
-                    <option value="tag"          {% if group_by == 'tag'          %}selected{% endif %}>Tag</option>
                 </select>
             </div>
             <div class="form-group" style="margin:0;">
@@ -59,8 +58,7 @@
         <h3>
             {% if group_by == 'category' %}Per categorie
             {% elif group_by == 'counterparty' %}Per tegenpartij
-            {% elif group_by == 'month' %}Per maand
-            {% else %}Per tag{% endif %}
+            {% else %}Per maand{% endif %}
             — {{ results|length }} groepen
         </h3>
         <span class="muted" style="font-size:.9rem;">Totaal: € {{ grand_total|round(2) }}</span>

@@ -3,7 +3,7 @@
 import logging
 from sqlalchemy.orm import Session
 
-from app.models import Rule, Transaction, Tag, Category
+from app.models import Rule, Transaction, Category
 
 logger = logging.getLogger(__name__)
 
@@ -67,12 +67,6 @@ def apply_rule_to_transaction(rule: Rule, transaction: Transaction, db: Session)
             # maar markeer alsnog als 'door regel toegewezen' zodat de badge
             # klopt na een backfill-run.
             transaction.assigned_by_rule_id = rule.id
-            changed = True
-
-    if rule.assign_tag_id:
-        tag = db.query(Tag).filter(Tag.id == rule.assign_tag_id).first()
-        if tag and tag not in transaction.tags:
-            transaction.tags.append(tag)
             changed = True
 
     if rule.action_rename_counterparty:

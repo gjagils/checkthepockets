@@ -8,21 +8,12 @@ from sqlalchemy import (
     DateTime,
     Text,
     ForeignKey,
-    Table,
     UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 
 from app.database import Base
 from app.crypto import EncryptedText
-
-
-transaction_tags = Table(
-    "transaction_tags",
-    Base.metadata,
-    Column("transaction_id", Integer, ForeignKey("transactions.id", ondelete="CASCADE"), primary_key=True),
-    Column("tag_id", Integer, ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True),
-)
 
 
 class User(Base):
@@ -42,7 +33,6 @@ class User(Base):
     categories = relationship("Category", back_populates="user", cascade="all, delete-orphan")
     savings_plans = relationship("SavingsPlan", back_populates="user", cascade="all, delete-orphan")
     budgets = relationship("Budget", back_populates="user", cascade="all, delete-orphan")
-    tags = relationship("Tag", back_populates="user", cascade="all, delete-orphan")
     rules = relationship("Rule", back_populates="user", cascade="all, delete-orphan")
     recurring_transactions = relationship("RecurringTransaction", back_populates="user", cascade="all, delete-orphan")
     portfolio_assets = relationship("PortfolioAsset", back_populates="user", cascade="all, delete-orphan")
@@ -124,24 +114,6 @@ class Category(Base):
     )
 
 
-class Tag(Base):
-    __tablename__ = "tags"
-
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    name = Column(String(50), nullable=False)
-    color = Column(String(7), nullable=True)
-    is_archived = Column(Integer, default=0)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-
-    user = relationship("User", back_populates="tags")
-    transactions = relationship("Transaction", secondary=transaction_tags, back_populates="tags")
-
-    __table_args__ = (
-        UniqueConstraint("user_id", "name", name="uq_user_tag"),
-    )
-
-
 class Rule(Base):
     __tablename__ = "rules"
 
@@ -160,7 +132,6 @@ class Rule(Base):
 
     # THEN actions
     assign_category_id = Column(Integer, ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)
-    assign_tag_id = Column(Integer, ForeignKey("tags.id", ondelete="SET NULL"), nullable=True)
     action_rename_counterparty = Column(String(255), nullable=True)
     action_set_reviewed = Column(Integer, default=0)
 
@@ -168,7 +139,6 @@ class Rule(Base):
 
     user = relationship("User", back_populates="rules")
     assign_category = relationship("Category")
-    assign_tag = relationship("Tag")
     condition_account = relationship("Account", foreign_keys=[condition_account_id])
 
 
@@ -260,7 +230,6 @@ class Transaction(Base):
 
     account = relationship("Account", back_populates="transactions")
     category = relationship("Category", back_populates="transactions")
-    tags = relationship("Tag", secondary=transaction_tags, back_populates="transactions")
     parent = relationship("Transaction", remote_side="Transaction.id", foreign_keys="[Transaction.parent_id]", backref="children")
     assigned_by_rule = relationship("Rule", foreign_keys=[assigned_by_rule_id])
 

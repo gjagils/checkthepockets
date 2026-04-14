@@ -21,7 +21,7 @@
     {% set path = request.url.path %}
     {% set main_active =
         'dashboard' if path == '/dashboard'
-        else 'financien' if path in ['/transactions', '/categories', '/tags', '/rules', '/recurring'] or path.startswith('/transactions')
+        else 'financien' if path in ['/transactions', '/categories', '/rules', '/recurring'] or path.startswith('/transactions')
         else 'budgetten' if path.startswith('/budgets') or path.startswith('/savings')
         else 'analyse' if path.startswith('/analytics') or path.startswith('/portfolio') or path.startswith('/networth')
         else 'rekeningen' if path.startswith('/accounts') or path.startswith('/import') or path.startswith('/banking')
@@ -56,7 +56,6 @@
             {% if main_active == 'financien' %}
                 <a href="/transactions" class="{{ 'active' if path == '/transactions' or path.startswith('/transactions/') }}">Transacties</a>
                 <a href="/categories" class="{{ 'active' if path == '/categories' }}">Categorieën</a>
-                <a href="/tags" class="{{ 'active' if path == '/tags' }}">Tags</a>
                 <a href="/rules" class="{{ 'active' if path == '/rules' }}">Regels</a>
                 <a href="/recurring" class="{{ 'active' if path == '/recurring' }}">Terugkerend</a>
             {% elif main_active == 'budgetten' %}
