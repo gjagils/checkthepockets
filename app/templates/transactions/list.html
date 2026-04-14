@@ -170,23 +170,24 @@
                     </td>
                     <td class="col-account muted"></td>
                     <td style="text-align:center; padding:0.3rem;">
-                        {% if candidates and tx.recurring_id %}
+                        {% if tx.recurring_id %}
                         <button type="button"
                                 class="tx-action-btn"
                                 id="projbtn-{{ tx.id }}"
                                 onclick="toggleProjPanel({{ tx.id }})"
-                                title="{{ candidates|length }} mogelijke match{% if candidates|length != 1 %}es{% endif %}">›</button>
+                                title="{% if candidates %}{{ candidates|length }} mogelijke match{% if candidates|length != 1 %}es{% endif %}{% else %}Geen automatische match{% endif %}">›</button>
                         {% endif %}
                     </td>
                 </tr>
-                {% if candidates and tx.recurring_id %}
+                {% if tx.recurring_id %}
                 <tr class="tx-action-panel" id="projpanel-{{ tx.id }}" style="display:none;">
                     <td colspan="9" class="tx-panel-cell">
                         <div class="tx-panel-inner">
                             <div class="tx-panel-info">
                                 <strong>Mogelijke matches voor "{{ tx.counterparty or tx.description or '—' }}"</strong>
-                                <span class="muted">Transacties binnen 30 dagen met vergelijkbaar bedrag</span>
+                                <span class="muted">Transacties binnen 30 dagen met vergelijkbaar bedrag (&plusmn;15%)</span>
                             </div>
+                            {% if candidates %}
                             <table class="proj-candidates">
                                 <thead>
                                     <tr><th>Datum</th><th>Tegenpartij</th><th>Omschrijving</th><th class="text-right">Bedrag</th><th></th></tr>
@@ -210,6 +211,12 @@
                                 {% endfor %}
                                 </tbody>
                             </table>
+                            {% else %}
+                            <div style="padding:0.5rem 0.25rem; color: var(--muted); font-size: 0.9rem;">
+                                Geen automatische matches gevonden binnen &plusmn;30 dagen en &plusmn;15% bedrag.
+                                <a href="/recurring" style="color: var(--orange); margin-left:0.5rem;">Koppel handmatig via Terugkerend &rarr;</a>
+                            </div>
+                            {% endif %}
                         </div>
                     </td>
                 </tr>
