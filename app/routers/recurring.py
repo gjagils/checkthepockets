@@ -261,7 +261,32 @@ def _is_active_in_month(item: RecurringTransaction, year: int, month: int) -> bo
     months = _active_months_set(item)
     if month not in months:
         return False
+    if _is_month_skipped(item, year, month):
+        return False
     return True
+
+
+def _skipped_months_set(item: RecurringTransaction) -> set[str]:
+    raw = (item.skipped_months or "").strip()
+    if not raw:
+        return set()
+    return {p.strip() for p in raw.split(",") if p.strip()}
+
+
+def _is_month_skipped(item: RecurringTransaction, year: int, month: int) -> bool:
+    return f"{year:04d}-{month:02d}" in _skipped_months_set(item)
+
+
+def _add_skipped_month(item: RecurringTransaction, year: int, month: int) -> None:
+    existing = _skipped_months_set(item)
+    existing.add(f"{year:04d}-{month:02d}")
+    item.skipped_months = ",".join(sorted(existing))
+
+
+def _remove_skipped_month(item: RecurringTransaction, year: int, month: int) -> None:
+    existing = _skipped_months_set(item)
+    existing.discard(f"{year:04d}-{month:02d}")
+    item.skipped_months = ",".join(sorted(existing)) if existing else None
 
 
 def _projected_hash(item_id: int, year: int, month: int) -> str:
@@ -434,6 +459,74 @@ def cleanup_matched_projected(user_id: int, db: Session) -> None:
                 changed = True
     if changed:
         db.commit()
+
+
+@router.post("/recurring/projected/{projected_tx_id}/skip")
+def skip_projected_transaction(
+    projected_tx_id: int,
+    request: Request,
+    redirect_to: str = Form("/transactions"),
+    db: Session = Depends(get_db),
+):
+    """Mark een verwachte transactie als 'vindt deze maand niet plaats' —
+    verwijdert de projected tx en markeert de maand in skipped_months van de
+    bijbehorende RecurringTransaction zodat hij niet opnieuw wordt aangemaakt."""
+    user = require_login(request, db)
+
+    ptx = (
+        db.query(Transaction)
+        .join(Account)
+        .filter(
+            Transaction.id == projected_tx_id,
+            Account.user_id == user.id,
+            Transaction.is_projected == 1,
+        )
+        .first()
+    )
+    if not ptx:
+        return RedirectResponse(redirect_to or "/transactions", status_code=302)
+
+    item = None
+    if ptx.recurring_id:
+        item = (
+            db.query(RecurringTransaction)
+            .filter(
+                RecurringTransaction.id == ptx.recurring_id,
+                RecurringTransaction.user_id == user.id,
+            )
+            .first()
+        )
+    if item and ptx.date:
+        _add_skipped_month(item, ptx.date.year, ptx.date.month)
+
+    db.delete(ptx)
+    db.commit()
+    return RedirectResponse(redirect_to or "/transactions", status_code=302)
+
+
+@router.post("/recurring/{item_id}/unskip-month")
+def unskip_month(
+    item_id: int,
+    request: Request,
+    year: int = Form(...),
+    month: int = Form(...),
+    redirect_to: str = Form("/recurring"),
+    db: Session = Depends(get_db),
+):
+    """Verwijder een skipped-month markering (undo)."""
+    user = require_login(request, db)
+    item = (
+        db.query(RecurringTransaction)
+        .filter(
+            RecurringTransaction.id == item_id,
+            RecurringTransaction.user_id == user.id,
+        )
+        .first()
+    )
+    if item:
+        _remove_skipped_month(item, year, month)
+        db.commit()
+    return RedirectResponse(redirect_to or "/recurring", status_code=302)
 
 
 @router.post("/recurring/analyze")

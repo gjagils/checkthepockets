@@ -111,6 +111,7 @@
                 Vorige periode: {{ entry.prev_period_start.strftime('%d-%m') }} t/m {{ entry.prev_period_end.strftime('%d-%m-%Y') }}
             </span>
         </div>
+        {% include "recurring/_skipped_months.html" %}
         {% include "recurring/_candidate_transactions.html" %}
         {% include "recurring/_linked_transactions.html" %}
         <div class="recurring-actions" style="margin-top:0.5rem;">
@@ -160,6 +161,7 @@
                     <span class="muted" style="font-size:0.78rem;">t/m {{ entry.period_end.strftime('%d-%m-%Y') }}</span>
                     <span class="recurring-badge recurring-badge-due">Nog niet gevonden</span>
                 </div>
+                {% include "recurring/_skipped_months.html" %}
                 {% include "recurring/_candidate_transactions.html" %}
                 {% include "recurring/_linked_transactions.html" %}
                 <div class="recurring-actions" style="margin-top:0.4rem;">
@@ -217,6 +219,7 @@
                     </form>
                     {% endif %}
                 </div>
+                {% include "recurring/_skipped_months.html" %}
                 {% include "recurring/_linked_transactions.html" %}
                 <div class="recurring-actions">
                     <button class="btn btn-sm" onclick="toggleRecurringEdit({{ item.id }})">Bewerken</button>
@@ -261,6 +264,7 @@
                         {% if item.start_date %}<span class="muted" style="font-size:0.75rem;">Vanaf {{ item.start_date.strftime('%d-%m-%Y') }}</span>{% endif %}
                         {% if item.end_date %}<span class="muted" style="font-size:0.75rem;">T/m {{ item.end_date.strftime('%d-%m-%Y') }}</span>{% endif %}
                     </div>
+                    {% include "recurring/_skipped_months.html" %}
                     <div class="recurring-actions">
                         <button class="btn btn-sm" onclick="toggleRecurringEdit({{ item.id }})">Bewerken</button>
                         <form method="post" action="/recurring/{{ item.id }}/toggle" style="display:inline;">

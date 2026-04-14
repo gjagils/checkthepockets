@@ -187,6 +187,7 @@ class RecurringTransaction(Base):
     start_date = Column(Date, nullable=True)
     end_date = Column(Date, nullable=True)
     active_months = Column(String(50), nullable=True)  # comma-separated month numbers, NULL = all
+    skipped_months = Column(String(2000), nullable=True)  # comma-separated "YYYY-MM" — maanden waarin deze verwachting NIET plaatsvindt
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     user = relationship("User", back_populates="recurring_transactions")

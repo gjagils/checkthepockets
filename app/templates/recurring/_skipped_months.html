@@ -1,0 +1,25 @@
+{# Toont de overgeslagen maanden voor een recurring item met undo-knopjes.
+   Verwacht: `item` in scope.
+#}
+{% if item.skipped_months %}
+<div class="skipped-months-row" style="margin-top:0.3rem; display:flex; align-items:center; gap:0.4rem; flex-wrap:wrap;">
+    <span class="muted" style="font-size:0.75rem;">Overgeslagen:</span>
+    {% for entry in item.skipped_months.split(',') %}
+        {% set entry = entry.strip() %}
+        {% if entry and '-' in entry %}
+            {% set _y = entry.split('-')[0] %}
+            {% set _m = entry.split('-')[1] %}
+            <form method="post" action="/recurring/{{ item.id }}/unskip-month" style="display:inline;"
+                  title="Klik om deze maand weer als verwacht te markeren">
+                <input type="hidden" name="year" value="{{ _y }}">
+                <input type="hidden" name="month" value="{{ _m|int }}">
+                <input type="hidden" name="redirect_to" value="/recurring">
+                <button type="submit" class="skipped-pill">
+                    {{ nl_month_abbrevs[_m|int] }} {{ _y }}
+                    <span class="skipped-pill-x" aria-hidden="true">×</span>
+                </button>
+            </form>
+        {% endif %}
+    {% endfor %}
+</div>
+{% endif %}

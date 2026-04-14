@@ -857,6 +857,59 @@ tfoot td { background: var(--surface-2); border-top: 1px solid var(--border); fo
 .select-year { min-width: 82px; }
 .select-month { min-width: 130px; }
 
+.month-nav {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+.month-nav-arrow {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.9rem;
+    height: 1.9rem;
+    border: 1px solid var(--border);
+    border-radius: var(--ctp-radius-sm);
+    background: var(--surface);
+    color: var(--muted);
+    font-size: 1.1rem;
+    font-weight: 700;
+    text-decoration: none;
+    transition: color 0.12s, background 0.12s;
+    line-height: 1;
+}
+.month-nav-arrow:hover { color: var(--text); background: var(--surface-2); }
+
+/* Overgeslagen maanden met undo-knop (op /recurring) */
+.skipped-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.18rem 0.5rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    font-family: var(--font-heading);
+    letter-spacing: 0.03em;
+    color: var(--muted);
+    background: var(--surface);
+    border: 1px dashed var(--border);
+    border-radius: 999px;
+    cursor: pointer;
+    transition: color 0.12s, background 0.12s, border-color 0.12s;
+}
+.skipped-pill:hover {
+    color: var(--text);
+    background: var(--surface-2);
+    border-style: solid;
+    border-color: var(--orange);
+}
+.skipped-pill .skipped-pill-x {
+    font-size: 0.85rem;
+    line-height: 1;
+    color: var(--muted);
+}
+.skipped-pill:hover .skipped-pill-x { color: var(--orange); }
+
 .year-btn {
     display: inline-flex;
     align-items: center;

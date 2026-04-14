@@ -75,21 +75,34 @@
             </select>
         </form>
 
-        <!-- Maand dropdown -->
-        <form method="get" action="/transactions" class="tx-inline-form" id="monthForm">
-            {% if current_category_id %}<input type="hidden" name="category_id" value="{{ current_category_id }}">{% endif %}
-            {% if current_account_id %}<input type="hidden" name="account_id" value="{{ current_account_id }}">{% endif %}
-            {% if current_tag_id %}<input type="hidden" name="tag_id" value="{{ current_tag_id }}">{% endif %}
-            {% if search %}<input type="hidden" name="search" value="{{ search }}">{% endif %}
-            <select name="month" class="select-sm select-month" onchange="monthFormSubmit(this)" title="Maand">
-                <option value="">— kies maand —</option>
-                {% for mname in _months_nl %}
-                    {% set mnum = loop.index %}
-                    {% set mval = "%04d-%02d"|format(_yr, mnum) %}
-                    <option value="{{ mval }}" {% if current_month_num == mnum %}selected{% endif %}>{{ mname }}</option>
-                {% endfor %}
-            </select>
-        </form>
+        <!-- Maand navigatie: ‹ dropdown › -->
+        {% set _nav_params = [] %}
+        {% if current_category_id %}{% set _ = _nav_params.append('category_id=' + current_category_id|string) %}{% endif %}
+        {% if current_account_id %}{% set _ = _nav_params.append('account_id=' + current_account_id|string) %}{% endif %}
+        {% if current_tag_id %}{% set _ = _nav_params.append('tag_id=' + current_tag_id|string) %}{% endif %}
+        {% if search %}{% set _ = _nav_params.append('search=' + search) %}{% endif %}
+        {% set _nav_suffix = ('&' + _nav_params|join('&')) if _nav_params else '' %}
+
+        <div class="month-nav">
+            <a href="/transactions?month={{ prev_month }}{{ _nav_suffix }}"
+               class="month-nav-arrow" title="Vorige maand">‹</a>
+            <form method="get" action="/transactions" class="tx-inline-form" id="monthForm">
+                {% if current_category_id %}<input type="hidden" name="category_id" value="{{ current_category_id }}">{% endif %}
+                {% if current_account_id %}<input type="hidden" name="account_id" value="{{ current_account_id }}">{% endif %}
+                {% if current_tag_id %}<input type="hidden" name="tag_id" value="{{ current_tag_id }}">{% endif %}
+                {% if search %}<input type="hidden" name="search" value="{{ search }}">{% endif %}
+                <select name="month" class="select-sm select-month" onchange="monthFormSubmit(this)" title="Maand">
+                    <option value="">— kies maand —</option>
+                    {% for mname in _months_nl %}
+                        {% set mnum = loop.index %}
+                        {% set mval = "%04d-%02d"|format(_yr, mnum) %}
+                        <option value="{{ mval }}" {% if current_month_num == mnum %}selected{% endif %}>{{ mname }}</option>
+                    {% endfor %}
+                </select>
+            </form>
+            <a href="/transactions?month={{ next_month }}{{ _nav_suffix }}"
+               class="month-nav-arrow" title="Volgende maand">›</a>
+        </div>
 
         <!-- Hele jaar knop -->
         {% set allparams = "year=" + _yr|string %}
@@ -284,6 +297,13 @@
                                 <a href="/recurring" style="color: var(--orange); margin-left:0.5rem;">Koppel handmatig via Terugkerend &rarr;</a>
                             </div>
                             {% endif %}
+                            <div class="tx-panel-footer" style="margin-top:0.6rem;">
+                                <form method="post" action="/recurring/projected/{{ tx.id }}/skip" style="display:inline;"
+                                      onsubmit="return confirm('Deze verwachte transactie voor {{ tx.date.strftime(\"%m-%Y\") }} definitief weghalen? De terugkerende post zelf blijft bestaan, alleen deze maand wordt overgeslagen.')">
+                                    <input type="hidden" name="redirect_to" value="/transactions?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}">
+                                    <button type="submit" class="tx-panel-footer-btn tx-panel-footer-danger">🗑 Verwachting voor deze maand weghalen</button>
+                                </form>
+                            </div>
                         </div>
                     </td>
                 </tr>
