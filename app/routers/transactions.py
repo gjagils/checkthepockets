@@ -379,15 +379,33 @@ def transaction_list(
         .all()
     )
     # {account_id: {"parents": [...], "children": {parent_id: [...]}}}
-    cats_by_account = {}
+    # Categorieën met account_id=None gelden voor alle rekeningen
+    global_cats = {"parents": [], "children": {}}
+    account_specific = {}
     for c in all_cats:
-        aid = c.account_id
-        if aid not in cats_by_account:
-            cats_by_account[aid] = {"parents": [], "children": {}}
-        if c.parent_id is None:
-            cats_by_account[aid]["parents"].append(c)
+        if c.account_id is None:
+            if c.parent_id is None:
+                global_cats["parents"].append(c)
+            else:
+                global_cats["children"].setdefault(c.parent_id, []).append(c)
         else:
-            cats_by_account[aid]["children"].setdefault(c.parent_id, []).append(c)
+            if c.account_id not in account_specific:
+                account_specific[c.account_id] = {"parents": [], "children": {}}
+            if c.parent_id is None:
+                account_specific[c.account_id]["parents"].append(c)
+            else:
+                account_specific[c.account_id]["children"].setdefault(c.parent_id, []).append(c)
+
+    # Merge: elke rekening krijgt globale + account-specifieke categorieën
+    all_account_ids = {a.id for a in accounts}
+    cats_by_account = {}
+    for aid in all_account_ids:
+        specific = account_specific.get(aid, {"parents": [], "children": {}})
+        merged_parents = global_cats["parents"] + specific["parents"]
+        merged_children = dict(global_cats["children"])
+        for pid, children in specific["children"].items():
+            merged_children.setdefault(pid, []).extend(children)
+        cats_by_account[aid] = {"parents": merged_parents, "children": merged_children}
 
     # Active recurring items for linking
     recurring_items = (
