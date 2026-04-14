@@ -315,6 +315,8 @@ async def sync_transactions(connection_id: int, request: Request, db: Session = 
     # (de stabiele Enable Banking account_uid) zodat meerdere rekeningen bij
     # dezelfde bank, of rekeningen zonder IBAN, nooit samenvallen.
     bank_key = conn.bank_name.lower().replace(" ", "_")
+    display = (conn.display_name or conn.bank_name).strip()
+    preferred_name = f"{display} - {account_iban}" if account_iban else display
     account = db.query(Account).filter(
         Account.user_id == user.id,
         Account.external_uid == account_uid,
@@ -330,15 +332,19 @@ async def sync_transactions(connection_id: int, request: Request, db: Session = 
         if account:
             account.external_uid = account_uid
     if account:
-        # Upgrade IBAN/naam als we die nu wel hebben
         if account_iban and not account.iban:
             account.iban = account_iban
-            if account.name.endswith(" - account"):
-                account.name = f"{conn.bank_name} - {account_iban}"
+        # Synchroniseer de naam met de connection-display_name, tenzij de
+        # gebruiker het account handmatig een custom naam heeft gegeven.
+        autogen_prefixes = (f"{conn.bank_name} -", f"{display} -", f"{conn.bank_name}",)
+        if account.name == f"{conn.bank_name} - account" or any(
+            account.name.startswith(p) for p in autogen_prefixes
+        ):
+            account.name = preferred_name
     else:
         account = Account(
             user_id=user.id,
-            name=f"{conn.bank_name} - {account_iban or 'account'}",
+            name=preferred_name,
             iban=account_iban or None,
             bank=bank_key,
             external_uid=account_uid,
@@ -428,7 +434,29 @@ async def rename_connection(connection_id: int, request: Request, db: Session = 
     if not conn:
         return RedirectResponse("/banking/connect", status_code=302)
 
+    old_display = (conn.display_name or conn.bank_name).strip()
     conn.display_name = display_name or None
+    new_display = (conn.display_name or conn.bank_name).strip()
+
+    # Auto-rename linked accounts (alleen de auto-gegenereerde namen,
+    # handmatig aangepaste account-namen laten we staan).
+    try:
+        stored_accounts = json.loads(conn.accounts_json or "[]")
+    except Exception:
+        stored_accounts = []
+    uids = [a.get("uid") for a in stored_accounts if a.get("uid")]
+    if uids:
+        linked = db.query(Account).filter(
+            Account.user_id == user.id,
+            Account.external_uid.in_(uids),
+        ).all()
+        autogen_starts = (
+            f"{old_display} -", f"{old_display}",
+            f"{conn.bank_name} -", f"{conn.bank_name}",
+        )
+        for acc in linked:
+            if any(acc.name.startswith(p) for p in autogen_starts) or acc.name == f"{conn.bank_name} - account":
+                acc.name = f"{new_display} - {acc.iban}" if acc.iban else new_display
     db.commit()
 
     return RedirectResponse("/banking/connect", status_code=302)
