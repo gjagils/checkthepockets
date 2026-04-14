@@ -9,13 +9,13 @@
 <div class="accounts-grid">
     {% for acc in accounts %}
     <div class="card account-card">
+        <h3 style="margin:0 0 0.5rem 0;">{{ acc.name or (acc.iban or acc.bank|upper) }}</h3>
         <div class="account-header">
             <span class="pill">{{ acc.bank|upper }}</span>
             <span class="muted">{{ acc.transactions|length }} transacties</span>
         </div>
-        <h3>{{ acc.name }}</h3>
         {% if acc.iban %}
-        <p class="muted">{{ acc.iban }}</p>
+        <p class="muted" style="font-size:0.85rem; margin-top:0.5rem;">{{ acc.iban }}</p>
         {% endif %}
         <div class="account-actions">
             <a href="/?account_id={{ acc.id }}" class="btn btn-sm">Bekijk transacties</a>
