@@ -1267,3 +1267,53 @@ tfoot td { background: var(--surface-2); border-top: 1px solid var(--border); fo
 .current-month-row {
     background: var(--sky-bg);
 }
+
+/* Bulk action bar (sticky onderaan als checkboxes zijn aangevinkt) */
+.bulk-bar {
+    position: fixed;
+    left: 50%;
+    bottom: 1.25rem;
+    transform: translate(-50%, 150%);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.6rem 1rem;
+    background: var(--navy, #234C75);
+    color: #fff;
+    border-radius: 0.6rem;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    z-index: 1000;
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 0.2s ease, opacity 0.2s ease;
+    max-width: calc(100vw - 2rem);
+    flex-wrap: wrap;
+}
+.bulk-bar.active {
+    transform: translate(-50%, 0);
+    opacity: 1;
+    pointer-events: auto;
+}
+.bulk-bar .bulk-count {
+    font-weight: 600;
+    white-space: nowrap;
+}
+.bulk-bar .bulk-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+.bulk-bar .select-sm {
+    padding: 0.3rem 0.5rem;
+    border-radius: 0.35rem;
+    border: 1px solid rgba(255,255,255,0.25);
+    background: #fff;
+    color: var(--text, #222);
+    font-size: 0.9rem;
+    max-width: 220px;
+}
+.bulk-bar .btn-sm {
+    padding: 0.35rem 0.7rem;
+    font-size: 0.85rem;
+}
