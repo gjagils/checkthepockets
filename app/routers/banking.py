@@ -173,8 +173,21 @@ def callback(request: Request, code: str = "", state: str = "", db: Session = De
             continue
         try:
             details = enable_banking.get_account_details(uid)
-            iban = details.get("account_id", {}).get("iban", "")
-            name = details.get("account_servicer", {}).get("bic_fi", "")
+            # Enable Banking kan account_id als dict OF als lijst teruggeven,
+            # en verschillende banken gebruiken verschillende velden.
+            iban = ""
+            acc_id = details.get("account_id")
+            if isinstance(acc_id, dict):
+                iban = acc_id.get("iban") or acc_id.get("IBAN") or ""
+            elif isinstance(acc_id, list):
+                for entry in acc_id:
+                    if isinstance(entry, dict):
+                        iban = entry.get("iban") or entry.get("IBAN") or ""
+                        if iban:
+                            break
+            if not iban:
+                iban = details.get("iban") or ""
+            name = details.get("account_servicer", {}).get("bic_fi", "") if isinstance(details.get("account_servicer"), dict) else ""
         except Exception:
             iban = ""
             name = ""
@@ -298,17 +311,34 @@ async def sync_transactions(connection_id: int, request: Request, db: Session = 
             },
         )
 
-    # Find or create the Account record
+    # Find or create the Account record. We matchen ALTIJD op bank, zodat
+    # twee bankkoppelingen zonder IBAN niet per ongeluk op dezelfde rij
+    # landen. Als er wel een IBAN bekend is, matchen we daar primair op.
     bank_key = conn.bank_name.lower().replace(" ", "_")
-    account = db.query(Account).filter(
-        Account.user_id == user.id,
-        Account.iban == account_iban,
-    ).first()
+    account = None
+    if account_iban:
+        account = db.query(Account).filter(
+            Account.user_id == user.id,
+            Account.bank == bank_key,
+            Account.iban == account_iban,
+        ).first()
+    if not account:
+        # Fallback: hetzelfde bank-key zonder IBAN (eerdere sync zonder IBAN)
+        account = db.query(Account).filter(
+            Account.user_id == user.id,
+            Account.bank == bank_key,
+            Account.iban.is_(None),
+        ).first()
+        # Als we nu wel een IBAN hebben, upgrade het bestaande account
+        if account and account_iban and not account.iban:
+            account.iban = account_iban
+            if account.name.endswith(" - account"):
+                account.name = f"{conn.bank_name} - {account_iban}"
     if not account:
         account = Account(
             user_id=user.id,
             name=f"{conn.bank_name} - {account_iban or 'account'}",
-            iban=account_iban,
+            iban=account_iban or None,
             bank=bank_key,
         )
         db.add(account)
