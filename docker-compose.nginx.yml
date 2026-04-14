@@ -1,0 +1,13 @@
+services:
+  nginx:
+    image: ghcr.io/gjagils/checkthepockets-nginx:latest
+    container_name: checkthepockets-nginx
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8368}:8000"
+    networks:
+      - cyp-net
+
+networks:
+  cyp-net:
+    external: true

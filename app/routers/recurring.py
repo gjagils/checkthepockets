@@ -886,10 +886,19 @@ def relink_all(
     user = require_login(request, db)
 
     from app.routers.transactions import auto_link_recurring_after_import
+    from datetime import date
+
     auto_link_recurring_after_import(db, user.id)
 
-    cleanup_matched_projected(db, user.id)
-    sync_projected_transactions(db, user.id)
+    cleanup_matched_projected(user.id, db)
+
+    today = date.today()
+    for offset in range(0, 3):
+        m = today.month + offset
+        y = today.year + (m - 1) // 12
+        m = (m - 1) % 12 + 1
+        sync_projected_transactions(user.id, y, m, db)
+
     db.commit()
 
     return RedirectResponse("/recurring", status_code=302)

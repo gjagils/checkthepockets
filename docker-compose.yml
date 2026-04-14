@@ -1,17 +1,10 @@
 services:
-  nginx:
-    image: ghcr.io/gjagils/checkthepockets-nginx:latest
-    container_name: checkthepockets-nginx
-    restart: unless-stopped
-    ports:
-      - "${APP_PORT:-8368}:8000"
-    depends_on:
-      - app
-
   app:
     image: ghcr.io/gjagils/checkthepockets:latest
     container_name: checkthepockets
     restart: unless-stopped
+    networks:
+      - cyp-net
     environment:
       # Database
       - DATABASE_URL=${DATABASE_URL}
@@ -37,3 +30,7 @@ services:
       - ENABLE_BANKING_PRIVATE_KEY_PATH=${ENABLE_BANKING_PRIVATE_KEY_PATH:-/app/keys/enable-banking.pem}
     volumes:
       - ${ENABLE_BANKING_KEY_DIR:-./keys}:/app/keys:ro
+
+networks:
+  cyp-net:
+    external: true
