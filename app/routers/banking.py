@@ -384,12 +384,14 @@ async def sync_transactions(connection_id: int, request: Request, db: Session = 
     conn.last_synced_at = datetime.utcnow()
     db.commit()
 
-    # Draai alle regels nogmaals over alle transacties (vangt rename → match ketens)
+    # Draai alle regels nogmaals over alle transacties (vangt rename → match
+    # ketens en categoriseert eerder geïmporteerde transacties waarvoor nu
+    # een matchende regel bestaat). We houden dit aantal apart zodat het niet
+    # in het 'auto-gecategoriseerd bij deze import' getal wordt geteld.
     from app.rules_engine import apply_rules_to_all
     extra = apply_rules_to_all(db, user.id)
     if extra:
-        auto_categorized += extra
-        logger.info("Bank sync: %d extra transacties gecategoriseerd via apply_rules_to_all", extra)
+        logger.info("Bank sync: %d extra bestaande transacties gecategoriseerd via apply_rules_to_all", extra)
 
     # Auto-link recurring and sync projections
     from app.routers.transactions import auto_link_recurring_after_import
@@ -408,6 +410,7 @@ async def sync_transactions(connection_id: int, request: Request, db: Session = 
             "imported": imported,
             "skipped": skipped,
             "auto_categorized": auto_categorized,
+            "extra_categorized": extra,
             "total": len(parsed),
             "account": account,
             "connection": conn,

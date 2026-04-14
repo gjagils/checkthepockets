@@ -24,6 +24,12 @@
         <div class="label">Auto-gecategoriseerd</div>
     </div>
     {% endif %}
+    {% if extra_categorized %}
+    <div class="summary-card">
+        <div class="value" style="color:var(--ctp-denim);">{{ extra_categorized }}</div>
+        <div class="label">Bestaande ook gecategoriseerd</div>
+    </div>
+    {% endif %}
 </div>
 
 <div class="card">
