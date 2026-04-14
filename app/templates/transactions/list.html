@@ -298,8 +298,9 @@
                             </div>
                             {% endif %}
                             <div class="tx-panel-footer" style="margin-top:0.6rem;">
+                                {% set _skip_month_label = tx.date.strftime('%m-%Y') %}
                                 <form method="post" action="/recurring/projected/{{ tx.id }}/skip" style="display:inline;"
-                                      onsubmit="return confirm('Deze verwachte transactie voor {{ tx.date.strftime(\"%m-%Y\") }} definitief weghalen? De terugkerende post zelf blijft bestaan, alleen deze maand wordt overgeslagen.')">
+                                      onsubmit="return confirm('Deze verwachte transactie voor {{ _skip_month_label }} definitief weghalen? De terugkerende post zelf blijft bestaan, alleen deze maand wordt overgeslagen.')">
                                     <input type="hidden" name="redirect_to" value="/transactions?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}">
                                     <button type="submit" class="tx-panel-footer-btn tx-panel-footer-danger">🗑 Verwachting voor deze maand weghalen</button>
                                 </form>
