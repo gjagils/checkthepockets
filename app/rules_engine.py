@@ -1,8 +1,11 @@
 """Rules engine: matching and applying rules to transactions."""
 
+import logging
 from sqlalchemy.orm import Session
 
 from app.models import Rule, Transaction, Tag, Category
+
+logger = logging.getLogger(__name__)
 
 
 def _get_field_value(transaction: Transaction, field: str) -> str:
@@ -109,6 +112,22 @@ def apply_rules_to_all(db: Session, user_id: int, only_uncategorized: bool = Fal
 
     transactions = query.all()
     affected = 0
+
+    # Debug: log uncategorized transactions and rule matching
+    uncategorized = [tx for tx in transactions if tx.category_id is None]
+    if uncategorized:
+        logger.info("apply_rules_to_all: %d/%d transacties zonder categorie", len(uncategorized), len(transactions))
+        for tx in uncategorized[:5]:
+            desc_val = tx.description or ""
+            cp_val = tx.counterparty or ""
+            logger.info("  TX id=%s date=%s desc=[%s] cp=[%s] desc_type=%s cp_type=%s",
+                        tx.id, tx.date, desc_val[:80], cp_val[:50], type(tx.description).__name__, type(tx.counterparty).__name__)
+            for rule in rules:
+                field_val = _get_field_value(tx, rule.match_field)
+                matches = _matches(field_val, rule.match_type, rule.match_value)
+                if rule.match_value.lower() in (desc_val + cp_val).lower():
+                    logger.info("    REGEL '%s': field=%s val=[%s] match_val='%s' → match=%s",
+                                rule.match_value, rule.match_field, field_val[:60], rule.match_value, matches)
 
     for tx in transactions:
         if apply_rules_to_transaction(rules, tx, db):
