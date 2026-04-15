@@ -217,7 +217,7 @@
                         {% if accounts %}
                         <div class="form-group">
                             <label for="condition_account_id">Alleen voor rekening <span class="muted">(optioneel)</span></label>
-                            <select name="condition_account_id" id="condition_account_id">
+                            <select name="condition_account_id" id="condition_account_id" class="js-cond-account">
                                 <option value="">Alle rekeningen</option>
                                 {% for acc in accounts %}
                                 <option value="{{ acc.id }}">{{ acc.name }}</option>
@@ -237,18 +237,18 @@
                         <div class="rule-condition">
                             <div class="form-group">
                                 <label for="assign_category_id">Categorie toewijzen</label>
-                                <select name="assign_category_id" id="assign_category_id">
+                                <select name="assign_category_id" id="assign_category_id" class="js-cat-select">
                                     <option value="">Geen</option>
                                     {% for cat in categories %}
                                     {% if not cat.parent_id %}
                                         {% if cat.children %}
-                                        <optgroup label="{{ cat.name }}">
+                                        <optgroup label="{{ cat.name }}" data-account-id="{{ cat.account_id or '' }}">
                                             {% for child in cat.children|sort(attribute='name') %}
-                                            <option value="{{ child.id }}" {% if prefill and prefill.assign_category_id == child.id %}selected{% endif %}>{{ child.name }}</option>
+                                            <option value="{{ child.id }}" data-account-id="{{ child.account_id or '' }}" {% if prefill and prefill.assign_category_id == child.id %}selected{% endif %}>{{ child.name }}</option>
                                             {% endfor %}
                                         </optgroup>
                                         {% else %}
-                                        <option value="{{ cat.id }}" {% if prefill and prefill.assign_category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+                                        <option value="{{ cat.id }}" data-account-id="{{ cat.account_id or '' }}" {% if prefill and prefill.assign_category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
                                         {% endif %}
                                     {% endif %}
                                     {% endfor %}
@@ -380,7 +380,7 @@
                         {% if accounts %}
                         <div class="form-group" style="margin-bottom:0.75rem;">
                             <label>Alleen voor rekening</label>
-                            <select name="condition_account_id">
+                            <select name="condition_account_id" class="js-cond-account">
                                 <option value="">Alle rekeningen</option>
                                 {% for acc in accounts %}
                                 <option value="{{ acc.id }}" {% if rule.condition_account_id == acc.id %}selected{% endif %}>{{ acc.name }}</option>
@@ -397,18 +397,18 @@
                         <div class="rule-condition">
                             <div class="form-group">
                                 <label>Categorie</label>
-                                <select name="assign_category_id">
+                                <select name="assign_category_id" class="js-cat-select">
                                     <option value="">Geen</option>
                                     {% for cat in categories %}
                                     {% if not cat.parent_id %}
                                         {% if cat.children %}
-                                        <optgroup label="{{ cat.name }}">
+                                        <optgroup label="{{ cat.name }}" data-account-id="{{ cat.account_id or '' }}">
                                             {% for child in cat.children|sort(attribute='name') %}
-                                            <option value="{{ child.id }}" {% if rule.assign_category_id == child.id %}selected{% endif %}>{{ child.name }}</option>
+                                            <option value="{{ child.id }}" data-account-id="{{ child.account_id or '' }}" {% if rule.assign_category_id == child.id %}selected{% endif %}>{{ child.name }}</option>
                                             {% endfor %}
                                         </optgroup>
                                         {% else %}
-                                        <option value="{{ cat.id }}" {% if rule.assign_category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+                                        <option value="{{ cat.id }}" data-account-id="{{ cat.account_id or '' }}" {% if rule.assign_category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
                                         {% endif %}
                                     {% endif %}
                                     {% endfor %}
@@ -655,5 +655,38 @@ function aiSuggest() {
             resultDiv.innerHTML = '<span style="color:var(--red);">Er ging iets mis.</span>';
         });
 }
+
+// ── Filter "Categorie toewijzen" op basis van gekozen rekening ────────
+function filterCategoriesByAccount(accountSel, catSel) {
+    const acc = accountSel.value || '';
+    // Filter options
+    catSel.querySelectorAll('option').forEach(opt => {
+        if (!opt.value) return; // keep "Geen" placeholder
+        const cid = opt.dataset.accountId || '';
+        // Visible: no account selected, OR category is global (cid=''), OR matches
+        opt.hidden = !!(acc && cid && cid !== acc);
+        opt.disabled = opt.hidden;
+    });
+    // Hide optgroups whose children are all hidden
+    catSel.querySelectorAll('optgroup').forEach(og => {
+        const visible = Array.from(og.children).some(c => !c.hidden);
+        og.hidden = !visible;
+        og.disabled = !visible;
+    });
+    // Reset selection if the current option is now hidden
+    const sel = catSel.options[catSel.selectedIndex];
+    if (sel && sel.hidden) catSel.value = '';
+}
+
+function wireCategoryAccountFilter(form) {
+    const accSel = form.querySelector('.js-cond-account');
+    const catSel = form.querySelector('.js-cat-select');
+    if (!accSel || !catSel) return;
+    const run = () => filterCategoriesByAccount(accSel, catSel);
+    accSel.addEventListener('change', run);
+    run(); // initial pass
+}
+
+document.querySelectorAll('form').forEach(wireCategoryAccountFilter);
 </script>
 {% endblock %}
