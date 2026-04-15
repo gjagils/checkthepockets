@@ -15,19 +15,26 @@ depends_on = None
 
 
 def upgrade():
-    # Drop FK column on rules first (references tags.id)
-    with op.batch_alter_table("rules") as batch_op:
-        try:
-            batch_op.drop_constraint("fk_rules_assign_tag_id", type_="foreignkey")
-        except Exception:
-            pass
-        batch_op.drop_column("assign_tag_id")
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+
+    # Drop assign_tag_id column from rules (its FK constraint drops with it on PG)
+    rules_cols = {c["name"] for c in inspector.get_columns("rules")}
+    if "assign_tag_id" in rules_cols:
+        # Drop any FK on assign_tag_id by its actual name (auto-generated)
+        for fk in inspector.get_foreign_keys("rules"):
+            if "assign_tag_id" in fk.get("constrained_columns", []) and fk.get("name"):
+                op.drop_constraint(fk["name"], "rules", type_="foreignkey")
+        op.drop_column("rules", "assign_tag_id")
 
     # Drop association table
-    op.drop_table("transaction_tags")
+    existing_tables = set(inspector.get_table_names())
+    if "transaction_tags" in existing_tables:
+        op.drop_table("transaction_tags")
 
     # Drop tags table
-    op.drop_table("tags")
+    if "tags" in existing_tables:
+        op.drop_table("tags")
 
 
 def downgrade():
@@ -46,8 +53,7 @@ def downgrade():
         sa.Column("transaction_id", sa.Integer(), sa.ForeignKey("transactions.id", ondelete="CASCADE"), primary_key=True),
         sa.Column("tag_id", sa.Integer(), sa.ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True),
     )
-    with op.batch_alter_table("rules") as batch_op:
-        batch_op.add_column(sa.Column("assign_tag_id", sa.Integer(), nullable=True))
-        batch_op.create_foreign_key(
-            "fk_rules_assign_tag_id", "tags", ["assign_tag_id"], ["id"], ondelete="SET NULL"
-        )
+    op.add_column("rules", sa.Column("assign_tag_id", sa.Integer(), nullable=True))
+    op.create_foreign_key(
+        "fk_rules_assign_tag_id", "rules", "tags", ["assign_tag_id"], ["id"], ondelete="SET NULL"
+    )
