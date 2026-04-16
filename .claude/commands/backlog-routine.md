@@ -41,7 +41,7 @@ git checkout -b feat/LIN-<ID>-<slug>
 - Lees relevante bestaande code **voordat** je wijzigt.
 - Volg de bestaande patronen in de codebase (FastAPI, Jinja, SQLAlchemy/Alembic).
 - Voeg/update tests in `tests/` waar zinvol.
-- **Stop-criteria** (zet issue op `Needs review` en ga door naar volgende):
+- **Stop-criteria** (zet issue op `In Review` en ga door naar volgende):
   - Acceptatiecriteria onduidelijk
   - Diff dreigt > 500 regels te worden
   - Issue raakt beschermde paths: `.github/workflows/`, `alembic/versions/`, `stack.env`, `deploy.sh`
@@ -55,7 +55,7 @@ git checkout -b feat/LIN-<ID>-<slug>
 source .venv/bin/activate 2>/dev/null || true
 pytest tests/ -x --tb=short
 ```
-Als pytest niet draait (missende dep/env): log dit, zet issue op `Needs review`, ga naar volgende.
+Als pytest niet draait (missende dep/env): log dit, zet issue op `In Review`, ga naar volgende.
 
 ### 5. Commit + push
 ```bash
@@ -89,8 +89,8 @@ EOF
 gh pr checks --watch --timeout 1200    # 20 min max
 ```
 - Groen + diff ≤ 500 regels + geen `needs-review` label → **stap 8** (merge)
-- Rood → push één reparatiepoging (max 1). Daarna: **zet Linear op `Needs review`**, PR open laten, Linear-comment met CI-log link, volgende issue.
-- Timeout → idem: `Needs review`, PR open.
+- Rood → push één reparatiepoging (max 1). Daarna: **zet Linear op `In Review`**, PR open laten, Linear-comment met CI-log link, volgende issue.
+- Timeout → idem: `In Review`, PR open.
 
 ### 8. Auto-merge
 ```bash
@@ -126,4 +126,4 @@ Deze samenvatting is nodig om de nachtelijke cron-tijd in te kunnen schatten.
 - **NOOIT** mergen zonder groene CI.
 - **NOOIT** `git push --force` op main of shared branches.
 - **NOOIT** `.github/workflows/`, `alembic/versions/`, `stack.env`, `deploy.sh` aanpassen zonder expliciet groen licht op de issue.
-- Bij twijfel: zet issue op `Needs review` en ga door.
+- Bij twijfel: zet issue op `In Review` en ga door.

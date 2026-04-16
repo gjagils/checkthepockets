@@ -152,6 +152,8 @@ Claude pakt alleen issues op die aan **alle** onderstaande voorwaarden voldoen:
 
 Selectie-volgorde binnen de kandidaten: **priority desc** → **createdAt asc** (oudste hoge-prio eerst). Er is **geen harde limiet** per run — Claude werkt door tot óf de kandidatenlijst leeg is, óf een run-afbreker optreedt (zie hieronder).
 
+> **Linear-context** — workspace `gjagils`, team `Gjagils` (key `GJA`), project `Checkthepockets` (ID `19674702-e4ee-42c5-bafb-f0ce9d3d708f`). Status-namen: `Todo`, `In Progress`, `In Review`, `Done`, `Backlog`, `Canceled`, `Duplicate`.
+
 ### Workflow per issue
 
 ```
@@ -178,7 +180,7 @@ Selectie-volgorde binnen de kandidaten: **priority desc** → **createdAt asc** 
 
 ### Run-afbrekers (failure-modus)
 
-Als één van deze gebeurt, stopt Claude en zet de issue op **"Needs review"** in Linear, met PR open:
+Als één van deze gebeurt, stopt Claude en zet de issue op **"In Review"** in Linear, met PR open:
 
 - CI faalt na 2 pushes (geen derde retry)
 - Tests kunnen lokaal niet draaien (missende dep, migratie-conflict)
