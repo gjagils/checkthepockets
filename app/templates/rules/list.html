@@ -47,6 +47,7 @@
                 <tr>
                     <th style="min-width:120px;">Herkenning</th>
                     <th style="min-width:120px;">Tegenpartij</th>
+                    <th style="min-width:130px;">Rekening</th>
                     <th style="min-width:140px;">Categorie</th>
                     <th style="width:50px; text-align:center;" title="Ongecategoriseerd">Nieuw</th>
                     <th style="width:50px; text-align:center;" title="Al gecategoriseerd">Bestaand</th>
@@ -68,14 +69,24 @@
                            placeholder="Schone naam">
                 </td>
                 <td>
-                    <select name="category_id" style="width:100%; font-size:.85rem; padding:.3rem .4rem;">
+                    <select name="condition_account_id" class="js-cond-account"
+                            style="width:100%; font-size:.85rem; padding:.3rem .4rem;">
+                        <option value="">— Alle —</option>
+                        {% for acc in accounts %}
+                        <option value="{{ acc.id }}">{{ acc.name }}</option>
+                        {% endfor %}
+                    </select>
+                </td>
+                <td>
+                    <select name="category_id" class="js-cat-select"
+                            style="width:100%; font-size:.85rem; padding:.3rem .4rem;">
                         <option value="">— Geen —</option>
                         {% for cat in categories %}
                         {% if not cat.parent_id %}
                             {% if cat.children %}
-                            <optgroup label="{{ cat.name }}">
+                            <optgroup label="{{ cat.name }}" data-account-id="{{ cat.account_id or '' }}">
                                 {% for child in cat.children|sort(attribute='name') %}
-                                <option value="{{ child.id }}" {% if s.category_id == child.id %}selected{% endif %}>{{ child.name }}</option>
+                                <option value="{{ child.id }}" data-account-id="{{ child.account_id or '' }}" {% if s.category_id == child.id %}selected{% endif %}>{{ child.name }}</option>
                                 {% endfor %}
                             </optgroup>
                             {% endif %}
@@ -107,7 +118,7 @@
                 </td>
             </tr>
             <tr id="suggestion-txs-{{ s.id }}" style="display:none;">
-                <td colspan="7" style="padding:0;">
+                <td colspan="8" style="padding:0;">
                     <div id="suggestion-txs-content-{{ s.id }}" style="padding:.5rem .75rem; background:var(--bg); max-height:300px; overflow-y:auto; font-size:.8rem;">
                         <span class="muted">Laden...</span>
                     </div>

@@ -270,6 +270,8 @@ async def accept_rule_suggestion(
     counterparty_clean = (form.get("counterparty_clean") or s.counterparty_clean or "").strip()
     category_id_raw = (form.get("category_id") or "").strip()
     category_id = int(category_id_raw) if category_id_raw else s.category_id
+    condition_account_id_raw = (form.get("condition_account_id") or "").strip()
+    condition_account_id = int(condition_account_id_raw) if condition_account_id_raw else None
     apply_existing = form.get("apply_existing") == "1"
 
     # Validate category ownership
@@ -278,6 +280,16 @@ async def accept_rule_suggestion(
         if not cat:
             category_id = None
 
+    # Validate account ownership
+    if condition_account_id:
+        acc_check = (
+            db.query(Account)
+            .filter(Account.id == condition_account_id, Account.user_id == user.id)
+            .first()
+        )
+        if not acc_check:
+            condition_account_id = None
+
     # Create the rule
     rule = Rule(
         user_id=user.id,
@@ -285,6 +297,7 @@ async def accept_rule_suggestion(
         match_field="description",
         match_type="contains",
         match_value=match_value,
+        condition_account_id=condition_account_id,
         assign_category_id=category_id,
         action_rename_counterparty=counterparty_clean or None,
         action_set_reviewed=0,
@@ -292,14 +305,16 @@ async def accept_rule_suggestion(
     db.add(rule)
     db.flush()
 
-    # Apply to transactions
+    # Apply to transactions (optioneel beperkt tot de gekozen rekening)
     applied = 0
-    all_txs = (
+    tx_query = (
         db.query(Transaction)
         .join(Account)
         .filter(Account.user_id == user.id, Transaction.is_excluded == 0, Transaction.is_projected == 0)
-        .all()
     )
+    if condition_account_id:
+        tx_query = tx_query.filter(Transaction.account_id == condition_account_id)
+    all_txs = tx_query.all()
     for tx in all_txs:
         desc = (tx.description or "").lower()
         cp = (tx.counterparty or "").lower()
