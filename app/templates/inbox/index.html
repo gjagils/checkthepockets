@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Inbox - Check Your Pockets{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Inbox</h1>
+    <span class="inbox-count-label">{{ inbox_total }} te categoriseren</span>
+</div>
+
+{% if not transactions %}
+<div class="card inbox-empty">
+    <p>Geen ongecategoriseerde transacties. Goed bezig!</p>
+</div>
+{% else %}
+<div class="inbox-list">
+    {% for tx in transactions %}
+    <details class="inbox-card" data-tx-id="{{ tx.id }}">
+        <summary class="inbox-card-summary">
+            <div class="inbox-card-main">
+                <div class="inbox-card-top">
+                    <span class="inbox-card-date">{{ tx.date.strftime('%d-%m-%Y') }}</span>
+                    <span class="inbox-card-amount {% if tx.amount >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
+                        &euro;&nbsp;{{ tx.amount|euro }}
+                    </span>
+                </div>
+                <div class="inbox-card-cp">{{ tx.counterparty or 'Onbekend' }}</div>
+                <div class="inbox-card-meta">
+                    <span class="inbox-card-account">{{ tx.account.name }}</span>
+                    {% if tx.description %}
+                    <span class="inbox-card-desc">{{ tx.description[:80] }}{% if tx.description|length > 80 %}…{% endif %}</span>
+                    {% endif %}
+                </div>
+            </div>
+        </summary>
+        <div class="inbox-picker">
+            {% if not parents %}
+            <p class="muted">Geen categorieën. Maak er eerst een via <a href="/categories">Categorieën</a>.</p>
+            {% else %}
+            {% for parent in parents %}
+                {% set children = children_by_parent.get(parent.id, []) %}
+                {% if children %}
+                <div class="inbox-picker-group">
+                    <div class="inbox-picker-parent">{{ parent.name }}</div>
+                    <div class="inbox-picker-children">
+                        {% for child in children %}
+                        <form method="post" action="/inbox/{{ tx.id }}/category" class="inbox-picker-form">
+                            <input type="hidden" name="category_id" value="{{ child.id }}">
+                            <button type="submit" class="inbox-picker-btn">{{ child.name }}</button>
+                        </form>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% else %}
+                <div class="inbox-picker-group">
+                    <form method="post" action="/inbox/{{ tx.id }}/category" class="inbox-picker-form">
+                        <input type="hidden" name="category_id" value="{{ parent.id }}">
+                        <button type="submit" class="inbox-picker-btn">{{ parent.name }}</button>
+                    </form>
+                </div>
+                {% endif %}
+            {% endfor %}
+            {% endif %}
+        </div>
+    </details>
+    {% endfor %}
+</div>
+{% endif %}
+{% endblock %}
