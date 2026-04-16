@@ -8,6 +8,12 @@ Sprints zijn gegroepeerd op gedeelde bestanden voor maximale efficiëntie per se
 
 ---
 
+## Open kleine UI-fixes
+
+- [ ] **Spaarplan — verwijder-knop in lijn met edit/refresh**: in `app/templates/savings/detail.html` macro `render_line` heeft de delete-knop een rode `btn-danger` border terwijl de pen (✎) en refresh (↻) ernaast neutraal grijs zijn. Verwijder de `btn-danger` class (of vervang door subtiele hover-rood) zodat de drie icon-knoppen visueel als groep aanvoelen.
+
+---
+
 ## Sprint 19 — Dashboard grafiek & recurring koppeling ✅ (2026-04-08)
 
 - [x] Klik-navigatie in grafiek via HTML links onder chart (Chart.js onClick was onbetrouwbaar)
