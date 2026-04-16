@@ -38,15 +38,27 @@ FREQUENCY_MONTHS = {
 }
 
 
+def _months_for_frequency(frequency: str, target_month: int | None = None) -> list[int]:
+    """Return the months (1..12) where this frequency 'fires', given an optional start month."""
+    if frequency == "monthly":
+        return list(range(1, 13))
+    if frequency == "quarterly":
+        start = target_month or 3
+        return sorted({((start - 1 + 3 * i) % 12) + 1 for i in range(4)})
+    if frequency == "biannual":
+        start = target_month or 6
+        return sorted({((start - 1 + 6 * i) % 12) + 1 for i in range(2)})
+    if frequency == "yearly":
+        return [target_month or 12]
+    if frequency == "one-off":
+        return [target_month] if target_month else []
+    return list(range(1, 13))
+
+
 def _smart_fill_entries(line: SavingsLine, target_month: int | None = None):
     """Create SavingsEntry objects based on frequency and default_amount."""
-    freq = line.frequency
     amount = line.default_amount or Decimal("0")
-
-    if freq in ("yearly", "one-off"):
-        months = [target_month] if target_month else [12]
-    else:
-        months = FREQUENCY_MONTHS.get(freq, list(range(1, 13)))
+    months = _months_for_frequency(line.frequency, target_month)
 
     entries = []
     for m in range(1, 13):
@@ -433,6 +445,9 @@ def add_line(
     else:
         line_is_income = 0
 
+    tm = target_month or None
+    months_for_line = _months_for_frequency(frequency, tm)
+
     line = SavingsLine(
         plan_id=plan_id,
         name=name.strip(),
@@ -440,14 +455,14 @@ def add_line(
         is_income=line_is_income,
         frequency=frequency,
         default_amount=amount,
-        annual_budget=amount * len(FREQUENCY_MONTHS.get(frequency, list(range(1, 13)))),
+        annual_budget=amount * len(months_for_line),
         sort_order=max_order + 1,
     )
     db.add(line)
     db.flush()
 
     # Smart fill entries
-    entries = _smart_fill_entries(line, target_month=target_month or None)
+    entries = _smart_fill_entries(line, target_month=tm)
     for entry in entries:
         db.add(entry)
 
@@ -491,21 +506,48 @@ def update_entry(
 
     plan = entry.line.plan
 
+    today = datetime.date.today()
     amount_str = amount.strip().replace(",", ".")
+    new_amount: Decimal | None
     if amount_str == "" or amount_str == "-":
-        entry.amount = None
-        entry.status = "forecast"
+        new_amount = None
     else:
         try:
-            entry.amount = Decimal(amount_str)
+            new_amount = Decimal(amount_str)
         except (InvalidOperation, ValueError):
             return JSONResponse({"error": "Ongeldig bedrag"}, status_code=400)
 
-        # Auto-determine status
-        today = datetime.date.today()
+    entry.amount = new_amount
+    if new_amount is None:
+        entry.status = "forecast"
+    else:
         entry.status = _determine_entry_status(
             db, plan.account_id, plan.year, entry.month, today
         )
+
+    # Propagate to future forecast cells in the same line:
+    # only cells that already had an amount (i.e. match the line's frequency pattern)
+    # AND are still 'forecast' get updated. Cells with confirmed/pending tx are left alone.
+    for sibling in entry.line.entries:
+        if sibling.id == entry.id:
+            continue
+        if sibling.month <= entry.month:
+            continue
+        if sibling.status != "forecast":
+            continue
+        if sibling.amount is None:
+            continue
+        sibling.amount = new_amount
+
+    # Refresh statuses for ALL entries in this line (so colors stay in sync,
+    # also for past months that may have just become confirmed/pending).
+    for e in entry.line.entries:
+        if e.amount is None:
+            e.status = "forecast"
+        else:
+            e.status = _determine_entry_status(
+                db, plan.account_id, plan.year, e.month, today
+            )
 
     db.commit()
 
@@ -514,6 +556,17 @@ def update_entry(
         (abs(e.amount) for e in entry.line.entries if e.amount is not None),
         Decimal("0"),
     )
+
+    # Build per-entry update info so the frontend can refresh other cells too
+    entries_payload = [
+        {
+            "id": e.id,
+            "month": e.month,
+            "amount": float(e.amount) if e.amount is not None else None,
+            "status": e.status,
+        }
+        for e in entry.line.entries
+    ]
 
     # Recalculate full running balance
     all_lines = (
@@ -542,6 +595,8 @@ def update_entry(
         "amount": float(entry.amount) if entry.amount is not None else None,
         "status": entry.status,
         "line_total": float(line_total),
+        "line_id": entry.line_id,
+        "entries": entries_payload,
         "running_balances": running_balances,
     })
 
@@ -586,7 +641,7 @@ def edit_line(
     line.is_income = line_is_income
     line.frequency = frequency
     line.default_amount = amount
-    line.annual_budget = amount * len(FREQUENCY_MONTHS.get(frequency, list(range(1, 13))))
+    line.annual_budget = amount * len(_months_for_frequency(frequency))
 
     db.commit()
 

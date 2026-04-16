@@ -238,7 +238,7 @@
                 <input type="text" name="default_amount" id="line_amount" value="0" placeholder="0,00">
             </div>
             <div class="form-group" id="target-month-group" style="display:none;">
-                <label for="line_target_month">Maand</label>
+                <label for="line_target_month"><span id="target-month-label">Maand</span></label>
                 <select name="target_month" id="line_target_month">
                     {% for m in range(1, 13) %}
                     <option value="{{ m }}">{{ months[m] }}</option>
@@ -340,30 +340,52 @@ function saveCell(input) {
     })
     .then(function(r) { return r.json(); })
     .then(function(data) {
-        if (data.ok) {
+        if (!data.ok) return;
+
+        var lineRow = cell.closest('tr');
+        var lineId = data.line_id || lineRow.dataset.lineId;
+
+        // Update every cell in this line based on the server response
+        if (data.entries && Array.isArray(data.entries)) {
+            data.entries.forEach(function(e) {
+                var cellEl = document.querySelector(
+                    'tr.savings-row[data-line-id="' + lineId + '"] td.savings-cell[data-entry-id="' + e.id + '"]'
+                );
+                if (!cellEl) return;
+                var d = cellEl.querySelector('.cell-display');
+                var i = cellEl.querySelector('.cell-input');
+                if (d) {
+                    d.textContent = (e.amount !== null && e.amount !== undefined) ? fmtEuro(e.amount) : '-';
+                }
+                if (i) {
+                    i.value = (e.amount !== null && e.amount !== undefined)
+                        ? Math.abs(e.amount).toFixed(2)
+                        : '';
+                }
+                cellEl.className = 'text-right savings-cell cell-' + e.status;
+            });
+        } else {
+            // Fallback to single-cell update for older responses
             if (data.amount !== null) {
                 display.textContent = fmtEuro(data.amount);
             } else {
                 display.textContent = '-';
             }
-
             cell.className = 'text-right savings-cell cell-' + data.status;
+        }
 
-            var lineRow = cell.closest('tr');
-            var lineId = lineRow.dataset.lineId;
-            var totalCell = document.querySelector('.line-total[data-line-id="' + lineId + '"]');
-            if (totalCell) {
-                totalCell.innerHTML = '<strong>' + fmtEuro(data.line_total) + '</strong>';
-            }
+        var totalCell = document.querySelector('.line-total[data-line-id="' + lineId + '"]');
+        if (totalCell) {
+            totalCell.innerHTML = '<strong>' + fmtEuro(data.line_total) + '</strong>';
+        }
 
-            if (data.running_balances) {
-                for (var m in data.running_balances) {
-                    var balCell = document.querySelector('.balance-cell[data-month="' + m + '"]');
-                    if (balCell) {
-                        var bal = data.running_balances[m];
-                        var cls = bal >= 0 ? 'amount-positive' : 'amount-negative';
-                        balCell.innerHTML = '<strong class="' + cls + '">' + fmtEuro(bal) + '</strong>';
-                    }
+        if (data.running_balances) {
+            for (var m in data.running_balances) {
+                var balCell = document.querySelector('.balance-cell[data-month="' + m + '"]');
+                if (balCell) {
+                    var bal = data.running_balances[m];
+                    var cls = bal >= 0 ? 'amount-positive' : 'amount-negative';
+                    balCell.innerHTML = '<strong class="' + cls + '">' + fmtEuro(bal) + '</strong>';
                 }
             }
         }
@@ -372,10 +394,18 @@ function saveCell(input) {
 
 function toggleTargetMonth(freq) {
     var group = document.getElementById('target-month-group');
-    if (freq === 'yearly' || freq === 'one-off') {
-        group.style.display = '';
-    } else {
+    var label = document.getElementById('target-month-label');
+    if (freq === 'monthly') {
         group.style.display = 'none';
+        return;
+    }
+    group.style.display = '';
+    if (label) {
+        if (freq === 'quarterly' || freq === 'biannual') {
+            label.textContent = 'Startmaand';
+        } else {
+            label.textContent = 'Maand';
+        }
     }
 }
 
