@@ -1533,3 +1533,51 @@ tfoot td { background: var(--surface-2); border-top: 1px solid var(--border); fo
     text-transform: uppercase;
     margin-bottom: 0.5rem;
 }
+
+/* ===== Inbox ===== */
+.nav-inbox-badge {
+    display: inline-block; background: var(--nav-active-border); color: #111;
+    font-size: 0.62rem; font-weight: 800; padding: 0.1rem 0.4rem; border-radius: 999px;
+    margin-left: 0.35rem; min-width: 1.2rem; text-align: center; line-height: 1.2;
+}
+.inbox-count-label { color: var(--muted); font-size: 0.8rem; font-weight: 600; }
+.inbox-empty { text-align: center; color: var(--muted); }
+.inbox-list { display: flex; flex-direction: column; gap: 0.75rem; }
+.inbox-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--ctp-radius); overflow: hidden;
+}
+.inbox-card[open] { border-color: var(--nav-active-border); }
+.inbox-card-summary { list-style: none; cursor: pointer; padding: 0.9rem 1rem; display: block; }
+.inbox-card-summary::-webkit-details-marker { display: none; }
+.inbox-card-main { display: flex; flex-direction: column; gap: 0.25rem; }
+.inbox-card-top { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
+.inbox-card-date { font-size: 0.75rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.inbox-card-amount { font-weight: 700; font-size: 1rem; font-variant-numeric: tabular-nums; }
+.inbox-card-cp { font-weight: 600; font-size: 1rem; color: var(--text); word-break: break-word; }
+.inbox-card-meta { display: flex; flex-wrap: wrap; gap: 0.4rem 0.75rem; font-size: 0.78rem; color: var(--muted); }
+.inbox-card-desc { word-break: break-word; }
+.inbox-picker {
+    border-top: 1px solid var(--border); padding: 0.75rem 1rem 1rem;
+    display: flex; flex-direction: column; gap: 0.75rem;
+}
+.inbox-picker-group { display: flex; flex-direction: column; gap: 0.35rem; }
+.inbox-picker-parent {
+    font-family: var(--font-heading); font-size: 0.68rem; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
+}
+.inbox-picker-children { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.inbox-picker-form { margin: 0; }
+.inbox-picker-btn {
+    background: var(--nav-sub-bg); color: var(--text); border: 1px solid var(--border);
+    border-radius: var(--ctp-radius-sm); padding: 0.55rem 0.85rem; font-size: 0.85rem;
+    font-weight: 600; cursor: pointer; min-height: 40px;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.inbox-picker-btn:hover {
+    background: var(--nav-active-border); color: #111; border-color: var(--nav-active-border);
+}
+@media (max-width: 480px) {
+    .inbox-picker-btn { flex: 1 1 calc(50% - 0.2rem); text-align: center; }
+    .inbox-card-cp, .inbox-card-amount { font-size: 0.95rem; }
+}

@@ -9,7 +9,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.auth import LoginRequired, get_current_user
 from app.database import get_db
-from app.routers import auth, transactions, accounts, categories, rules, budgets, recurring, dashboard, savings, analytics, portfolio, networth, settings, admin, banking
+from app.routers import auth, transactions, accounts, categories, rules, budgets, recurring, dashboard, savings, analytics, portfolio, networth, settings, admin, banking, inbox
 from app.scheduler import start_scheduler
 
 from app.config import SECRET_KEY
@@ -28,6 +28,27 @@ _ASSET_VERSION = hashlib.md5(str(time.time()).encode()).hexdigest()[:8]
 async def add_asset_version(request: Request, call_next):
     """Make asset_version available in all template contexts."""
     request.state.asset_version = _ASSET_VERSION
+    return await call_next(request)
+
+
+@app.middleware("http")
+async def add_inbox_count(request: Request, call_next):
+    """Populate request.state.inbox_count for the nav badge (authenticated users)."""
+    request.state.inbox_count = 0
+    if not request.url.path.startswith("/static"):
+        try:
+            from app.auth import get_session_user_id
+            from app.database import SessionLocal
+            from app.routers.inbox import inbox_count
+            uid = get_session_user_id(request)
+            if uid:
+                db = SessionLocal()
+                try:
+                    request.state.inbox_count = inbox_count(db, uid)
+                finally:
+                    db.close()
+        except Exception:
+            pass
     return await call_next(request)
 
 @app.get("/")
@@ -71,6 +92,7 @@ app.include_router(networth.router)
 app.include_router(settings.router)
 app.include_router(admin.router)
 app.include_router(banking.router)
+app.include_router(inbox.router)
 
 
 @app.on_event("startup")

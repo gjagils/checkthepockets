@@ -21,11 +21,13 @@
     {% set path = request.url.path %}
     {% set main_active =
         'dashboard' if path == '/dashboard'
+        else 'inbox' if path == '/inbox' or path.startswith('/inbox/')
         else 'financien' if path in ['/transactions', '/categories', '/rules', '/recurring'] or path.startswith('/transactions')
         else 'budgetten' if path.startswith('/budgets') or path.startswith('/savings')
         else 'analyse' if path.startswith('/analytics') or path.startswith('/portfolio') or path.startswith('/networth')
         else 'rekeningen' if path.startswith('/accounts') or path.startswith('/import') or path.startswith('/banking')
         else '' %}
+    {% set inbox_count = request.state.inbox_count if request.state.inbox_count is defined else 0 %}
     <div class="navbar-wrapper">
         <nav class="nav-main">
             <a href="/dashboard" class="nav-brand">
@@ -38,6 +40,10 @@
             </a>
             <div class="nav-main-links">
                 <a href="/dashboard" class="{{ 'active' if main_active == 'dashboard' }}">Dashboard</a>
+                <a href="/inbox" class="nav-inbox-link {{ 'active' if main_active == 'inbox' }}">
+                    Inbox
+                    {% if inbox_count > 0 %}<span class="nav-inbox-badge">{{ inbox_count }}</span>{% endif %}
+                </a>
                 <a href="/transactions" class="{{ 'active' if main_active == 'financien' }}">Financiën</a>
                 <a href="/budgets" class="{{ 'active' if main_active == 'budgetten' }}">Budgetten</a>
                 <a href="/analytics" class="{{ 'active' if main_active == 'analyse' }}">Analyse</a>
