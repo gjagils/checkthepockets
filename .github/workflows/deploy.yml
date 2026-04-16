@@ -3,6 +3,11 @@ name: Build and Deploy
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '**.md'
+      - '.claude/**'
+      - 'LICENSE'
+      - '.gitignore'
 
 env:
   REGISTRY: ghcr.io
