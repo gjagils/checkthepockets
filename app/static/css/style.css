@@ -116,7 +116,7 @@
     --subnav-link-color:     rgba(255, 255, 255, 0.65);
     --subnav-active-color:   #FFFFFF;
     --subnav-active-border:  #F28C28;
-    --subnav-active-bg:      rgba(255, 255, 255, 0.12);
+    --subnav-active-bg:      transparent;
 
     /* Page */
     --page-title-color: #234C75;
