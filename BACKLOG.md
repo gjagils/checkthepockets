@@ -10,7 +10,7 @@ Sprints zijn gegroepeerd op gedeelde bestanden voor maximale efficiëntie per se
 
 ## Open kleine UI-fixes
 
-- [ ] **Spaarplan — verwijder-knop in lijn met edit/refresh**: in `app/templates/savings/detail.html` macro `render_line` heeft de delete-knop een rode `btn-danger` border terwijl de pen (✎) en refresh (↻) ernaast neutraal grijs zijn. Verwijder de `btn-danger` class (of vervang door subtiele hover-rood) zodat de drie icon-knoppen visueel als groep aanvoelen.
+_(geen open items)_
 
 ---
 
@@ -210,24 +210,6 @@ Sprints zijn gegroepeerd op gedeelde bestanden voor maximale efficiëntie per se
 - [x] Conflict-strategie via radio-knoppen op preview-pagina
 - [x] Downloadknop + upload-formulier op settings-pagina
 - [x] Versienummer in export-JSON (version: 1) met validatie bij import
-
----
-
-## Sprint 4 — Analyse & Rapportage
-*Nieuwe rapportage-pagina's. Onafhankelijk van andere sprints.*
-
-**Bestanden:** `app/routers/analytics.py`, `app/templates/analytics/index.html`, nieuw: `app/templates/analytics/stats.html`
-
-**Context voor nieuwe sessie:**
-- Analytics router staat in `app/routers/analytics.py` — huidige functie: `analytics()` op `/analytics`
-- Dashboard router (`app/routers/dashboard.py`) heeft al spaartarief-logica en recurring preview
-- Recurring transacties model: `RecurringTransaction` met `frequency`, `amount_expected`, `is_active`
-
-**Taken:**
-- [ ] **Stats pagina** `/analytics/stats`: top merchants op totaalkosten + transactiefrequentie, nieuwe tegenpartijen deze maand (niet eerder gezien), top-10 categorieën — nieuwe route + template
-- [ ] **Spaartarief op dashboard**: al berekend in dashboard router, alleen prominent tonen in de summary-kaarten boven de grafiek
-- [ ] **Projectie op dashboard**: bereken voor huidige maand: verwacht nog te ontvangen/betalen via actieve recurring items die nog niet gematcht zijn — toon als "+€X verwacht" naast de totalen
-- [ ] **Flexibele query-builder** `/analytics/query`: form met datumrange + groepeer-op (categorie/tag/merchant) + grafiektype (bar, pie, line) — render resultaat als chart + downloadbare CSV
 
 ---
 
