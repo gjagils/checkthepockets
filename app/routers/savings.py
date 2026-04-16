@@ -182,6 +182,7 @@ def _determine_color_status(
     month: int,
     year: int,
     today: datetime.date,
+    month_fully_categorized: bool = False,
 ) -> str:
     """Bepaal de kleurstatus voor een spaarcel.
 
@@ -189,7 +190,8 @@ def _determine_color_status(
     - 'current' (grijs): lopende maand
     - 'above' (groen): beter dan verwacht
     - 'match' (blauw): gelijk aan verwacht
-    - 'below' (oranje): slechter dan verwacht
+    - 'below' (rood): slechter dan verwacht (incl. niet-gerealiseerd in een
+      maand waarin alle transacties gecategoriseerd zijn)
     """
     # Toekomst
     if (year, month) > (today.year, today.month):
@@ -197,9 +199,13 @@ def _determine_color_status(
     # Lopende maand — altijd grijs ongeacht waarde
     if (year, month) == (today.year, today.month):
         return "current"
-    # Verleden maand zonder actual
+    # Verleden maand zonder actual: als de maand volledig gecategoriseerd is
+    # weten we zeker dat 0 ontvangen/uitgegeven is voor deze categorie.
     if actual is None:
-        return "forecast"
+        if month_fully_categorized:
+            actual = Decimal("0")
+        else:
+            return "forecast"
 
     actual_abs = abs(actual)
     expected_abs = abs(expected) if expected is not None else Decimal("0")
@@ -364,6 +370,7 @@ def plan_detail(
     # - Category-linked lines: pull the per-month sum of that category's transactions
     #   into the entry, en kleur op basis van actual vs expected (default_amount).
     # - Lines without a category: status puur op basis van past/current/future + waarde.
+    fully_cat_months = _months_fully_categorized(db, plan.account_id, plan.year)
     category_totals = {}
     for line in plan.lines:
         is_inc = bool(line.is_income)
@@ -379,6 +386,7 @@ def plan_detail(
                 entry.status = _determine_color_status(
                     actual, line.default_amount, is_inc,
                     entry.month, plan.year, today,
+                    month_fully_categorized=(entry.month in fully_cat_months),
                 )
         else:
             for entry in line.entries:
