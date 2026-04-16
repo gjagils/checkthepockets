@@ -107,6 +107,46 @@ def _has_transactions_in_month(db: Session, account_id: int, year: int, month: i
     ) is not None
 
 
+def _months_fully_categorized(db: Session, account_id: int, year: int) -> set[int]:
+    """Maanden waarin het account transacties heeft én ALLE transacties een categorie hebben.
+    Voor die maanden mogen we veilig aannemen dat een categorie zonder match echt 0 is."""
+    total_rows = (
+        db.query(
+            func.extract("month", Transaction.date).label("month"),
+            func.count(Transaction.id).label("total"),
+        )
+        .filter(
+            Transaction.account_id == account_id,
+            func.extract("year", Transaction.date) == year,
+            Transaction.is_excluded == 0,
+            Transaction.is_projected == 0,
+        )
+        .group_by(func.extract("month", Transaction.date))
+        .all()
+    )
+    uncat_rows = (
+        db.query(
+            func.extract("month", Transaction.date).label("month"),
+            func.count(Transaction.id).label("cnt"),
+        )
+        .filter(
+            Transaction.account_id == account_id,
+            func.extract("year", Transaction.date) == year,
+            Transaction.is_excluded == 0,
+            Transaction.is_projected == 0,
+            Transaction.category_id.is_(None),
+        )
+        .group_by(func.extract("month", Transaction.date))
+        .all()
+    )
+    uncat_map = {int(r.month): int(r.cnt) for r in uncat_rows}
+    return {
+        int(r.month)
+        for r in total_rows
+        if int(r.total) > 0 and uncat_map.get(int(r.month), 0) == 0
+    }
+
+
 def _determine_entry_status(
     db: Session, account_id: int, year: int, month: int, today: datetime.date
 ) -> str:
@@ -742,6 +782,7 @@ def quick_add_line(
     category_id: int = Form(0),
     new_category_name: str = Form(""),
     new_category_is_income: int = Form(0),
+    new_category_parent_id: int = Form(0),
     # Optionele matching-regel
     create_rule: int = Form(0),
     rule_match_field: str = Form("description"),
@@ -772,12 +813,31 @@ def quick_add_line(
         name = new_category_name.strip()
         if not name:
             return RedirectResponse(f"/savings/{plan_id}", status_code=302)
-        # Voorkom duplicaten op (user, account, name)
+
+        # Optionele parent — als gegeven: nieuwe categorie wordt subcategorie,
+        # erft account_id en is_income van de parent (net als /categories POST).
+        parent: Category | None = None
+        if new_category_parent_id:
+            parent = (
+                db.query(Category)
+                .filter(
+                    Category.id == new_category_parent_id,
+                    Category.user_id == user.id,
+                )
+                .first()
+            )
+
+        cat_account_id = parent.account_id if parent else plan.account_id
+        cat_is_income = parent.is_income if parent else (1 if new_category_is_income else 0)
+        cat_parent_id = parent.id if parent else None
+
+        # Voorkom duplicaten op (user, account, parent, name)
         cat = (
             db.query(Category)
             .filter(
                 Category.user_id == user.id,
-                Category.account_id == plan.account_id,
+                Category.account_id == cat_account_id,
+                Category.parent_id.is_(cat_parent_id) if cat_parent_id is None else Category.parent_id == cat_parent_id,
                 Category.name == name,
             )
             .first()
@@ -785,16 +845,20 @@ def quick_add_line(
         if not cat:
             max_order = (
                 db.query(Category.sort_order)
-                .filter(Category.user_id == user.id, Category.parent_id.is_(None))
+                .filter(
+                    Category.user_id == user.id,
+                    Category.parent_id.is_(cat_parent_id) if cat_parent_id is None else Category.parent_id == cat_parent_id,
+                )
                 .order_by(Category.sort_order.desc())
                 .first()
             )
             next_order = (max_order[0] + 1) if max_order and max_order[0] is not None else 0
             cat = Category(
                 user_id=user.id,
-                account_id=plan.account_id,
+                account_id=cat_account_id,
+                parent_id=cat_parent_id,
                 name=name,
-                is_income=1 if new_category_is_income else 0,
+                is_income=cat_is_income,
                 sort_order=next_order,
             )
             db.add(cat)
