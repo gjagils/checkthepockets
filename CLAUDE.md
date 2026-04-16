@@ -141,6 +141,19 @@ Het product-backlog leeft in **Linear** (workspace `gjagils`, project `checkthep
 - **`BACKLOG.md`** — historisch archief van afgeronde sprints. **Niet meer bijwerken met nieuwe items.** Blijft bestaan voor context/geschiedenis.
 - **Claude Code** — implementeert, pusht, merget. Werkt alleen aan issues die jij expliciet vrijgeeft.
 
+### Linear MCP lokaal setup
+
+Een verse Claude Code CLI-sessie heeft **geen** Linear-connectie vanzelf. Eenmalig per lokale omgeving verbinden:
+
+1. Start Claude Code in deze repo.
+2. Typ `/mcp` → kies **Linear** → **Connect**.
+3. OAuth opent in de browser, autoriseer de workspace `gjagils`.
+4. Na succes zijn alle `mcp__linear__*` tools beschikbaar in de sessie.
+
+Herhaal dit alleen als je Claude Code opnieuw installeert of de OAuth-token intrekt.
+
+> **Cloud-runs (Remote Trigger)** hebben een eigen, onafhankelijke Linear-connectie die in claude.ai is geconfigureerd — de lokale OAuth is daarvoor niet nodig. Als de nachtrun Linear-errors geeft, herautoriseer dan in claude.ai, niet lokaal.
+
 ### Selectie-criteria
 
 Claude pakt alleen issues op die aan **alle** onderstaande voorwaarden voldoen:
@@ -177,6 +190,19 @@ Selectie-volgorde binnen de kandidaten: **priority desc** → **createdAt asc** 
 - **Alleen mergen als**: alle GitHub Actions checks groen, PR heeft geen review-requested labels, diff < 500 regels, niet op beschermde paths (`.github/workflows/`, `alembic/versions/`, `stack.env`, `deploy.sh`).
 - **Squash-merge altijd**, branch wordt verwijderd.
 - Bij groter of gevoeliger werk: zet zelf een `needs-review`-label op de Linear-issue vóór de run — dan maakt Claude wél een PR maar merged niet.
+
+### CI-vereiste voor auto-merge
+
+Expliciet: auto-merge mag **alleen** als er een PR-level CI-workflow is die groen staat. De workflow `.github/workflows/ci.yml` (job `test`) vervult die rol en draait op elke `pull_request` naar `main`.
+
+- **Met groene PR-CI** → Claude mag auto-mergen (mits alle andere auto-merge regels kloppen).
+- **Zonder PR-CI** (bv. docs-only PR die geen CI triggert) → auto-merge alleen toegestaan wanneer aan **alle** onderstaande voldaan is:
+  - Diff ≤ 50 regels
+  - Alleen wijzigingen in: `**.md`, `.claude/**`, `app/templates/**`, `app/static/**` (docs of static assets)
+  - Geen Python-code, migrations, workflows, compose-files of secrets aangepast
+- **Anders** → zet de Linear-issue op `In Review` of gebruik het `needs-review`-label; Claude maakt de PR maar merged niet.
+
+Bij twijfel: altijd `needs-review`. Liever een wachtende PR dan een ongeteste merge.
 
 ### Run-afbrekers (failure-modus)
 
