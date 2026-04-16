@@ -1,7 +1,7 @@
 ---
 name: backlog-routine
 description: Werk de Linear-backlog af voor checkthepockets. Pakt alle issues met label 'claude-ready' + status 'Todo', implementeert, pusht, en merged autonoom na groene CI. Gebruik dit voor handmatige testruns of laat het automatisch draaien via de nachtelijke Remote Trigger.
-allowed-tools: Bash, Read, Write, Edit, Glob, Grep, TodoWrite, AskUserQuestion
+allowed-tools: Bash, Read, Write, Edit, Glob, Grep, TodoWrite, AskUserQuestion, mcp__linear__list_issues, mcp__linear__get_issue, mcp__linear__save_issue, mcp__linear__save_comment, mcp__linear__list_comments, mcp__linear__list_issue_labels, mcp__linear__list_issue_statuses, mcp__linear__get_user, mcp__linear__list_projects
 ---
 
 # Backlog-routine — Linear → Claude Code (checkthepockets)
