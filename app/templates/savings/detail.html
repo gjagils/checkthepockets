@@ -107,6 +107,7 @@
         <p class="muted">Startsaldo: &euro;&nbsp;{{ plan.starting_balance|euro }}{% if plan.account.iban %} &middot; {{ plan.account.iban }}{% endif %}</p>
     </div>
     <div style="display:flex; gap:0.5rem;">
+        <button type="button" class="btn btn-primary" onclick="openQuickAdd()">+ Snel toevoegen</button>
         <form method="post" action="/savings/{{ plan.id }}/analyze" style="margin:0;">
             <button type="submit" class="btn btn-accent">✨ Analyseer transacties</button>
         </form>
@@ -295,6 +296,109 @@
         <span class="legend-item"><span class="legend-dot legend-forecast"></span> Prognose</span>
     </div>
 </div>
+
+<!-- Snel toevoegen-modal: categorie + (optioneel) regel + plan-rij in één -->
+<div id="quick-add-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeQuickAdd()">
+    <div class="modal-box" style="max-width:640px;">
+        <div class="modal-header">
+            <h3>Snel toevoegen</h3>
+            <button type="button" class="btn btn-sm" onclick="closeQuickAdd()">✕</button>
+        </div>
+        <form method="post" action="/savings/{{ plan.id }}/quick-add" style="padding:1rem 1.25rem;">
+
+            <!-- ── Stap 1 — Categorie ─────────────────────── -->
+            <h4 style="margin:0 0 0.5rem; font-size:0.85rem; text-transform:uppercase; color:var(--muted);">1. Categorie</h4>
+            <div style="display:flex; gap:1rem; margin-bottom:0.75rem;">
+                <label style="display:flex; align-items:center; gap:0.4rem;">
+                    <input type="radio" name="category_mode" value="existing" checked onchange="qaToggleCategoryMode(this.value)">
+                    Bestaande
+                </label>
+                <label style="display:flex; align-items:center; gap:0.4rem;">
+                    <input type="radio" name="category_mode" value="new" onchange="qaToggleCategoryMode(this.value)">
+                    Nieuwe categorie
+                </label>
+            </div>
+
+            <div id="qa-existing-category" class="form-group" style="margin-bottom:1rem;">
+                <label>Kies categorie</label>
+                <select name="category_id" id="qa-category-select" onchange="qaPrefillName()">
+                    <option value="0">— Geen categorie —</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat.id }}" data-name="{{ cat.name }}">{{ cat.name }}{% if cat.is_income %} (inkomen){% endif %}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div id="qa-new-category" style="display:none; margin-bottom:1rem;">
+                <div class="form-group" style="margin-bottom:0.5rem;">
+                    <label>Naam nieuwe categorie</label>
+                    <input type="text" name="new_category_name" id="qa-new-cat-name" oninput="qaPrefillName()" placeholder="bv. Spaarbijdrage">
+                </div>
+                <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.85rem;">
+                    <input type="checkbox" name="new_category_is_income" value="1">
+                    Inkomen-categorie
+                </label>
+                <p class="muted" style="font-size:0.75rem; margin-top:0.4rem;">Wordt aangemaakt op rekening <strong>{{ plan.account.name }}</strong>.</p>
+            </div>
+
+            <!-- ── Stap 2 — Optionele regel ────────────────── -->
+            <h4 style="margin:0.5rem 0 0.5rem; font-size:0.85rem; text-transform:uppercase; color:var(--muted);">2. Transacties automatisch koppelen <span class="muted" style="text-transform:none; font-weight:normal;">(optioneel)</span></h4>
+            <label style="display:flex; align-items:center; gap:0.4rem; margin-bottom:0.5rem;">
+                <input type="checkbox" name="create_rule" value="1" id="qa-create-rule" onchange="qaToggleRule(this.checked)">
+                Maak een regel die transacties op deze categorie zet
+            </label>
+            <div id="qa-rule-fields" style="display:none; margin-bottom:1rem; padding-left:1.5rem; border-left:2px solid var(--border);">
+                <div class="form-group" style="margin-bottom:0.5rem;">
+                    <label>Zoek in</label>
+                    <select name="rule_match_field">
+                        <option value="description">Omschrijving</option>
+                        <option value="counterparty">Tegenpartij</option>
+                        <option value="counterparty_iban">IBAN tegenpartij</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Match-tekst (bevat)</label>
+                    <input type="text" name="rule_match_value" placeholder="bv. RENTE" >
+                </div>
+                <p class="muted" style="font-size:0.75rem; margin-top:0.4rem;">De regel wordt direct toegepast op bestaande, nog ongecategoriseerde transacties van deze rekening.</p>
+            </div>
+
+            <!-- ── Stap 3 — Plan-rij ────────────────────────── -->
+            <h4 style="margin:0.5rem 0 0.5rem; font-size:0.85rem; text-transform:uppercase; color:var(--muted);">3. Spaarplan-regel</h4>
+            <div class="filter-bar" style="flex-wrap:wrap; gap:0.75rem;">
+                <div class="form-group" style="flex:2; min-width:150px;">
+                    <label>Naam</label>
+                    <input type="text" name="line_name" id="qa-line-name" required placeholder="bv. Rente">
+                </div>
+                <div class="form-group" style="flex:1; min-width:120px;">
+                    <label>Frequentie</label>
+                    <select name="frequency" id="qa-frequency" onchange="qaToggleTargetMonth(this.value)">
+                        {% for key, label in frequency_labels.items() %}
+                        <option value="{{ key }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group" style="flex:1; min-width:100px;">
+                    <label>Bedrag per keer</label>
+                    <input type="text" name="default_amount" value="0" placeholder="0,00">
+                </div>
+                <div class="form-group" id="qa-target-month-group" style="display:none; flex:1; min-width:110px;">
+                    <label><span id="qa-target-month-label">Maand</span></label>
+                    <select name="target_month">
+                        {% for m in range(1, 13) %}
+                        <option value="{{ m }}">{{ months[m] }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="modal-footer" style="margin-top:1rem; padding-top:0.75rem; border-top:1px solid var(--border); display:flex; gap:0.5rem; justify-content:flex-end;">
+                <button type="button" class="btn btn-sm" onclick="closeQuickAdd()">Annuleren</button>
+                <button type="submit" class="btn btn-primary">Toevoegen</button>
+            </div>
+        </form>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -426,6 +530,69 @@ function toggleEditRow(lineId) {
         row.style.display = '';
     } else {
         row.style.display = 'none';
+    }
+}
+
+// ── Snel-toevoegen-modal ────────────────────────────────────────────
+function openQuickAdd() {
+    var modal = document.getElementById('quick-add-modal');
+    if (modal) modal.style.display = 'flex';
+}
+function closeQuickAdd() {
+    var modal = document.getElementById('quick-add-modal');
+    if (modal) modal.style.display = 'none';
+}
+function qaToggleCategoryMode(mode) {
+    var existing = document.getElementById('qa-existing-category');
+    var fresh = document.getElementById('qa-new-category');
+    if (mode === 'new') {
+        existing.style.display = 'none';
+        fresh.style.display = '';
+    } else {
+        existing.style.display = '';
+        fresh.style.display = 'none';
+    }
+    qaPrefillName();
+}
+function qaToggleRule(checked) {
+    document.getElementById('qa-rule-fields').style.display = checked ? '' : 'none';
+}
+function qaPrefillName() {
+    var nameInput = document.getElementById('qa-line-name');
+    if (!nameInput) return;
+    if (nameInput.dataset.userEdited === '1') return;  // gebruiker heeft zelf getypt
+    var mode = document.querySelector('input[name="category_mode"]:checked');
+    if (!mode) return;
+    if (mode.value === 'new') {
+        var v = (document.getElementById('qa-new-cat-name') || {}).value || '';
+        nameInput.value = v;
+    } else {
+        var sel = document.getElementById('qa-category-select');
+        var opt = sel ? sel.options[sel.selectedIndex] : null;
+        nameInput.value = (opt && opt.dataset.name) ? opt.dataset.name : '';
+    }
+}
+// markeer wanneer de gebruiker zelf het naamveld aanpast zodat we niet
+// over hun keuze heen schrijven
+document.addEventListener('DOMContentLoaded', function () {
+    var nameInput = document.getElementById('qa-line-name');
+    if (nameInput) {
+        nameInput.addEventListener('input', function () { this.dataset.userEdited = '1'; });
+    }
+});
+function qaToggleTargetMonth(freq) {
+    var group = document.getElementById('qa-target-month-group');
+    var label = document.getElementById('qa-target-month-label');
+    if (!group) return;
+    if (freq === 'monthly') {
+        group.style.display = 'none';
+        return;
+    }
+    group.style.display = '';
+    if (label) {
+        label.textContent = (freq === 'quarterly' || freq === 'biannual')
+            ? 'Startmaand'
+            : 'Maand';
     }
 }
 

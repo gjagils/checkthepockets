@@ -8,11 +8,12 @@ from sqlalchemy import func
 
 from app.database import get_db
 from app.models import (
-    Account, Transaction, Category,
+    Account, Transaction, Category, Rule,
     SavingsPlan, SavingsLine, SavingsEntry,
 )
 from app.auth import require_login
 from app.template_config import templates
+from app.rules_engine import apply_single_rule
 
 router = APIRouter(prefix="/savings")
 
@@ -697,6 +698,147 @@ def delete_line(
 
     plan_id = line.plan_id
     db.delete(line)
+    db.commit()
+
+    return RedirectResponse(f"/savings/{plan_id}", status_code=302)
+
+
+@router.post("/{plan_id}/quick-add")
+def quick_add_line(
+    plan_id: int,
+    request: Request,
+    # Categorie
+    category_mode: str = Form("existing"),  # 'existing' | 'new'
+    category_id: int = Form(0),
+    new_category_name: str = Form(""),
+    new_category_is_income: int = Form(0),
+    # Optionele matching-regel
+    create_rule: int = Form(0),
+    rule_match_field: str = Form("description"),
+    rule_match_value: str = Form(""),
+    # Plan-rij
+    line_name: str = Form(...),
+    frequency: str = Form("monthly"),
+    default_amount: str = Form("0"),
+    target_month: int = Form(0),
+    db: Session = Depends(get_db),
+):
+    """Maak in één POST een categorie (optioneel nieuw), optioneel een rule die
+    transacties op die categorie zet, en een SavingsLine met gevulde entries."""
+    user = require_login(request, db)
+
+    plan = (
+        db.query(SavingsPlan)
+        .options(joinedload(SavingsPlan.account))
+        .filter(SavingsPlan.id == plan_id, SavingsPlan.user_id == user.id)
+        .first()
+    )
+    if not plan:
+        return RedirectResponse("/savings", status_code=302)
+
+    # ── 1. Categorie ──────────────────────────────────────────────
+    cat: Category | None = None
+    if category_mode == "new":
+        name = new_category_name.strip()
+        if not name:
+            return RedirectResponse(f"/savings/{plan_id}", status_code=302)
+        # Voorkom duplicaten op (user, account, name)
+        cat = (
+            db.query(Category)
+            .filter(
+                Category.user_id == user.id,
+                Category.account_id == plan.account_id,
+                Category.name == name,
+            )
+            .first()
+        )
+        if not cat:
+            max_order = (
+                db.query(Category.sort_order)
+                .filter(Category.user_id == user.id, Category.parent_id.is_(None))
+                .order_by(Category.sort_order.desc())
+                .first()
+            )
+            next_order = (max_order[0] + 1) if max_order and max_order[0] is not None else 0
+            cat = Category(
+                user_id=user.id,
+                account_id=plan.account_id,
+                name=name,
+                is_income=1 if new_category_is_income else 0,
+                sort_order=next_order,
+            )
+            db.add(cat)
+            db.flush()
+    else:
+        if category_id:
+            cat = (
+                db.query(Category)
+                .filter(Category.id == category_id, Category.user_id == user.id)
+                .first()
+            )
+
+    # ── 2. Optionele matching-regel ───────────────────────────────
+    if create_rule and cat and rule_match_value.strip():
+        rule = Rule(
+            user_id=user.id,
+            name=f"Auto: {cat.name}"[:100],
+            is_active=1,
+            match_field=rule_match_field if rule_match_field in ("description", "counterparty", "counterparty_iban") else "description",
+            match_type="contains",
+            match_value=rule_match_value.strip(),
+            condition_account_id=plan.account_id,
+            assign_category_id=cat.id,
+        )
+        db.add(rule)
+        db.flush()
+        # Pas direct toe op bestaande transacties (alleen ongecategoriseerd)
+        apply_single_rule(db, user.id, rule.id, only_uncategorized=True)
+
+    # ── 3. SavingsLine + entries ──────────────────────────────────
+    try:
+        amount = Decimal(default_amount.replace(",", "."))
+    except (InvalidOperation, ValueError):
+        amount = Decimal("0")
+
+    tm = target_month or None
+    months_for_line = _months_for_frequency(frequency, tm)
+
+    max_order = (
+        db.query(func.max(SavingsLine.sort_order))
+        .filter(SavingsLine.plan_id == plan_id)
+        .scalar()
+    ) or 0
+
+    line = SavingsLine(
+        plan_id=plan_id,
+        name=line_name.strip() or (cat.name if cat else "Nieuwe regel"),
+        category_id=cat.id if cat else None,
+        is_income=cat.is_income if cat else 0,
+        frequency=frequency,
+        default_amount=amount,
+        annual_budget=amount * len(months_for_line),
+        sort_order=max_order + 1,
+    )
+    db.add(line)
+    db.flush()
+
+    entries = _smart_fill_entries(line, target_month=tm)
+    for entry in entries:
+        db.add(entry)
+
+    # Vul entries vanuit transacties als er een categorie is
+    if cat:
+        today = datetime.date.today()
+        tx_totals = _get_transaction_totals_by_month(
+            db, plan.account_id, plan.year, cat.id
+        )
+        for entry in entries:
+            if entry.month in tx_totals:
+                entry.amount = tx_totals[entry.month]
+                entry.status = _determine_entry_status(
+                    db, plan.account_id, plan.year, entry.month, today
+                )
+
     db.commit()
 
     return RedirectResponse(f"/savings/{plan_id}", status_code=302)
