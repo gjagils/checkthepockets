@@ -28,6 +28,9 @@
         else '' %}
     <div class="navbar-wrapper">
         <nav class="nav-main">
+            <button type="button" class="nav-hamburger" id="nav-hamburger-btn" aria-label="Menu openen" aria-expanded="false" aria-controls="mobile-drawer">
+                <span></span><span></span><span></span>
+            </button>
             <a href="/dashboard" class="nav-brand">
                 <img src="/static/logo.png?v={{ request.state.asset_version }}" alt="Check Your Pockets">
                 <span class="brand-text">
@@ -46,7 +49,7 @@
             <div class="nav-user-section">
                 <button class="theme-toggle" id="theme-toggle-btn" onclick="toggleTheme()" title="Thema wisselen">🌙</button>
                 {% if user.is_admin %}
-                <a href="/admin/users" class="nav-link-subtle {{ 'active' if path.startswith('/admin') }}" title="Admin">⚙ Admin</a>
+                <a href="/admin/users" class="nav-link-subtle nav-admin-link {{ 'active' if path.startswith('/admin') }}" title="Admin">⚙ Admin</a>
                 {% endif %}
                 <a href="/settings" class="nav-avatar" title="Instellingen">{{ user.username[0] | upper }}</a>
                 <a href="/logout" class="nav-logout-link">Uitloggen</a>
@@ -74,6 +77,64 @@
             {% endif %}
         </nav>
     </div>
+
+    <div class="mobile-drawer" id="mobile-drawer" aria-hidden="true">
+        <div class="mobile-drawer-backdrop" data-drawer-close></div>
+        <aside class="mobile-drawer-panel" role="dialog" aria-label="Hoofdmenu" aria-modal="true">
+            <div class="mobile-drawer-header">
+                <span class="mobile-drawer-title">Menu</span>
+                <button type="button" class="mobile-drawer-close" data-drawer-close aria-label="Menu sluiten">✕</button>
+            </div>
+            <nav class="mobile-drawer-nav">
+                <a href="/dashboard" class="m-nav-main {{ 'active' if main_active == 'dashboard' }}">Dashboard</a>
+
+                <div class="m-nav-group {{ 'open' if main_active == 'financien' }}">
+                    <a href="/transactions" class="m-nav-main {{ 'active' if main_active == 'financien' }}">Financiën</a>
+                    <div class="m-nav-children">
+                        <a href="/transactions" class="{{ 'active' if path == '/transactions' or path.startswith('/transactions/') }}">Transacties</a>
+                        <a href="/categories" class="{{ 'active' if path == '/categories' }}">Categorieën</a>
+                        <a href="/rules" class="{{ 'active' if path == '/rules' }}">Regels</a>
+                        <a href="/recurring" class="{{ 'active' if path == '/recurring' }}">Terugkerend</a>
+                    </div>
+                </div>
+
+                <div class="m-nav-group {{ 'open' if main_active == 'budgetten' }}">
+                    <a href="/budgets" class="m-nav-main {{ 'active' if main_active == 'budgetten' }}">Budgetten</a>
+                    <div class="m-nav-children">
+                        <a href="/budgets" class="{{ 'active' if path.startswith('/budgets') }}">Budgetten</a>
+                        <a href="/savings" class="{{ 'active' if path.startswith('/savings') }}">Sparen</a>
+                    </div>
+                </div>
+
+                <div class="m-nav-group {{ 'open' if main_active == 'analyse' }}">
+                    <a href="/analytics" class="m-nav-main {{ 'active' if main_active == 'analyse' }}">Analyse</a>
+                    <div class="m-nav-children">
+                        <a href="/analytics" class="{{ 'active' if path == '/analytics' }}">Analyse</a>
+                        <a href="/analytics/stats" class="{{ 'active' if path == '/analytics/stats' }}">Statistieken</a>
+                        <a href="/analytics/query" class="{{ 'active' if path == '/analytics/query' }}">Query</a>
+                        <a href="/portfolio" class="{{ 'active' if path.startswith('/portfolio') }}">Portfolio</a>
+                        <a href="/networth" class="{{ 'active' if path.startswith('/networth') }}">Vermogen</a>
+                    </div>
+                </div>
+
+                <div class="m-nav-group {{ 'open' if main_active == 'rekeningen' }}">
+                    <a href="/accounts" class="m-nav-main {{ 'active' if main_active == 'rekeningen' }}">Rekeningen</a>
+                    <div class="m-nav-children">
+                        <a href="/accounts" class="{{ 'active' if path.startswith('/accounts') }}">Rekeningen</a>
+                        <a href="/import" class="{{ 'active' if path.startswith('/import') }}">Importeren</a>
+                        <a href="/banking/connect" class="{{ 'active' if path.startswith('/banking') }}">Bankkoppeling</a>
+                    </div>
+                </div>
+            </nav>
+            <div class="mobile-drawer-footer">
+                {% if user.is_admin %}
+                <a href="/admin/users" class="m-nav-main {{ 'active' if path.startswith('/admin') }}">⚙ Admin</a>
+                {% endif %}
+                <a href="/settings" class="m-nav-main {{ 'active' if path.startswith('/settings') }}">Instellingen</a>
+                <a href="/logout" class="m-nav-main">Uitloggen</a>
+            </div>
+        </aside>
+    </div>
     {% endif %}
 
     <main class="container {% block container_class %}{% endblock %}">
@@ -94,6 +155,26 @@
             if (btn) btn.textContent = theme === 'dark' ? '☀' : '🌙';
         }
         updateThemeIcon(document.documentElement.getAttribute('data-theme') || 'light');
+
+        (function() {
+            var btn = document.getElementById('nav-hamburger-btn');
+            var drawer = document.getElementById('mobile-drawer');
+            if (!btn || !drawer) return;
+            function setOpen(open) {
+                drawer.classList.toggle('open', open);
+                btn.classList.toggle('is-active', open);
+                btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+                drawer.setAttribute('aria-hidden', open ? 'false' : 'true');
+                document.body.classList.toggle('nav-drawer-open', open);
+            }
+            btn.addEventListener('click', function() { setOpen(!drawer.classList.contains('open')); });
+            drawer.querySelectorAll('[data-drawer-close]').forEach(function(el) {
+                el.addEventListener('click', function() { setOpen(false); });
+            });
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape' && drawer.classList.contains('open')) setOpen(false);
+            });
+        })();
     </script>
 </body>
 </html>
