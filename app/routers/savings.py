@@ -110,20 +110,13 @@ def _has_transactions_in_month(db: Session, account_id: int, year: int, month: i
 def _determine_entry_status(
     db: Session, account_id: int, year: int, month: int, today: datetime.date
 ) -> str:
-    """
-    Determine the status for an entry:
-    - 'confirmed' (green): month is past AND transactions exist for that month
-                           AND transactions exist in a subsequent month (or month is fully past)
-    - 'pending' (blue): transactions exist for this month but next month has no transactions yet
-                        and the month isn't fully in the past yet
-    - 'forecast' (grey): no transactions for this month, still in the future
-    """
+    """Legacy status helper — kept as fallback for non-category lines.
+    See `_determine_color_status` for the new actual-vs-expected coloring."""
     has_tx = _has_transactions_in_month(db, account_id, year, month)
 
     if not has_tx:
         return "forecast"
 
-    # Check if this month is completely in the past
     first_of_next = datetime.date(
         year if month < 12 else year + 1,
         month + 1 if month < 12 else 1,
@@ -132,16 +125,50 @@ def _determine_entry_status(
     month_is_past = today >= first_of_next
 
     if month_is_past:
-        return "confirmed"
+        return "match"
 
-    # Month is current or has transactions but not fully past
-    # Check if the next month already has transactions (meaning this month is "closed")
     if month < 12:
         next_has_tx = _has_transactions_in_month(db, account_id, year, month + 1)
         if next_has_tx:
-            return "confirmed"
+            return "match"
 
-    return "pending"
+    return "current"
+
+
+def _determine_color_status(
+    actual: Decimal | None,
+    expected: Decimal | None,
+    is_income: bool,
+    month: int,
+    year: int,
+    today: datetime.date,
+) -> str:
+    """Bepaal de kleurstatus voor een spaarcel.
+
+    - 'forecast' (transparant): toekomstige maand of geen actual
+    - 'current' (grijs): lopende maand
+    - 'above' (groen): beter dan verwacht
+    - 'match' (blauw): gelijk aan verwacht
+    - 'below' (oranje): slechter dan verwacht
+    """
+    # Toekomst
+    if (year, month) > (today.year, today.month):
+        return "forecast"
+    # Lopende maand — altijd grijs ongeacht waarde
+    if (year, month) == (today.year, today.month):
+        return "current"
+    # Verleden maand zonder actual
+    if actual is None:
+        return "forecast"
+
+    actual_abs = abs(actual)
+    expected_abs = abs(expected) if expected is not None else Decimal("0")
+
+    if actual_abs == expected_abs:
+        return "match"
+    if is_income:
+        return "above" if actual_abs > expected_abs else "below"
+    return "above" if actual_abs < expected_abs else "below"
 
 
 def _build_category_suggestions(
@@ -295,30 +322,32 @@ def plan_detail(
 
     # Auto-sync amounts & statuses:
     # - Category-linked lines: pull the per-month sum of that category's transactions
-    #   into the entry so what you see matches the actual transactions.
-    # - Lines without a category: only refresh the status based on transactions.
+    #   into the entry, en kleur op basis van actual vs expected (default_amount).
+    # - Lines without a category: status puur op basis van past/current/future + waarde.
     category_totals = {}
     for line in plan.lines:
+        is_inc = bool(line.is_income)
         if line.category_id:
             tx_totals = _get_transaction_totals_by_month(
                 db, plan.account_id, plan.year, line.category_id
             )
             category_totals[line.id] = tx_totals
             for entry in line.entries:
-                if entry.month in tx_totals:
-                    if entry.amount != tx_totals[entry.month]:
-                        entry.amount = tx_totals[entry.month]
-                    entry.status = _determine_entry_status(
-                        db, plan.account_id, plan.year, entry.month, today
-                    )
+                actual = tx_totals.get(entry.month)
+                if actual is not None and entry.amount != actual:
+                    entry.amount = actual
+                entry.status = _determine_color_status(
+                    actual, line.default_amount, is_inc,
+                    entry.month, plan.year, today,
+                )
         else:
             for entry in line.entries:
-                if entry.amount is not None:
-                    new_status = _determine_entry_status(
-                        db, plan.account_id, plan.year, entry.month, today
-                    )
-                    if entry.status != new_status:
-                        entry.status = new_status
+                # Voor regels zonder categorie: amount is wat de gebruiker zelf zette,
+                # dus dat geldt zowel als actual als als expected (= altijd 'match' in 't verleden).
+                entry.status = _determine_color_status(
+                    entry.amount, entry.amount, is_inc,
+                    entry.month, plan.year, today,
+                )
 
     # Split lines into income and expense
     income_lines = [l for l in plan.lines if l.is_income]
@@ -519,16 +548,10 @@ def update_entry(
             return JSONResponse({"error": "Ongeldig bedrag"}, status_code=400)
 
     entry.amount = new_amount
-    if new_amount is None:
-        entry.status = "forecast"
-    else:
-        entry.status = _determine_entry_status(
-            db, plan.account_id, plan.year, entry.month, today
-        )
 
     # Propagate to future forecast cells in the same line:
-    # only cells that already had an amount (i.e. match the line's frequency pattern)
-    # AND are still 'forecast' get updated. Cells with confirmed/pending tx are left alone.
+    # only cells that still match the previous default (i.e. weren't manually set)
+    # AND are still 'forecast' get updated. Cells with actuals are left alone.
     for sibling in entry.line.entries:
         if sibling.id == entry.id:
             continue
@@ -540,15 +563,22 @@ def update_entry(
             continue
         sibling.amount = new_amount
 
-    # Refresh statuses for ALL entries in this line (so colors stay in sync,
-    # also for past months that may have just become confirmed/pending).
-    for e in entry.line.entries:
-        if e.amount is None:
-            e.status = "forecast"
-        else:
-            e.status = _determine_entry_status(
-                db, plan.account_id, plan.year, e.month, today
-            )
+    # Refresh statuses for ALL entries in this line met de nieuwe color-logic.
+    line = entry.line
+    is_inc = bool(line.is_income)
+    if line.category_id:
+        tx_totals = _get_transaction_totals_by_month(
+            db, plan.account_id, plan.year, line.category_id
+        )
+    else:
+        tx_totals = {}
+
+    for e in line.entries:
+        actual = tx_totals.get(e.month) if line.category_id else e.amount
+        expected = line.default_amount if line.category_id else e.amount
+        e.status = _determine_color_status(
+            actual, expected, is_inc, e.month, plan.year, today,
+        )
 
     db.commit()
 
