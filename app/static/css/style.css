@@ -691,22 +691,23 @@ tfoot td { background: var(--surface-2); border-top: 1px solid var(--border); fo
 .savings-cell { cursor: pointer; padding: 0.4rem 0.6rem !important; transition: background 0.1s; position: relative; }
 .savings-cell:hover { background: var(--orange-bg) !important; }
 
-/* Spaarcel-statussen — actual vs verwacht */
-.cell-above   { background: rgba(74, 222, 128, 0.10); }       /* groen — beter dan verwacht */
-.cell-above:hover   { background: rgba(74, 222, 128, 0.20) !important; }
-.cell-match   { background: var(--sky-bg); }                  /* blauw — gelijk aan verwacht */
-.cell-match:hover   { background: rgba(64, 196, 255, 0.20) !important; }
-.cell-below   { background: rgba(255, 152, 0, 0.10); }        /* lichtoranje — slechter dan verwacht */
-.cell-below:hover   { background: rgba(255, 152, 0, 0.22) !important; }
-.cell-current { background: var(--surface-2); }               /* grijs — lopende maand */
-.cell-current:hover { background: var(--surface-2) !important; }
+/* Spaarcel-statussen — actual vs verwacht. Iets verzadigder zodat de kleuren
+   van een afstand goed leesbaar zijn maar geen print-ink zijn. */
+.cell-above   { background: rgba(74, 222, 128, 0.22); }       /* groen — beter dan verwacht */
+.cell-above:hover   { background: rgba(74, 222, 128, 0.34) !important; }
+.cell-match   { background: rgba(64, 196, 255, 0.20); }       /* blauw — gelijk aan verwacht */
+.cell-match:hover   { background: rgba(64, 196, 255, 0.32) !important; }
+.cell-below   { background: rgba(255, 152, 0, 0.22); }        /* oranje — slechter dan verwacht */
+.cell-below:hover   { background: rgba(255, 152, 0, 0.34) !important; }
+.cell-current { background: rgba(148, 163, 184, 0.22); }      /* grijs — lopende maand */
+.cell-current:hover { background: rgba(148, 163, 184, 0.32) !important; }
 .cell-forecast { background: transparent; }
 
 /* Legacy aliases voor oude rijen die nog 'confirmed' / 'pending' in de DB hebben */
-.cell-confirmed { background: rgba(74, 222, 128, 0.10); }
-.cell-confirmed:hover { background: rgba(74, 222, 128, 0.20) !important; }
-.cell-pending { background: var(--sky-bg); }
-.cell-pending:hover { background: rgba(64, 196, 255, 0.20) !important; }
+.cell-confirmed { background: rgba(74, 222, 128, 0.22); }
+.cell-confirmed:hover { background: rgba(74, 222, 128, 0.34) !important; }
+.cell-pending { background: rgba(64, 196, 255, 0.20); }
+.cell-pending:hover { background: rgba(64, 196, 255, 0.32) !important; }
 
 .cell-input {
     width: 100%;
@@ -754,11 +755,11 @@ tfoot td { background: var(--surface-2); border-top: 1px solid var(--border); fo
 .savings-legend { display: flex; gap: 1.5rem; flex-wrap: wrap; font-size: 0.78rem; color: var(--muted); }
 .legend-item { display: flex; align-items: center; gap: 0.4rem; }
 .legend-dot { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
-.legend-above   { background: rgba(74, 222, 128, 0.30); border: 1px solid var(--green); }
-.legend-match   { background: rgba(64, 196, 255, 0.25); border: 1px solid var(--sky); }
-.legend-below   { background: rgba(255, 152, 0, 0.30);  border: 1px solid var(--orange); }
-.legend-current { background: var(--surface-2);         border: 1px solid var(--muted); }
-.legend-forecast { background: transparent;             border: 1px dashed var(--border); }
+.legend-above   { background: rgba(74, 222, 128, 0.45);  border: 1px solid var(--green); }
+.legend-match   { background: rgba(64, 196, 255, 0.40);  border: 1px solid var(--sky); }
+.legend-below   { background: rgba(255, 152, 0, 0.45);   border: 1px solid var(--orange); }
+.legend-current { background: rgba(148, 163, 184, 0.40); border: 1px solid var(--muted); }
+.legend-forecast { background: transparent;              border: 1px dashed var(--border); }
 /* Legacy */
 .legend-confirmed { background: rgba(74, 222, 128, 0.30); border: 1px solid var(--green); }
 .legend-pending { background: rgba(64, 196, 255, 0.25); border: 1px solid var(--sky); }
