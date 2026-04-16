@@ -845,8 +845,8 @@ tfoot td { background: var(--surface-2); border-top: 1px solid var(--border); fo
 .cell-above:hover   { background: rgba(74, 222, 128, 0.34) !important; }
 .cell-match   { background: rgba(64, 196, 255, 0.20); }       /* blauw — gelijk aan verwacht */
 .cell-match:hover   { background: rgba(64, 196, 255, 0.32) !important; }
-.cell-below   { background: rgba(255, 152, 0, 0.22); }        /* oranje — slechter dan verwacht */
-.cell-below:hover   { background: rgba(255, 152, 0, 0.34) !important; }
+.cell-below   { background: rgba(239, 68, 68, 0.24); }        /* rood — slechter dan verwacht / niet ontvangen */
+.cell-below:hover   { background: rgba(239, 68, 68, 0.36) !important; }
 .cell-current { background: rgba(148, 163, 184, 0.22); }      /* grijs — lopende maand */
 .cell-current:hover { background: rgba(148, 163, 184, 0.32) !important; }
 .cell-forecast { background: transparent; }
@@ -905,7 +905,7 @@ tfoot td { background: var(--surface-2); border-top: 1px solid var(--border); fo
 .legend-dot { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
 .legend-above   { background: rgba(74, 222, 128, 0.45);  border: 1px solid var(--green); }
 .legend-match   { background: rgba(64, 196, 255, 0.40);  border: 1px solid var(--sky); }
-.legend-below   { background: rgba(255, 152, 0, 0.45);   border: 1px solid var(--orange); }
+.legend-below   { background: rgba(239, 68, 68, 0.45);   border: 1px solid var(--red); }
 .legend-current { background: rgba(148, 163, 184, 0.40); border: 1px solid var(--muted); }
 .legend-forecast { background: transparent;              border: 1px dashed var(--border); }
 /* Legacy */
