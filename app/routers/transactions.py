@@ -27,6 +27,10 @@ from app.template_config import templates
 
 router = APIRouter()
 
+# Datumgrens voor de "sluit oude onbekende uit"-bulkactie: transacties voor
+# deze datum zonder categorie worden als afgehandeld beschouwd.
+OLD_UNCATEGORIZED_CUTOFF = date_type(2026, 1, 1)
+
 PARSERS = {
     "abn_amro": ("ABN AMRO", abn_amro.parse),
     "bunq": ("Bunq", bunq.parse),
@@ -350,6 +354,22 @@ def transaction_list(
     all_count = uncat_base.count()
     categorized_count = all_count - uncategorized_count
 
+    # Oude ongecategoriseerde transacties (vóór cutoff, nog niet uitgesloten) —
+    # gebruikt voor de "sluit oude onbekende uit"-knop. Niet gescoped op
+    # huidige maand/jaar: het is een eenmalige opschoonactie.
+    old_uncat_count = (
+        db.query(Transaction)
+        .join(Account)
+        .filter(
+            Account.user_id == user.id,
+            Transaction.category_id.is_(None),
+            Transaction.date < OLD_UNCATEGORIZED_CUTOFF,
+            Transaction.is_excluded == 0,
+            Transaction.is_projected == 0,
+        )
+        .count()
+    )
+
     # Sync + fetch projected transactions for current month view
     projected_transactions = []
     projected_candidates = {}
@@ -475,6 +495,8 @@ def transaction_list(
             "uncategorized_count": uncategorized_count,
             "all_count": all_count,
             "categorized_count": categorized_count,
+            "old_uncat_count": old_uncat_count,
+            "old_uncat_cutoff_label": OLD_UNCATEGORIZED_CUTOFF.strftime("%d-%m-%Y"),
             "projected_transactions": projected_transactions,
             "projected_candidates": projected_candidates,
         },
@@ -509,6 +531,37 @@ def set_category(
     if category_id and tx.counterparty and redirect_to:
         sep = "&" if "?" in redirect_to else "?"
         redirect_to = f"{redirect_to}{sep}suggest_rule_tx={transaction_id}"
+
+    return RedirectResponse(redirect_to, status_code=302)
+
+
+@router.post("/transactions/exclude-old-uncategorized")
+def exclude_old_uncategorized(
+    request: Request,
+    redirect_to: str = Form("/transactions?category_id=-1"),
+    db: Session = Depends(get_db),
+):
+    """Bulk: sluit alle ongecategoriseerde transacties vóór OLD_UNCATEGORIZED_CUTOFF uit.
+
+    Zelfde effect als per transactie op 'Uitsluiten' klikken (is_excluded=1).
+    """
+    user = require_login(request, db)
+
+    transactions = (
+        db.query(Transaction)
+        .join(Account)
+        .filter(
+            Account.user_id == user.id,
+            Transaction.category_id.is_(None),
+            Transaction.date < OLD_UNCATEGORIZED_CUTOFF,
+            Transaction.is_excluded == 0,
+            Transaction.is_projected == 0,
+        )
+        .all()
+    )
+    for tx in transactions:
+        tx.is_excluded = 1
+    db.commit()
 
     return RedirectResponse(redirect_to, status_code=302)
 

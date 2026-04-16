@@ -113,6 +113,25 @@
             <a href="{{ _cat_url(-2) }}" class="cat-btn {% if _is_cat %}active{% endif %}">Gecategoriseerd ({{ categorized_count }})</a>
         </div>
 
+        {% if _is_uncat and old_uncat_count %}
+        <form method="post" action="/transactions/exclude-old-uncategorized" class="tx-inline-form"
+              data-confirm="Sluit {{ old_uncat_count }} niet-gecategoriseerde transacties van vóór {{ old_uncat_cutoff_label }} uit? (Per transactie terug te draaien via Uitsluiten)">
+            <input type="hidden" name="redirect_to" value="{{ request.url.path }}?{{ request.url.query }}">
+            <button type="submit" class="btn btn-sm btn-secondary" title="Zelfde als per transactie Uitsluiten klikken, maar dan in bulk">
+                Sluit {{ old_uncat_count }} oude onbekende uit
+            </button>
+        </form>
+        <script>
+            (function() {
+                document.querySelectorAll('form[data-confirm]').forEach(function(f) {
+                    f.addEventListener('submit', function(e) {
+                        if (!window.confirm(f.getAttribute('data-confirm'))) e.preventDefault();
+                    });
+                });
+            })();
+        </script>
+        {% endif %}
+
         {# Categorie-dropdown verschijnt alleen als 'Gecategoriseerd' actief is #}
         {% if _is_cat %}
         <form method="get" action="/transactions" class="tx-inline-form">
