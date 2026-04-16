@@ -280,24 +280,32 @@ def plan_detail(
     if not plan:
         return RedirectResponse("/savings", status_code=302)
 
-    # Auto-update entry statuses based on transactions
-    for line in plan.lines:
-        for entry in line.entries:
-            if entry.amount is not None:
-                new_status = _determine_entry_status(
-                    db, plan.account_id, plan.year, entry.month, today
-                )
-                if entry.status != new_status:
-                    entry.status = new_status
-
-    # Get transaction totals per category per month for matching info
+    # Auto-sync amounts & statuses:
+    # - Category-linked lines: pull the per-month sum of that category's transactions
+    #   into the entry so what you see matches the actual transactions.
+    # - Lines without a category: only refresh the status based on transactions.
     category_totals = {}
     for line in plan.lines:
         if line.category_id:
-            totals = _get_transaction_totals_by_month(
+            tx_totals = _get_transaction_totals_by_month(
                 db, plan.account_id, plan.year, line.category_id
             )
-            category_totals[line.id] = totals
+            category_totals[line.id] = tx_totals
+            for entry in line.entries:
+                if entry.month in tx_totals:
+                    if entry.amount != tx_totals[entry.month]:
+                        entry.amount = tx_totals[entry.month]
+                    entry.status = _determine_entry_status(
+                        db, plan.account_id, plan.year, entry.month, today
+                    )
+        else:
+            for entry in line.entries:
+                if entry.amount is not None:
+                    new_status = _determine_entry_status(
+                        db, plan.account_id, plan.year, entry.month, today
+                    )
+                    if entry.status != new_status:
+                        entry.status = new_status
 
     # Split lines into income and expense
     income_lines = [l for l in plan.lines if l.is_income]
