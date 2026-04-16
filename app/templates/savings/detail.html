@@ -70,7 +70,7 @@
             </div>
             <div class="form-group">
                 <label>Frequentie</label>
-                <select name="frequency">
+                <select name="frequency" onchange="toggleEditTargetMonth({{ line.id }}, this.value)">
                     {% for key, label in frequency_labels.items() %}
                     <option value="{{ key }}" {% if line.frequency == key %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
@@ -79,6 +79,17 @@
             <div class="form-group">
                 <label>Bedrag per keer</label>
                 <input type="text" name="default_amount" value="{{ "%.2f"|format(line.default_amount) }}">
+            </div>
+            <div class="form-group edit-target-month-group" id="edit-target-month-{{ line.id }}"
+                 style="{% if line.frequency == 'monthly' %}display:none;{% endif %}">
+                <label>
+                    <span class="edit-target-month-label">{% if line.frequency in ['quarterly', 'biannual'] %}Startmaand{% else %}Maand{% endif %}</span>
+                </label>
+                <select name="target_month">
+                    {% for m in range(1, 13) %}
+                    <option value="{{ m }}">{{ months[m] }}</option>
+                    {% endfor %}
+                </select>
             </div>
             <div class="form-group" style="align-self:flex-end;">
                 <button type="submit" class="btn btn-primary btn-sm">Opslaan</button>
@@ -415,6 +426,22 @@ function toggleEditRow(lineId) {
         row.style.display = '';
     } else {
         row.style.display = 'none';
+    }
+}
+
+function toggleEditTargetMonth(lineId, freq) {
+    var group = document.getElementById('edit-target-month-' + lineId);
+    if (!group) return;
+    if (freq === 'monthly') {
+        group.style.display = 'none';
+        return;
+    }
+    group.style.display = '';
+    var label = group.querySelector('.edit-target-month-label');
+    if (label) {
+        label.textContent = (freq === 'quarterly' || freq === 'biannual')
+            ? 'Startmaand'
+            : 'Maand';
     }
 }
 </script>

@@ -609,12 +609,14 @@ def edit_line(
     category_id: int = Form(0),
     frequency: str = Form("monthly"),
     default_amount: str = Form("0"),
+    target_month: int = Form(0),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
 
     line = (
         db.query(SavingsLine)
+        .options(joinedload(SavingsLine.entries), joinedload(SavingsLine.plan))
         .join(SavingsPlan)
         .filter(SavingsLine.id == line_id, SavingsPlan.user_id == user.id)
         .first()
@@ -623,6 +625,7 @@ def edit_line(
         return RedirectResponse("/savings", status_code=302)
 
     cat_id = category_id if category_id else None
+    tm = target_month or None
 
     # Determine is_income from linked category
     line_is_income = 0
@@ -636,12 +639,39 @@ def edit_line(
     except (InvalidOperation, ValueError):
         amount = line.default_amount
 
+    months_for_line = _months_for_frequency(frequency, tm)
+
     line.name = name.strip()
     line.category_id = cat_id
     line.is_income = line_is_income
     line.frequency = frequency
     line.default_amount = amount
-    line.annual_budget = amount * len(_months_for_frequency(frequency))
+    line.annual_budget = amount * len(months_for_line)
+
+    # Refill forecast entries based on the new frequency / amount.
+    # Confirmed/pending cells (with actual transactions) are left alone.
+    months_set = set(months_for_line)
+    for entry in line.entries:
+        if entry.status != "forecast":
+            continue
+        if entry.month in months_set:
+            entry.amount = amount
+        else:
+            entry.amount = None
+
+    # If the line has a category, sync amounts from transactions for months
+    # that have transactions (mirrors the on-page-load behaviour).
+    if cat_id:
+        tx_totals = _get_transaction_totals_by_month(
+            db, line.plan.account_id, line.plan.year, cat_id
+        )
+        today = datetime.date.today()
+        for entry in line.entries:
+            if entry.month in tx_totals:
+                entry.amount = tx_totals[entry.month]
+                entry.status = _determine_entry_status(
+                    db, line.plan.account_id, line.plan.year, entry.month, today
+                )
 
     db.commit()
 
