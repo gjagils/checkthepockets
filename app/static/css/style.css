@@ -819,9 +819,15 @@ tfoot td { background: var(--surface-2); border-top: 1px solid var(--border); fo
 .savings-grid { min-width: 900px; border-collapse: separate; border-spacing: 0; }
 .savings-table-wrap { overflow-x: auto; overflow-y: visible; max-height: none; }
 
+/* Sticky thead (onder de sticky navbar van 92px op desktop / 52px op mobiel) */
 .savings-grid thead th {
+    position: sticky;
+    top: 92px;
     z-index: 4;
     background: var(--surface-2);
+}
+@media (max-width: 768px) {
+    .savings-grid thead th { top: 52px; }
 }
 .savings-grid th.sticky-col,
 .savings-grid td.sticky-col {
@@ -833,8 +839,17 @@ tfoot td { background: var(--surface-2); border-top: 1px solid var(--border); fo
     max-width: 240px;
     border-right: 1px solid var(--border);
 }
-.savings-grid th.sticky-col { background: var(--surface-2); z-index: 5; }
+.savings-grid th.sticky-col { background: var(--surface-2); z-index: 6; }
 .savings-grid th.month-col { min-width: 90px; white-space: nowrap; }
+
+/* Sticky saldo-rij onderaan: blijft zichtbaar tijdens scrollen */
+.savings-grid tr.balance-row td {
+    position: sticky;
+    bottom: 0;
+    background: var(--surface-2);
+    z-index: 3;
+}
+.savings-grid tr.balance-row td.sticky-col { z-index: 6; }
 
 .savings-cell { cursor: pointer; padding: 0.4rem 0.6rem !important; transition: background 0.1s; position: relative; }
 .savings-cell:hover { background: var(--orange-bg) !important; }

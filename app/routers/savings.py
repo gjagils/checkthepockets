@@ -381,10 +381,17 @@ def plan_detail(
             category_totals[line.id] = tx_totals
             for entry in line.entries:
                 actual = tx_totals.get(entry.month)
+                # Een maand telt als "ingepland" wanneer er vóór deze sync al
+                # een bedrag stond (smart_fill vult alleen schema-maanden in).
+                # Buiten het schema blijft expected 0 — anders zou een kwartaal-
+                # lijn in niet-kwartaalmaanden onterecht als "niet ontvangen"
+                # rood kleuren.
+                was_scheduled = entry.amount is not None
                 if actual is not None and entry.amount != actual:
                     entry.amount = actual
+                expected_for_cell = line.default_amount if was_scheduled else Decimal("0")
                 entry.status = _determine_color_status(
-                    actual, line.default_amount, is_inc,
+                    actual, expected_for_cell, is_inc,
                     entry.month, plan.year, today,
                     month_fully_categorized=(entry.month in fully_cat_months),
                 )
