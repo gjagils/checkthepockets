@@ -785,6 +785,7 @@ def edit_line(
     frequency: str = Form("monthly"),
     default_amount: str = Form("0"),
     target_month: int = Form(0),
+    is_income: str = Form(""),
     amount_1: str = Form(""), amount_2: str = Form(""), amount_3: str = Form(""),
     amount_4: str = Form(""), amount_5: str = Form(""), amount_6: str = Form(""),
     amount_7: str = Form(""), amount_8: str = Form(""), amount_9: str = Form(""),
@@ -812,7 +813,16 @@ def edit_line(
     cat = db.query(Category).filter(Category.id == cat_id, Category.user_id == user.id).first()
     if not cat:
         return RedirectResponse(f"/savings/{line.plan_id}?error=category_required", status_code=302)
-    line_is_income = cat.is_income
+
+    # is_income wordt primair bepaald door de gekoppelde categorie; de form-override
+    # laat toe om een regel lokaal als inkomen/uitgave te markeren (bv. "Extra storting"
+    # onder een uitgave-categorie die je als terug-gestorte inkomst wil boeken).
+    if is_income in ("1", "true"):
+        line_is_income = 1
+    elif is_income in ("0", "false"):
+        line_is_income = 0
+    else:
+        line_is_income = cat.is_income
 
     try:
         amount = Decimal(default_amount.replace(",", "."))

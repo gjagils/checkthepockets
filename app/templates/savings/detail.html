@@ -87,6 +87,13 @@
                 </select>
             </div>
             <div class="form-group">
+                <label>Type</label>
+                <select name="is_income">
+                    <option value="0" {% if not line.is_income %}selected{% endif %}>Uitgave</option>
+                    <option value="1" {% if line.is_income %}selected{% endif %}>Inkomen</option>
+                </select>
+            </div>
+            <div class="form-group">
                 <label>Frequentie</label>
                 <select name="frequency" onchange="toggleEditTargetMonth({{ line.id }}, this.value)">
                     {% for key, label in frequency_labels.items() %}
