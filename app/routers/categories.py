@@ -12,6 +12,24 @@ from app.template_config import templates
 router = APIRouter(prefix="/categories")
 
 
+def _categories_redirect(
+    account_id: int | None = None,
+    show_archived: int = 0,
+    error: str | None = None,
+) -> str:
+    """Bouw een /categories-URL die de actieve filters (rekening, archief)
+    behoudt na een mutatie. Optioneel een ?error= query param voor flash-meldingen."""
+    parts: list[str] = []
+    if account_id:
+        parts.append(f"account_id={int(account_id)}")
+    if show_archived:
+        parts.append("show_archived=1")
+    if error:
+        parts.append(f"error={error}")
+    qs = "&".join(parts)
+    return "/categories" + (f"?{qs}" if qs else "")
+
+
 @router.get("")
 def categories_list(
     request: Request,
@@ -82,6 +100,8 @@ def create_category(
     parent_id: int = Form(0),
     color: str = Form(""),
     is_income: int = Form(0),
+    redirect_account_id: int = Form(0),
+    redirect_show_archived: int = Form(0),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
@@ -96,7 +116,10 @@ def create_category(
             .first()
         )
         if not account:
-            return RedirectResponse("/categories", status_code=302)
+            return RedirectResponse(
+                _categories_redirect(redirect_account_id, redirect_show_archived),
+                status_code=302,
+            )
 
     if par_id:
         parent = (
@@ -105,7 +128,10 @@ def create_category(
             .first()
         )
         if not parent:
-            return RedirectResponse("/categories", status_code=302)
+            return RedirectResponse(
+                _categories_redirect(redirect_account_id, redirect_show_archived),
+                status_code=302,
+            )
         acc_id = parent.account_id
         is_income = parent.is_income
 
@@ -129,10 +155,13 @@ def create_category(
     db.add(cat)
     db.commit()
 
-    redirect = "/categories"
-    if acc_id:
-        redirect += f"?account_id={acc_id}"
-    return RedirectResponse(redirect, status_code=302)
+    # Bij creatie: als de gebruiker een filter op een rekening had staan,
+    # die behouden. Anders (geen filter) geen auto-switch naar de nieuwe
+    # rekening, dat zou verwarrend zijn.
+    return RedirectResponse(
+        _categories_redirect(redirect_account_id, redirect_show_archived),
+        status_code=302,
+    )
 
 
 @router.post("/{category_id}/edit")
@@ -146,6 +175,8 @@ def edit_category(
     exclude_from_budget: int = Form(0),
     exclude_from_totals: int = Form(0),
     parent_id: int = Form(-1),  # -1 = niet opgegeven, 0 = hoofdcategorie, >0 = onder die parent
+    redirect_account_id: int = Form(0),
+    redirect_show_archived: int = Form(0),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
@@ -156,7 +187,10 @@ def edit_category(
         .first()
     )
     if not cat:
-        return RedirectResponse("/categories", status_code=302)
+        return RedirectResponse(
+            _categories_redirect(redirect_account_id, redirect_show_archived),
+            status_code=302,
+        )
 
     acc_id = account_id if account_id else None
 
@@ -167,7 +201,10 @@ def edit_category(
             .first()
         )
         if not account:
-            return RedirectResponse("/categories", status_code=302)
+            return RedirectResponse(
+                _categories_redirect(redirect_account_id, redirect_show_archived),
+                status_code=302,
+            )
 
     cat.name = name.strip()
     cat.color = color.strip() or None
@@ -185,7 +222,10 @@ def edit_category(
         new_parent_id: int | None = parent_id if parent_id > 0 else None
 
         if new_parent_id == category_id:
-            return RedirectResponse("/categories?error=invalid_parent", status_code=302)
+            return RedirectResponse(
+                _categories_redirect(redirect_account_id, redirect_show_archived, error="invalid_parent"),
+                status_code=302,
+            )
 
         if new_parent_id is not None:
             new_parent = (
@@ -198,7 +238,10 @@ def edit_category(
                 .first()
             )
             if not new_parent:
-                return RedirectResponse("/categories?error=invalid_parent", status_code=302)
+                return RedirectResponse(
+                    _categories_redirect(redirect_account_id, redirect_show_archived, error="invalid_parent"),
+                    status_code=302,
+                )
 
             # Kan deze categorie wel subcategorie worden?
             has_children = (
@@ -207,7 +250,10 @@ def edit_category(
                 .first()
             ) is not None
             if has_children:
-                return RedirectResponse("/categories?error=has_children", status_code=302)
+                return RedirectResponse(
+                    _categories_redirect(redirect_account_id, redirect_show_archived, error="has_children"),
+                    status_code=302,
+                )
 
             cat.parent_id = new_parent.id
             # Erf account_id en is_income van de nieuwe hoofdcategorie zodat
@@ -238,13 +284,18 @@ def edit_category(
             child.is_income = is_income
 
     db.commit()
-    return RedirectResponse("/categories", status_code=302)
+    return RedirectResponse(
+        _categories_redirect(redirect_account_id, redirect_show_archived),
+        status_code=302,
+    )
 
 
 @router.post("/{category_id}/archive")
 def archive_category(
     request: Request,
     category_id: int,
+    redirect_account_id: int = Form(0),
+    redirect_show_archived: int = Form(0),
     db: Session = Depends(get_db),
 ):
     """Toggle is_archived on a category (and its children)."""
@@ -265,7 +316,10 @@ def archive_category(
         ).update({"is_archived": new_state})
         db.commit()
 
-    return RedirectResponse("/categories", status_code=302)
+    return RedirectResponse(
+        _categories_redirect(redirect_account_id, redirect_show_archived),
+        status_code=302,
+    )
 
 
 @router.post("/merge")
@@ -273,19 +327,23 @@ def merge_categories(
     request: Request,
     from_id: int = Form(...),
     to_id: int = Form(...),
+    redirect_account_id: int = Form(0),
+    redirect_show_archived: int = Form(0),
     db: Session = Depends(get_db),
 ):
     """Move all transactions from category A to category B, then delete A."""
     user = require_login(request, db)
 
+    redirect_url = _categories_redirect(redirect_account_id, redirect_show_archived)
+
     if from_id == to_id:
-        return RedirectResponse("/categories", status_code=302)
+        return RedirectResponse(redirect_url, status_code=302)
 
     from_cat = db.query(Category).filter(Category.id == from_id, Category.user_id == user.id).first()
     to_cat = db.query(Category).filter(Category.id == to_id, Category.user_id == user.id).first()
 
     if not from_cat or not to_cat:
-        return RedirectResponse("/categories", status_code=302)
+        return RedirectResponse(redirect_url, status_code=302)
 
     # Move all transactions
     db.query(Transaction).filter(Transaction.category_id == from_id).update(
@@ -301,7 +359,7 @@ def merge_categories(
     db.delete(from_cat)
     db.commit()
 
-    return RedirectResponse("/categories", status_code=302)
+    return RedirectResponse(redirect_url, status_code=302)
 
 
 class ReorderItem(BaseModel):
@@ -341,9 +399,13 @@ def reorder_categories(
 def delete_category(
     request: Request,
     category_id: int,
+    redirect_account_id: int = Form(0),
+    redirect_show_archived: int = Form(0),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
+
+    redirect_url = _categories_redirect(redirect_account_id, redirect_show_archived)
 
     cat = (
         db.query(Category)
@@ -351,7 +413,7 @@ def delete_category(
         .first()
     )
     if not cat:
-        return RedirectResponse("/categories", status_code=302)
+        return RedirectResponse(redirect_url, status_code=302)
 
     db.query(Category).filter(
         Category.parent_id == category_id,
@@ -361,4 +423,4 @@ def delete_category(
     db.delete(cat)
     db.commit()
 
-    return RedirectResponse("/categories", status_code=302)
+    return RedirectResponse(redirect_url, status_code=302)

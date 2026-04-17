@@ -1,5 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Categorieën - Check Your Pockets{% endblock %}
+
+{% macro filter_state() %}
+<input type="hidden" name="redirect_account_id" value="{{ current_account_id or 0 }}">
+<input type="hidden" name="redirect_show_archived" value="{{ 1 if show_archived else 0 }}">
+{% endmacro %}
+
 {% block content %}
 <div class="page-header">
     <h1>Categorieën</h1>
@@ -18,6 +24,7 @@
     <div class="card">
         <h2>Hoofdcategorie toevoegen</h2>
         <form method="post" action="/categories">
+            {{ filter_state() }}
             <div class="form-stack">
                 <div class="form-group">
                     <label for="cat_name">Naam</label>
@@ -50,6 +57,7 @@
     <div class="card">
         <h2>Subcategorie toevoegen</h2>
         <form method="post" action="/categories">
+            {{ filter_state() }}
             <div class="form-stack">
                 <div class="form-group">
                     <label for="sub_parent">Hoofdcategorie</label>
@@ -134,12 +142,14 @@
                     <td class="nowrap">
                         <button type="button" class="btn btn-sm" onclick="toggleEdit('cat-{{ cat.id }}')">Bewerk</button>
                         <form method="post" action="/categories/{{ cat.id }}/archive" style="display:inline;">
+                            {{ filter_state() }}
                             <button type="submit" class="btn btn-sm" title="{{ 'Dearchiveren' if cat.is_archived else 'Archiveren' }}">
                                 {{ '↩' if cat.is_archived else '🗄' }}
                             </button>
                         </form>
                         <form method="post" action="/categories/{{ cat.id }}/delete" style="display:inline;"
                               onsubmit="return confirm('Hoofdcategorie en alle subcategorieën verwijderen?')">
+                            {{ filter_state() }}
                             <button type="submit" class="btn btn-sm btn-danger">X</button>
                         </form>
                     </td>
@@ -147,6 +157,7 @@
                 <tr class="edit-row" id="cat-{{ cat.id }}" style="display:none;">
                     <td colspan="8">
                         <form method="post" action="/categories/{{ cat.id }}/edit" class="filter-bar" style="flex-wrap:wrap; padding:0.5rem 0;">
+                            {{ filter_state() }}
                             <div class="form-group">
                                 <label>Naam</label>
                                 <input type="text" name="name" value="{{ cat.name }}" required>
@@ -207,12 +218,14 @@
                     <td class="nowrap">
                         <button type="button" class="btn btn-sm" onclick="toggleEdit('cat-{{ sub.id }}')">Bewerk</button>
                         <form method="post" action="/categories/{{ sub.id }}/archive" style="display:inline;">
+                            {{ filter_state() }}
                             <button type="submit" class="btn btn-sm" title="{{ 'Dearchiveren' if sub.is_archived else 'Archiveren' }}">
                                 {{ '↩' if sub.is_archived else '🗄' }}
                             </button>
                         </form>
                         <form method="post" action="/categories/{{ sub.id }}/delete" style="display:inline;"
                               onsubmit="return confirm('Subcategorie verwijderen?')">
+                            {{ filter_state() }}
                             <button type="submit" class="btn btn-sm btn-danger">X</button>
                         </form>
                     </td>
@@ -220,6 +233,7 @@
                 <tr class="edit-row" id="cat-{{ sub.id }}" style="display:none;">
                     <td colspan="8">
                         <form method="post" action="/categories/{{ sub.id }}/edit" class="filter-bar" style="flex-wrap:wrap; padding:0.5rem 0;">
+                            {{ filter_state() }}
                             <div class="form-group">
                                 <label>Naam</label>
                                 <input type="text" name="name" value="{{ sub.name }}" required>
@@ -282,6 +296,7 @@
         Alle transacties van de broncategorie worden verplaatst naar de doelcategorie. De bron wordt daarna verwijderd.
     </p>
     <form method="post" action="/categories/merge" class="filter-bar" style="flex-wrap:wrap;">
+        {{ filter_state() }}
         <div class="form-group">
             <label>Van (bron)</label>
             <select name="from_id" required>
@@ -311,6 +326,41 @@
 {% endif %}
 
 <script>
+// Scroll-positie bewaren over categorie-mutaties heen. We slaan vlak voor
+// een submit de huidige scrollY op in sessionStorage en herstellen die op
+// de volgende pageload. Per-pagina key zodat andere schermen niet in de
+// weg zitten.
+(function() {
+    var KEY = 'categoriesScrollY';
+
+    // Na reload: saldo herstellen en direct wissen.
+    var saved = sessionStorage.getItem(KEY);
+    if (saved !== null) {
+        sessionStorage.removeItem(KEY);
+        var y = parseInt(saved, 10);
+        if (!isNaN(y)) {
+            // requestAnimationFrame zodat het gebeurt na layout-paint,
+            // anders negeert de browser de scroll bij 'instant' navigatie.
+            window.requestAnimationFrame(function() {
+                window.scrollTo({ top: y, left: 0, behavior: 'instant' });
+            });
+        }
+    }
+
+    // Sla scrollY op zodra een formulier dat naar /categories* post submit.
+    document.addEventListener('submit', function(e) {
+        var form = e.target;
+        if (!form || !form.action) return;
+        var a = form.getAttribute('action') || '';
+        if (a.indexOf('/categories') !== 0 && a.indexOf('/categories/') === -1) {
+            // Alleen categorieën-mutaties opslaan; filter-GET mag ook.
+            // Maar andere forms op de pagina laten we met rust.
+            return;
+        }
+        sessionStorage.setItem(KEY, String(window.scrollY));
+    }, true);
+})();
+
 function toggleEdit(id) {
     var row = document.getElementById(id);
     row.style.display = row.style.display === 'none' ? '' : 'none';

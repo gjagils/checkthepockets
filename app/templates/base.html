@@ -25,7 +25,7 @@
         else 'financien' if path in ['/transactions', '/categories', '/rules', '/recurring'] or path.startswith('/transactions')
         else 'budgetten' if path.startswith('/budgets') or path.startswith('/savings')
         else 'analyse' if path.startswith('/analytics') or path.startswith('/portfolio') or path.startswith('/networth')
-        else 'rekeningen' if path.startswith('/accounts') or path.startswith('/import') or path.startswith('/banking')
+        else 'rekeningen' if path.startswith('/accounts') or path.startswith('/import') or path.startswith('/banking') or path.startswith('/persons')
         else '' %}
     {% set inbox_count = request.state.inbox_count if request.state.inbox_count is defined else 0 %}
     <div class="navbar-wrapper">
@@ -78,6 +78,7 @@
                 <a href="/networth" class="{{ 'active' if path.startswith('/networth') }}">Vermogen</a>
             {% elif main_active == 'rekeningen' %}
                 <a href="/accounts" class="{{ 'active' if path.startswith('/accounts') }}">Rekeningen</a>
+                <a href="/persons" class="{{ 'active' if path.startswith('/persons') }}">Personen</a>
                 <a href="/import" class="{{ 'active' if path.startswith('/import') }}">Importeren</a>
                 <a href="/banking/connect" class="{{ 'active' if path.startswith('/banking') }}">Bankkoppeling</a>
             {% endif %}
@@ -127,6 +128,7 @@
                     <a href="/accounts" class="m-nav-main {{ 'active' if main_active == 'rekeningen' }}">Rekeningen</a>
                     <div class="m-nav-children">
                         <a href="/accounts" class="{{ 'active' if path.startswith('/accounts') }}">Rekeningen</a>
+                        <a href="/persons" class="{{ 'active' if path.startswith('/persons') }}">Personen</a>
                         <a href="/import" class="{{ 'active' if path.startswith('/import') }}">Importeren</a>
                         <a href="/banking/connect" class="{{ 'active' if path.startswith('/banking') }}">Bankkoppeling</a>
                     </div>

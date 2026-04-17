@@ -6,7 +6,7 @@ from fastapi.responses import RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import PortfolioAsset, PortfolioPerson, PortfolioHolding, PortfolioPriceSnapshot
+from app.models import PortfolioAsset, Person, PortfolioHolding, PortfolioPriceSnapshot
 from app.auth import require_login
 from app.portfolio_prices import fetch_price, fetch_historical_prices, PRESET_ASSETS
 from app.template_config import templates
@@ -30,9 +30,9 @@ def portfolio_overview(
         .all()
     )
     persons = (
-        db.query(PortfolioPerson)
-        .filter(PortfolioPerson.user_id == user.id)
-        .order_by(PortfolioPerson.name)
+        db.query(Person)
+        .filter(Person.user_id == user.id)
+        .order_by(Person.sort_order, Person.name)
         .all()
     )
     holdings = (
@@ -148,7 +148,8 @@ def add_person(
     user = require_login(request, db)
     name = name.strip()
     if name:
-        person = PortfolioPerson(user_id=user.id, name=name)
+        max_order = db.query(Person).filter(Person.user_id == user.id).count()
+        person = Person(user_id=user.id, name=name, sort_order=max_order)
         db.add(person)
         db.commit()
     return RedirectResponse("/portfolio", status_code=302)
@@ -161,9 +162,9 @@ def delete_person(
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
-    person = db.query(PortfolioPerson).filter(
-        PortfolioPerson.id == person_id,
-        PortfolioPerson.user_id == user.id,
+    person = db.query(Person).filter(
+        Person.id == person_id,
+        Person.user_id == user.id,
     ).first()
     if person:
         db.delete(person)
@@ -273,8 +274,8 @@ def save_holding(
     asset = db.query(PortfolioAsset).filter(
         PortfolioAsset.id == asset_id, PortfolioAsset.user_id == user.id
     ).first()
-    person = db.query(PortfolioPerson).filter(
-        PortfolioPerson.id == person_id, PortfolioPerson.user_id == user.id
+    person = db.query(Person).filter(
+        Person.id == person_id, Person.user_id == user.id
     ).first()
     if not asset or not person:
         return JSONResponse({"ok": False}, status_code=400)

@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Personen - Check Your Pockets{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Personen</h1>
+</div>
+
+<div class="card" style="margin-bottom:1.5rem;">
+    <p class="muted" style="margin-bottom:0.75rem;">
+        Personen zijn eigenaren van spaarrekeningen en beleggingen. Zo kun je
+        kapitaalontwikkeling zien per persoon of per duo (bijv. "Samen", "Partner",
+        "Ikzelf", "Kind 1", "Kind 2"). Een rekening kan meerdere eigenaren hebben.
+    </p>
+    <form method="post" action="/persons" style="display:flex; gap:0.5rem; max-width:480px;">
+        <input type="text" name="name" placeholder="Nieuwe persoon"
+               required class="budget-input"
+               style="flex:1; text-align:left; width:auto;">
+        <button type="submit" class="btn btn-primary">Toevoegen</button>
+    </form>
+</div>
+
+{% if persons %}
+<div class="card">
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:60px;">Volgorde</th>
+                    <th>Naam</th>
+                    <th class="text-right" style="width:180px;">Acties</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for person in persons %}
+                <tr>
+                    <td class="nowrap">
+                        <form method="post" action="/persons/{{ person.id }}/move" style="display:inline;">
+                            <input type="hidden" name="direction" value="up">
+                            <button type="submit" class="btn btn-sm"
+                                    {% if loop.first %}disabled{% endif %}>↑</button>
+                        </form>
+                        <form method="post" action="/persons/{{ person.id }}/move" style="display:inline;">
+                            <input type="hidden" name="direction" value="down">
+                            <button type="submit" class="btn btn-sm"
+                                    {% if loop.last %}disabled{% endif %}>↓</button>
+                        </form>
+                    </td>
+                    <td>
+                        <form method="post" action="/persons/{{ person.id }}/rename" style="display:flex; gap:0.5rem;">
+                            <input type="text" name="name" value="{{ person.name }}"
+                                   class="budget-input"
+                                   style="flex:1; text-align:left; width:auto; max-width:320px;">
+                            <button type="submit" class="btn btn-sm">Opslaan</button>
+                        </form>
+                    </td>
+                    <td class="text-right">
+                        <form method="post" action="/persons/{{ person.id }}/delete" style="display:inline;"
+                              onsubmit="return confirm('{{ person.name }} verwijderen? Alle koppelingen met beleggingen en rekeningen gaan verloren.');">
+                            <button type="submit" class="btn btn-sm btn-danger">Verwijderen</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="card" style="text-align:center; padding:3rem;">
+    <p class="muted">Nog geen personen aangemaakt. Voeg hierboven je eerste persoon toe.</p>
+</div>
+{% endif %}
+{% endblock %}
