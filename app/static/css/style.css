@@ -817,17 +817,24 @@ tfoot td { background: var(--surface-2); border-top: 1px solid var(--border); fo
 /* ===== Savings Planner ===== */
 .savings-top-bar { display: flex; justify-content: space-between; align-items: flex-end; gap: 1rem; }
 .savings-grid { min-width: 900px; border-collapse: separate; border-spacing: 0; }
-.savings-table-wrap { overflow-x: auto; overflow-y: visible; max-height: none; }
 
-/* Sticky thead (onder de sticky navbar van 92px op desktop / 52px op mobiel) */
-.savings-grid thead th {
-    position: sticky;
-    top: 92px;
-    z-index: 4;
-    background: var(--surface-2);
+/* Excel-stijl scrollbox: maand-header bovenaan en saldo-rij onderaan blijven
+   altijd zichtbaar, regel-kolom blijft links. Box scrolt zelf in beide
+   richtingen; sticky is daardoor stabiel binnen één container. */
+.savings-table-wrap {
+    overflow: auto;
+    max-height: calc(100vh - 220px);
 }
 @media (max-width: 768px) {
-    .savings-grid thead th { top: 52px; }
+    .savings-table-wrap { max-height: calc(100vh - 160px); }
+}
+
+.savings-grid thead tr { background: var(--surface-2); }
+.savings-grid thead th {
+    position: sticky;
+    top: 0;
+    z-index: 4;
+    background: var(--surface-2);
 }
 .savings-grid th.sticky-col,
 .savings-grid td.sticky-col {
@@ -839,10 +846,11 @@ tfoot td { background: var(--surface-2); border-top: 1px solid var(--border); fo
     max-width: 240px;
     border-right: 1px solid var(--border);
 }
+/* Regel-kolom in de sticky header: bovenhoek-cell blijft op beide assen zichtbaar */
 .savings-grid th.sticky-col { background: var(--surface-2); z-index: 6; }
 .savings-grid th.month-col { min-width: 90px; white-space: nowrap; }
 
-/* Sticky saldo-rij onderaan: blijft zichtbaar tijdens scrollen */
+/* Saldo-rij: plakt onderin de scrollbox */
 .savings-grid tr.balance-row td {
     position: sticky;
     bottom: 0;
