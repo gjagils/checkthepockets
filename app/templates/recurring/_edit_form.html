@@ -20,6 +20,15 @@
     </div>
     <div class="rule-condition">
         <div class="form-group">
+            <label>Rekening {% if not item.account_id %}<small class="muted">(nog niet gekoppeld)</small>{% endif %}</label>
+            <select name="account_id">
+                <option value="" {% if not item.account_id %}selected{% endif %}>— geen rekening —</option>
+                {% for acc in accounts %}
+                <option value="{{ acc.id }}" {% if item.account_id == acc.id %}selected{% endif %}>{{ acc.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
             <label>Categorie <span style="color:var(--ctp-danger);">*</span></label>
             <select name="category_id" required>
                 <option value="" disabled {% if not item.category_id %}selected{% endif %}>Kies een categorie…</option>

@@ -391,6 +391,17 @@ def transaction_list(
             proj_q = proj_q.filter(Transaction.date >= proj_date_from)
         if proj_date_to:
             proj_q = proj_q.filter(Transaction.date <= proj_date_to)
+        if account_id:
+            # Toon alleen projecties op geselecteerde rekening, plus items zonder
+            # rekening-koppeling (legacy / backward compat).
+            proj_q = proj_q.outerjoin(
+                RecurringTransaction, Transaction.recurring_id == RecurringTransaction.id
+            ).filter(
+                or_(
+                    Transaction.account_id == account_id,
+                    RecurringTransaction.account_id.is_(None),
+                )
+            )
         projected_transactions = proj_q.order_by(Transaction.date.asc()).all()
 
         # For each projected tx, find candidate real transactions (match on counterparty + amount)
