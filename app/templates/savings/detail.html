@@ -172,6 +172,10 @@
 <div class="alert alert-danger" style="margin-bottom:1rem;">Kies een categorie — spaarregels moeten aan een categorie gekoppeld zijn.</div>
 {% endif %}
 
+{% if request.query_params.get('error') == 'parent_required' %}
+<div class="alert alert-danger" style="margin-bottom:1rem;">Kies een hoofdcategorie — nieuwe categorieën via snel-toevoegen worden altijd subcategorieën.</div>
+{% endif %}
+
 {% if ai_suggestions %}
 <div class="card" style="margin-bottom:1rem; border-left:4px solid var(--gold);">
     <h3 style="margin-bottom:0.75rem;">✨ AI-voorstellen voor spaarplan</h3>
@@ -390,14 +394,19 @@
 
             <div id="qa-new-category" style="display:none; margin-bottom:1rem;">
                 <div class="form-group" style="margin-bottom:0.5rem;">
-                    <label>Naam nieuwe categorie</label>
+                    <label>Ouder-categorie (hoofdcategorie)</label>
+                    <select name="new_category_parent_id" id="qa-new-cat-parent">
+                        <option value="">— Kies hoofdcategorie —</option>
+                        {% for cat in categories if not cat.parent_id %}
+                        <option value="{{ cat.id }}">{{ cat.name }}{% if cat.is_income %} (inkomen){% endif %}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:0.5rem;">
+                    <label>Naam nieuwe subcategorie</label>
                     <input type="text" name="new_category_name" id="qa-new-cat-name" oninput="qaPrefillName()" placeholder="bv. Spaarbijdrage">
                 </div>
-                <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.85rem;">
-                    <input type="checkbox" name="new_category_is_income" value="1">
-                    Inkomen-categorie
-                </label>
-                <p class="muted" style="font-size:0.75rem; margin-top:0.4rem;">Wordt aangemaakt op rekening <strong>{{ plan.account.name }}</strong>.</p>
+                <p class="muted" style="font-size:0.75rem; margin-top:0.4rem;">Nieuwe categorie wordt als <strong>subcategorie</strong> aangemaakt onder de gekozen hoofdcategorie (erft rekening &amp; inkomen/uitgave).</p>
             </div>
 
             <!-- ── Stap 2 — Optionele regel ────────────────── -->
@@ -437,7 +446,7 @@
                         {% endfor %}
                     </select>
                 </div>
-                <div class="form-group" style="flex:1; min-width:100px;">
+                <div class="form-group" id="qa-default-amount-group" style="flex:1; min-width:100px;">
                     <label>Bedrag per keer</label>
                     <input type="text" name="default_amount" value="0" placeholder="0,00">
                 </div>
@@ -448,6 +457,17 @@
                         <option value="{{ m }}">{{ months[m] }}</option>
                         {% endfor %}
                     </select>
+                </div>
+            </div>
+            <div class="form-group" id="qa-custom-amounts-group" style="display:none; flex-basis:100%; margin-top:0.75rem;">
+                <label>Bedrag per maand <span class="muted" style="font-weight:normal; font-size:0.78rem;">(leeg = niet ingepland)</span></label>
+                <div class="custom-amounts-grid">
+                    {% for m in range(1, 13) %}
+                    <div class="custom-amount-cell">
+                        <label for="qa-amount-{{ m }}">{{ months[m] }}</label>
+                        <input type="text" name="amount_{{ m }}" id="qa-amount-{{ m }}" placeholder="-" inputmode="decimal">
+                    </div>
+                    {% endfor %}
                 </div>
             </div>
 
@@ -588,16 +608,19 @@ function qaToggleCategoryMode(mode) {
     var fresh = document.getElementById('qa-new-category');
     var selExisting = document.getElementById('qa-category-select');
     var newName = document.getElementById('qa-new-cat-name');
+    var newParent = document.getElementById('qa-new-cat-parent');
     if (mode === 'new') {
         existing.style.display = 'none';
         fresh.style.display = '';
         if (selExisting) selExisting.disabled = true;
         if (newName) newName.required = true;
+        if (newParent) newParent.required = true;
     } else {
         existing.style.display = '';
         fresh.style.display = 'none';
         if (selExisting) selExisting.disabled = false;
         if (newName) newName.required = false;
+        if (newParent) newParent.required = false;
     }
     qaPrefillName();
 }
@@ -630,6 +653,19 @@ document.addEventListener('DOMContentLoaded', function () {
 function qaToggleTargetMonth(freq) {
     var group = document.getElementById('qa-target-month-group');
     var label = document.getElementById('qa-target-month-label');
+    var defGroup = document.getElementById('qa-default-amount-group');
+    var customGroup = document.getElementById('qa-custom-amounts-group');
+
+    if (freq === 'custom') {
+        if (group) group.style.display = 'none';
+        if (defGroup) defGroup.style.display = 'none';
+        if (customGroup) customGroup.style.display = '';
+        return;
+    }
+
+    if (defGroup) defGroup.style.display = '';
+    if (customGroup) customGroup.style.display = 'none';
+
     if (!group) return;
     if (freq === 'monthly') {
         group.style.display = 'none';
