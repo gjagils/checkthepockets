@@ -796,10 +796,11 @@ tfoot td { background: var(--surface-2); border-top: 1px solid var(--border); fo
 }
 
 /* ===== Accounts Grid ===== */
-.accounts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
+.accounts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; align-items: stretch; }
+.account-card { display: flex; flex-direction: column; }
 .account-card .account-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
 .account-card h3 { font-size: 1rem; margin-bottom: 0.25rem; }
-.account-actions { margin-top: 1rem; display: flex; gap: 0.5rem; }
+.account-actions { margin-top: auto; padding-top: 1rem; display: flex; gap: 0.5rem; }
 
 /* ===== Format List ===== */
 .format-list { list-style: none; padding: 0; }
