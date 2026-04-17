@@ -8,6 +8,7 @@
 {% if accounts %}
 <div class="accounts-grid">
     {% for acc in accounts %}
+    {% set owner_ids = acc.owners | map(attribute='id') | list %}
     <div class="card account-card">
         <h3 style="margin:0 0 0.5rem 0; color:var(--text, #1a1a1a);">{{ acc.name or (acc.iban or acc.bank|upper) }}</h3>
         <div class="account-header">
@@ -17,6 +18,29 @@
         {% if acc.iban %}
         <p class="muted" style="font-size:0.85rem; margin-top:0.5rem;">{{ acc.iban }}</p>
         {% endif %}
+
+        <div style="margin-top:0.75rem; padding-top:0.75rem; border-top:1px solid var(--ctp-border);">
+            <div style="font-size:0.8rem; font-weight:600; margin-bottom:0.35rem;">Eigenaar(s)</div>
+            {% if persons %}
+            <form method="post" action="/accounts/{{ acc.id }}/owners">
+                <div style="display:flex; flex-wrap:wrap; gap:0.35rem 0.75rem; margin-bottom:0.5rem;">
+                    {% for p in persons %}
+                    <label style="display:flex; align-items:center; gap:0.25rem; font-size:0.85rem;">
+                        <input type="checkbox" name="owner_id" value="{{ p.id }}"
+                               {% if p.id in owner_ids %}checked{% endif %}>
+                        {{ p.name }}
+                    </label>
+                    {% endfor %}
+                </div>
+                <button type="submit" class="btn btn-sm">Eigenaar opslaan</button>
+            </form>
+            {% else %}
+            <p class="muted" style="font-size:0.8rem; margin:0;">
+                Nog geen personen. <a href="/persons">Voeg hier een persoon toe</a>.
+            </p>
+            {% endif %}
+        </div>
+
         <div class="account-actions">
             <a href="/?account_id={{ acc.id }}" class="btn btn-sm">Bekijk transacties</a>
             <form method="post" action="/accounts/{{ acc.id }}/delete" style="display:inline;"

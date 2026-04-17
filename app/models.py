@@ -9,11 +9,22 @@ from sqlalchemy import (
     Text,
     ForeignKey,
     UniqueConstraint,
+    Table,
 )
 from sqlalchemy.orm import relationship
 
 from app.database import Base
 from app.crypto import EncryptedText
+
+
+# Many-to-many: een Account heeft 0..N eigenaren (Persons); een Person kan
+# eigenaar zijn van meerdere rekeningen. Composite PK.
+account_owners = Table(
+    "account_owners",
+    Base.metadata,
+    Column("account_id", Integer, ForeignKey("accounts.id", ondelete="CASCADE"), primary_key=True),
+    Column("person_id", Integer, ForeignKey("persons.id", ondelete="CASCADE"), primary_key=True),
+)
 
 
 class User(Base):
@@ -42,7 +53,7 @@ class User(Base):
     rules = relationship("Rule", back_populates="user", cascade="all, delete-orphan")
     recurring_transactions = relationship("RecurringTransaction", back_populates="user", cascade="all, delete-orphan")
     portfolio_assets = relationship("PortfolioAsset", back_populates="user", cascade="all, delete-orphan")
-    portfolio_persons = relationship("PortfolioPerson", back_populates="user", cascade="all, delete-orphan")
+    persons = relationship("Person", back_populates="user", cascade="all, delete-orphan")
     portfolio_holdings = relationship("PortfolioHolding", back_populates="user", cascade="all, delete-orphan")
     networth_accounts = relationship("NetWorthAccount", back_populates="user", cascade="all, delete-orphan")
     networth_snapshots = relationship("NetWorthSnapshot", back_populates="user", cascade="all, delete-orphan")
@@ -85,6 +96,10 @@ class Account(Base):
     )
     savings_plans = relationship(
         "SavingsPlan", back_populates="account", cascade="all, delete-orphan"
+    )
+    owners = relationship(
+        "Person", secondary=account_owners, back_populates="accounts",
+        order_by="Person.sort_order",
     )
 
     __table_args__ = (
@@ -317,16 +332,20 @@ class PortfolioAsset(Base):
     holdings = relationship("PortfolioHolding", back_populates="asset", cascade="all, delete-orphan")
 
 
-class PortfolioPerson(Base):
-    __tablename__ = "portfolio_persons"
+class Person(Base):
+    __tablename__ = "persons"
 
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     name = Column(String(100), nullable=False)
+    sort_order = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
-    user = relationship("User", back_populates="portfolio_persons")
+    user = relationship("User", back_populates="persons")
     holdings = relationship("PortfolioHolding", back_populates="person", cascade="all, delete-orphan")
+    accounts = relationship(
+        "Account", secondary=account_owners, back_populates="owners",
+    )
 
 
 class PortfolioHolding(Base):
@@ -335,12 +354,12 @@ class PortfolioHolding(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     asset_id = Column(Integer, ForeignKey("portfolio_assets.id", ondelete="CASCADE"), nullable=False)
-    person_id = Column(Integer, ForeignKey("portfolio_persons.id", ondelete="CASCADE"), nullable=False)
+    person_id = Column(Integer, ForeignKey("persons.id", ondelete="CASCADE"), nullable=False)
     quantity = Column(Numeric(16, 8), default=0)
 
     user = relationship("User", back_populates="portfolio_holdings")
     asset = relationship("PortfolioAsset", back_populates="holdings")
-    person = relationship("PortfolioPerson", back_populates="holdings")
+    person = relationship("Person", back_populates="holdings")
 
     __table_args__ = (
         UniqueConstraint("user_id", "asset_id", "person_id", name="uq_holding_user_asset_person"),

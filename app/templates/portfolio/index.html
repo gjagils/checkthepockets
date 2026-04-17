@@ -14,6 +14,9 @@
     <!-- Personen -->
     <div class="card">
         <h2>Personen</h2>
+        <p class="muted" style="font-size:0.85rem; margin-bottom:0.75rem;">
+            Personen zijn globaal: ze zijn ook eigenaren van spaarrekeningen.
+        </p>
         {% for person in persons %}
         <div style="display:flex; justify-content:space-between; align-items:center; padding:0.4rem 0; border-bottom:1px solid var(--ctp-border);">
             <span>{{ person.name }}</span>
@@ -26,6 +29,7 @@
             <input type="text" name="name" placeholder="Naam" required class="budget-input" style="flex:1; text-align:left; width:auto;">
             <button type="submit" class="btn btn-sm btn-primary">Toevoegen</button>
         </form>
+        <a href="/persons" class="muted" style="display:inline-block; margin-top:0.6rem; font-size:0.85rem;">Uitgebreid beheer →</a>
     </div>
 
     <!-- Asset toevoegen -->
