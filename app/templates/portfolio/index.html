@@ -97,6 +97,7 @@
                     {% for person in persons %}
                     <th class="text-right">{{ person.name }}<br><span class="muted" style="font-weight:400;">Aantal</span></th>
                     <th class="text-right"><span class="muted" style="font-weight:400;">Waarde</span></th>
+                    <th class="text-right" title="Maandelijkse storting (positief) of onttrekking (negatief) in euro"><span class="muted" style="font-weight:400;">Mnd € ±</span></th>
                     {% endfor %}
                     <th class="text-right" style="border-left:2px solid var(--ctp-border);">Totaal</th>
                     <th class="text-right">Groei/mnd</th>
@@ -120,6 +121,7 @@
                     {% for person in persons %}
                     {% set qty = holdings_map.get((asset.id, person.id), 0) %}
                     {% set val = qty * asset.current_price_eur %}
+                    {% set contrib = contribution_map.get((asset.id, person.id), 0) %}
                     <td class="text-right">
                         <input type="text" class="budget-input"
                                data-asset-id="{{ asset.id }}"
@@ -130,6 +132,16 @@
                                style="width:90px;">
                     </td>
                     <td class="text-right nowrap muted">&euro;&nbsp;{{ val|euro }}</td>
+                    <td class="text-right">
+                        <input type="text" class="budget-input"
+                               data-asset-id="{{ asset.id }}"
+                               data-person-id="{{ person.id }}"
+                               value="{{ "%.2f"|format(contrib or 0) }}"
+                               onblur="saveContribution(this)"
+                               onkeydown="if(event.key==='Enter')this.blur()"
+                               title="Maandelijkse storting (+) of onttrekking (-) in euro"
+                               style="width:80px;">
+                    </td>
                     {% endfor %}
                     <td class="text-right nowrap" style="border-left:2px solid var(--ctp-border); font-weight:700;">
                         &euro;&nbsp;{{ asset_totals.get(asset.id, 0)|euro }}
@@ -144,6 +156,7 @@
                     {% for person in persons %}
                     <td></td>
                     <td class="text-right nowrap"><strong>&euro;&nbsp;{{ person_totals.get(person.id, 0)|euro }}</strong></td>
+                    <td></td>
                     {% endfor %}
                     <td class="text-right nowrap" style="border-left:2px solid var(--ctp-border);">
                         <strong>&euro;&nbsp;{{ grand_total|euro }}</strong>
@@ -236,7 +249,17 @@
 {% if chart_data and chart_data.past|length > 0 and grand_total > 0 %}
 <div class="card">
     <h2>Waardeverloop {{ current_year }}</h2>
-    <p class="muted" style="margin-bottom:1rem;">Verleden op basis van historische prijzen, toekomst op basis van groeipercentage.</p>
+    <p class="muted" style="margin-bottom:1rem;">Verleden op basis van historische prijzen, toekomst op basis van groeipercentage{% set total_contrib = asset_contributions.values()|sum %}{% if total_contrib %} incl. &euro;&nbsp;{{ total_contrib|euro }}/mnd storting{% endif %}.</p>
+    {% set contrib_assets = [] %}
+    {% for asset in assets %}{% if asset_contributions.get(asset.id) %}{% set _ = contrib_assets.append(asset) %}{% endif %}{% endfor %}
+    {% if contrib_assets %}
+    <ul class="muted" style="font-size:0.85rem; margin:0 0 1rem 1.25rem;">
+        {% for asset in contrib_assets %}
+        {% set c = asset_contributions.get(asset.id) %}
+        <li>{{ asset.name }}: &euro;&nbsp;{{ c|euro }}/mnd{% if c < 0 %} (onttrekking){% else %} (storting){% endif %}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
     <div style="position:relative; height:320px;">
         <canvas id="portfolioChart"></canvas>
     </div>
@@ -308,6 +331,33 @@ function saveHolding(input) {
                 input.classList.remove('budget-saved');
             }, 600);
             // Reload to update totals
+            setTimeout(function() { location.reload(); }, 700);
+        }
+    });
+}
+
+function saveContribution(input) {
+    var assetId = input.dataset.assetId;
+    var personId = input.dataset.personId;
+    var value = input.value.trim().replace(',', '.');
+
+    var formData = new FormData();
+    formData.append('asset_id', assetId);
+    formData.append('person_id', personId);
+    formData.append('contribution', value);
+
+    fetch('/portfolio/holdings/save-contribution', {
+        method: 'POST',
+        body: formData,
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.ok) {
+            input.classList.add('budget-saved');
+            setTimeout(function() {
+                input.classList.remove('budget-saved');
+            }, 600);
+            // Reload to update projection chart
             setTimeout(function() { location.reload(); }, 700);
         }
     });

@@ -50,23 +50,30 @@ def portfolio_overview(
     )
 
     # Build holdings matrix: {(asset_id, person_id): quantity}
+    # en een contributie-map {(asset_id, person_id): monthly_contribution_eur}
     holdings_map = {}
+    contribution_map = {}
     for h in holdings:
         holdings_map[(h.asset_id, h.person_id)] = h.quantity
+        contribution_map[(h.asset_id, h.person_id)] = h.monthly_contribution_eur or Decimal("0")
 
     # Calculate totals per person
     person_totals = {p.id: Decimal("0") for p in persons}
     asset_totals = {}
+    asset_contributions = {}
     grand_total = Decimal("0")
 
     for asset in assets:
         asset_total = Decimal("0")
+        asset_contribution = Decimal("0")
         for person in persons:
             qty = holdings_map.get((asset.id, person.id), Decimal("0"))
             value = qty * asset.current_price_eur
             person_totals[person.id] += value
             asset_total += value
+            asset_contribution += contribution_map.get((asset.id, person.id), Decimal("0"))
         asset_totals[asset.id] = asset_total
+        asset_contributions[asset.id] = asset_contribution
         grand_total += asset_total
 
     # Build chart data for portfolio value over time
@@ -120,13 +127,21 @@ def portfolio_overview(
                 else:
                     chart_data["future"].append(None)
             else:
-                # Future: project from current value using growth
+                # Future: project from current value using growth + monthly contribution.
+                # Per asset simuleren we maand-voor-maand van current_month tot `month`:
+                #   value = (value + contribution) * (1 + growth/100)
+                # zodat stortingen gestapeld groeien en onttrekkingen (negatief) het
+                # saldo verlagen.
                 chart_data["past"].append(None)
                 months_ahead = month - current_month
                 month_total = Decimal("0")
                 for asset in assets:
-                    growth = (1 + asset.monthly_growth_pct / 100) ** months_ahead
-                    month_total += asset_totals.get(asset.id, Decimal("0")) * growth
+                    value = asset_totals.get(asset.id, Decimal("0"))
+                    contribution = asset_contributions.get(asset.id, Decimal("0"))
+                    growth_factor = Decimal("1") + (asset.monthly_growth_pct / Decimal("100"))
+                    for _ in range(months_ahead):
+                        value = (value + contribution) * growth_factor
+                    month_total += value
                 chart_data["future"].append(float(round(month_total, 2)))
 
     return templates.TemplateResponse(
@@ -137,8 +152,10 @@ def portfolio_overview(
             "assets": assets,
             "persons": persons,
             "holdings_map": holdings_map,
+            "contribution_map": contribution_map,
             "person_totals": person_totals,
             "asset_totals": asset_totals,
+            "asset_contributions": asset_contributions,
             "grand_total": grand_total,
             "chart_data": chart_data,
             "current_year": current_year,
@@ -315,6 +332,55 @@ def save_holding(
     db.commit()
     value = float(qty * asset.current_price_eur)
     return JSONResponse({"ok": True, "quantity": float(qty), "value": value})
+
+
+@router.post("/holdings/save-contribution")
+def save_contribution(
+    request: Request,
+    asset_id: int = Form(...),
+    person_id: int = Form(...),
+    contribution: str = Form("0"),
+    db: Session = Depends(get_db),
+):
+    """Sla een maandelijkse storting (positief) of onttrekking (negatief) op
+    voor een specifieke (asset, person)-combinatie. Gebruikt voor de
+    projectie-grafiek zodat toekomstige maanden realistisch meegroeien."""
+    user = require_login(request, db)
+
+    asset = db.query(PortfolioAsset).filter(
+        PortfolioAsset.id == asset_id, PortfolioAsset.user_id == user.id
+    ).first()
+    person = db.query(Person).filter(
+        Person.id == person_id, Person.user_id == user.id
+    ).first()
+    if not asset or not person:
+        return JSONResponse({"ok": False}, status_code=400)
+
+    try:
+        amount = Decimal(contribution.strip().replace(",", ".") or "0")
+    except (InvalidOperation, ValueError):
+        return JSONResponse({"ok": False}, status_code=400)
+
+    holding = db.query(PortfolioHolding).filter(
+        PortfolioHolding.user_id == user.id,
+        PortfolioHolding.asset_id == asset_id,
+        PortfolioHolding.person_id == person_id,
+    ).first()
+
+    if holding:
+        holding.monthly_contribution_eur = amount
+    else:
+        holding = PortfolioHolding(
+            user_id=user.id,
+            asset_id=asset_id,
+            person_id=person_id,
+            quantity=Decimal("0"),
+            monthly_contribution_eur=amount,
+        )
+        db.add(holding)
+
+    db.commit()
+    return JSONResponse({"ok": True, "contribution": float(amount)})
 
 
 @router.post("/refresh-prices")

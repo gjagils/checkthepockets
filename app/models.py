@@ -362,6 +362,7 @@ class PortfolioHolding(Base):
     asset_id = Column(Integer, ForeignKey("portfolio_assets.id", ondelete="CASCADE"), nullable=False)
     person_id = Column(Integer, ForeignKey("persons.id", ondelete="CASCADE"), nullable=False)
     quantity = Column(Numeric(16, 8), default=0)
+    monthly_contribution_eur = Column(Numeric(12, 2), default=0)
 
     user = relationship("User", back_populates="portfolio_holdings")
     asset = relationship("PortfolioAsset", back_populates="holdings")
