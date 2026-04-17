@@ -187,18 +187,23 @@ Selectie-volgorde binnen de kandidaten: **priority desc** → **createdAt asc** 
 
 ### Auto-merge regels
 
-- **Alleen mergen als**: alle GitHub Actions checks groen, PR heeft geen review-requested labels, diff < 500 regels, niet op beschermde paths (`.github/workflows/`, `alembic/versions/`, `stack.env`, `deploy.sh`).
-- **Squash-merge altijd**, branch wordt verwijderd.
-- Bij groter of gevoeliger werk: zet zelf een `needs-review`-label op de Linear-issue vóór de run — dan maakt Claude wél een PR maar merged niet.
+**Basisregel:** zodra de PR-CI groen is, mag Claude direct squash-mergen naar `main` (branch wordt verwijderd). Diffgrootte, beschermde paths en bestandstype zijn géén blokker meer — groene tests = klaar voor productie.
+
+**Uitzonderingen waarbij Claude wél eerst wacht op handmatige review:**
+- Er staat een `needs-review`-label op de Linear-issue of op de PR.
+- De gebruiker heeft expliciet gevraagd om eerst te reviewen.
+- CI faalt of is nog niet aanwezig (zie volgende sectie).
+
+**Squash-merge altijd**, branch wordt verwijderd.
 
 ### CI-vereiste voor auto-merge
 
-Expliciet: auto-merge mag **alleen** als er een PR-level CI-workflow is die groen staat. De workflow `.github/workflows/ci.yml` (job `test`) vervult die rol en draait op elke `pull_request` naar `main`.
+Auto-merge mag **alleen** als er een PR-level CI-workflow is die groen staat. De workflow `.github/workflows/ci.yml` (job `test`) vervult die rol en draait op elke `pull_request` naar `main`.
 
-- **Met groene PR-CI** → Claude mag auto-mergen (mits alle andere auto-merge regels kloppen).
-- **Zonder PR-CI** (bv. docs-only PR die geen CI triggert) → auto-merge alleen toegestaan wanneer aan **alle** onderstaande voldaan is:
+- **Met groene PR-CI** → Claude mag direct mergen.
+- **Zonder PR-CI** (bv. docs-only PR die geen CI triggert) → auto-merge alleen als de wijziging echt triviaal en veilig is:
   - Diff ≤ 50 regels
-  - Alleen wijzigingen in: `**.md`, `.claude/**`, `app/templates/**`, `app/static/**` (docs of static assets)
+  - Alleen `**.md`, `.claude/**`, `app/templates/**`, `app/static/**` (docs of static assets)
   - Geen Python-code, migrations, workflows, compose-files of secrets aangepast
 - **Anders** → zet de Linear-issue op `In Review` of gebruik het `needs-review`-label; Claude maakt de PR maar merged niet.
 
