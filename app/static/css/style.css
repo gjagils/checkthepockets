@@ -895,32 +895,23 @@ tfoot td { background: var(--surface-2); border-top: 1px solid var(--border); fo
 .cell-input:focus { outline: none; }
 .cell-display { display: block; padding: 0.15rem 0; font-size: 0.82rem; font-variant-numeric: tabular-nums; }
 
-/* Compact spaar-rij: icoontjes als top-rij, titelrij met freq-badge + naam. */
-.line-actions-row {
+/* Compact spaar-rij: freq-badge linksboven, actie-iconen rechtsboven, titel onder. */
+.line-head-row {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 4px;
     margin-bottom: 4px;
 }
-.line-actions-row form { margin: 0; line-height: 0; }
-.line-category-hint {
-    font-family: var(--font-heading);
-    font-size: 0.62rem;
-    color: var(--sky);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    font-weight: 700;
-    margin-left: auto;
-    padding-left: 0.25rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 110px;
+.line-actions-right {
+    display: flex;
+    align-items: center;
+    gap: 4px;
 }
+.line-actions-right form { margin: 0; line-height: 0; }
 .line-title-row {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
     padding-bottom: 3px;
     border-bottom: 2px solid transparent;
 }
