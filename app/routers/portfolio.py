@@ -69,22 +69,46 @@ def portfolio_overview(
 
     # Calculate totals per person
     person_totals = {p.id: Decimal("0") for p in persons}
+    person_cash_totals = {p.id: Decimal("0") for p in persons}
     asset_totals = {}
+    asset_cash_totals = {}
     asset_contributions = {}
     grand_total = Decimal("0")
+    grand_cash_total = Decimal("0")
 
     for asset in assets:
         asset_total = Decimal("0")
         asset_contribution = Decimal("0")
+        fee_fixed = asset.cashout_fee_fixed_eur or Decimal("0")
+        fee_pct = asset.cashout_fee_pct or Decimal("0")
         for person in persons:
             qty = holdings_map.get((asset.id, person.id), Decimal("0"))
             value = qty * asset.current_price_eur
             person_totals[person.id] += value
             asset_total += value
             asset_contribution += contribution_map.get((asset.id, person.id), Decimal("0"))
+        # Cashout voor hele asset: eerst pct over gross, dan vaste fee eraf,
+        # clamp op 0 zodat een te hoge fee nooit een negatief bedrag oplevert.
+        if asset_total > 0:
+            cash = asset_total - (asset_total * fee_pct / Decimal("100")) - fee_fixed
+            if cash < 0:
+                cash = Decimal("0")
+        else:
+            cash = Decimal("0")
         asset_totals[asset.id] = asset_total
+        asset_cash_totals[asset.id] = cash
         asset_contributions[asset.id] = asset_contribution
         grand_total += asset_total
+        grand_cash_total += cash
+        # Verdeel de cash evenredig over personen naar hun aandeel in asset_total
+        # zodat som(person_cash) exact gelijk is aan grand_cash_total.
+        if asset_total > 0 and cash > 0:
+            for person in persons:
+                qty = holdings_map.get((asset.id, person.id), Decimal("0"))
+                value_p = qty * asset.current_price_eur
+                if value_p > 0:
+                    share = value_p / asset_total
+                    person_cash_totals[person.id] += cash * share
 
     # Build chart data for portfolio value over time
     now = datetime.date.today()
@@ -164,9 +188,12 @@ def portfolio_overview(
             "holdings_map": holdings_map,
             "contribution_map": contribution_map,
             "person_totals": person_totals,
+            "person_cash_totals": person_cash_totals,
             "asset_totals": asset_totals,
+            "asset_cash_totals": asset_cash_totals,
             "asset_contributions": asset_contributions,
             "grand_total": grand_total,
+            "grand_cash_total": grand_cash_total,
             "chart_data": chart_data,
             "current_year": current_year,
             "preset_assets": PRESET_ASSETS,
@@ -221,6 +248,8 @@ def add_asset(
     ticker: str = Form(""),
     exchange: str = Form(""),
     manual_price: str = Form(""),
+    cashout_fee_fixed_eur: str = Form("0"),
+    cashout_fee_pct: str = Form("0"),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
@@ -240,6 +269,19 @@ def add_asset(
         ticker=ticker.strip() or None,
         exchange=exchange.strip() or None,
     )
+
+    try:
+        asset.cashout_fee_fixed_eur = Decimal(
+            (cashout_fee_fixed_eur or "0").strip().replace(",", ".") or "0"
+        )
+    except (InvalidOperation, ValueError):
+        asset.cashout_fee_fixed_eur = Decimal("0")
+    try:
+        asset.cashout_fee_pct = Decimal(
+            (cashout_fee_pct or "0").strip().replace(",", ".") or "0"
+        )
+    except (InvalidOperation, ValueError):
+        asset.cashout_fee_pct = Decimal("0")
 
     # Optional manual initial price (useful for stocks where there's no auto-fetch)
     manual = manual_price.strip().replace(",", ".")
@@ -266,6 +308,8 @@ def edit_asset(
     manual_price: str = Form(""),
     ticker: str | None = Form(None),
     exchange: str | None = Form(None),
+    cashout_fee_fixed_eur: str | None = Form(None),
+    cashout_fee_pct: str | None = Form(None),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
@@ -299,6 +343,22 @@ def edit_asset(
         asset.ticker = ticker.strip() or None
     if exchange is not None:
         asset.exchange = exchange.strip() or None
+
+    # Cashout fees (only update if submitted)
+    if cashout_fee_fixed_eur is not None:
+        try:
+            asset.cashout_fee_fixed_eur = Decimal(
+                cashout_fee_fixed_eur.strip().replace(",", ".") or "0"
+            )
+        except (InvalidOperation, ValueError):
+            pass
+    if cashout_fee_pct is not None:
+        try:
+            asset.cashout_fee_pct = Decimal(
+                cashout_fee_pct.strip().replace(",", ".") or "0"
+            )
+        except (InvalidOperation, ValueError):
+            pass
 
     db.commit()
     return RedirectResponse("/portfolio", status_code=302)

@@ -95,6 +95,16 @@
                 <label>Verwachte maandelijkse groei (%)</label>
                 <input type="text" name="monthly_growth_pct" placeholder="0,5" inputmode="decimal">
             </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem;">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Opname fee vast (&euro;) <span class="muted" style="font-weight:normal;">(optioneel)</span></label>
+                    <input type="text" name="cashout_fee_fixed_eur" placeholder="0,00" inputmode="decimal">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Opname fee (%) <span class="muted" style="font-weight:normal;">(optioneel)</span></label>
+                    <input type="text" name="cashout_fee_pct" placeholder="0,00" inputmode="decimal">
+                </div>
+            </div>
             <button type="submit" class="btn btn-primary">Toevoegen</button>
         </form>
     </div>
@@ -203,6 +213,8 @@
     <p class="muted" style="margin-bottom:1rem;">Wat elke asset waard is bij opname, per persoon.</p>
     {% for asset in assets %}
     {% set atotal = asset_totals.get(asset.id, 0) %}
+    {% set acash = asset_cash_totals.get(asset.id, 0) %}
+    {% set has_fees = (asset.cashout_fee_fixed_eur and asset.cashout_fee_fixed_eur > 0) or (asset.cashout_fee_pct and asset.cashout_fee_pct > 0) %}
     {% if atotal > 0 %}
     <div style="margin-bottom:1.25rem; padding-bottom:1rem; border-bottom:1px solid var(--ctp-border);">
         <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:0.5rem;">
@@ -213,6 +225,16 @@
             <span class="muted">Prijs per eenheid:</span>
             <span>&euro;&nbsp;{{ asset.current_price_eur|euro }}</span>
         </div>
+        {% if has_fees %}
+        <div style="display:flex; justify-content:space-between; margin-bottom:0.25rem; color:var(--ctp-denim);">
+            <span>Contant na aftrek
+                {%- if asset.cashout_fee_fixed_eur and asset.cashout_fee_fixed_eur > 0 %} &euro;&nbsp;{{ asset.cashout_fee_fixed_eur|euro }}{% endif %}
+                {%- if (asset.cashout_fee_fixed_eur and asset.cashout_fee_fixed_eur > 0) and (asset.cashout_fee_pct and asset.cashout_fee_pct > 0) %} +{% endif %}
+                {%- if asset.cashout_fee_pct and asset.cashout_fee_pct > 0 %} {{ asset.cashout_fee_pct }}%{% endif %}:
+            </span>
+            <span style="font-weight:700;">&euro;&nbsp;{{ acash|euro }}</span>
+        </div>
+        {% endif %}
         {% for person in persons %}
         {% set qty = holdings_map.get((asset.id, person.id), 0) %}
         {% set val = qty * asset.current_price_eur %}
@@ -249,6 +271,8 @@
                     <th title="Alleen voor aandelen">Beurs</th>
                     <th>Groei/mnd (%)</th>
                     <th>Handmatige prijs</th>
+                    <th title="Vaste opnamekosten in euro">Opname fee (&euro;)</th>
+                    <th title="Variabele opnamekosten als percentage">Opname fee (%)</th>
                     <th></th>
                     <th></th>
                 </tr>
@@ -264,6 +288,8 @@
                     <td><input type="text" name="exchange" value="{{ asset.exchange or '' }}" class="budget-input" style="width:130px; text-align:left;" placeholder="{% if asset.asset_class == 'stock' %}Euronext Amsterdam{% else %}-{% endif %}"></td>
                     <td><input type="text" name="monthly_growth_pct" value="{{ asset.monthly_growth_pct }}" class="budget-input" style="width:70px;"></td>
                     <td><input type="text" name="manual_price" placeholder="{{ "%.2f"|format(asset.current_price_eur) }}" class="budget-input" style="width:100px;"></td>
+                    <td><input type="text" name="cashout_fee_fixed_eur" value="{{ asset.cashout_fee_fixed_eur or 0 }}" class="budget-input" style="width:80px;"></td>
+                    <td><input type="text" name="cashout_fee_pct" value="{{ asset.cashout_fee_pct or 0 }}" class="budget-input" style="width:70px;"></td>
                     <td><button type="submit" class="btn btn-sm">Opslaan</button></td>
                     </form>
                     <td>

@@ -334,6 +334,8 @@ class PortfolioAsset(Base):
     current_price_eur = Column(Numeric(16, 4), default=0)
     price_updated_at = Column(DateTime, nullable=True)
     monthly_growth_pct = Column(Numeric(6, 2), default=0)
+    cashout_fee_fixed_eur = Column(Numeric(12, 2), default=0)
+    cashout_fee_pct = Column(Numeric(6, 2), default=0)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     user = relationship("User", back_populates="portfolio_assets")
