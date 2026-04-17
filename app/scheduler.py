@@ -6,7 +6,7 @@ Uses APScheduler to run scheduled background jobs.
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from pytz import timezone as pytz_timezone
@@ -17,6 +17,98 @@ logger = logging.getLogger(__name__)
 
 NL_TZ = pytz_timezone("Europe/Amsterdam")
 scheduler = BackgroundScheduler(timezone=NL_TZ)
+
+
+def compute_digest_stats(db, user_id: int, now_utc: datetime | None = None):
+    """Compute (per_account, uncat_total, new_total) voor de weekly digest.
+
+    - per_account: lijst van (account_naam, aantal nieuwe transacties in de
+      laatste 7 dagen o.b.v. boekdatum). Accounts zonder nieuwe transacties
+      worden weggelaten.
+    - uncat_total: totaal aantal transacties in de inbox (zonder categorie,
+      excl. splits/projecties/excluded).
+    - new_total: som van per_account.
+    """
+    from sqlalchemy import func
+    from app.models import Account, Transaction
+    from app.routers.inbox import inbox_count
+
+    today = (now_utc or datetime.utcnow()).date()
+    since = today - timedelta(days=7)
+
+    rows = (
+        db.query(Account.name, func.count(Transaction.id))
+        .join(Transaction, Transaction.account_id == Account.id)
+        .filter(
+            Account.user_id == user_id,
+            Transaction.date >= since,
+            Transaction.is_projected == 0,
+            Transaction.is_excluded == 0,
+        )
+        .group_by(Account.name)
+        .order_by(func.count(Transaction.id).desc(), Account.name)
+        .all()
+    )
+    per_account = [(name, int(cnt)) for name, cnt in rows]
+    new_total = sum(c for _, c in per_account)
+    uncat_total = inbox_count(db, user_id)
+    return per_account, uncat_total, new_total
+
+
+def _run_weekly_digests():
+    """Hourly tick: stuurt een digest naar users waarvan nu het ingestelde
+    dag+uur (Europe/Amsterdam) overeenkomt en die hem de afgelopen 6 dagen
+    nog niet hebben gehad. Skip lege weken (0 nieuw + 0 uncat)."""
+    from app.database import SessionLocal
+    from app.models import User
+    from app.email_service import send_weekly_digest
+
+    now_nl = datetime.now(NL_TZ)
+    now_weekday = now_nl.weekday()
+    now_hour = now_nl.hour
+    threshold = datetime.utcnow() - timedelta(days=6)
+
+    db = SessionLocal()
+    try:
+        candidates = (
+            db.query(User)
+            .filter(
+                User.weekly_digest_enabled == 1,
+                User.is_active == 1,
+                User.email.isnot(None),
+                User.weekly_digest_weekday == now_weekday,
+                User.weekly_digest_hour == now_hour,
+            )
+            .all()
+        )
+        if not candidates:
+            return
+
+        for user in candidates:
+            if user.weekly_digest_last_sent_at and user.weekly_digest_last_sent_at > threshold:
+                continue
+            per_account, uncat_total, new_total = compute_digest_stats(db, user.id)
+            if new_total == 0 and uncat_total == 0:
+                continue
+            sent = send_weekly_digest(
+                to=user.email,
+                username=user.username,
+                per_account=per_account,
+                uncat_total=uncat_total,
+                new_total=new_total,
+            )
+            if sent:
+                user.weekly_digest_last_sent_at = datetime.utcnow()
+                db.commit()
+                logger.info("Weekly digest verzonden naar %s (new=%d, uncat=%d)",
+                            user.email, new_total, uncat_total)
+            else:
+                logger.warning("Weekly digest verzenden faalde voor %s", user.email)
+    except Exception as e:
+        logger.error("Weekly digest run faalde: %s", e)
+        db.rollback()
+    finally:
+        db.close()
 
 
 def _sync_all_bank_connections():
@@ -153,6 +245,16 @@ def start_scheduler():
             replace_existing=True,
         )
         logger.info("Bank sync ingepland om 01:00 en 17:00 Europe/Amsterdam")
+
+    scheduler.add_job(
+        _run_weekly_digests,
+        "cron",
+        minute=0,
+        timezone=NL_TZ,
+        id="weekly_digest",
+        replace_existing=True,
+    )
+    logger.info("Weekly digest tick ingepland elk heel uur (Europe/Amsterdam)")
 
     if scheduler.get_jobs():
         scheduler.start()

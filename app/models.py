@@ -29,6 +29,12 @@ class User(Base):
     last_login_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
+    # Weekly digest voorkeuren — opt-in, jouw eigen ritme.
+    weekly_digest_enabled = Column(Integer, default=0)        # 1 = abonneer, 0 = uit
+    weekly_digest_weekday = Column(Integer, default=4)        # 0=ma ... 6=zo, default vrijdag
+    weekly_digest_hour = Column(Integer, default=8)           # 0..23 in Europe/Amsterdam
+    weekly_digest_last_sent_at = Column(DateTime, nullable=True)
+
     accounts = relationship("Account", back_populates="user", cascade="all, delete-orphan")
     categories = relationship("Category", back_populates="user", cascade="all, delete-orphan")
     savings_plans = relationship("SavingsPlan", back_populates="user", cascade="all, delete-orphan")

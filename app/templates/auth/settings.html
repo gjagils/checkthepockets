@@ -45,6 +45,43 @@
 </div>
 
 <div class="card">
+    <h2>Weekly digest</h2>
+    <p style="color:var(--muted); font-size:0.9rem; margin-bottom:1.25rem;">
+        Krijg periodiek een mail met hoeveel transacties er zijn binnengekomen per rekening
+        en hoeveel er nog gereviewd moeten worden — met een knop naar je inbox.
+        Je kunt 'm altijd weer uitschakelen. Standaard staat hij uit.
+    </p>
+    {% if digest_success %}<div class="alert alert-success">{{ digest_success }}</div>{% endif %}
+    <form method="post" action="/settings/digest" class="filter-bar" style="flex-wrap:wrap; align-items:flex-end;">
+        <div class="form-group" style="flex:1; min-width:200px;">
+            <label>
+                <input type="checkbox" name="enabled" value="1" {% if user.weekly_digest_enabled %}checked{% endif %}>
+                Weekly digest per email ontvangen
+            </label>
+        </div>
+        <div class="form-group">
+            <label for="digest_weekday">Dag</label>
+            <select id="digest_weekday" name="weekday">
+                {% for d, label in [(0,'Maandag'),(1,'Dinsdag'),(2,'Woensdag'),(3,'Donderdag'),(4,'Vrijdag'),(5,'Zaterdag'),(6,'Zondag')] %}
+                <option value="{{ d }}" {% if user.weekly_digest_weekday == d %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="digest_hour">Tijd</label>
+            <select id="digest_hour" name="hour">
+                {% for h in range(0, 24) %}
+                <option value="{{ h }}" {% if user.weekly_digest_hour == h %}selected{% endif %}>{{ "%02d:00"|format(h) }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group" style="align-self:flex-end;">
+            <button type="submit" class="btn btn-primary">Opslaan</button>
+        </div>
+    </form>
+</div>
+
+<div class="card">
     <h2>Wachtwoord wijzigen</h2>
     {% if errors %}
     <div class="alert alert-error">
