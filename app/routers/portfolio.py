@@ -16,19 +16,27 @@ router = APIRouter(prefix="/portfolio")
 MONTH_LABELS = ["Jan", "Feb", "Mrt", "Apr", "Mei", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dec"]
 
 
+ASSET_TYPE_LABELS = {
+    "stock": "Beleggingen",
+    "crypto": "Crypto",
+    "metal": "Edelmetaal",
+}
+
+
 @router.get("")
 def portfolio_overview(
     request: Request,
+    type: str | None = Query(None),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
 
-    assets = (
-        db.query(PortfolioAsset)
-        .filter(PortfolioAsset.user_id == user.id)
-        .order_by(PortfolioAsset.asset_class, PortfolioAsset.name)
-        .all()
-    )
+    filter_type = type if type in ASSET_TYPE_LABELS else None
+
+    asset_query = db.query(PortfolioAsset).filter(PortfolioAsset.user_id == user.id)
+    if filter_type:
+        asset_query = asset_query.filter(PortfolioAsset.asset_class == filter_type)
+    assets = asset_query.order_by(PortfolioAsset.asset_class, PortfolioAsset.name).all()
     persons = (
         db.query(Person)
         .filter(Person.user_id == user.id)
@@ -135,6 +143,8 @@ def portfolio_overview(
             "chart_data": chart_data,
             "current_year": current_year,
             "preset_assets": PRESET_ASSETS,
+            "filter_type": filter_type,
+            "filter_type_label": ASSET_TYPE_LABELS.get(filter_type) if filter_type else None,
         },
     )
 
