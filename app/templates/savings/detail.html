@@ -103,7 +103,21 @@
 <div class="page-header">
     <div>
         <h1>{{ plan.account.name }} - {{ plan.year }}</h1>
-        <p class="muted">Startsaldo: &euro;&nbsp;{{ plan.starting_balance|euro }}{% if plan.account.iban %} &middot; {{ plan.account.iban }}{% endif %}</p>
+        <p class="muted">
+            Startsaldo:
+            <span class="starting-balance-wrap" style="display:inline-flex; align-items:center; gap:0.25rem;">
+                <span id="starting-balance-display"
+                      onclick="startEditStartingBalance()"
+                      title="Klik om het startsaldo aan te passen"
+                      style="cursor:pointer; text-decoration:underline dotted; text-underline-offset:3px;">&euro;&nbsp;{{ plan.starting_balance|euro }}</span>
+                <input type="text" id="starting-balance-input" class="cell-input"
+                       style="display:none; width:7rem;"
+                       value="{{ "%.2f"|format(plan.starting_balance or 0) }}"
+                       onblur="saveStartingBalance()"
+                       onkeydown="startingBalanceKeydown(event)">
+            </span>
+            {% if plan.account.iban %} &middot; {{ plan.account.iban }}{% endif %}
+        </p>
     </div>
     <div style="display:flex; gap:0.5rem;">
         <button type="button" class="btn btn-primary" onclick="openQuickAdd()">+ Snel toevoegen</button>
@@ -532,6 +546,75 @@ function toggleEditRow(lineId) {
     } else {
         row.style.display = 'none';
     }
+}
+
+// ── Startsaldo inline-edit ───────────────────────────────────────────
+function fmtEuroSigned(val) {
+    var sign = val < 0 ? '-' : '';
+    var abs = Math.abs(val).toFixed(2).replace('.', ',');
+    // Add thousand separators (dots)
+    var parts = abs.split(',');
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return '\u20AC\u00A0' + sign + parts.join(',');
+}
+
+function startEditStartingBalance() {
+    var d = document.getElementById('starting-balance-display');
+    var i = document.getElementById('starting-balance-input');
+    if (!d || !i) return;
+    d.style.display = 'none';
+    i.style.display = 'inline-block';
+    i.focus();
+    i.select();
+}
+
+function startingBalanceKeydown(e) {
+    if (e.key === 'Enter') {
+        e.target.blur();
+    } else if (e.key === 'Escape') {
+        var d = document.getElementById('starting-balance-display');
+        var i = document.getElementById('starting-balance-input');
+        i.style.display = 'none';
+        d.style.display = '';
+    }
+}
+
+function saveStartingBalance() {
+    var d = document.getElementById('starting-balance-display');
+    var i = document.getElementById('starting-balance-input');
+    if (!d || !i) return;
+
+    var newValue = i.value.trim().replace(',', '.');
+    i.style.display = 'none';
+    d.style.display = '';
+
+    var formData = new FormData();
+    formData.append('starting_balance', newValue);
+
+    fetch('/savings/{{ plan.id }}/starting-balance', {
+        method: 'POST',
+        body: formData,
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (!data.ok) {
+            if (data.error) alert(data.error);
+            return;
+        }
+        d.innerHTML = fmtEuroSigned(data.starting_balance);
+        i.value = data.starting_balance.toFixed(2);
+
+        if (data.running_balances) {
+            for (var m in data.running_balances) {
+                var balCell = document.querySelector('.balance-cell[data-month="' + m + '"]');
+                if (balCell) {
+                    var bal = data.running_balances[m];
+                    var cls = bal >= 0 ? 'amount-positive' : 'amount-negative';
+                    balCell.innerHTML = '<strong class="' + cls + '">' + fmtEuro(bal) + '</strong>';
+                }
+            }
+        }
+    });
 }
 
 // ── Snel-toevoegen-modal ────────────────────────────────────────────
