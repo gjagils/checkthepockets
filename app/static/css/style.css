@@ -895,16 +895,57 @@ tfoot td { background: var(--surface-2); border-top: 1px solid var(--border); fo
 .cell-input:focus { outline: none; }
 .cell-display { display: block; padding: 0.15rem 0; font-size: 0.82rem; font-variant-numeric: tabular-nums; }
 
-.line-info-row { display: flex; align-items: center; gap: 0.5rem; }
-.line-actions-stack { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
-.line-actions-stack form { margin: 0; line-height: 0; }
+/* Compact spaar-rij: icoontjes als top-rij, titelrij met freq-badge + naam. */
+.line-actions-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 4px;
+}
+.line-actions-row form { margin: 0; line-height: 0; }
+.line-category-hint {
+    font-family: var(--font-heading);
+    font-size: 0.62rem;
+    color: var(--sky);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+    margin-left: auto;
+    padding-left: 0.25rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 110px;
+}
+.line-title-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding-bottom: 3px;
+    border-bottom: 2px solid transparent;
+}
+.line-title-row.line-has-category { border-bottom-color: var(--sky); }
+.line-freq-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 0.65rem;
+    font-weight: 800;
+    font-family: var(--font-heading);
+    flex-shrink: 0;
+    line-height: 1;
+}
 .btn-icon { padding: 0.2rem 0.4rem; font-size: 0.8rem; line-height: 1; min-width: 24px; text-align: center; border-radius: 4px; }
 /* Neutraal grijs in rust, subtiele rode hover — zodat een destructieve icoon-knop visueel
    in de icoon-stack past (niet afwijkt met een rood randje zoals .btn-danger doet). */
 .btn-icon-danger:hover { background: rgba(248, 113, 113, 0.12); color: var(--red); border-color: var(--red); }
-.line-name { font-weight: 700; font-size: 0.875rem; }
-.line-category { font-size: 0.7rem; color: var(--sky); font-weight: 700; font-family: var(--font-heading); }
-.line-freq { font-size: 0.67rem; color: var(--muted); }
+.line-name { font-weight: 700; font-size: 0.875rem; line-height: 1.15; }
 
 .section-header td {
     background: var(--surface-2);

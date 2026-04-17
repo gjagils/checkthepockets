@@ -3,28 +3,28 @@
 {% block container_class %}container-wide{% endblock %}
 
 {% macro render_line(line) %}
+{% set freq_letter = {'monthly':'M','quarterly':'K','biannual':'H','yearly':'J','one-off':'E'}.get(line.frequency, '?') %}
+{% set freq_label = frequency_labels.get(line.frequency, line.frequency) %}
 <tr class="savings-row" data-line-id="{{ line.id }}">
     <td class="sticky-col">
-        <div class="line-info-row">
-            <div class="line-actions-stack">
-                <button type="button" class="btn btn-sm btn-icon" onclick="toggleEditRow({{ line.id }})" title="Bewerken">&#9998;</button>
-                {% if line.category_id %}
-                <form method="post" action="/savings/lines/{{ line.id }}/fill-from-transactions">
-                    <button type="submit" class="btn btn-sm btn-icon" title="Vul vanuit transacties">&#8635;</button>
-                </form>
-                {% endif %}
-                <form method="post" action="/savings/lines/{{ line.id }}/delete"
-                      onsubmit="return confirm('Regel verwijderen?')">
-                    <button type="submit" class="btn btn-sm btn-icon btn-icon-danger" title="Verwijderen">&times;</button>
-                </form>
-            </div>
-            <div>
-                <div class="line-name">{{ line.name }}</div>
-                {% if line.category %}
-                <div class="line-category">{{ line.category.name }}</div>
-                {% endif %}
-                <div class="line-freq">{{ frequency_labels.get(line.frequency, line.frequency) }}</div>
-            </div>
+        <div class="line-actions-row">
+            <button type="button" class="btn btn-sm btn-icon" onclick="toggleEditRow({{ line.id }})" title="Bewerken">&#9998;</button>
+            {% if line.category_id %}
+            <form method="post" action="/savings/lines/{{ line.id }}/fill-from-transactions" style="margin:0; line-height:0;">
+                <button type="submit" class="btn btn-sm btn-icon" title="Vul vanuit transacties">&#8635;</button>
+            </form>
+            {% endif %}
+            <form method="post" action="/savings/lines/{{ line.id }}/delete" style="margin:0; line-height:0;"
+                  onsubmit="return confirm('Regel verwijderen?')">
+                <button type="submit" class="btn btn-sm btn-icon btn-icon-danger" title="Verwijderen">&times;</button>
+            </form>
+            {% if line.category %}
+            <span class="line-category-hint" title="Gekoppeld aan categorie: {{ line.category.name }}">{{ line.category.name }}</span>
+            {% endif %}
+        </div>
+        <div class="line-title-row {% if line.category_id %}line-has-category{% endif %}">
+            <span class="line-freq-badge" title="{{ freq_label }}">{{ freq_letter }}</span>
+            <span class="line-name">{{ line.name }}</span>
         </div>
     </td>
     {% for m in range(1, 13) %}
