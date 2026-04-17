@@ -145,6 +145,7 @@ def edit_category(
     is_income: int = Form(0),
     exclude_from_budget: int = Form(0),
     exclude_from_totals: int = Form(0),
+    parent_id: int = Form(-1),  # -1 = niet opgegeven, 0 = hoofdcategorie, >0 = onder die parent
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
@@ -173,6 +174,56 @@ def edit_category(
     cat.exclude_from_budget = exclude_from_budget
     cat.exclude_from_totals = exclude_from_totals
 
+    # Hiërarchie-wijziging (alleen als de gebruiker parent_id heeft meegestuurd)
+    #   parent_id == -1 → veld ontbreekt in het formulier, niks veranderen.
+    #   parent_id == 0  → maak deze categorie hoofdcategorie (parent_id = NULL).
+    #   parent_id > 0   → zet deze categorie onder de gekozen hoofdcategorie.
+    # Een categorie met eigen subcategorieën kan NIET zelf subcategorie worden
+    # (we ondersteunen geen 3-lagen hiërarchie). Cycles worden voorkomen doordat
+    # we alleen top-level categorieën als parent toestaan.
+    if parent_id != -1:
+        new_parent_id: int | None = parent_id if parent_id > 0 else None
+
+        if new_parent_id == category_id:
+            return RedirectResponse("/categories?error=invalid_parent", status_code=302)
+
+        if new_parent_id is not None:
+            new_parent = (
+                db.query(Category)
+                .filter(
+                    Category.id == new_parent_id,
+                    Category.user_id == user.id,
+                    Category.parent_id.is_(None),
+                )
+                .first()
+            )
+            if not new_parent:
+                return RedirectResponse("/categories?error=invalid_parent", status_code=302)
+
+            # Kan deze categorie wel subcategorie worden?
+            has_children = (
+                db.query(Category.id)
+                .filter(Category.parent_id == category_id, Category.user_id == user.id)
+                .first()
+            ) is not None
+            if has_children:
+                return RedirectResponse("/categories?error=has_children", status_code=302)
+
+            cat.parent_id = new_parent.id
+            # Erf account_id en is_income van de nieuwe hoofdcategorie zodat
+            # de boom consistent blijft met hoe /categories POST nieuwe subs
+            # aanmaakt.
+            cat.account_id = new_parent.account_id
+            cat.is_income = new_parent.is_income
+        else:
+            # Wordt (weer) een hoofdcategorie. Account/is_income mag opnieuw
+            # expliciet via het formulier gezet worden.
+            cat.parent_id = None
+            cat.account_id = acc_id
+            cat.is_income = is_income
+
+    # Voor categorieën die hoofdcategorie BLIJVEN: sync account/is_income ook
+    # naar alle children, net als voorheen.
     if cat.parent_id is None:
         cat.account_id = acc_id
         cat.is_income = is_income

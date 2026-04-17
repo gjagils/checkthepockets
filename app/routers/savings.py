@@ -921,6 +921,10 @@ def quick_add_line(
     frequency: str = Form("monthly"),
     default_amount: str = Form("0"),
     target_month: int = Form(0),
+    amount_1: str = Form(""), amount_2: str = Form(""), amount_3: str = Form(""),
+    amount_4: str = Form(""), amount_5: str = Form(""), amount_6: str = Form(""),
+    amount_7: str = Form(""), amount_8: str = Form(""), amount_9: str = Form(""),
+    amount_10: str = Form(""), amount_11: str = Form(""), amount_12: str = Form(""),
     db: Session = Depends(get_db),
 ):
     """Maak in één POST een categorie (optioneel nieuw), optioneel een rule die
@@ -941,24 +945,30 @@ def quick_add_line(
     if category_mode == "new":
         name = new_category_name.strip()
         if not name:
-            return RedirectResponse(f"/savings/{plan_id}", status_code=302)
+            return RedirectResponse(f"/savings/{plan_id}?error=category_required", status_code=302)
 
-        # Optionele parent — als gegeven: nieuwe categorie wordt subcategorie,
-        # erft account_id en is_income van de parent (net als /categories POST).
-        parent: Category | None = None
-        if new_category_parent_id:
-            parent = (
-                db.query(Category)
-                .filter(
-                    Category.id == new_category_parent_id,
-                    Category.user_id == user.id,
-                )
-                .first()
+        # Nieuwe categorie via snel-toevoegen is ALTIJD een subcategorie onder een
+        # expliciet gekozen hoofdcategorie. We dwingen dat hier af zodat de boom
+        # netjes tweelagig blijft (geen losse hoofdcategorieën via deze flow).
+        if not new_category_parent_id:
+            return RedirectResponse(f"/savings/{plan_id}?error=parent_required", status_code=302)
+
+        parent = (
+            db.query(Category)
+            .filter(
+                Category.id == new_category_parent_id,
+                Category.user_id == user.id,
+                Category.parent_id.is_(None),  # parent moet zelf hoofdcategorie zijn
             )
+            .first()
+        )
+        if not parent:
+            return RedirectResponse(f"/savings/{plan_id}?error=parent_required", status_code=302)
 
-        cat_account_id = parent.account_id if parent else plan.account_id
-        cat_is_income = parent.is_income if parent else (1 if new_category_is_income else 0)
-        cat_parent_id = parent.id if parent else None
+        # Account & is_income erven van de hoofdcategorie.
+        cat_account_id = parent.account_id
+        cat_is_income = parent.is_income
+        cat_parent_id = parent.id
 
         # Voorkom duplicaten op (user, account, parent, name)
         cat = (
@@ -1028,7 +1038,22 @@ def quick_add_line(
         amount = Decimal("0")
 
     tm = target_month or None
-    months_for_line = _months_for_frequency(frequency, tm)
+
+    # Voor 'onregelmatig' (custom) komt het schema uit de 12 per-maand-velden.
+    custom_amounts: dict[int, Decimal | None] | None = None
+    if frequency == "custom":
+        custom_amounts = _parse_custom_amounts(
+            amount_1, amount_2, amount_3, amount_4, amount_5, amount_6,
+            amount_7, amount_8, amount_9, amount_10, amount_11, amount_12,
+        )
+        amount = Decimal("0")
+        annual_budget = sum(
+            (v for v in custom_amounts.values() if v is not None),
+            Decimal("0"),
+        )
+    else:
+        months_for_line = _months_for_frequency(frequency, tm)
+        annual_budget = amount * len(months_for_line)
 
     max_order = (
         db.query(func.max(SavingsLine.sort_order))
@@ -1043,13 +1068,13 @@ def quick_add_line(
         is_income=cat.is_income if cat else 0,
         frequency=frequency,
         default_amount=amount,
-        annual_budget=amount * len(months_for_line),
+        annual_budget=annual_budget,
         sort_order=max_order + 1,
     )
     db.add(line)
     db.flush()
 
-    entries = _smart_fill_entries(line, target_month=tm)
+    entries = _smart_fill_entries(line, target_month=tm, custom_amounts=custom_amounts)
     for entry in entries:
         db.add(entry)
 
