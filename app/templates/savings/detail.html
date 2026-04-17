@@ -35,16 +35,24 @@
             {% set entry.id = e.id %}
         {% endif %}
     {% endfor %}
-    <td class="text-right savings-cell cell-{{ entry.status }}"
+    {% set tx_month = '%04d-%02d' | format(plan.year, m) %}
+    {% set tx_url = '/transactions?account_id=' ~ plan.account_id ~ '&month=' ~ tx_month %}
+    {% if line.category_id %}{% set tx_url = tx_url ~ '&category_id=' ~ line.category_id %}{% endif %}
+    {% set tx_url = tx_url ~ '&back=' ~ ('/savings/' ~ plan.id) | urlencode ~ '&back_label=' ~ ('Spaarplan ' ~ plan.year) | urlencode %}
+    {% set is_future_empty = (plan.year, m) > (today.year, today.month) and entry.val is none %}
+    <td class="text-right savings-cell cell-{{ entry.status }}{% if is_future_empty %} cell-nolink{% endif %}"
         data-entry-id="{{ entry.id }}"
         data-month="{{ m }}">
-        <span class="cell-display" onclick="startEdit(this)">
+        {% if is_future_empty %}
+        <span class="cell-display">
             {% if entry.val is not none %}&euro;&nbsp;{{ entry.val|abs|euro }}{% else %}-{% endif %}
         </span>
-        <input type="text" class="cell-input" style="display:none;"
-               value="{% if entry.val is not none %}{{ "%.2f"|format(entry.val|abs) }}{% endif %}"
-               onblur="saveCell(this)"
-               onkeydown="cellKeydown(event, this)">
+        {% else %}
+        <a class="cell-display" href="{{ tx_url }}"
+           title="Bekijk transacties{% if line.category %} voor {{ line.category.name }}{% endif %} in {{ months[m] }} {{ plan.year }}">
+            {% if entry.val is not none %}&euro;&nbsp;{{ entry.val|abs|euro }}{% else %}-{% endif %}
+        </a>
+        {% endif %}
     </td>
     {% endfor %}
     <td class="text-right nowrap line-total" data-line-id="{{ line.id }}">
@@ -60,8 +68,8 @@
             </div>
             <div class="form-group">
                 <label>Categorie</label>
-                <select name="category_id">
-                    <option value="0">Geen categorie</option>
+                <select name="category_id" required>
+                    <option value="" disabled {% if not line.category_id %}selected{% endif %}>Kies categorie</option>
                     {% for cat in categories %}
                     <option value="{{ cat.id }}" {% if line.category_id == cat.id %}selected{% endif %}>{{ cat.name }}{% if cat.is_income %} (inkomen){% endif %}</option>
                     {% endfor %}
@@ -130,6 +138,10 @@
 
 {% if analyze_status == 'empty' %}
 <div class="alert alert-info" style="margin-bottom:1rem;">Geen patronen gevonden in de transacties van deze rekening.</div>
+{% endif %}
+
+{% if request.query_params.get('error') == 'category_required' %}
+<div class="alert alert-danger" style="margin-bottom:1rem;">Kies een categorie — spaarregels moeten aan een categorie gekoppeld zijn.</div>
 {% endif %}
 
 {% if ai_suggestions %}
@@ -235,19 +247,12 @@
                 <input type="text" name="name" id="line_name" required placeholder="bijv. Maandelijks sparen">
             </div>
             <div class="form-group">
-                <label for="line_category">Categorie (optioneel)</label>
-                <select name="category_id" id="line_category">
-                    <option value="0">Geen categorie</option>
+                <label for="line_category">Categorie</label>
+                <select name="category_id" id="line_category" required>
+                    <option value="" disabled selected>Kies categorie</option>
                     {% for cat in categories %}
                     <option value="{{ cat.id }}">{{ cat.name }}{% if cat.is_income %} (inkomen){% endif %}</option>
                     {% endfor %}
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="line_type">Type</label>
-                <select name="is_income" id="line_type">
-                    <option value="0">Uitgave</option>
-                    <option value="1">Inkomen</option>
                 </select>
             </div>
             <div class="form-group">
@@ -336,8 +341,8 @@
 
             <div id="qa-existing-category" class="form-group" style="margin-bottom:1rem;">
                 <label>Kies categorie</label>
-                <select name="category_id" id="qa-category-select" onchange="qaPrefillName()">
-                    <option value="0">— Geen categorie —</option>
+                <select name="category_id" id="qa-category-select" onchange="qaPrefillName()" required>
+                    <option value="" disabled selected>— Kies categorie —</option>
                     {% for cat in categories %}
                     <option value="{{ cat.id }}" data-name="{{ cat.name }}">{{ cat.name }}{% if cat.is_income %} (inkomen){% endif %}</option>
                     {% endfor %}
@@ -418,108 +423,8 @@
 
 {% block scripts %}
 <script>
-function startEdit(displayEl) {
-    var cell = displayEl.parentElement;
-    var input = cell.querySelector('.cell-input');
-    displayEl.style.display = 'none';
-    input.style.display = 'block';
-    input.focus();
-    input.select();
-}
-
-function cellKeydown(e, input) {
-    if (e.key === 'Enter') {
-        input.blur();
-    } else if (e.key === 'Escape') {
-        var cell = input.parentElement;
-        var display = cell.querySelector('.cell-display');
-        input.style.display = 'none';
-        display.style.display = '';
-    } else if (e.key === 'Tab') {
-        e.preventDefault();
-        input.blur();
-        var td = input.closest('td');
-        var nextTd = e.shiftKey ? td.previousElementSibling : td.nextElementSibling;
-        if (nextTd && nextTd.classList.contains('savings-cell')) {
-            var nextDisplay = nextTd.querySelector('.cell-display');
-            if (nextDisplay) startEdit(nextDisplay);
-        }
-    }
-}
-
 function fmtEuro(val) {
     return '\u20AC\u00A0' + Math.abs(val).toFixed(2).replace('.', ',');
-}
-
-function saveCell(input) {
-    var cell = input.parentElement;
-    var display = cell.querySelector('.cell-display');
-    var entryId = cell.dataset.entryId;
-    var newValue = input.value.trim().replace(',', '.');
-
-    input.style.display = 'none';
-    display.style.display = '';
-
-    var formData = new FormData();
-    formData.append('entry_id', entryId);
-    formData.append('amount', newValue);
-
-    fetch('/savings/entries/update', {
-        method: 'POST',
-        body: formData,
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-        if (!data.ok) return;
-
-        var lineRow = cell.closest('tr');
-        var lineId = data.line_id || lineRow.dataset.lineId;
-
-        // Update every cell in this line based on the server response
-        if (data.entries && Array.isArray(data.entries)) {
-            data.entries.forEach(function(e) {
-                var cellEl = document.querySelector(
-                    'tr.savings-row[data-line-id="' + lineId + '"] td.savings-cell[data-entry-id="' + e.id + '"]'
-                );
-                if (!cellEl) return;
-                var d = cellEl.querySelector('.cell-display');
-                var i = cellEl.querySelector('.cell-input');
-                if (d) {
-                    d.textContent = (e.amount !== null && e.amount !== undefined) ? fmtEuro(e.amount) : '-';
-                }
-                if (i) {
-                    i.value = (e.amount !== null && e.amount !== undefined)
-                        ? Math.abs(e.amount).toFixed(2)
-                        : '';
-                }
-                cellEl.className = 'text-right savings-cell cell-' + e.status;
-            });
-        } else {
-            // Fallback to single-cell update for older responses
-            if (data.amount !== null) {
-                display.textContent = fmtEuro(data.amount);
-            } else {
-                display.textContent = '-';
-            }
-            cell.className = 'text-right savings-cell cell-' + data.status;
-        }
-
-        var totalCell = document.querySelector('.line-total[data-line-id="' + lineId + '"]');
-        if (totalCell) {
-            totalCell.innerHTML = '<strong>' + fmtEuro(data.line_total) + '</strong>';
-        }
-
-        if (data.running_balances) {
-            for (var m in data.running_balances) {
-                var balCell = document.querySelector('.balance-cell[data-month="' + m + '"]');
-                if (balCell) {
-                    var bal = data.running_balances[m];
-                    var cls = bal >= 0 ? 'amount-positive' : 'amount-negative';
-                    balCell.innerHTML = '<strong class="' + cls + '">' + fmtEuro(bal) + '</strong>';
-                }
-            }
-        }
-    });
 }
 
 function toggleTargetMonth(freq) {
@@ -629,12 +534,18 @@ function closeQuickAdd() {
 function qaToggleCategoryMode(mode) {
     var existing = document.getElementById('qa-existing-category');
     var fresh = document.getElementById('qa-new-category');
+    var selExisting = document.getElementById('qa-category-select');
+    var newName = document.getElementById('qa-new-cat-name');
     if (mode === 'new') {
         existing.style.display = 'none';
         fresh.style.display = '';
+        if (selExisting) selExisting.disabled = true;
+        if (newName) newName.required = true;
     } else {
         existing.style.display = '';
         fresh.style.display = 'none';
+        if (selExisting) selExisting.disabled = false;
+        if (newName) newName.required = false;
     }
     qaPrefillName();
 }

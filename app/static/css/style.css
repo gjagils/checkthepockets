@@ -861,6 +861,8 @@ tfoot td { background: var(--surface-2); border-top: 1px solid var(--border); fo
 
 .savings-cell { cursor: pointer; padding: 0.4rem 0.6rem !important; transition: background 0.1s; position: relative; }
 .savings-cell:hover { background: var(--orange-bg) !important; }
+.savings-cell.cell-nolink { cursor: default; }
+.savings-cell.cell-nolink:hover { background: transparent !important; }
 
 /* Spaarcel-statussen — actual vs verwacht. Iets verzadigder zodat de kleuren
    van een afstand goed leesbaar zijn maar geen print-ink zijn. */
@@ -893,7 +895,8 @@ tfoot td { background: var(--surface-2); border-top: 1px solid var(--border); fo
     box-shadow: 0 0 0 2px rgba(64, 196, 255, 0.18);
 }
 .cell-input:focus { outline: none; }
-.cell-display { display: block; padding: 0.15rem 0; font-size: 0.82rem; font-variant-numeric: tabular-nums; }
+.cell-display { display: block; padding: 0.15rem 0; font-size: 0.82rem; font-variant-numeric: tabular-nums; color: inherit; text-decoration: none; }
+a.cell-display:hover { text-decoration: none; color: inherit; }
 
 /* Compact spaar-rij: freq-badge linksboven, actie-iconen rechtsboven, titel onder. */
 .line-head-row {

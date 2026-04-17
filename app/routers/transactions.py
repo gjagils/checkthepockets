@@ -279,6 +279,8 @@ def transaction_list(
     date_to: str | None = Query(None),
     amount_min: str | None = Query(None),
     amount_max: str | None = Query(None),
+    back: str = Query(""),         # optionele deep-link-terug (bijv. /savings/42)
+    back_label: str = Query(""),   # tekst op de terugknop
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
@@ -499,6 +501,9 @@ def transaction_list(
             "old_uncat_cutoff_label": OLD_UNCATEGORIZED_CUTOFF.strftime("%d-%m-%Y"),
             "projected_transactions": projected_transactions,
             "projected_candidates": projected_candidates,
+            # Back-knop: alleen relatieve paden toestaan (geen open redirects).
+            "back_url": back if back.startswith("/") and not back.startswith("//") else "",
+            "back_label": (back_label or "Terug")[:80],
         },
     )
 
