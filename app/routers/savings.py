@@ -28,6 +28,7 @@ FREQUENCY_LABELS = {
     "biannual": "Halfjaarlijks",
     "yearly": "Jaarlijks",
     "one-off": "Eenmalig",
+    "custom": "Onregelmatig",
 }
 
 FREQUENCY_MONTHS = {
@@ -36,11 +37,13 @@ FREQUENCY_MONTHS = {
     "biannual": [6, 12],
     "yearly": [12],
     "one-off": [],
+    "custom": [],
 }
 
 
 def _months_for_frequency(frequency: str, target_month: int | None = None) -> list[int]:
-    """Return the months (1..12) where this frequency 'fires', given an optional start month."""
+    """Return the months (1..12) where this frequency 'fires', given an optional start month.
+    Voor 'custom' is er geen vast schema — de maanden volgen uit per-maand ingevoerde bedragen."""
     if frequency == "monthly":
         return list(range(1, 13))
     if frequency == "quarterly":
@@ -53,20 +56,51 @@ def _months_for_frequency(frequency: str, target_month: int | None = None) -> li
         return [target_month or 12]
     if frequency == "one-off":
         return [target_month] if target_month else []
+    if frequency == "custom":
+        return []
     return list(range(1, 13))
 
 
-def _smart_fill_entries(line: SavingsLine, target_month: int | None = None):
-    """Create SavingsEntry objects based on frequency and default_amount."""
-    amount = line.default_amount or Decimal("0")
-    months = _months_for_frequency(line.frequency, target_month)
+def _parse_custom_amounts(
+    a1: str, a2: str, a3: str, a4: str, a5: str, a6: str,
+    a7: str, a8: str, a9: str, a10: str, a11: str, a12: str,
+) -> dict[int, Decimal | None]:
+    """Parse 12 maandvelden naar een {1..12: Decimal|None} dict.
+    Lege waarden → None (maand niet ingepland). Ongeldige waarden → None."""
+    raw = [a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12]
+    result: dict[int, Decimal | None] = {}
+    for i, v in enumerate(raw, start=1):
+        s = (v or "").strip().replace(",", ".")
+        if s == "":
+            result[i] = None
+            continue
+        try:
+            result[i] = Decimal(s)
+        except (InvalidOperation, ValueError):
+            result[i] = None
+    return result
+
+
+def _smart_fill_entries(
+    line: SavingsLine,
+    target_month: int | None = None,
+    custom_amounts: dict[int, Decimal | None] | None = None,
+):
+    """Create SavingsEntry objects based on frequency and default_amount,
+    of op basis van een handmatige per-maand dict voor frequentie 'custom'."""
+    if line.frequency == "custom":
+        amounts_map = custom_amounts or {}
+    else:
+        amount = line.default_amount or Decimal("0")
+        months = _months_for_frequency(line.frequency, target_month)
+        amounts_map = {m: (amount if m in months else None) for m in range(1, 13)}
 
     entries = []
     for m in range(1, 13):
         entry = SavingsEntry(
             line=line,
             month=m,
-            amount=amount if m in months else None,
+            amount=amounts_map.get(m),
             status="forecast",
         )
         entries.append(entry)
@@ -508,6 +542,10 @@ def add_line(
     frequency: str = Form("monthly"),
     default_amount: str = Form("0"),
     target_month: int = Form(0),
+    amount_1: str = Form(""), amount_2: str = Form(""), amount_3: str = Form(""),
+    amount_4: str = Form(""), amount_5: str = Form(""), amount_6: str = Form(""),
+    amount_7: str = Form(""), amount_8: str = Form(""), amount_9: str = Form(""),
+    amount_10: str = Form(""), amount_11: str = Form(""), amount_12: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
@@ -552,7 +590,23 @@ def add_line(
         line_is_income = cat.is_income
 
     tm = target_month or None
-    months_for_line = _months_for_frequency(frequency, tm)
+
+    # Voor 'onregelmatig' (custom) komt het schema uit de 12 per-maand-velden;
+    # default_amount wordt dan op 0 gezet en annual_budget = som van de maanden.
+    custom_amounts: dict[int, Decimal | None] | None = None
+    if frequency == "custom":
+        custom_amounts = _parse_custom_amounts(
+            amount_1, amount_2, amount_3, amount_4, amount_5, amount_6,
+            amount_7, amount_8, amount_9, amount_10, amount_11, amount_12,
+        )
+        amount = Decimal("0")
+        annual_budget = sum(
+            (v for v in custom_amounts.values() if v is not None),
+            Decimal("0"),
+        )
+    else:
+        months_for_line = _months_for_frequency(frequency, tm)
+        annual_budget = amount * len(months_for_line)
 
     line = SavingsLine(
         plan_id=plan_id,
@@ -561,14 +615,14 @@ def add_line(
         is_income=line_is_income,
         frequency=frequency,
         default_amount=amount,
-        annual_budget=amount * len(months_for_line),
+        annual_budget=annual_budget,
         sort_order=max_order + 1,
     )
     db.add(line)
     db.flush()
 
     # Smart fill entries
-    entries = _smart_fill_entries(line, target_month=tm)
+    entries = _smart_fill_entries(line, target_month=tm, custom_amounts=custom_amounts)
     for entry in entries:
         db.add(entry)
 
@@ -731,6 +785,10 @@ def edit_line(
     frequency: str = Form("monthly"),
     default_amount: str = Form("0"),
     target_month: int = Form(0),
+    amount_1: str = Form(""), amount_2: str = Form(""), amount_3: str = Form(""),
+    amount_4: str = Form(""), amount_5: str = Form(""), amount_6: str = Form(""),
+    amount_7: str = Form(""), amount_8: str = Form(""), amount_9: str = Form(""),
+    amount_10: str = Form(""), amount_11: str = Form(""), amount_12: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
@@ -761,19 +819,34 @@ def edit_line(
     except (InvalidOperation, ValueError):
         amount = line.default_amount
 
-    months_for_line = _months_for_frequency(frequency, tm)
+    # Voor 'onregelmatig' komt het schema uit de 12 per-maand-velden.
+    custom_amounts: dict[int, Decimal | None] | None = None
+    if frequency == "custom":
+        custom_amounts = _parse_custom_amounts(
+            amount_1, amount_2, amount_3, amount_4, amount_5, amount_6,
+            amount_7, amount_8, amount_9, amount_10, amount_11, amount_12,
+        )
+        months_set = {m for m, v in custom_amounts.items() if v is not None}
+        amount = Decimal("0")
+        annual_budget = sum(
+            (v for v in custom_amounts.values() if v is not None),
+            Decimal("0"),
+        )
+    else:
+        months_for_line = _months_for_frequency(frequency, tm)
+        months_set = set(months_for_line)
+        annual_budget = amount * len(months_for_line)
 
     line.name = name.strip()
     line.category_id = cat_id
     line.is_income = line_is_income
     line.frequency = frequency
     line.default_amount = amount
-    line.annual_budget = amount * len(months_for_line)
+    line.annual_budget = annual_budget
 
-    # Herberekening van alle cellen op basis van de nieuwe frequentie / bedrag.
-    # Maanden met een werkelijke transactie voor de (nieuwe) categorie houden
-    # hun actual bedrag; alle andere maanden volgen het schema.
-    months_set = set(months_for_line)
+    # Herberekening van alle cellen op basis van de nieuwe frequentie / bedrag
+    # (of per-maand bedragen voor 'custom'). Maanden met een werkelijke
+    # transactie voor de (nieuwe) categorie houden hun actual bedrag.
     if cat_id:
         tx_totals = _get_transaction_totals_by_month(
             db, line.plan.account_id, line.plan.year, cat_id
@@ -789,6 +862,10 @@ def edit_line(
             entry.status = _determine_entry_status(
                 db, line.plan.account_id, line.plan.year, entry.month, today
             )
+        elif custom_amounts is not None:
+            # Onregelmatig: pak het bedrag dat voor deze maand is opgegeven
+            # (kan None zijn → maand niet ingepland).
+            entry.amount = custom_amounts.get(entry.month)
         elif entry.month in months_set:
             # Ingepland in het nieuwe schema, nog geen transactie → nieuwe default.
             entry.amount = amount
