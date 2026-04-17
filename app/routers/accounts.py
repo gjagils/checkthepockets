@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -32,7 +32,12 @@ def accounts_list(request: Request, db: Session = Depends(get_db)):
 
 
 @router.post("/accounts/{account_id}/owners")
-async def set_account_owners(account_id: int, request: Request, db: Session = Depends(get_db)):
+def set_account_owners(
+    account_id: int,
+    request: Request,
+    owner_id: list[int] = Form(default=[]),
+    db: Session = Depends(get_db),
+):
     user = require_login(request, db)
     account = (
         db.query(Account)
@@ -42,22 +47,10 @@ async def set_account_owners(account_id: int, request: Request, db: Session = De
     if not account:
         return RedirectResponse("/accounts", status_code=302)
 
-    form = await request.form()
-    raw_ids = form.getlist("owner_id") if hasattr(form, "getlist") else form.get("owner_id") or []
-    if isinstance(raw_ids, str):
-        raw_ids = [raw_ids]
-
-    wanted_ids = set()
-    for val in raw_ids:
-        try:
-            wanted_ids.add(int(val))
-        except (TypeError, ValueError):
-            continue
-
-    if wanted_ids:
+    if owner_id:
         owners = (
             db.query(Person)
-            .filter(Person.user_id == user.id, Person.id.in_(wanted_ids))
+            .filter(Person.user_id == user.id, Person.id.in_(set(owner_id)))
             .all()
         )
     else:
