@@ -505,6 +505,16 @@ def add_line(
     if not plan:
         return RedirectResponse("/savings", status_code=302)
 
+    # Categorie is verplicht — spaarregels moeten altijd aan een categorie hangen
+    # zodat de cellen kunnen linken naar de onderliggende transacties.
+    cat_id = category_id if category_id else None
+    if not cat_id:
+        return RedirectResponse(f"/savings/{plan_id}?error=category_required", status_code=302)
+
+    cat = db.query(Category).filter(Category.id == cat_id, Category.user_id == user.id).first()
+    if not cat:
+        return RedirectResponse(f"/savings/{plan_id}?error=category_required", status_code=302)
+
     try:
         amount = Decimal(default_amount.replace(",", "."))
     except (InvalidOperation, ValueError):
@@ -517,18 +527,14 @@ def add_line(
         .scalar()
     ) or 0
 
-    cat_id = category_id if category_id else None
-
-    # Determine is_income: from form field, or fallback to linked category
+    # is_income wordt primair bepaald door de gekoppelde categorie;
+    # de expliciete form-override blijft alleen als noodrem.
     if is_income in ("1", "true"):
         line_is_income = 1
     elif is_income in ("0", "false"):
         line_is_income = 0
-    elif cat_id:
-        cat = db.query(Category).filter(Category.id == cat_id).first()
-        line_is_income = cat.is_income if cat else 0
     else:
-        line_is_income = 0
+        line_is_income = cat.is_income
 
     tm = target_month or None
     months_for_line = _months_for_frequency(frequency, tm)
@@ -576,7 +582,21 @@ def update_entry(
     amount: str = Form(""),
     db: Session = Depends(get_db),
 ):
-    """AJAX endpoint for inline cell editing."""
+    """Legacy AJAX endpoint — handmatig bewerken is uitgeschakeld.
+    Bedragen komen nu altijd uit de gekoppelde transacties."""
+    return JSONResponse(
+        {"error": "Bedragen worden automatisch uit transacties berekend en zijn niet handmatig bewerkbaar."},
+        status_code=410,
+    )
+
+
+def _unused_update_entry(
+    request: Request,
+    entry_id: int = Form(...),
+    amount: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """Oorspronkelijke implementatie, uitgeschakeld. Bewaard voor referentie."""
     user = require_login(request, db)
 
     entry = (
@@ -713,12 +733,13 @@ def edit_line(
     cat_id = category_id if category_id else None
     tm = target_month or None
 
-    # Determine is_income from linked category
-    line_is_income = 0
-    if cat_id:
-        cat = db.query(Category).filter(Category.id == cat_id).first()
-        if cat:
-            line_is_income = cat.is_income
+    # Categorie blijft verplicht bij bewerken.
+    if not cat_id:
+        return RedirectResponse(f"/savings/{line.plan_id}?error=category_required", status_code=302)
+    cat = db.query(Category).filter(Category.id == cat_id, Category.user_id == user.id).first()
+    if not cat:
+        return RedirectResponse(f"/savings/{line.plan_id}?error=category_required", status_code=302)
+    line_is_income = cat.is_income
 
     try:
         amount = Decimal(default_amount.replace(",", "."))
@@ -885,6 +906,10 @@ def quick_add_line(
                 .filter(Category.id == category_id, Category.user_id == user.id)
                 .first()
             )
+
+    # Categorie blijft verplicht — zonder categorie geen regel.
+    if not cat:
+        return RedirectResponse(f"/savings/{plan_id}?error=category_required", status_code=302)
 
     # ── 2. Optionele matching-regel ───────────────────────────────
     if create_rule and cat and rule_match_value.strip():

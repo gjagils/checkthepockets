@@ -2,6 +2,11 @@
 {% block title %}Transacties - Check Your Pockets{% endblock %}
 {% block container_class %}container-wide{% endblock %}
 {% block content %}
+{% if back_url %}
+<div style="margin-bottom:0.75rem;">
+    <a href="{{ back_url }}" class="btn btn-sm">&larr; {{ back_label }}</a>
+</div>
+{% endif %}
 <div class="page-header">
     <h1>Transacties <span class="muted" style="font-weight:400; font-size:0.9rem;">({{ total }})</span></h1>
     <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">

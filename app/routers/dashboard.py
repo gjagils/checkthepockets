@@ -233,8 +233,8 @@ def _level1_yearly(request, db, user, current_year, years, base_tx_filter, today
             "uncat_count": uncat_by_month.get(m, {}).get("count", 0),
             "uncat_amount": uncat_by_month.get(m, {}).get("amount", Decimal("0")),
             "is_current": (m == today.month and current_year == today.year),
-            "tx_link": f"/transactions?month={current_year}-{m:02d}",
-            "tx_link_uncat": f"/transactions?month={current_year}-{m:02d}&uncategorized=1",
+            "tx_link": f"/transactions?month={current_year}-{m:02d}&back=%2Fdashboard&back_label=Dashboard",
+            "tx_link_uncat": f"/transactions?month={current_year}-{m:02d}&uncategorized=1&back=%2Fdashboard&back_label=Dashboard",
         })
 
     # JSON for Chart.js
@@ -394,7 +394,7 @@ def _level2_categories(request, db, user, current_year, month, years, base_tx_fi
             "uncat_amount": Decimal("0"),
             "is_current": False,
             "color": parent.color,
-            "tx_link": f"/transactions?month={current_year}-{month:02d}&category_id={parent.id}",
+            "tx_link": f"/transactions?month={current_year}-{month:02d}&category_id={parent.id}&back=%2Fdashboard&back_label=Dashboard",
             "tx_link_uncat": "",
         })
 
@@ -403,7 +403,7 @@ def _level2_categories(request, db, user, current_year, month, years, base_tx_fi
         overview_rows.append({
             "label": "Niet gecategoriseerd",
             "key": -1,
-            "link": f"/transactions?year={current_year}&month={month}&uncategorized=1",
+            "link": f"/transactions?year={current_year}&month={month}&uncategorized=1&back=%2Fdashboard&back_label=Dashboard",
             "income_budget": Decimal("0"),
             "income_actual": Decimal("0"),
             "expense_budget": Decimal("0"),
@@ -411,8 +411,8 @@ def _level2_categories(request, db, user, current_year, month, years, base_tx_fi
             "uncat_count": uncat_count,
             "uncat_amount": uncat_amount,
             "is_current": False,
-            "tx_link": f"/transactions?month={current_year}-{month:02d}&uncategorized=1",
-            "tx_link_uncat": f"/transactions?month={current_year}-{month:02d}&uncategorized=1",
+            "tx_link": f"/transactions?month={current_year}-{month:02d}&uncategorized=1&back=%2Fdashboard&back_label=Dashboard",
+            "tx_link_uncat": f"/transactions?month={current_year}-{month:02d}&uncategorized=1&back=%2Fdashboard&back_label=Dashboard",
         })
 
     # JSON for Chart.js
@@ -548,7 +548,7 @@ def _level3_subcategories(request, db, user, current_year, month, category_id,
             "uncat_amount": Decimal("0"),
             "is_current": False,
             "color": cat.color,
-            "tx_link": f"/transactions?month={current_year}-{month:02d}&category_id={cat.id}",
+            "tx_link": f"/transactions?month={current_year}-{month:02d}&category_id={cat.id}&back=%2Fdashboard&back_label=Dashboard",
             "tx_link_uncat": "",
         })
 
