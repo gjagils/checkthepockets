@@ -101,15 +101,15 @@ def test_rename_and_delete_person(db_session):
     alice = _make_user(db_session)
     client = _login_client(alice.id)
     client.post("/persons", data={"name": "Oud"})
-    p = db_session.query(Person).filter(Person.user_id == alice.id).first()
+    pid = db_session.query(Person).filter(Person.user_id == alice.id).first().id
 
-    client.post(f"/persons/{p.id}/rename", data={"name": "Nieuw"})
+    client.post(f"/persons/{pid}/rename", data={"name": "Nieuw"})
     db_session.expire_all()
-    assert db_session.query(Person).filter(Person.id == p.id).one().name == "Nieuw"
+    assert db_session.query(Person).filter(Person.id == pid).one().name == "Nieuw"
 
-    client.post(f"/persons/{p.id}/delete")
+    client.post(f"/persons/{pid}/delete")
     db_session.expire_all()
-    assert db_session.query(Person).filter(Person.id == p.id).first() is None
+    assert db_session.query(Person).filter(Person.id == pid).first() is None
 
 
 def test_move_person_up_and_down(db_session):
@@ -174,23 +174,24 @@ def test_assign_and_clear_account_owners(db_session):
     db_session.refresh(p1)
     db_session.refresh(p2)
 
+    p1_id, p2_id, acc_id = p1.id, p2.id, acc.id
     client = _login_client(alice.id)
-    # Zet beide als eigenaar ("Samen")
-    client.post(f"/accounts/{acc.id}/owners", data=[("owner_id", str(p1.id)), ("owner_id", str(p2.id))])
+    # Zet beide als eigenaar ("Samen") — httpx serialiseert list-values als meerdere velden
+    client.post(f"/accounts/{acc_id}/owners", data={"owner_id": [str(p1_id), str(p2_id)]})
     db_session.expire_all()
-    refreshed = db_session.query(Account).filter(Account.id == acc.id).one()
-    assert {o.id for o in refreshed.owners} == {p1.id, p2.id}
+    refreshed = db_session.query(Account).filter(Account.id == acc_id).one()
+    assert {o.id for o in refreshed.owners} == {p1_id, p2_id}
 
     # Zet alleen p1
-    client.post(f"/accounts/{acc.id}/owners", data={"owner_id": str(p1.id)})
+    client.post(f"/accounts/{acc_id}/owners", data={"owner_id": str(p1_id)})
     db_session.expire_all()
-    refreshed = db_session.query(Account).filter(Account.id == acc.id).one()
-    assert [o.id for o in refreshed.owners] == [p1.id]
+    refreshed = db_session.query(Account).filter(Account.id == acc_id).one()
+    assert [o.id for o in refreshed.owners] == [p1_id]
 
     # Wis alle eigenaren
-    client.post(f"/accounts/{acc.id}/owners", data={})
+    client.post(f"/accounts/{acc_id}/owners", data={})
     db_session.expire_all()
-    refreshed = db_session.query(Account).filter(Account.id == acc.id).one()
+    refreshed = db_session.query(Account).filter(Account.id == acc_id).one()
     assert refreshed.owners == []
 
 
