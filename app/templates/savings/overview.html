@@ -66,7 +66,7 @@
         <div class="filter-bar" style="flex-wrap: wrap;">
             <div class="form-group">
                 <label for="account_id">Spaarrekening</label>
-                <select name="account_id" id="account_id" required>
+                <select name="account_id" id="account_id" required onchange="updateSourcePlans()">
                     <option value="">Kies een rekening</option>
                     {% for acc in accounts %}
                     <option value="{{ acc.id }}">{{ acc.name }}{% if acc.iban %} ({{ acc.iban }}){% endif %}</option>
@@ -81,11 +81,41 @@
                 <label for="starting_balance">Startsaldo</label>
                 <input type="text" name="starting_balance" id="starting_balance" value="0" placeholder="0,00">
             </div>
+            <div class="form-group">
+                <label for="source_plan_id">Kopieer van (optioneel)</label>
+                <select name="source_plan_id" id="source_plan_id">
+                    <option value="">— Leeg starten —</option>
+                </select>
+                <small class="muted" style="display:block; margin-top:0.25rem;">
+                    Neemt alle spaarregels over; startsaldo volgt het eindsaldo van dat jaar.
+                </small>
+            </div>
             <div class="form-group" style="align-self: flex-end;">
                 <button type="submit" class="btn btn-primary">Aanmaken</button>
             </div>
         </div>
     </form>
+    <script>
+        // Mapping account_id -> [{id, year, line_count}, ...]
+        window.__sourcePlansByAccount = {{ source_plans_by_account|tojson }};
+        function updateSourcePlans() {
+            var accSel = document.getElementById('account_id');
+            var srcSel = document.getElementById('source_plan_id');
+            if (!accSel || !srcSel) return;
+            var accId = accSel.value;
+            // Reset options
+            srcSel.innerHTML = '<option value="">— Leeg starten —</option>';
+            if (!accId) return;
+            var plans = (window.__sourcePlansByAccount || {})[accId] || [];
+            for (var i = 0; i < plans.length; i++) {
+                var p = plans[i];
+                var opt = document.createElement('option');
+                opt.value = p.id;
+                opt.textContent = p.year + ' — ' + p.line_count + ' regels';
+                srcSel.appendChild(opt);
+            }
+        }
+    </script>
     {% else %}
     <p class="muted">Importeer eerst transacties om rekeningen aan te maken.</p>
     <a href="/import" class="btn btn-primary" style="margin-top: 0.5rem;">CSV importeren</a>
