@@ -82,8 +82,9 @@ def test_digest_stats_counts_per_account_and_inbox(db):
     assert per_account_dict.get("Samen") == 2
     assert per_account_dict.get("Privé") == 1
     assert new_total == 3
-    # Alle 3 counted transacties zijn zonder categorie, dus inbox = 3
-    assert uncat_total == 3
+    # Inbox-count is niet gescoped op 7 dagen, dus de 10-dagen-oude tx
+    # telt óók mee. Excluded/projected zitten er niet in.
+    assert uncat_total == 4
 
 
 def test_digest_stats_empty_when_no_activity(db):
