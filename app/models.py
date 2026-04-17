@@ -263,10 +263,16 @@ class SavingsPlan(Base):
     account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
     year = Column(Integer, nullable=False)
     starting_balance = Column(Numeric(12, 2), default=0)
+    source_plan_id = Column(
+        Integer, ForeignKey("savings_plans.id", ondelete="SET NULL"), nullable=True,
+    )
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     user = relationship("User", back_populates="savings_plans")
     account = relationship("Account", back_populates="savings_plans")
+    source_plan = relationship(
+        "SavingsPlan", remote_side="SavingsPlan.id", foreign_keys=[source_plan_id],
+    )
     lines = relationship(
         "SavingsLine", back_populates="plan", cascade="all, delete-orphan",
         order_by="SavingsLine.sort_order",

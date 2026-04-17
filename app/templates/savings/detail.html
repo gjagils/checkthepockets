@@ -148,6 +148,18 @@
         <h1>{{ plan.account.name }} - {{ plan.year }}</h1>
         <p class="muted">
             Startsaldo:
+            {% if source_plan %}
+            <span title="Gekoppeld aan eindsaldo {{ source_plan.year }} — past zich automatisch aan wanneer {{ source_plan.year }} wijzigt">
+                &euro;&nbsp;{{ effective_starting_balance|euro }}
+            </span>
+            &middot;
+            <span title="Gekoppeld aan eindsaldo {{ source_plan.year }}">🔗 Volgt {{ source_plan.year }}</span>
+            <form method="post" action="/savings/{{ plan.id }}/unlink"
+                  style="display:inline;"
+                  onsubmit="return confirm('Koppeling met {{ source_plan.year }} verbreken? Het huidige startsaldo wordt vastgelegd.');">
+                <button type="submit" class="btn btn-sm btn-secondary" style="padding:0.1rem 0.5rem; font-size:0.8rem;">Loskoppelen</button>
+            </form>
+            {% else %}
             <span class="starting-balance-wrap" style="display:inline-flex; align-items:center; gap:0.25rem;">
                 <span id="starting-balance-display"
                       onclick="startEditStartingBalance()"
@@ -159,6 +171,7 @@
                        onblur="saveStartingBalance()"
                        onkeydown="startingBalanceKeydown(event)">
             </span>
+            {% endif %}
             {% if plan.account.iban %} &middot; {{ plan.account.iban }}{% endif %}
         </p>
     </div>

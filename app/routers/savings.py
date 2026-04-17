@@ -81,6 +81,63 @@ def _parse_custom_amounts(
     return result
 
 
+def _compute_december_balance(db: Session, plan: SavingsPlan) -> Decimal:
+    """Bereken het eindsaldo (december) van een plan op basis van
+    starting_balance + alle entry-bedragen per maand.
+
+    Voor category-linked lijnen worden de werkelijke transactie-totalen van
+    die categorie gebruikt wanneer die er zijn; voor regels zonder categorie
+    gebruiken we het entry-bedrag zoals het opgeslagen is.
+    """
+    balance = plan.starting_balance or Decimal("0")
+    for m in range(1, 13):
+        month_total = Decimal("0")
+        for line in plan.lines:
+            entry = next((e for e in line.entries if e.month == m), None)
+            amount = entry.amount if entry else None
+            if line.category_id:
+                tx_totals = _get_transaction_totals_by_month(
+                    db, plan.account_id, plan.year, line.category_id
+                )
+                actual = tx_totals.get(m)
+                if actual is not None:
+                    amount = actual
+            if amount is None:
+                continue
+            if line.is_income:
+                month_total += abs(amount)
+            else:
+                month_total -= abs(amount)
+        balance += month_total
+    return balance
+
+
+def _copy_lines_to_plan(db: Session, source_plan: SavingsPlan, new_plan: SavingsPlan) -> None:
+    """Kopieer alle SavingsLine-objecten van source_plan naar new_plan.
+    Voor frequentie 'custom' worden de per-maand forecast-bedragen uit de
+    bron-entries overgenomen; voor andere frequenties opnieuw opgebouwd via
+    _smart_fill_entries op basis van default_amount."""
+    for src_line in source_plan.lines:
+        new_line = SavingsLine(
+            plan=new_plan,
+            name=src_line.name,
+            category_id=src_line.category_id,
+            is_income=src_line.is_income,
+            annual_budget=src_line.annual_budget,
+            frequency=src_line.frequency,
+            default_amount=src_line.default_amount,
+            sort_order=src_line.sort_order,
+        )
+        db.add(new_line)
+        if src_line.frequency == "custom":
+            custom_amounts = {e.month: e.amount for e in src_line.entries}
+            entries = _smart_fill_entries(new_line, custom_amounts=custom_amounts)
+        else:
+            entries = _smart_fill_entries(new_line)
+        for e in entries:
+            db.add(e)
+
+
 def _smart_fill_entries(
     line: SavingsLine,
     target_month: int | None = None,
@@ -320,6 +377,20 @@ def savings_overview(
     )
     years = sorted({r[0] for r in plan_years} | {current_year})
 
+    # Per rekening: beschikbare bron-plannen (van andere jaren) voor "kopieer van"
+    all_plans = (
+        db.query(SavingsPlan)
+        .options(joinedload(SavingsPlan.lines))
+        .filter(SavingsPlan.user_id == user.id)
+        .order_by(SavingsPlan.year.desc())
+        .all()
+    )
+    source_plans_by_account: dict[int, list[dict]] = {}
+    for p in all_plans:
+        source_plans_by_account.setdefault(p.account_id, []).append(
+            {"id": p.id, "year": p.year, "line_count": len(p.lines)}
+        )
+
     return templates.TemplateResponse(
         "savings/overview.html",
         {
@@ -329,6 +400,7 @@ def savings_overview(
             "accounts": accounts,
             "current_year": current_year,
             "years": years,
+            "source_plans_by_account": source_plans_by_account,
         },
     )
 
@@ -339,6 +411,7 @@ def create_plan(
     account_id: int = Form(...),
     year: int = Form(...),
     starting_balance: str = Form("0"),
+    source_plan_id: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
@@ -361,6 +434,27 @@ def create_plan(
     if existing:
         return RedirectResponse(f"/savings/{existing.id}", status_code=302)
 
+    # Source-plan resolutie: alleen een plan van dezelfde rekening + andere user
+    # mag gebruikt worden.
+    source_plan = None
+    src_raw = (source_plan_id or "").strip()
+    if src_raw:
+        try:
+            sid = int(src_raw)
+        except ValueError:
+            sid = 0
+        if sid:
+            source_plan = (
+                db.query(SavingsPlan)
+                .options(joinedload(SavingsPlan.lines).joinedload(SavingsLine.entries))
+                .filter(
+                    SavingsPlan.id == sid,
+                    SavingsPlan.user_id == user.id,
+                    SavingsPlan.account_id == account_id,
+                )
+                .first()
+            )
+
     try:
         balance = Decimal(starting_balance.replace(",", "."))
     except (InvalidOperation, ValueError):
@@ -371,8 +465,14 @@ def create_plan(
         account_id=account_id,
         year=year,
         starting_balance=balance,
+        source_plan_id=source_plan.id if source_plan else None,
     )
     db.add(plan)
+    db.flush()
+
+    if source_plan:
+        _copy_lines_to_plan(db, source_plan, plan)
+
     db.commit()
 
     return RedirectResponse(f"/savings/{plan.id}", status_code=302)
@@ -399,6 +499,25 @@ def plan_detail(
     )
     if not plan:
         return RedirectResponse("/savings", status_code=302)
+
+    # Live-derived startsaldo: als dit plan gekoppeld is aan een vorig jaar,
+    # gebruiken we het eindsaldo van dat bronplan (december) als effectief
+    # startsaldo. We overschrijven plan.starting_balance *niet* — die blijft
+    # staan als fallback en wordt pas bevroren bij loskoppelen.
+    source_plan = None
+    effective_starting_balance = plan.starting_balance or Decimal("0")
+    if plan.source_plan_id:
+        source_plan = (
+            db.query(SavingsPlan)
+            .options(joinedload(SavingsPlan.lines).joinedload(SavingsLine.entries))
+            .filter(
+                SavingsPlan.id == plan.source_plan_id,
+                SavingsPlan.user_id == user.id,
+            )
+            .first()
+        )
+        if source_plan:
+            effective_starting_balance = _compute_december_balance(db, source_plan)
 
     # Auto-sync amounts & statuses:
     # - Category-linked lines: pull the per-month sum of that category's transactions
@@ -459,7 +578,7 @@ def plan_detail(
     # Calculate running balance per month
     # Income adds, expense subtracts (amounts stored as positive)
     running_balance = {}
-    balance = plan.starting_balance or Decimal("0")
+    balance = effective_starting_balance
     for m in range(1, 13):
         month_total = Decimal("0")
         for line in plan.lines:
@@ -528,8 +647,44 @@ def plan_detail(
             "fully_cat_months": fully_cat_months,
             "ai_suggestions": ai_suggestions,
             "analyze_status": analyze_status,
+            "source_plan": source_plan,
+            "effective_starting_balance": effective_starting_balance,
         },
     )
+
+
+@router.post("/{plan_id}/unlink")
+def unlink_source_plan(
+    request: Request,
+    plan_id: int,
+    db: Session = Depends(get_db),
+):
+    """Verbreek de koppeling met het bronplan en bevries het startsaldo
+    op de laatst berekende waarde (eindsaldo december bronplan)."""
+    user = require_login(request, db)
+    plan = (
+        db.query(SavingsPlan)
+        .filter(SavingsPlan.id == plan_id, SavingsPlan.user_id == user.id)
+        .first()
+    )
+    if not plan or not plan.source_plan_id:
+        return RedirectResponse(f"/savings/{plan_id}", status_code=302)
+
+    source_plan = (
+        db.query(SavingsPlan)
+        .options(joinedload(SavingsPlan.lines).joinedload(SavingsLine.entries))
+        .filter(
+            SavingsPlan.id == plan.source_plan_id,
+            SavingsPlan.user_id == user.id,
+        )
+        .first()
+    )
+    if source_plan:
+        plan.starting_balance = _compute_december_balance(db, source_plan)
+    plan.source_plan_id = None
+    db.commit()
+
+    return RedirectResponse(f"/savings/{plan_id}", status_code=302)
 
 
 @router.post("/lines")
