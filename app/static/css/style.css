@@ -898,6 +898,34 @@ tfoot td { background: var(--surface-2); border-top: 1px solid var(--border); fo
 .cell-display { display: block; padding: 0.15rem 0; font-size: 0.82rem; font-variant-numeric: tabular-nums; color: inherit; text-decoration: none; }
 a.cell-display:hover { text-decoration: none; color: inherit; }
 
+/* Per-maand grid voor frequentie 'Onregelmatig' */
+.custom-amounts-grid {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 0.4rem;
+    margin-top: 0.25rem;
+}
+.custom-amount-cell { display: flex; flex-direction: column; gap: 0.15rem; }
+.custom-amount-cell label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    color: var(--muted);
+    letter-spacing: 0.02em;
+}
+.custom-amount-cell input {
+    width: 100%;
+    padding: 0.3rem 0.4rem;
+    font-size: 0.82rem;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+@media (max-width: 960px) {
+    .custom-amounts-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+@media (max-width: 520px) {
+    .custom-amounts-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
 /* Compact spaar-rij: freq-badge linksboven, actie-iconen rechtsboven, titel onder. */
 .line-head-row {
     display: flex;
