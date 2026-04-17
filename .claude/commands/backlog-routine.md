@@ -85,12 +85,39 @@ EOF
 ```
 
 ### 7. Wacht op CI
+
+Gebruik een polling-loop in plaats van `gh pr checks --watch`. `--watch` hangt soms op een gemist status-event terwijl de run al klaar is; poll-by-state is robuuster.
+
 ```bash
-gh pr checks --watch --timeout 1200    # 20 min max
+BRANCH=$(git branch --show-current)
+deadline=$((SECONDS + 1200))      # 20 min hard max
+last_poke=0
+while [ $SECONDS -lt $deadline ]; do
+    STATE=$(gh pr checks --json state -q '.[].state // empty' 2>/dev/null | sort -u | tr '\n' ',')
+    # Geen draaiende checks meer? Afronden, ook als --watch zou hangen.
+    if [[ ! "$STATE" =~ (PENDING|QUEUED|IN_PROGRESS) ]]; then
+        if [[ "$STATE" =~ (FAILURE|ERROR|CANCELLED) ]]; then echo "CI rood: $STATE"; break; fi
+        if [[ "$STATE" =~ SUCCESS ]]; then echo "CI groen"; break; fi
+    fi
+    # Elke 3 min expliciet de laatste workflow-run opvragen — forceert een refresh.
+    if (( SECONDS - last_poke > 180 )); then
+        gh run list --branch "$BRANCH" --limit 3
+        last_poke=$SECONDS
+    fi
+    sleep 20
+done
 ```
+
+**Stuck-check** (doen als de loop >3 min geen state-verandering ziet):
+
+1. Draai `gh run list --branch <branch> --limit 3` — is er überhaupt een run voor je laatste commit?
+2. Zo niet (geen workflow getriggerd, paths-ignore bv. geskipt): push een leeg commit om `ci.yml` te forceren: `git commit --allow-empty -m "ci: retrigger" && git push`.
+3. Zo ja maar al lang `completed`: behandel de bekende eindstatus als waarheid en ga door.
+
+**Beslissing na wait:**
 - Groen + diff ≤ 500 regels + geen `needs-review` label → **stap 8** (merge)
 - Rood → push één reparatiepoging (max 1). Daarna: **zet Linear op `In Review`**, PR open laten, Linear-comment met CI-log link, volgende issue.
-- Timeout → idem: `In Review`, PR open.
+- Timeout (20 min hard max) → idem: `In Review`, PR open.
 
 ### 8. Auto-merge
 ```bash
