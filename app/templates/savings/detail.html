@@ -36,10 +36,21 @@
         {% endif %}
     {% endfor %}
     {% set tx_month = '%04d-%02d' | format(plan.year, m) %}
-    {% set tx_url = '/transactions?account_id=' ~ plan.account_id ~ '&month=' ~ tx_month %}
-    {% if line.category_id %}{% set tx_url = tx_url ~ '&category_id=' ~ line.category_id %}{% endif %}
+    {% set is_past = (plan.year, m) < (today.year, today.month) %}
+    {% set is_future = (plan.year, m) > (today.year, today.month) %}
+    {% set is_future_empty = is_future and entry.val is none %}
+    {# Link doel:
+       - Verleden + geen actual + maand niet volledig gecategoriseerd → ongecategoriseerde
+         transacties van die maand (zodat de gebruiker ze kan koppelen).
+       - Anders → categorie + maand. #}
+    {% set pending_uncat = is_past and entry.val is none and (m not in fully_cat_months) and line.category_id %}
+    {% if pending_uncat %}
+        {% set tx_url = '/transactions?account_id=' ~ plan.account_id ~ '&month=' ~ tx_month ~ '&category_id=-1' %}
+    {% else %}
+        {% set tx_url = '/transactions?account_id=' ~ plan.account_id ~ '&month=' ~ tx_month %}
+        {% if line.category_id %}{% set tx_url = tx_url ~ '&category_id=' ~ line.category_id %}{% endif %}
+    {% endif %}
     {% set tx_url = tx_url ~ '&back=' ~ ('/savings/' ~ plan.id) | urlencode ~ '&back_label=' ~ ('Spaarplan ' ~ plan.year) | urlencode %}
-    {% set is_future_empty = (plan.year, m) > (today.year, today.month) and entry.val is none %}
     <td class="text-right savings-cell cell-{{ entry.status }}{% if is_future_empty %} cell-nolink{% endif %}"
         data-entry-id="{{ entry.id }}"
         data-month="{{ m }}">
@@ -49,7 +60,7 @@
         </span>
         {% else %}
         <a class="cell-display" href="{{ tx_url }}"
-           title="Bekijk transacties{% if line.category %} voor {{ line.category.name }}{% endif %} in {{ months[m] }} {{ plan.year }}">
+           title="{% if pending_uncat %}Maand nog niet volledig gecategoriseerd — bekijk ongecategoriseerde transacties in {{ months[m] }} {{ plan.year }}{% else %}Bekijk transacties{% if line.category %} voor {{ line.category.name }}{% endif %} in {{ months[m] }} {{ plan.year }}{% endif %}">
             {% if entry.val is not none %}&euro;&nbsp;{{ entry.val|abs|euro }}{% else %}-{% endif %}
         </a>
         {% endif %}
