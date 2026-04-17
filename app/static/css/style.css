@@ -587,6 +587,28 @@ body.nav-drawer-open { overflow: hidden; }
 .filter-bar { display: flex; gap: 1rem; align-items: flex-end; }
 .filter-bar .form-group { margin-bottom: 0; min-width: 180px; }
 
+/* ===== Checkbox-row helper =====
+   Consistent uitlijnen van checkbox naast label-tekst: zelfde baseline,
+   kleine gap, klikbaar hele regel. Gebruik in plaats van inline flex-stijlen. */
+.check-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    line-height: 1.2;
+}
+.check-row input[type="checkbox"] {
+    margin: 0;
+    flex-shrink: 0;
+    vertical-align: middle;
+}
+label.check-row,
+.check-row label {
+    margin: 0;
+    font-weight: inherit;
+    cursor: pointer;
+}
+
 /* ===== Buttons ===== */
 .btn {
     display: inline-flex;

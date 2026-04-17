@@ -53,9 +53,9 @@
     {% if digest_success %}<div class="alert alert-success">{{ digest_success }}</div>{% endif %}
     <form method="post" action="/settings/digest" class="filter-bar" style="flex-wrap:wrap; align-items:flex-end;">
         <div class="form-group" style="flex:1; min-width:200px;">
-            <label>
+            <label class="check-row">
                 <input type="checkbox" name="enabled" value="1" {% if user.weekly_digest_enabled %}checked{% endif %}>
-                Weekly digest per email ontvangen
+                <span>Weekly digest per email ontvangen</span>
             </label>
         </div>
         <div class="form-group">

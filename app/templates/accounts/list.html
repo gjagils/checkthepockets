@@ -25,10 +25,10 @@
             <form method="post" action="/accounts/{{ acc.id }}/owners">
                 <div style="display:flex; flex-wrap:wrap; gap:0.35rem 0.75rem; margin-bottom:0.5rem;">
                     {% for p in persons %}
-                    <label style="display:flex; align-items:center; gap:0.25rem; font-size:0.85rem;">
+                    <label class="check-row" style="font-size:0.85rem;">
                         <input type="checkbox" name="owner_id" value="{{ p.id }}"
                                {% if p.id in owner_ids %}checked{% endif %}>
-                        {{ p.name }}
+                        <span>{{ p.name }}</span>
                     </label>
                     {% endfor %}
                 </div>

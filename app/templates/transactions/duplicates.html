@@ -28,8 +28,8 @@
         <span class="muted" style="font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; font-family:'Syne',sans-serif;">
             {{ group|length }}× duplicaat — {{ group[0].date.strftime('%d-%m-%Y') }} · €{{ group[0].amount|euro }} · {{ group[0].counterparty or '—' }}
         </span>
-        <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.78rem; cursor:pointer; color:var(--muted);">
-            <input type="checkbox" class="select-group-cb" data-group="{{ loop.index }}"> Selecteer alles behalve eerste
+        <label class="check-row" style="font-size:0.78rem; color:var(--muted);">
+            <input type="checkbox" class="select-group-cb" data-group="{{ loop.index }}"> <span>Selecteer alles behalve eerste</span>
         </label>
     </div>
     <div class="table-wrap">
