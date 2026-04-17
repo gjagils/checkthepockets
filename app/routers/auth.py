@@ -421,6 +421,29 @@ def change_password(
     )
 
 
+@router.post("/settings/digest")
+def update_digest_preferences(
+    request: Request,
+    enabled: str = Form(""),
+    weekday: int = Form(4),
+    hour: int = Form(8),
+    db: Session = Depends(get_db),
+):
+    user = require_login(request, db)
+
+    user.weekly_digest_enabled = 1 if enabled == "1" else 0
+    if 0 <= weekday <= 6:
+        user.weekly_digest_weekday = weekday
+    if 0 <= hour <= 23:
+        user.weekly_digest_hour = hour
+    db.commit()
+
+    return templates.TemplateResponse(
+        "auth/settings.html",
+        {"request": request, "user": user, "digest_success": "Digest-voorkeuren opgeslagen"},
+    )
+
+
 @router.post("/settings/delete-account")
 def delete_account(
     request: Request,

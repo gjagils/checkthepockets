@@ -68,6 +68,67 @@ def send_password_reset_email(to: str, token: str) -> bool:
     return _send(to, "Wachtwoord opnieuw instellen — Check Your Pockets", html)
 
 
+def send_weekly_digest(
+    to: str,
+    username: str,
+    per_account: list[tuple[str, int]],
+    uncat_total: int,
+    new_total: int,
+) -> bool:
+    """Verstuurt een weekly digest met per-account counts en een CTA naar /inbox.
+
+    `per_account` is een lijst van (account_naam, aantal_nieuwe_transacties).
+    """
+    inbox_url = f"{APP_URL}/inbox"
+    settings_url = f"{APP_URL}/settings"
+
+    rows = "".join(
+        f"""
+        <tr>
+            <td style="padding:0.4rem 0; color:#333;">{name}</td>
+            <td style="padding:0.4rem 0; text-align:right; font-weight:700; color:#111;">{count}</td>
+        </tr>
+        """
+        for name, count in per_account
+    ) or """
+        <tr><td style="padding:0.4rem 0; color:#888;" colspan="2">Geen nieuwe transacties afgelopen week.</td></tr>
+        """
+
+    html = f"""
+    <div style="font-family:sans-serif; max-width:520px; margin:0 auto; color:#222;">
+        <h2 style="margin-bottom:0.25rem;">Hoi {username},</h2>
+        <p style="color:#666; margin-top:0;">Je wekelijkse overzicht van Check Your Pockets.</p>
+
+        <h3 style="margin-top:1.75rem;">Afgelopen week binnengekomen</h3>
+        <table style="width:100%; border-collapse:collapse; font-size:0.95rem;">
+            {rows}
+            <tr style="border-top:1px solid #e5e5e5;">
+                <td style="padding:0.5rem 0; font-weight:700;">Totaal</td>
+                <td style="padding:0.5rem 0; text-align:right; font-weight:700;">{new_total}</td>
+            </tr>
+        </table>
+
+        <p style="text-align:center; margin:2rem 0;">
+            <a href="{inbox_url}" style="background:#F9A800; color:#fff; padding:0.75rem 1.5rem;
+               border-radius:8px; text-decoration:none; font-weight:700; display:inline-block;">
+                Naar mijn inbox
+            </a>
+        </p>
+
+        <p style="color:#333; text-align:center; margin:1.25rem 0 0.25rem;">
+            In totaal staan er <strong>{uncat_total}</strong> transacties nog op review.
+        </p>
+
+        <hr style="border:none; border-top:1px solid #eee; margin:2rem 0 1rem;">
+        <p style="color:#888; font-size:0.82rem; text-align:center;">
+            Ga naar <a href="{settings_url}" style="color:#666;">Instellingen</a> om aan te passen wanneer je deze mail krijgt of om 'm uit te zetten.
+        </p>
+    </div>
+    """
+    subject = f"Je hebt {new_total} nieuwe transactie(s) te reviewen" if new_total else f"{uncat_total} transactie(s) wachten in je inbox"
+    return _send(to, subject, html)
+
+
 def send_invite_email(to: str, token: str, invited_by: str) -> bool:
     url = f"{APP_URL}/register?invite={token}"
     html = f"""
