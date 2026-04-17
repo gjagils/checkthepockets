@@ -32,7 +32,20 @@
         {% if plan.account.iban %}
         <p class="muted">{{ plan.account.iban }}</p>
         {% endif %}
-        <p class="muted">Startsaldo: &euro;&nbsp;{{ plan.starting_balance|euro }}</p>
+        <p class="muted">
+            Startsaldo:
+            <span class="starting-balance-wrap" data-plan-id="{{ plan.id }}" style="display:inline-flex; align-items:center; gap:0.25rem;">
+                <span class="starting-balance-display"
+                      onclick="startEditStartingBalance(this)"
+                      title="Klik om het startsaldo aan te passen"
+                      style="cursor:pointer; text-decoration:underline dotted; text-underline-offset:3px;">&euro;&nbsp;{{ plan.starting_balance|euro }}</span>
+                <input type="text" class="starting-balance-input cell-input"
+                       style="display:none; width:7rem;"
+                       value="{{ "%.2f"|format(plan.starting_balance or 0) }}"
+                       onblur="saveStartingBalance(this)"
+                       onkeydown="startingBalanceKeydown(event, this)">
+            </span>
+        </p>
         <p class="muted">{{ plan.lines|length }} spaarregels</p>
         <div class="account-actions">
             <a href="/savings/{{ plan.id }}" class="btn btn-sm btn-primary">Openen</a>
@@ -78,4 +91,65 @@
     <a href="/import" class="btn btn-primary" style="margin-top: 0.5rem;">CSV importeren</a>
     {% endif %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function fmtEuroSigned(val) {
+    var sign = val < 0 ? '-' : '';
+    var abs = Math.abs(val).toFixed(2).replace('.', ',');
+    var parts = abs.split(',');
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return '\u20AC\u00A0' + sign + parts.join(',');
+}
+
+function startEditStartingBalance(displayEl) {
+    var wrap = displayEl.parentElement;
+    var input = wrap.querySelector('.starting-balance-input');
+    if (!input) return;
+    displayEl.style.display = 'none';
+    input.style.display = 'inline-block';
+    input.focus();
+    input.select();
+}
+
+function startingBalanceKeydown(e, input) {
+    if (e.key === 'Enter') {
+        input.blur();
+    } else if (e.key === 'Escape') {
+        var wrap = input.parentElement;
+        var display = wrap.querySelector('.starting-balance-display');
+        input.style.display = 'none';
+        if (display) display.style.display = '';
+    }
+}
+
+function saveStartingBalance(input) {
+    var wrap = input.parentElement;
+    var display = wrap.querySelector('.starting-balance-display');
+    var planId = wrap.dataset.planId;
+    if (!display || !planId) return;
+
+    var newValue = input.value.trim().replace(',', '.');
+    input.style.display = 'none';
+    display.style.display = '';
+
+    var formData = new FormData();
+    formData.append('starting_balance', newValue);
+
+    fetch('/savings/' + planId + '/starting-balance', {
+        method: 'POST',
+        body: formData,
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (!data.ok) {
+            if (data.error) alert(data.error);
+            return;
+        }
+        display.innerHTML = fmtEuroSigned(data.starting_balance);
+        input.value = data.starting_balance.toFixed(2);
+    });
+}
+</script>
 {% endblock %}

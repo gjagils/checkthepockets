@@ -938,6 +938,59 @@ def quick_add_line(
     return RedirectResponse(f"/savings/{plan_id}", status_code=302)
 
 
+@router.post("/{plan_id}/starting-balance")
+def update_starting_balance(
+    plan_id: int,
+    request: Request,
+    starting_balance: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    """AJAX endpoint to update a plan's starting balance and return fresh running balances."""
+    user = require_login(request, db)
+
+    plan = (
+        db.query(SavingsPlan)
+        .options(joinedload(SavingsPlan.lines).joinedload(SavingsLine.entries))
+        .filter(SavingsPlan.id == plan_id, SavingsPlan.user_id == user.id)
+        .first()
+    )
+    if not plan:
+        return JSONResponse({"error": "Niet gevonden"}, status_code=404)
+
+    raw = (starting_balance or "").strip().replace(",", ".")
+    if raw == "":
+        new_balance = Decimal("0")
+    else:
+        try:
+            new_balance = Decimal(raw)
+        except (InvalidOperation, ValueError):
+            return JSONResponse({"error": "Ongeldig bedrag"}, status_code=400)
+
+    plan.starting_balance = new_balance
+    db.commit()
+
+    # Recalculate running balances for all 12 months
+    balance = plan.starting_balance or Decimal("0")
+    running_balances = {}
+    for m in range(1, 13):
+        month_total = Decimal("0")
+        for line in plan.lines:
+            entry = next((e for e in line.entries if e.month == m), None)
+            if entry and entry.amount is not None:
+                if line.is_income:
+                    month_total += abs(entry.amount)
+                else:
+                    month_total -= abs(entry.amount)
+        balance += month_total
+        running_balances[m] = float(balance)
+
+    return JSONResponse({
+        "ok": True,
+        "starting_balance": float(plan.starting_balance),
+        "running_balances": running_balances,
+    })
+
+
 @router.post("/{plan_id}/delete")
 def delete_plan(
     request: Request,
