@@ -325,10 +325,12 @@ class PortfolioAsset(Base):
 
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    name = Column(String(100), nullable=False)       # "Goud", "Zilver", "Bitcoin"
-    symbol = Column(String(20), nullable=False)       # "XAU", "XAG", "bitcoin"
-    asset_class = Column(String(20), nullable=False)  # "metal", "crypto"
-    unit = Column(String(20), default="oz")           # "oz", "gram", "coin"
+    name = Column(String(100), nullable=False)       # "Goud", "Zilver", "Bitcoin", "ASML"
+    symbol = Column(String(20), nullable=False)       # "XAU", "XAG", "bitcoin", "ASML.AS"
+    asset_class = Column(String(20), nullable=False)  # "metal", "crypto", "stock"
+    unit = Column(String(20), default="oz")           # "oz", "gram", "coin", "aandeel"
+    ticker = Column(String(20), nullable=True)        # Optional stock ticker, e.g. "ASML.AS"
+    exchange = Column(String(50), nullable=True)      # Optional exchange, e.g. "Euronext Amsterdam"
     current_price_eur = Column(Numeric(16, 4), default=0)
     price_updated_at = Column(DateTime, nullable=True)
     monthly_growth_pct = Column(Numeric(6, 2), default=0)

@@ -12,7 +12,9 @@
 {% if filter_type == 'stock' %}
 <div class="card" style="border-left:4px solid var(--ctp-coin); margin-bottom:1.5rem;">
     <p style="margin:0;">
-        Beleggingen (aandelen) als asset-type worden later toegevoegd. Zodra de aandelen-implementatie gemerged is, verschijnen hier alleen assets van type <code>stock</code>.
+        <strong>Beleggingen (aandelen)</strong> — koers wordt handmatig onderhouden.
+        Voeg een asset toe met type <em>Aandeel</em> en vul de ticker (bv. <code>ASML.AS</code>) en handmatige prijs in.
+        Automatische koersen volgen in een toekomstige versie.
     </p>
 </div>
 {% endif %}
@@ -64,14 +66,29 @@
                 </div>
                 <div class="form-group" style="margin-bottom:0;">
                     <label>Type</label>
-                    <select name="asset_class" id="asset-class">
+                    <select name="asset_class" id="asset-class" onchange="toggleStockFields(this.value)">
                         <option value="metal" {{ 'selected' if filter_type == 'metal' }}>Edelmetaal</option>
                         <option value="crypto" {{ 'selected' if filter_type == 'crypto' }}>Crypto</option>
+                        <option value="stock" {{ 'selected' if filter_type == 'stock' }}>Aandeel</option>
                     </select>
                 </div>
                 <div class="form-group" style="margin-bottom:0;">
                     <label>Eenheid</label>
                     <input type="text" name="unit" id="asset-unit" placeholder="troy oz">
+                </div>
+            </div>
+            <div id="stock-extra-fields" style="display:{{ 'grid' if filter_type == 'stock' else 'none' }}; grid-template-columns:1fr 1fr; gap:0.5rem;">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Ticker <span class="muted" style="font-weight:normal;">(optioneel)</span></label>
+                    <input type="text" name="ticker" id="asset-ticker" placeholder="bv. ASML.AS">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Beurs <span class="muted" style="font-weight:normal;">(optioneel)</span></label>
+                    <input type="text" name="exchange" id="asset-exchange" placeholder="bv. Euronext Amsterdam">
+                </div>
+                <div class="form-group" style="margin-bottom:0; grid-column:1 / -1;">
+                    <label>Startprijs (EUR) <span class="muted" style="font-weight:normal;">(optioneel, handmatig)</span></label>
+                    <input type="text" name="manual_price" id="asset-manual-price" placeholder="bv. 625,40" inputmode="decimal">
                 </div>
             </div>
             <div class="form-group" style="margin-bottom:0;">
@@ -105,17 +122,29 @@
             </thead>
             <tbody>
                 {% for asset in assets %}
+                {% set stale_days = price_age_days.get(asset.id) %}
                 <tr>
                     <td>
                         <strong>{{ asset.name }}</strong>
                         <span class="badge" style="font-size:0.65rem;">{{ asset.unit }}</span>
+                        {% if asset.ticker %}
+                        <span class="muted" style="font-size:0.72rem; margin-left:0.35rem;" title="{% if asset.exchange %}{{ asset.exchange }}{% else %}Ticker{% endif %}">{{ asset.ticker }}</span>
+                        {% endif %}
                     </td>
                     <td class="text-right nowrap">&euro;&nbsp;{{ asset.current_price_eur|euro }}</td>
-                    <td class="text-right nowrap muted" style="font-size:0.75rem;">
-                        {% if asset.price_updated_at %}
-                        {{ asset.price_updated_at.strftime('%d-%m %H:%M') }}
+                    <td class="text-right nowrap" style="font-size:0.75rem;">
+                        {% if asset.price_updated_at and stale_days is not none %}
+                            {% if stale_days > 30 %}
+                            <span style="color:var(--ctp-danger); font-weight:600;" title="{{ asset.price_updated_at.strftime('%d-%m-%Y %H:%M') }}">
+                                ⚠ {{ stale_days }} dgn geleden
+                            </span>
+                            {% elif stale_days == 0 %}
+                            <span class="muted" title="{{ asset.price_updated_at.strftime('%d-%m-%Y %H:%M') }}">vandaag</span>
+                            {% else %}
+                            <span class="muted" title="{{ asset.price_updated_at.strftime('%d-%m-%Y %H:%M') }}">{{ stale_days }} dgn geleden</span>
+                            {% endif %}
                         {% else %}
-                        -
+                        <span class="muted">-</span>
                         {% endif %}
                     </td>
                     {% for person in persons %}
@@ -216,6 +245,8 @@
                     <th>Asset</th>
                     <th>Naam</th>
                     <th>Eenheid</th>
+                    <th title="Alleen voor aandelen">Ticker</th>
+                    <th title="Alleen voor aandelen">Beurs</th>
                     <th>Groei/mnd (%)</th>
                     <th>Handmatige prijs</th>
                     <th></th>
@@ -229,6 +260,8 @@
                     <form method="post" action="/portfolio/assets/{{ asset.id }}/edit">
                     <td><input type="text" name="name" value="{{ asset.name }}" class="budget-input" style="width:120px; text-align:left;"></td>
                     <td><input type="text" name="unit" value="{{ asset.unit }}" class="budget-input" style="width:80px; text-align:left;"></td>
+                    <td><input type="text" name="ticker" value="{{ asset.ticker or '' }}" class="budget-input" style="width:90px; text-align:left;" placeholder="{% if asset.asset_class == 'stock' %}ASML.AS{% else %}-{% endif %}"></td>
+                    <td><input type="text" name="exchange" value="{{ asset.exchange or '' }}" class="budget-input" style="width:130px; text-align:left;" placeholder="{% if asset.asset_class == 'stock' %}Euronext Amsterdam{% else %}-{% endif %}"></td>
                     <td><input type="text" name="monthly_growth_pct" value="{{ asset.monthly_growth_pct }}" class="budget-input" style="width:70px;"></td>
                     <td><input type="text" name="manual_price" placeholder="{{ "%.2f"|format(asset.current_price_eur) }}" class="budget-input" style="width:100px;"></td>
                     <td><button type="submit" class="btn btn-sm">Opslaan</button></td>
@@ -307,6 +340,14 @@ function fillPreset(val) {
     document.getElementById('asset-symbol').value = parts[1];
     document.getElementById('asset-class').value = parts[2];
     document.getElementById('asset-unit').value = parts[3];
+    toggleStockFields(parts[2]);
+}
+
+function toggleStockFields(val) {
+    var el = document.getElementById('stock-extra-fields');
+    if (el) {
+        el.style.display = (val === 'stock') ? 'grid' : 'none';
+    }
 }
 
 function saveHolding(input) {
