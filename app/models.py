@@ -168,6 +168,7 @@ class RecurringTransaction(Base):
 
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    account_id = Column(Integer, ForeignKey("accounts.id"), nullable=True)
     name = Column(String(150), nullable=False)
     amount_expected = Column(Numeric(12, 2), nullable=False)
     frequency = Column(String(20), nullable=False)  # "monthly", "weekly", "yearly", "quarterly"
@@ -182,6 +183,7 @@ class RecurringTransaction(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     user = relationship("User", back_populates="recurring_transactions")
+    account = relationship("Account")
     category = relationship("Category")
 
 

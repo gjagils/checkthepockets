@@ -402,16 +402,20 @@ def sync_projected_transactions(user_id: int, year: int, month: int, db: Session
                 # No real match — ensure projected placeholder exists (upsert logic)
                 proj = db.query(Transaction).filter(Transaction.import_hash == proj_hash).first()
                 if proj:
-                    # Update existing projected transaction in case amount/category changed
+                    # Update existing projected transaction in case amount/category/account changed
                     proj.amount = item.amount_expected
                     proj.description = item.name
                     proj.counterparty = item.counterparty or item.name
                     proj.category_id = item.category_id
                     proj.recurring_id = item.id
+                    if item.account_id:
+                        proj.account_id = item.account_id
                     changed = True
                 else:
+                    # Gebruik de gekoppelde rekening van de recurring indien aanwezig
+                    proj_account_id = item.account_id or default_account.id
                     db.add(Transaction(
-                        account_id=default_account.id,
+                        account_id=proj_account_id,
                         date=period_start,
                         amount=item.amount_expected,
                         currency="EUR",
@@ -665,6 +669,13 @@ def _render_recurring_page(
         .all()
     )
 
+    accounts = (
+        db.query(Account)
+        .filter(Account.user_id == user.id)
+        .order_by(Account.name)
+        .all()
+    )
+
     # Find earliest real transaction — don't flag "missed" before this date
     first_tx_date = (
         db.query(func.min(Transaction.date))
@@ -825,7 +836,7 @@ def _render_recurring_page(
             "request": request, "user": user,
             "items_active": items_active, "items_due": items_due,
             "items_missed": items_missed, "items_inactive": items_inactive,
-            "categories": categories, "frequencies": FREQUENCIES,
+            "categories": categories, "accounts": accounts, "frequencies": FREQUENCIES,
             "nl_month_abbrevs": NL_MONTH_ABBREVS,
             "total_active": len(items_active), "total_due": len(items_due),
             "total_missed": len(items_missed), "today": today,
@@ -927,6 +938,7 @@ async def create_recurring(
     name: str = Form(...),
     amount_expected: str = Form(...),
     frequency: str = Form(...),
+    account_id: str = Form(""),
     category_id: str = Form(""),
     counterparty: str = Form(""),
     description_match: str = Form(""),
@@ -944,6 +956,17 @@ async def create_recurring(
         return RedirectResponse("/recurring", status_code=302)
     if frequency not in FREQUENCIES:
         return RedirectResponse("/recurring", status_code=302)
+
+    # Rekening is verplicht bij een nieuwe recurring
+    acc_id_str = account_id.strip()
+    if not acc_id_str.isdigit():
+        return RedirectResponse("/recurring?error=account_required", status_code=302)
+    acc = db.query(Account).filter(
+        Account.id == int(acc_id_str), Account.user_id == user.id
+    ).first()
+    if not acc:
+        return RedirectResponse("/recurring?error=account_required", status_code=302)
+    acc_id = acc.id
 
     try:
         parsed_amount = Decimal(amount_expected.strip().replace(",", "."))
@@ -974,6 +997,7 @@ async def create_recurring(
 
     item = RecurringTransaction(
         user_id=user.id,
+        account_id=acc_id,
         name=name,
         amount_expected=parsed_amount,
         frequency=frequency,
@@ -1177,6 +1201,7 @@ def edit_recurring(
     name: str = Form(...),
     amount_expected: str = Form(...),
     frequency: str = Form(...),
+    account_id: str = Form(""),
     category_id: str = Form(""),
     counterparty: str = Form(""),
     description_match: str = Form(""),
@@ -1195,6 +1220,20 @@ def edit_recurring(
     name = name.strip()
     if not name:
         return RedirectResponse("/recurring", status_code=302)
+
+    # Rekening: leeg = NULL (backward compat); ingevulde waarde moet valid zijn
+    acc_id_str = account_id.strip()
+    if acc_id_str:
+        if not acc_id_str.isdigit():
+            return RedirectResponse(f"/recurring?error=account_required&item={item.id}", status_code=302)
+        acc = db.query(Account).filter(
+            Account.id == int(acc_id_str), Account.user_id == user.id
+        ).first()
+        if not acc:
+            return RedirectResponse(f"/recurring?error=account_required&item={item.id}", status_code=302)
+        item.account_id = acc.id
+    else:
+        item.account_id = None
 
     try:
         parsed_amount = Decimal(amount_expected.strip().replace(",", "."))
