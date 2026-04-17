@@ -387,8 +387,22 @@ def plan_detail(
                 # lijn in niet-kwartaalmaanden onterecht als "niet ontvangen"
                 # rood kleuren.
                 was_scheduled = entry.amount is not None
-                if actual is not None and entry.amount != actual:
-                    entry.amount = actual
+                is_past = (plan.year, entry.month) < (today.year, today.month)
+                month_fully_cat = entry.month in fully_cat_months
+                if actual is not None:
+                    # We hebben werkelijke transactie(s) → gebruik dat bedrag.
+                    if entry.amount != actual:
+                        entry.amount = actual
+                elif is_past and was_scheduled and month_fully_cat:
+                    # Voorbije maand die ingepland stond, volledig gecategoriseerd,
+                    # en geen transactie voor deze categorie → 0 is zeker.
+                    # (Is de maand nog niet volledig gecategoriseerd, dan laten we
+                    # het forecast-bedrag staan — klikken brengt de gebruiker naar
+                    # de ongecategoriseerde transacties om alsnog te koppelen.)
+                    entry.amount = Decimal("0")
+                # Anders (toekomst / lopende maand / niet-volledig-gecategoriseerd
+                # verleden): laat forecast staan zodat de gebruiker nog steeds ziet
+                # wat gepland was.
                 expected_for_cell = line.default_amount if was_scheduled else Decimal("0")
                 entry.status = _determine_color_status(
                     actual, expected_for_cell, is_inc,
@@ -477,6 +491,7 @@ def plan_detail(
             "categories": categories,
             "frequency_labels": FREQUENCY_LABELS,
             "today": today,
+            "fully_cat_months": fully_cat_months,
             "ai_suggestions": ai_suggestions,
             "analyze_status": analyze_status,
         },
@@ -755,30 +770,31 @@ def edit_line(
     line.default_amount = amount
     line.annual_budget = amount * len(months_for_line)
 
-    # Refill forecast entries based on the new frequency / amount.
-    # Confirmed/pending cells (with actual transactions) are left alone.
+    # Herberekening van alle cellen op basis van de nieuwe frequentie / bedrag.
+    # Maanden met een werkelijke transactie voor de (nieuwe) categorie houden
+    # hun actual bedrag; alle andere maanden volgen het schema.
     months_set = set(months_for_line)
-    for entry in line.entries:
-        if entry.status != "forecast":
-            continue
-        if entry.month in months_set:
-            entry.amount = amount
-        else:
-            entry.amount = None
-
-    # If the line has a category, sync amounts from transactions for months
-    # that have transactions (mirrors the on-page-load behaviour).
     if cat_id:
         tx_totals = _get_transaction_totals_by_month(
             db, line.plan.account_id, line.plan.year, cat_id
         )
-        today = datetime.date.today()
-        for entry in line.entries:
-            if entry.month in tx_totals:
-                entry.amount = tx_totals[entry.month]
-                entry.status = _determine_entry_status(
-                    db, line.plan.account_id, line.plan.year, entry.month, today
-                )
+    else:
+        tx_totals = {}
+
+    today = datetime.date.today()
+    for entry in line.entries:
+        if entry.month in tx_totals:
+            # Er zijn werkelijke transactie(s) — niet overschrijven.
+            entry.amount = tx_totals[entry.month]
+            entry.status = _determine_entry_status(
+                db, line.plan.account_id, line.plan.year, entry.month, today
+            )
+        elif entry.month in months_set:
+            # Ingepland in het nieuwe schema, nog geen transactie → nieuwe default.
+            entry.amount = amount
+        else:
+            # Buiten het schema (bv. kwartaal-maand in maandlijst) → leegmaken.
+            entry.amount = None
 
     db.commit()
 
