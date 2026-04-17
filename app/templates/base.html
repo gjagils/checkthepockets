@@ -24,9 +24,10 @@
         else 'inbox' if path == '/inbox' or path.startswith('/inbox/')
         else 'financien' if path in ['/transactions', '/categories', '/rules', '/recurring'] or path.startswith('/transactions')
         else 'budgetten' if path.startswith('/budgets') or path.startswith('/savings')
-        else 'analyse' if path.startswith('/analytics') or path.startswith('/portfolio') or path.startswith('/networth')
+        else 'portfolio' if path.startswith('/analytics') or path.startswith('/portfolio') or path.startswith('/networth')
         else 'rekeningen' if path.startswith('/accounts') or path.startswith('/import') or path.startswith('/banking') or path.startswith('/persons')
         else '' %}
+    {% set portfolio_type = request.query_params.get('type') if path.startswith('/portfolio') else None %}
     {% set inbox_count = request.state.inbox_count if request.state.inbox_count is defined else 0 %}
     <div class="navbar-wrapper">
         <nav class="nav-main">
@@ -49,7 +50,7 @@
                 </a>
                 <a href="/transactions" class="{{ 'active' if main_active == 'financien' }}">Financiën</a>
                 <a href="/budgets" class="{{ 'active' if main_active == 'budgetten' }}">Budgetten</a>
-                <a href="/analytics" class="{{ 'active' if main_active == 'analyse' }}">Analyse</a>
+                <a href="/portfolio" class="{{ 'active' if main_active == 'portfolio' }}">Portfolio</a>
                 <a href="/accounts" class="{{ 'active' if main_active == 'rekeningen' }}">Rekeningen</a>
             </div>
             <div class="nav-user-section">
@@ -70,12 +71,13 @@
             {% elif main_active == 'budgetten' %}
                 <a href="/budgets" class="{{ 'active' if path.startswith('/budgets') }}">Budgetten</a>
                 <a href="/savings" class="{{ 'active' if path.startswith('/savings') }}">Sparen</a>
-            {% elif main_active == 'analyse' %}
+            {% elif main_active == 'portfolio' %}
                 <a href="/analytics" class="{{ 'active' if path == '/analytics' }}">Analyse</a>
                 <a href="/analytics/stats" class="{{ 'active' if path == '/analytics/stats' }}">Statistieken</a>
                 <a href="/analytics/query" class="{{ 'active' if path == '/analytics/query' }}">Query</a>
-                <a href="/portfolio" class="{{ 'active' if path.startswith('/portfolio') }}">Portfolio</a>
-                <a href="/networth" class="{{ 'active' if path.startswith('/networth') }}">Vermogen</a>
+                <a href="/portfolio?type=stock" class="{{ 'active' if path.startswith('/portfolio') and portfolio_type == 'stock' }}">Beleggingen</a>
+                <a href="/portfolio?type=crypto" class="{{ 'active' if path.startswith('/portfolio') and portfolio_type == 'crypto' }}">Crypto</a>
+                <a href="/portfolio?type=metal" class="{{ 'active' if path.startswith('/portfolio') and portfolio_type == 'metal' }}">Edelmetaal</a>
             {% elif main_active == 'rekeningen' %}
                 <a href="/accounts" class="{{ 'active' if path.startswith('/accounts') }}">Rekeningen</a>
                 <a href="/persons" class="{{ 'active' if path.startswith('/persons') }}">Personen</a>
@@ -113,14 +115,15 @@
                     </div>
                 </div>
 
-                <div class="m-nav-group {{ 'open' if main_active == 'analyse' }}">
-                    <a href="/analytics" class="m-nav-main {{ 'active' if main_active == 'analyse' }}">Analyse</a>
+                <div class="m-nav-group {{ 'open' if main_active == 'portfolio' }}">
+                    <a href="/portfolio" class="m-nav-main {{ 'active' if main_active == 'portfolio' }}">Portfolio</a>
                     <div class="m-nav-children">
                         <a href="/analytics" class="{{ 'active' if path == '/analytics' }}">Analyse</a>
                         <a href="/analytics/stats" class="{{ 'active' if path == '/analytics/stats' }}">Statistieken</a>
                         <a href="/analytics/query" class="{{ 'active' if path == '/analytics/query' }}">Query</a>
-                        <a href="/portfolio" class="{{ 'active' if path.startswith('/portfolio') }}">Portfolio</a>
-                        <a href="/networth" class="{{ 'active' if path.startswith('/networth') }}">Vermogen</a>
+                        <a href="/portfolio?type=stock" class="{{ 'active' if path.startswith('/portfolio') and portfolio_type == 'stock' }}">Beleggingen</a>
+                        <a href="/portfolio?type=crypto" class="{{ 'active' if path.startswith('/portfolio') and portfolio_type == 'crypto' }}">Crypto</a>
+                        <a href="/portfolio?type=metal" class="{{ 'active' if path.startswith('/portfolio') and portfolio_type == 'metal' }}">Edelmetaal</a>
                     </div>
                 </div>
 
