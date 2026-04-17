@@ -57,6 +57,16 @@ def portfolio_overview(
         holdings_map[(h.asset_id, h.person_id)] = h.quantity
         contribution_map[(h.asset_id, h.person_id)] = h.monthly_contribution_eur or Decimal("0")
 
+    # Age (in days) of the last price update per asset — used in template for
+    # een "laatst bijgewerkt X dagen geleden" indicator met warning bij > 30 dagen.
+    now_dt = datetime.datetime.utcnow()
+    price_age_days = {}
+    for asset in assets:
+        if asset.price_updated_at:
+            price_age_days[asset.id] = (now_dt - asset.price_updated_at).days
+        else:
+            price_age_days[asset.id] = None
+
     # Calculate totals per person
     person_totals = {p.id: Decimal("0") for p in persons}
     asset_totals = {}
@@ -162,6 +172,7 @@ def portfolio_overview(
             "preset_assets": PRESET_ASSETS,
             "filter_type": filter_type,
             "filter_type_label": ASSET_TYPE_LABELS.get(filter_type) if filter_type else None,
+            "price_age_days": price_age_days,
         },
     )
 
@@ -207,6 +218,9 @@ def add_asset(
     asset_class: str = Form(...),
     unit: str = Form(""),
     monthly_growth_pct: str = Form("0"),
+    ticker: str = Form(""),
+    exchange: str = Form(""),
+    manual_price: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
@@ -223,7 +237,19 @@ def add_asset(
         asset_class=asset_class,
         unit=unit.strip() or "stuk",
         monthly_growth_pct=growth,
+        ticker=ticker.strip() or None,
+        exchange=exchange.strip() or None,
     )
+
+    # Optional manual initial price (useful for stocks where there's no auto-fetch)
+    manual = manual_price.strip().replace(",", ".")
+    if manual:
+        try:
+            asset.current_price_eur = Decimal(manual)
+            asset.price_updated_at = datetime.datetime.utcnow()
+        except (InvalidOperation, ValueError):
+            pass
+
     db.add(asset)
     db.commit()
 
@@ -238,6 +264,8 @@ def edit_asset(
     unit: str = Form(""),
     monthly_growth_pct: str = Form("0"),
     manual_price: str = Form(""),
+    ticker: str | None = Form(None),
+    exchange: str | None = Form(None),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
@@ -265,6 +293,12 @@ def edit_asset(
             asset.price_updated_at = datetime.datetime.utcnow()
         except (InvalidOperation, ValueError):
             pass
+
+    # Ticker/exchange (only update if field was submitted — None means not in form)
+    if ticker is not None:
+        asset.ticker = ticker.strip() or None
+    if exchange is not None:
+        asset.exchange = exchange.strip() or None
 
     db.commit()
     return RedirectResponse("/portfolio", status_code=302)
@@ -388,7 +422,11 @@ def refresh_prices(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    """Fetch live prices and historical prices for all assets."""
+    """Fetch live prices and historical prices for all assets.
+
+    Stocks (`asset_class == 'stock'`) worden overgeslagen: de prijs is handmatig
+    en er is in deze issue nog geen automatische API voor aandelen gekoppeld.
+    """
     user = require_login(request, db)
 
     assets = (
@@ -398,7 +436,12 @@ def refresh_prices(
     )
 
     updated = 0
+    skipped_stocks = 0
     for asset in assets:
+        if asset.asset_class == "stock":
+            skipped_stocks += 1
+            continue
+
         # Fetch current price
         price = fetch_price(asset.symbol, asset.asset_class)
         if price is not None:
@@ -426,4 +469,9 @@ def refresh_prices(
                 db.add(snapshot)
 
     db.commit()
+    if skipped_stocks:
+        import logging
+        logging.getLogger(__name__).info(
+            "Refresh-prices: %d stocks overgeslagen (handmatige koers)", skipped_stocks
+        )
     return RedirectResponse("/portfolio", status_code=302)
