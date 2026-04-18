@@ -23,6 +23,12 @@
 </div>
 {% endif %}
 
+{% if flash == 'bulk_imported' %}
+<div class="card" style="margin-bottom:1rem; background:#e7f5e7; border:1px solid #4caf50;">
+    <strong>✓</strong> Bulk-import klaar — {{ bulk_new_count }} nieuwe, {{ bulk_updated_count }} bijgewerkt.
+</div>
+{% endif %}
+
 {% if error == 'duplicate' %}
 <div class="card" style="margin-bottom:1rem; background:#fde7e7; border:1px solid #e53935;">
     <strong>✗</strong> Er bestaat al een rij met dezelfde rentevast-periode en LTV-bucket.
@@ -37,12 +43,112 @@
 </div>
 {% endif %}
 
+{% if bulk_error %}
+<div class="card" style="margin-bottom:1rem; background:#fde7e7; border:1px solid #e53935;">
+    <strong>✗</strong> {{ bulk_error }}
+</div>
+{% endif %}
+
 <div class="card" style="margin-bottom:1.5rem;">
     <p class="muted" style="margin:0;">
         Rentes zijn indicatief. ABN-koppeling volgt in een later ticket. LTV =
         loan-to-value (hypotheek / woningwaarde). De bucket-bovengrens bepaalt
         welke rij toegepast wordt bij een scenario.
     </p>
+</div>
+
+{# ─── Bulk invoer ──────────────────────────────────────────────────────── #}
+<div class="card" style="margin-bottom:1.5rem;">
+    <h2 style="margin:0 0 0.5rem 0; font-size:1.1rem;">Bulk invoer</h2>
+    <p class="muted" style="margin:0 0 0.75rem 0; font-size:0.9rem;">
+        Plak een tabel uit de ABN-tariefpagina of je Excel. Accepteerd twee
+        formaten: (1) <code>fixed_years, ltv_max_pct, interest_rate</code> op
+        elke regel, of (2) de originele ABN-tabel met kolommen NHG / ≤65% / ≤85%
+        / ≤90% / &gt;90% (NHG en variabele rentes worden overgeslagen).
+    </p>
+    <form method="post" action="/hypotheek/rentes/bulk/preview">
+        <textarea name="raw_text" rows="6" style="width:100%; font-family:monospace;"
+                  placeholder="10 jaar vast	3,65%	3,75%	3,80%	3,85%	3,95%
+20 jaar vast	4,05%	4,15%	4,20%	4,25%	4,35%">{{ bulk_raw_text or '' }}</textarea>
+        <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
+            <button type="submit" class="btn btn-primary">Voorvertoning →</button>
+        </div>
+    </form>
+
+    {% if bulk_parsed is defined and bulk_parsed is not none %}
+    <hr style="margin:1rem 0;">
+    <h3 style="margin:0 0 0.5rem 0; font-size:1rem;">Voorvertoning</h3>
+
+    {% if bulk_parsed.errors %}
+    <div style="background:#fde7e7; border:1px solid #e53935; padding:0.5rem 0.75rem; margin-bottom:0.75rem; border-radius:4px;">
+        <strong>{{ bulk_parsed.errors | length }} foutmelding(en):</strong>
+        <ul style="margin:0.25rem 0 0 1.25rem;">
+            {% for err in bulk_parsed.errors %}<li>{{ err }}</li>{% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    {% if bulk_parsed.skipped %}
+    <div style="background:#fff8e1; border:1px solid #ffc107; padding:0.5rem 0.75rem; margin-bottom:0.75rem; border-radius:4px;">
+        <strong>{{ bulk_parsed.skipped | length }} overgeslagen:</strong>
+        <ul style="margin:0.25rem 0 0 1.25rem;">
+            {% for s in bulk_parsed.skipped %}<li>{{ s }}</li>{% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    {% if bulk_parsed.rows %}
+    <p style="margin:0 0 0.5rem 0;">
+        <strong>{{ bulk_new_rows | length }} nieuw</strong>,
+        <strong>{{ bulk_update_rows | length }} bijgewerkt</strong> van de
+        <strong>{{ bulk_parsed.rows | length }}</strong> geparsed rijen.
+    </p>
+    <div class="table-wrap" style="max-height:20rem; overflow-y:auto;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Rentevast</th>
+                    <th class="text-right">LTV max</th>
+                    <th class="text-right">Rente</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in bulk_new_rows %}
+                <tr>
+                    <td>{{ row.fixed_years }}j</td>
+                    <td class="text-right">{{ "%.2f" | format(row.ltv_max_pct * 100) }}%</td>
+                    <td class="text-right">{{ "%.2f" | format(row.interest_rate * 100) }}%</td>
+                    <td><span style="color:#2e7d32;">nieuw</span></td>
+                </tr>
+                {% endfor %}
+                {% for row, current_rate in bulk_update_rows %}
+                <tr>
+                    <td>{{ row.fixed_years }}j</td>
+                    <td class="text-right">{{ "%.2f" | format(row.ltv_max_pct * 100) }}%</td>
+                    <td class="text-right">
+                        {{ "%.2f" | format(row.interest_rate * 100) }}%
+                        <span class="muted">({{ "%.2f" | format(current_rate * 100) }}% → {{ "%.2f" | format(row.interest_rate * 100) }}%)</span>
+                    </td>
+                    <td><span style="color:#ef6c00;">update</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if not bulk_parsed.errors %}
+    <form method="post" action="/hypotheek/rentes/bulk/import" style="margin-top:0.75rem;">
+        <input type="hidden" name="raw_text" value="{{ bulk_raw_text }}">
+        <button type="submit" class="btn btn-primary">
+            Importeer {{ bulk_parsed.rows | length }} rijen
+        </button>
+    </form>
+    {% endif %}
+    {% else %}
+    <p class="muted" style="margin:0;">Geen geldige rijen gevonden in de invoer.</p>
+    {% endif %}
+    {% endif %}
 </div>
 
 <div class="card" style="margin-bottom:1.5rem;">
