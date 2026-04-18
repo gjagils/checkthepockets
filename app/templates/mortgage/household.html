@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}Hypotheek — Huishouden - Check Your Pockets{% endblock %}
+
+{% macro euro_input(name, value, placeholder="0,00") -%}
+<input type="text" name="{{ name }}" class="budget-input"
+       value="{{ '%.2f' % value if value is not none else '' }}"
+       placeholder="{{ placeholder }}"
+       inputmode="decimal" style="text-align:right;">
+{%- endmacro %}
+
+{% macro pct_input(name, value, placeholder="0,00") -%}
+<input type="text" name="{{ name }}" class="budget-input"
+       value="{{ '%.2f' % (value * 100) if value is not none else '' }}"
+       placeholder="{{ placeholder }}"
+       inputmode="decimal" style="text-align:right;">
+{%- endmacro %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Huishoud-instellingen</h1>
+</div>
+
+{% if saved %}
+<div class="card" style="margin-bottom:1rem; background:#e7f5e7; border:1px solid #4caf50;">
+    <strong>✓ Opgeslagen.</strong> Je huishoud-instellingen zijn bijgewerkt.
+</div>
+{% endif %}
+
+<div class="card" style="margin-bottom:1.5rem;">
+    <p class="muted" style="margin-bottom:0;">
+        Deze waardes zijn stabiel en gelden voor alle hypotheek-scenarios. Vul ze
+        één keer in; je hoeft ze niet per scenario opnieuw op te geven.
+    </p>
+</div>
+
+<form method="post" action="/hypotheek/huishouden" class="card" style="display:grid; gap:1.75rem;">
+
+    <section>
+        <h2 style="margin:0 0 0.25rem 0;">Inkomen</h2>
+        <p class="muted" style="margin:0 0 0.75rem 0;">
+            Netto maandsalarissen van beide huishoudleden. Gebruikt om de maximale
+            maandlast te toetsen.
+        </p>
+        <div class="table-wrap">
+            <table>
+                <tbody>
+                    <tr>
+                        <td>Naam persoon 1</td>
+                        <td><input type="text" name="salary_primary_name"
+                                   value="{{ household.salary_primary_name or '' }}"
+                                   class="budget-input" style="text-align:left;"></td>
+                        <td>Netto per maand (€)</td>
+                        <td>{{ euro_input("salary_primary", household.salary_primary) }}</td>
+                    </tr>
+                    <tr>
+                        <td>Naam persoon 2</td>
+                        <td><input type="text" name="salary_secondary_name"
+                                   value="{{ household.salary_secondary_name or '' }}"
+                                   class="budget-input" style="text-align:left;"></td>
+                        <td>Netto per maand (€)</td>
+                        <td>{{ euro_input("salary_secondary", household.salary_secondary) }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section>
+        <h2 style="margin:0 0 0.25rem 0;">Bestaande hypotheek</h2>
+        <p class="muted" style="margin:0 0 0.75rem 0;">
+            Deel dat meeverhuist bij een nieuwe hypotheek. Pim = annuïtair deel
+            met rente-aftrek; aflossingsvrij heeft een vaste maandlast.
+        </p>
+        <div class="table-wrap">
+            <table>
+                <tbody>
+                    <tr>
+                        <td>Pim-deel bedrag (€)</td>
+                        <td>{{ euro_input("existing_mortgage_pim", household.existing_mortgage_pim) }}</td>
+                        <td>Pim-rente (%)</td>
+                        <td>{{ pct_input("existing_mortgage_pim_rate", household.existing_mortgage_pim_rate) }}</td>
+                    </tr>
+                    <tr>
+                        <td>Teruggave Pim (%)</td>
+                        <td>{{ pct_input("existing_mortgage_pim_refund_rate", household.existing_mortgage_pim_refund_rate) }}</td>
+                        <td>Aflossingsvrij bedrag (€)</td>
+                        <td>{{ euro_input("existing_mortgage_interest_only", household.existing_mortgage_interest_only) }}</td>
+                    </tr>
+                    <tr>
+                        <td>Aflossingsvrij maandlast (€)</td>
+                        <td>{{ euro_input("existing_mortgage_interest_only_monthly", household.existing_mortgage_interest_only_monthly) }}</td>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section>
+        <h2 style="margin:0 0 0.25rem 0;">Huidige woning</h2>
+        <p class="muted" style="margin:0 0 0.75rem 0;">
+            Restschuld op de huidige woning. Wordt verrekend met de verkoopprijs
+            om de overwaarde te bepalen.
+        </p>
+        <div class="table-wrap">
+            <table>
+                <tbody>
+                    <tr>
+                        <td>Restschuld huidige woning (€)</td>
+                        <td>{{ euro_input("current_home_debt", household.current_home_debt) }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section>
+        <h2 style="margin:0 0 0.25rem 0;">Belasting & forfait</h2>
+        <p class="muted" style="margin:0 0 0.75rem 0;">
+            Voor renteaftrek en eigen-woning-forfait. Defaults: 36,97% en € 3.600.
+        </p>
+        <div class="table-wrap">
+            <table>
+                <tbody>
+                    <tr>
+                        <td>Belastingtarief (%)</td>
+                        <td>{{ pct_input("tax_rate", household.tax_rate, "36,97") }}</td>
+                        <td>Eigen woning forfait (€)</td>
+                        <td>{{ euro_input("notional_rent_value", household.notional_rent_value, "3600,00") }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section>
+        <h2 style="margin:0 0 0.25rem 0;">Kosten-percentages</h2>
+        <p class="muted" style="margin:0 0 0.75rem 0;">
+            Aankoopkosten (notaris, overdrachtsbelasting) en verkoopkosten (makelaar).
+            Defaults: 2,5% aankoop, 1,5% verkoop.
+        </p>
+        <div class="table-wrap">
+            <table>
+                <tbody>
+                    <tr>
+                        <td>Aankoopkosten (%)</td>
+                        <td>{{ pct_input("purchase_costs_pct", household.purchase_costs_pct, "2,50") }}</td>
+                        <td>Verkoopkosten (%)</td>
+                        <td>{{ pct_input("selling_costs_pct", household.selling_costs_pct, "1,50") }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <div style="display:flex; justify-content:flex-end;">
+        <button type="submit" class="btn btn-primary">Opslaan</button>
+    </div>
+</form>
+{% endblock %}
