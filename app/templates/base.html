@@ -85,6 +85,7 @@
             {% elif main_active == 'hypotheek' %}
                 <a href="/hypotheek" class="{{ 'active' if path == '/hypotheek' }}">Overzicht</a>
                 <a href="/hypotheek/huishouden" class="{{ 'active' if path.startswith('/hypotheek/huishouden') }}">Huishouden</a>
+                <a href="/hypotheek/rentes" class="{{ 'active' if path.startswith('/hypotheek/rentes') }}">Rentes</a>
             {% elif main_active == 'rekeningen' %}
                 <a href="/accounts" class="{{ 'active' if path.startswith('/accounts') }}">Rekeningen</a>
                 <a href="/persons" class="{{ 'active' if path.startswith('/persons') }}">Personen</a>
@@ -140,6 +141,7 @@
                     <div class="m-nav-children">
                         <a href="/hypotheek" class="{{ 'active' if path == '/hypotheek' }}">Overzicht</a>
                         <a href="/hypotheek/huishouden" class="{{ 'active' if path.startswith('/hypotheek/huishouden') }}">Huishouden</a>
+                        <a href="/hypotheek/rentes" class="{{ 'active' if path.startswith('/hypotheek/rentes') }}">Rentes</a>
                     </div>
                 </div>
                 {% endif %}
