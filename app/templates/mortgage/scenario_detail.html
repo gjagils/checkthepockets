@@ -13,13 +13,21 @@
 </div>
 
 {% if flash == 'created' %}
-<div class="card" style="margin-bottom:1rem; background:#e7f5e7; border:1px solid #4caf50;">
-    <strong>✓</strong> Scenario aangemaakt.
-</div>
+<div class="card" style="margin-bottom:1rem; background:#e7f5e7; border:1px solid #4caf50;"><strong>✓</strong> Scenario aangemaakt.</div>
 {% elif flash == 'updated' %}
-<div class="card" style="margin-bottom:1rem; background:#e7f5e7; border:1px solid #4caf50;">
-    <strong>✓</strong> Scenario bijgewerkt.
-</div>
+<div class="card" style="margin-bottom:1rem; background:#e7f5e7; border:1px solid #4caf50;"><strong>✓</strong> Scenario bijgewerkt.</div>
+{% elif flash == 'variant_added' %}
+<div class="card" style="margin-bottom:1rem; background:#e7f5e7; border:1px solid #4caf50;"><strong>✓</strong> Variant toegevoegd.</div>
+{% elif flash == 'variant_deleted' %}
+<div class="card" style="margin-bottom:1rem; background:#e7f5e7; border:1px solid #4caf50;"><strong>✓</strong> Variant verwijderd.</div>
+{% elif flash == 'variant_duplicate' %}
+<div class="card" style="margin-bottom:1rem; background:#fde7e7; border:1px solid #e53935;"><strong>✗</strong> Deze rentevast-periode bestaat al als variant.</div>
+{% elif flash == 'variant_invalid' %}
+<div class="card" style="margin-bottom:1rem; background:#fde7e7; border:1px solid #e53935;"><strong>✗</strong> Ongeldige variant-invoer.</div>
+{% elif flash == 'budget_saved' %}
+<div class="card" style="margin-bottom:1rem; background:#e7f5e7; border:1px solid #4caf50;"><strong>✓</strong> Scenario-budget opgeslagen.</div>
+{% elif flash == 'budget_reset' %}
+<div class="card" style="margin-bottom:1rem; background:#e7f5e7; border:1px solid #4caf50;"><strong>✓</strong> Scenario-override verwijderd.</div>
 {% endif %}
 
 <div class="card" style="margin-bottom:1.5rem;">
@@ -32,9 +40,7 @@
         <div><span class="muted">Verkoop oude woning</span><br>€ {{ scenario.sale_old_home | euro0 }}</div>
         <div><span class="muted">Energielabel</span><br>{{ scenario.energy_label or '—' }}</div>
     </div>
-    {% if scenario.notes %}
-    <p class="muted" style="margin-top:0.75rem; margin-bottom:0;">{{ scenario.notes }}</p>
-    {% endif %}
+    {% if scenario.notes %}<p class="muted" style="margin-top:0.75rem; margin-bottom:0;">{{ scenario.notes }}</p>{% endif %}
 </div>
 
 <div class="card" style="margin-bottom:1.5rem;">
@@ -47,31 +53,238 @@
     </div>
 </div>
 
+{# ─── Varianten ───────────────────────────────────────────────────────────── #}
+<div class="card" style="margin-bottom:1.5rem;">
+    <h2 style="margin:0 0 0.75rem 0; font-size:1.1rem;">Varianten</h2>
+
+    {% if variant_stats %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Rentevast</th>
+                    <th>Rente</th>
+                    <th>Bron</th>
+                    <th class="text-right">Annuiteit / maand</th>
+                    <th class="text-right">Netto / maand</th>
+                    <th class="text-right">1e 5 jaar totaal</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for vs in variant_stats %}
+                <tr>
+                    <td>{{ vs.fixed_years }}j</td>
+                    <td>
+                        {% if vs.rate_missing %}
+                        <span class="muted">—</span>
+                        {% else %}
+                        {{ "%.2f" | format(vs.rate * 100) }}%
+                        {% endif %}
+                    </td>
+                    <td class="muted">{{ vs.rate_source }}</td>
+                    <td class="text-right">
+                        {% if vs.rate_missing %}<span class="muted">—</span>{% else %}€ {{ vs.annuity_monthly | euro }}{% endif %}
+                    </td>
+                    <td class="text-right">
+                        {% if vs.rate_missing %}<span class="muted">—</span>{% else %}€ {{ vs.net_monthly | euro }}{% endif %}
+                    </td>
+                    <td class="text-right">
+                        {% if vs.rate_missing %}<span class="muted">—</span>{% else %}€ {{ vs.first_5y_total_cost | euro0 }}{% endif %}
+                    </td>
+                    <td class="text-right">
+                        <form method="post" action="/hypotheek/scenarios/{{ scenario.id }}/variants/{{ vs.variant.id }}/delete"
+                              style="display:inline;"
+                              onsubmit="return confirm('Variant verwijderen?');">
+                            <button type="submit" class="btn btn-sm btn-danger">Verwijderen</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="muted">Nog geen varianten. Voeg er een toe om rentevast-periodes te vergelijken.</p>
+    {% endif %}
+
+    {% if missing_fixed_years or available_fixed_years %}
+    <form method="post" action="/hypotheek/scenarios/{{ scenario.id }}/variants"
+          style="margin-top:0.75rem; display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+        <label style="display:flex; gap:0.35rem; align-items:center;">
+            <span>Rentevast</span>
+            <select name="fixed_years" required>
+                {% for fy in missing_fixed_years or available_fixed_years %}
+                <option value="{{ fy }}">{{ fy }} jaar</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label style="display:flex; gap:0.35rem; align-items:center;">
+            <span>Override (%)</span>
+            <input type="text" name="interest_rate_override" inputmode="decimal"
+                   placeholder="leeg = uit rente-tabel"
+                   class="budget-input" style="width:10rem;">
+        </label>
+        <button type="submit" class="btn">+ Variant toevoegen</button>
+    </form>
+    {% endif %}
+</div>
+
+{# ─── Vergelijking ───────────────────────────────────────────────────────── #}
+{% if variant_stats|selectattr("rate_missing", "equalto", false)|list %}
+<div class="card" style="margin-bottom:1.5rem;">
+    <h2 style="margin:0 0 0.75rem 0; font-size:1.1rem;">Vergelijking</h2>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th></th>
+                    {% for vs in variant_stats %}
+                    {% if not vs.rate_missing %}<th class="text-right">{{ vs.fixed_years }}j</th>{% endif %}
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="muted">Rente</td>
+                    {% for vs in variant_stats %}
+                    {% if not vs.rate_missing %}<td class="text-right">{{ "%.2f" | format(vs.rate * 100) }}%</td>{% endif %}
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td class="muted">Annuiteit / maand</td>
+                    {% for vs in variant_stats %}
+                    {% if not vs.rate_missing %}<td class="text-right">€ {{ vs.annuity_monthly | euro }}</td>{% endif %}
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td class="muted">Bestaande PIM / maand</td>
+                    {% for vs in variant_stats %}
+                    {% if not vs.rate_missing %}<td class="text-right">€ {{ vs.pim_monthly | euro }}</td>{% endif %}
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td class="muted">Aflossingsvrij / maand</td>
+                    {% for vs in variant_stats %}
+                    {% if not vs.rate_missing %}<td class="text-right">€ {{ vs.interest_only_monthly | euro }}</td>{% endif %}
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td class="muted">Belastingteruggaaf / maand</td>
+                    {% for vs in variant_stats %}
+                    {% if not vs.rate_missing %}<td class="text-right">€ {{ vs.monthly_refund | euro }}</td>{% endif %}
+                    {% endfor %}
+                </tr>
+                <tr style="border-top:2px solid #999;">
+                    <td><strong>Netto maandlast hypotheek</strong></td>
+                    {% for vs in variant_stats %}
+                    {% if not vs.rate_missing %}<td class="text-right"><strong>€ {{ vs.net_monthly | euro }}</strong></td>{% endif %}
+                    {% endfor %}
+                </tr>
+                {% if budget_rows %}
+                <tr>
+                    <td class="muted">Overschot van salaris</td>
+                    {% for pair in variant_leftover_pairs %}
+                    {% if not pair[0].rate_missing %}
+                    <td class="text-right" style="{% if pair[1] is not none and pair[1] < 0 %}color:#b31919;{% endif %}">
+                        {% if pair[1] is none %}<span class="muted">—</span>{% else %}€ {{ pair[1] | euro }}{% endif %}
+                    </td>
+                    {% endif %}
+                    {% endfor %}
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if chart_series %}
+    <div style="margin-top:1rem;">
+        <canvas id="netMonthlyChart" height="300" aria-label="Netto maandlast over 30 jaar"></canvas>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+{# ─── Budget-impact ──────────────────────────────────────────────────────── #}
+{% if budget_rows %}
+<div class="card" style="margin-bottom:1.5rem;">
+    <h2 style="margin:0 0 0.75rem 0; font-size:1.1rem;">
+        Maandbudget bij dit scenario
+        <span class="muted" style="font-weight:normal; font-size:0.9rem;">
+            (huidig = {{ budget_year }}-{{ '%02d' | format(budget_month) }})
+        </span>
+    </h2>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Categorie</th>
+                    <th class="text-right">Budget huidig</th>
+                    <th class="text-right">Scenario-override</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in budget_rows %}
+                <tr>
+                    <td>{{ row.category.name if row.category else '—' }}</td>
+                    <td class="text-right">€ {{ row.current_amount | euro }}</td>
+                    <td class="text-right">
+                        <form method="post" action="/hypotheek/scenarios/{{ scenario.id }}/budgets"
+                              style="display:flex; gap:0.35rem; justify-content:flex-end; align-items:center;">
+                            <input type="hidden" name="category_id" value="{{ row.category_id }}">
+                            <input type="text" name="amount" inputmode="decimal"
+                                   value="{% if row.scenario_amount is not none %}{{ '%.2f' | format(row.scenario_amount) }}{% endif %}"
+                                   placeholder="{{ '%.2f' | format(row.current_amount) }}"
+                                   class="budget-input" style="width:7rem; text-align:right;">
+                            <button type="submit" class="btn btn-sm">Opslaan</button>
+                        </form>
+                    </td>
+                    <td>
+                        {% if row.scenario_amount is not none %}
+                        <form method="post" action="/hypotheek/scenarios/{{ scenario.id }}/budgets/reset"
+                              style="display:inline;">
+                            <input type="hidden" name="category_id" value="{{ row.category_id }}">
+                            <button type="submit" class="btn btn-sm">Reset</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                <tr style="border-top:2px solid #999;">
+                    <td><strong>Totaal budget / maand</strong></td>
+                    <td class="text-right"><strong>€ {{ budget_total | euro }}</strong></td>
+                    <td></td><td></td>
+                </tr>
+                <tr>
+                    <td class="muted">Totaal salaris / maand</td>
+                    <td class="text-right">€ {{ salary_sum | euro }}</td>
+                    <td></td><td></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <p class="muted" style="margin:0.75rem 0 0 0; font-size:0.9rem;">
+        Overschot = salaris − budget − netto maandlast nieuwe hypotheek − bestaande PIM − aflossingsvrij.
+    </p>
+</div>
+{% elif budget_year is none %}
+<div class="card" style="margin-bottom:1.5rem;">
+    <p class="muted" style="margin:0;">Geen budget-data gevonden om maandbudget-impact te berekenen. Stel eerst budgetten in.</p>
+</div>
+{% endif %}
+
+{# ─── Aflossingstabel ───────────────────────────────────────────────────── #}
 {% if rate_missing %}
 <div class="card" style="margin-bottom:1.5rem; background:#fde7e7; border:1px solid #e53935;">
     <strong>Geen rente gevonden</strong> voor {{ fixed_years }} jaar rentevast bij LTV {{ "%.1f" | format(ltv_fraction * 100) }}%.
     Voeg een rij toe in de <a href="/hypotheek/rentes">rente-tabel</a> die deze LTV-bucket dekt.
 </div>
-{% else %}
-<div class="card" style="margin-bottom:1.5rem;">
-    <h2 style="margin:0 0 0.75rem 0; font-size:1.1rem;">
-        Maandlasten — {{ fixed_years }}j rentevast · {{ "%.2f" | format(rate * 100) }}%
-    </h2>
-    <div class="kv-grid">
-        <div><span class="muted">Bruto maandtermijn</span><br><strong>€ {{ monthly_payment | euro }}</strong></div>
-        <div><span class="muted">Netto (na renteaftrek, jaar 1)</span><br><strong>€ {{ net_monthly | euro }}</strong></div>
-        <div><span class="muted">Rente jaar 1-5 totaal</span><br>€ {{ first_5y_interest | euro0 }}</div>
-        <div><span class="muted">Belastingteruggaaf jaar 1-5</span><br>€ {{ first_5y_refund | euro0 }}</div>
-    </div>
-    <p class="muted" style="margin:0.75rem 0 0 0; font-size:0.9rem;">
-        Netto-maandlast is een benadering: jaar-1 rente minus eigenwoningforfait (€ {{ household.notional_rent_value | euro0 }}) × belastingschijf ({{ "%.2f" | format(household.tax_rate * 100) }}%) / 12.
-        Aftrek daalt over de looptijd.
-    </p>
-</div>
-
-{% if schedule %}
+{% elif schedule %}
 <details class="card" style="margin-bottom:1.5rem;">
-    <summary style="cursor:pointer; font-weight:600;">Aflossingstabel ({{ schedule | length }} maanden)</summary>
+    <summary style="cursor:pointer; font-weight:600;">
+        Aflossingstabel ({{ fixed_years }}j rentevast · {{ "%.2f" | format(rate * 100) }}% · {{ schedule | length }} maanden)
+    </summary>
     <div class="table-wrap" style="margin-top:0.75rem; max-height:24rem; overflow-y:auto;">
         <table>
             <thead>
@@ -100,10 +313,39 @@
     </div>
 </details>
 {% endif %}
-{% endif %}
 
 <style>
 .kv-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(10rem, 1fr)); gap:0.75rem; }
 .kv-grid > div { background:#f7f7f7; padding:0.5rem 0.75rem; border-radius:4px; }
 </style>
+
+{% if chart_series %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    if (typeof Chart === 'undefined') return;
+    var ctx = document.getElementById('netMonthlyChart');
+    if (!ctx) return;
+    var palette = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b'];
+    var datasets = {{ chart_series | tojson }}.map(function (s, i) {
+        return {
+            label: s.label,
+            data: s.data,
+            borderColor: palette[i % palette.length],
+            backgroundColor: palette[i % palette.length],
+            fill: false, tension: 0.1,
+        };
+    });
+    new Chart(ctx, {
+        type: 'line',
+        data: { labels: {{ chart_labels | tojson }}, datasets: datasets },
+        options: {
+            plugins: { title: { display: true, text: 'Netto maandlast per jaar (€)' } },
+            scales: { y: { beginAtZero: false, title: { display: true, text: '€ / maand' } },
+                      x: { title: { display: true, text: 'Jaar' } } },
+        },
+    });
+});
+</script>
+{% endif %}
 {% endblock %}

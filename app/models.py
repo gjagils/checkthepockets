@@ -571,6 +571,29 @@ class MortgageVariant(Base):
     )
 
 
+class MortgageScenarioBudget(Base):
+    """Scenario-specifieke budget-override per categorie."""
+    __tablename__ = "mortgage_scenario_budgets"
+
+    id = Column(Integer, primary_key=True)
+    scenario_id = Column(
+        Integer, ForeignKey("mortgage_scenarios.id", ondelete="CASCADE"), nullable=False,
+    )
+    category_id = Column(
+        Integer, ForeignKey("categories.id", ondelete="CASCADE"), nullable=False,
+    )
+    amount = Column(Numeric(12, 2), nullable=False, default=0)
+
+    scenario = relationship("MortgageScenario")
+    category = relationship("Category")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "scenario_id", "category_id", name="uq_scenario_budget_scenario_category",
+        ),
+    )
+
+
 class PortfolioPriceSnapshot(Base):
     __tablename__ = "portfolio_price_snapshots"
 
