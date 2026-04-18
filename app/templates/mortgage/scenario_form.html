@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}{% if mode == 'edit' %}Scenario bewerken{% else %}Nieuw scenario{% endif %} - Check Your Pockets{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>{% if mode == 'edit' %}Scenario bewerken{% else %}Nieuw scenario{% endif %}</h1>
+</div>
+
+<form method="post"
+      action="{% if mode == 'edit' %}/hypotheek/scenarios/{{ scenario.id }}/edit{% else %}/hypotheek/scenarios{% endif %}">
+    <div class="card" style="margin-bottom:1rem;">
+        <div class="form-row">
+            <label>Naam</label>
+            <input type="text" name="name" required maxlength="150"
+                   value="{{ scenario.name if scenario else '' }}"
+                   placeholder="bv. Kerkstraat 12">
+        </div>
+
+        <div class="form-row">
+            <label>Taxatie (€)</label>
+            <input type="text" name="valuation" inputmode="decimal"
+                   value="{{ '%.2f' | format(scenario.valuation) if scenario else '' }}"
+                   placeholder="450000,00">
+        </div>
+
+        <div class="form-row">
+            <label>Bod (€)</label>
+            <input type="text" name="offer" inputmode="decimal"
+                   value="{{ '%.2f' | format(scenario.offer) if scenario else '' }}"
+                   placeholder="445000,00">
+        </div>
+
+        <div class="form-row">
+            <label>Verbouwkosten (€)</label>
+            <input type="text" name="renovation_cost" inputmode="decimal"
+                   value="{{ '%.2f' | format(scenario.renovation_cost) if scenario else '0,00' }}"
+                   placeholder="0,00">
+        </div>
+
+        <div class="form-row">
+            <label>Eigen inbreng (€)</label>
+            <input type="text" name="own_contribution" inputmode="decimal"
+                   value="{{ '%.2f' | format(scenario.own_contribution) if scenario else '0,00' }}"
+                   placeholder="0,00">
+        </div>
+
+        <div class="form-row">
+            <label>Verwachte verkoop oude woning (€)</label>
+            <input type="text" name="sale_old_home" inputmode="decimal"
+                   value="{{ '%.2f' | format(scenario.sale_old_home) if scenario else '0,00' }}"
+                   placeholder="0,00">
+        </div>
+
+        <div class="form-row">
+            <label>Energielabel</label>
+            <select name="energy_label">
+                {% set current_label = scenario.energy_label if scenario else 'A' %}
+                {% for label in ['A', 'B', 'C', 'D', 'E', 'F', 'G'] %}
+                <option value="{{ label }}" {% if current_label == label %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-row">
+            <label>Notities</label>
+            <textarea name="notes" rows="3" placeholder="Korte notitie over het huis, straat, bijzonderheden">{{ scenario.notes or '' if scenario else '' }}</textarea>
+        </div>
+    </div>
+
+    <div style="display:flex; gap:0.5rem;">
+        <button type="submit" class="btn btn-primary">
+            {% if mode == 'edit' %}Opslaan{% else %}Aanmaken{% endif %}
+        </button>
+        <a href="{% if mode == 'edit' %}/hypotheek/scenarios/{{ scenario.id }}{% else %}/hypotheek/scenarios{% endif %}" class="btn">Annuleren</a>
+    </div>
+</form>
+{% endblock %}

@@ -28,7 +28,7 @@
             <tbody>
                 {% for s in scenarios %}
                 <tr>
-                    <td>{{ s.name }}</td>
+                    <td><a href="/hypotheek/scenarios/{{ s.id }}">{{ s.name }}</a></td>
                     <td class="text-right">€ {{ s.valuation | euro0 }}</td>
                     <td class="text-right">€ {{ s.offer | euro0 }}</td>
                 </tr>
@@ -36,10 +36,12 @@
             </tbody>
         </table>
     </div>
+    <p style="margin:1rem 0 0 0;"><a href="/hypotheek/scenarios" class="btn">Alle scenarios →</a></p>
 </div>
 {% else %}
 <div class="card" style="text-align:center; padding:3rem;">
-    <p class="muted">Nog niet ingericht. Scenarios komen beschikbaar in een volgende iteratie.</p>
+    <p class="muted" style="margin-bottom:1rem;">Nog geen scenarios. Start met een nieuw scenario om de berekening te draaien.</p>
+    <a href="/hypotheek/scenarios/nieuw" class="btn btn-primary">+ Nieuw scenario</a>
 </div>
 {% endif %}
 {% endblock %}
