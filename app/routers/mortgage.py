@@ -17,6 +17,11 @@ from app.models import (
     MortgageScenarioBudget,
     MortgageVariant,
 )
+from app.mortgage_rate_parser import (
+    ParsedRate,
+    compare_with_existing,
+    parse_bulk_rates,
+)
 from app.template_config import templates
 
 router = APIRouter(prefix="/hypotheek")
@@ -210,6 +215,8 @@ def rates_index(request: Request, db: Session = Depends(get_db)):
     rates = _rates_for_user(db, user.id)
     flash = request.query_params.get("flash")
     error = request.query_params.get("error")
+    bulk_new = request.query_params.get("new")
+    bulk_upd = request.query_params.get("upd")
     return templates.TemplateResponse(
         "mortgage/rates.html",
         {
@@ -218,6 +225,8 @@ def rates_index(request: Request, db: Session = Depends(get_db)):
             "rates": rates,
             "flash": flash,
             "error": error,
+            "bulk_new_count": int(bulk_new) if bulk_new and bulk_new.isdigit() else 0,
+            "bulk_updated_count": int(bulk_upd) if bulk_upd and bulk_upd.isdigit() else 0,
         },
     )
 
@@ -318,6 +327,96 @@ def rates_seed(request: Request, db: Session = Depends(get_db)):
         ))
     db.commit()
     return RedirectResponse("/hypotheek/rentes?flash=seeded", status_code=302)
+
+
+@router.post("/rentes/bulk/preview")
+def rates_bulk_preview(
+    request: Request,
+    raw_text: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """Parse paste-input en render een voorvertoning — importeert nog niets."""
+    user = _require_admin(request, db)
+    parse_result = parse_bulk_rates(raw_text)
+    existing = _rates_for_user(db, user.id)
+    new_rows, update_rows = compare_with_existing(parse_result.rows, existing)
+    return templates.TemplateResponse(
+        "mortgage/rates.html",
+        {
+            "request": request,
+            "user": user,
+            "rates": existing,
+            "flash": None,
+            "error": None,
+            "bulk_raw_text": raw_text,
+            "bulk_parsed": parse_result,
+            "bulk_new_rows": new_rows,
+            "bulk_update_rows": update_rows,
+            "bulk_mode": "preview",
+        },
+    )
+
+
+@router.post("/rentes/bulk/import")
+def rates_bulk_import(
+    request: Request,
+    raw_text: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """Schrijf de parsed rijen weg — upsert op (fixed_years, ltv_max_pct)."""
+    user = _require_admin(request, db)
+    parse_result = parse_bulk_rates(raw_text)
+    if parse_result.has_errors or not parse_result.rows:
+        existing = _rates_for_user(db, user.id)
+        new_rows, update_rows = compare_with_existing(parse_result.rows, existing)
+        return templates.TemplateResponse(
+            "mortgage/rates.html",
+            {
+                "request": request,
+                "user": user,
+                "rates": existing,
+                "flash": None,
+                "error": None,
+                "bulk_raw_text": raw_text,
+                "bulk_parsed": parse_result,
+                "bulk_new_rows": new_rows,
+                "bulk_update_rows": update_rows,
+                "bulk_mode": "preview",
+                "bulk_error": (
+                    "Import geannuleerd: los eerst de foutmeldingen op."
+                    if parse_result.has_errors
+                    else "Niets te importeren."
+                ),
+            },
+            status_code=400,
+        )
+
+    existing = {
+        (r.fixed_years, Decimal(str(r.ltv_max_pct))): r
+        for r in _rates_for_user(db, user.id)
+    }
+    new_count = 0
+    updated_count = 0
+    for row in parse_result.rows:
+        key = (row.fixed_years, row.ltv_max_pct)
+        current = existing.get(key)
+        if current:
+            if Decimal(str(current.interest_rate)) != row.interest_rate:
+                current.interest_rate = row.interest_rate
+                updated_count += 1
+        else:
+            db.add(MortgageRateTable(
+                user_id=user.id,
+                fixed_years=row.fixed_years,
+                ltv_max_pct=row.ltv_max_pct,
+                interest_rate=row.interest_rate,
+            ))
+            new_count += 1
+    db.commit()
+    return RedirectResponse(
+        f"/hypotheek/rentes?flash=bulk_imported&new={new_count}&upd={updated_count}",
+        status_code=302,
+    )
 
 
 # ──────────────────────────────────────────────────────────────────────────────
