@@ -145,7 +145,7 @@ def test_seed_fills_empty_table(db_session):
 
     db_session.expire_all()
     rows = db_session.query(MortgageRateTable).filter(MortgageRateTable.user_id == admin.id).all()
-    assert len(rows) == 12  # 4 rentevast × 3 LTV
+    assert len(rows) == 48  # 12 rentevast × 4 LTV (ABN 18 april 2026)
 
 
 def test_seed_refuses_non_empty_table(db_session):

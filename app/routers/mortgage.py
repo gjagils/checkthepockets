@@ -22,22 +22,58 @@ from app.template_config import templates
 router = APIRouter(prefix="/hypotheek")
 
 
-# Seed-defaults uit Excel "annuiteit berekenen"-tab (ABN-kolommen E2:H4).
-# Ontbrekende 15j-waarden geïnterpoleerd tussen 10j en 20j zodat de seed
-# compleet is; admin kan na seed alles handmatig aanpassen.
+# Seed-defaults: ABN Annuïteiten Budget hypotheek met huisbankkorting (0,20%
+# verwerkt), zoals gepubliceerd op abnamro.nl op 18 april 2026. NHG-kolom en
+# variabele rente bewust weggelaten (passen niet in het model).
 RATE_SEED_DEFAULTS = [
-    (5, Decimal("0.65"), Decimal("0.0339")),
-    (5, Decimal("0.85"), Decimal("0.0344")),
-    (5, Decimal("0.86"), Decimal("0.0348")),
-    (10, Decimal("0.65"), Decimal("0.0373")),
-    (10, Decimal("0.85"), Decimal("0.0375")),
-    (10, Decimal("0.86"), Decimal("0.0377")),
-    (15, Decimal("0.65"), Decimal("0.0395")),
-    (15, Decimal("0.85"), Decimal("0.0400")),
-    (15, Decimal("0.86"), Decimal("0.0410")),
-    (20, Decimal("0.65"), Decimal("0.0416")),
-    (20, Decimal("0.85"), Decimal("0.0425")),
-    (20, Decimal("0.86"), Decimal("0.0444")),
+    (1, Decimal("0.65"), Decimal("0.0380")),
+    (1, Decimal("0.85"), Decimal("0.0385")),
+    (1, Decimal("0.90"), Decimal("0.0386")),
+    (1, Decimal("1.00"), Decimal("0.0389")),
+    (2, Decimal("0.65"), Decimal("0.0377")),
+    (2, Decimal("0.85"), Decimal("0.0382")),
+    (2, Decimal("0.90"), Decimal("0.0383")),
+    (2, Decimal("1.00"), Decimal("0.0386")),
+    (3, Decimal("0.65"), Decimal("0.0377")),
+    (3, Decimal("0.85"), Decimal("0.0382")),
+    (3, Decimal("0.90"), Decimal("0.0383")),
+    (3, Decimal("1.00"), Decimal("0.0386")),
+    (5, Decimal("0.65"), Decimal("0.0375")),
+    (5, Decimal("0.85"), Decimal("0.0380")),
+    (5, Decimal("0.90"), Decimal("0.0381")),
+    (5, Decimal("1.00"), Decimal("0.0383")),
+    (6, Decimal("0.65"), Decimal("0.0399")),
+    (6, Decimal("0.85"), Decimal("0.0404")),
+    (6, Decimal("0.90"), Decimal("0.0405")),
+    (6, Decimal("1.00"), Decimal("0.0407")),
+    (7, Decimal("0.65"), Decimal("0.0401")),
+    (7, Decimal("0.85"), Decimal("0.0406")),
+    (7, Decimal("0.90"), Decimal("0.0407")),
+    (7, Decimal("1.00"), Decimal("0.0409")),
+    (10, Decimal("0.65"), Decimal("0.0404")),
+    (10, Decimal("0.85"), Decimal("0.0405")),
+    (10, Decimal("0.90"), Decimal("0.0406")),
+    (10, Decimal("1.00"), Decimal("0.0407")),
+    (12, Decimal("0.65"), Decimal("0.0417")),
+    (12, Decimal("0.85"), Decimal("0.0419")),
+    (12, Decimal("0.90"), Decimal("0.0424")),
+    (12, Decimal("1.00"), Decimal("0.0435")),
+    (15, Decimal("0.65"), Decimal("0.0421")),
+    (15, Decimal("0.85"), Decimal("0.0432")),
+    (15, Decimal("0.90"), Decimal("0.0446")),
+    (15, Decimal("1.00"), Decimal("0.0453")),
+    (17, Decimal("0.65"), Decimal("0.0421")),
+    (17, Decimal("0.85"), Decimal("0.0432")),
+    (17, Decimal("0.90"), Decimal("0.0446")),
+    (17, Decimal("1.00"), Decimal("0.0453")),
+    (20, Decimal("0.65"), Decimal("0.0439")),
+    (20, Decimal("0.85"), Decimal("0.0448")),
+    (20, Decimal("0.90"), Decimal("0.0456")),
+    (20, Decimal("1.00"), Decimal("0.0467")),
+    (30, Decimal("0.65"), Decimal("0.0457")),
+    (30, Decimal("0.85"), Decimal("0.0464")),
+    (30, Decimal("0.90"), Decimal("0.0471")),
+    (30, Decimal("1.00"), Decimal("0.0477")),
 ]
 
 
