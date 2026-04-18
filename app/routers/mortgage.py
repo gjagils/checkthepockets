@@ -9,9 +9,12 @@ from app import mortgage_calc
 from app.auth import require_login
 from app.database import get_db
 from app.models import (
+    Budget,
+    Category,
     HouseholdFinance,
     MortgageRateTable,
     MortgageScenario,
+    MortgageScenarioBudget,
     MortgageVariant,
 )
 from app.template_config import templates
@@ -357,6 +360,17 @@ def scenarios_new(request: Request, db: Session = Depends(get_db)):
     )
 
 
+def _auto_create_variants(db: Session, user_id: int, scenario: MortgageScenario) -> None:
+    """Maak 1 variant per distinct rentevast-periode uit de rate-tabel van de user."""
+    fixed_years_list = sorted({
+        r.fixed_years for r in db.query(MortgageRateTable)
+        .filter(MortgageRateTable.user_id == user_id).all()
+    })
+    for fy in fixed_years_list:
+        db.add(MortgageVariant(scenario_id=scenario.id, fixed_years=fy))
+    db.commit()
+
+
 @router.post("/scenarios")
 def scenarios_create(
     request: Request,
@@ -386,7 +400,146 @@ def scenarios_create(
     db.add(s)
     db.commit()
     db.refresh(s)
+    _auto_create_variants(db, user.id, s)
     return RedirectResponse(f"/hypotheek/scenarios/{s.id}?flash=created", status_code=302)
+
+
+def _variant_stats(
+    variant: MortgageVariant,
+    ann_principal: Decimal,
+    ltv_fraction: Decimal,
+    rates,
+    household: HouseholdFinance,
+):
+    """Bereken alle rijen voor deze variant voor de vergelijkingstabel + chart."""
+    tax_rate = Decimal(str(household.tax_rate))
+    notional = Decimal(str(household.notional_rent_value))
+    existing_pim = Decimal(str(household.existing_mortgage_pim))
+    existing_pim_rate = Decimal(str(household.existing_mortgage_pim_rate))
+    existing_io_monthly = Decimal(str(household.existing_mortgage_interest_only_monthly))
+
+    override = variant.interest_rate_override
+    if override is not None:
+        rate = Decimal(str(override))
+        rate_source = "handmatig"
+    else:
+        rate = mortgage_calc.pick_rate(rates, variant.fixed_years, ltv_fraction)
+        rate_source = "uit rente-tabel"
+
+    stats = {
+        "variant": variant,
+        "fixed_years": variant.fixed_years,
+        "rate": rate,
+        "rate_source": rate_source,
+        "rate_missing": rate is None,
+        "annuity_monthly": Decimal("0.00"),
+        "pim_monthly": Decimal("0.00"),
+        "interest_only_monthly": existing_io_monthly,
+        "monthly_refund": Decimal("0.00"),
+        "net_monthly": Decimal("0.00"),
+        "first_5y_total_cost": Decimal("0.00"),
+        "net_monthly_by_year": [],
+    }
+
+    if rate is None:
+        return stats
+
+    # Nieuw annuïtair deel.
+    stats["annuity_monthly"] = mortgage_calc.pmt(ann_principal, rate, 30)
+    # Bestaande PIM loopt door: rente * principal / 12 (schatting).
+    stats["pim_monthly"] = (existing_pim * existing_pim_rate / Decimal(12)).quantize(
+        Decimal("0.01")
+    )
+
+    # Netto maandlast jaar 1 volgens calc-engine.
+    stats["net_monthly"] = mortgage_calc.net_monthly(
+        stats["annuity_monthly"], rate, ann_principal, tax_rate, notional,
+    )
+    stats["monthly_refund"] = (
+        stats["annuity_monthly"] - stats["net_monthly"]
+    ).quantize(Decimal("0.01"))
+
+    if ann_principal > 0:
+        schedule = list(
+            mortgage_calc.amortization_schedule(ann_principal, rate, 30)
+        )
+        # Eerste 5 jaar totale kosten (som van netto-maandlasten).
+        for year_offset in range(30):
+            rows = schedule[year_offset * 12:(year_offset + 1) * 12]
+            if not rows:
+                break
+            year_interest = sum((r.interest for r in rows), Decimal(0))
+            year_gross = sum((r.payment for r in rows), Decimal(0))
+            deductible = max(year_interest - notional, Decimal(0))
+            year_refund = deductible * tax_rate
+            year_net = (year_gross - year_refund) / Decimal(12)
+            stats["net_monthly_by_year"].append(year_net.quantize(Decimal("0.01")))
+        # Eerste 5 jaar som (60 maanden, gemiddeld):
+        first_60 = schedule[:60]
+        gross_60 = sum((r.payment for r in first_60), Decimal(0))
+        interest_60 = sum((r.interest for r in first_60), Decimal(0))
+        refund_approx = Decimal(0)
+        for year_offset in range(5):
+            rows = schedule[year_offset * 12:(year_offset + 1) * 12]
+            year_int = sum((r.interest for r in rows), Decimal(0))
+            refund_approx += max(year_int - notional, Decimal(0)) * tax_rate
+        stats["first_5y_total_cost"] = (gross_60 - refund_approx).quantize(
+            Decimal("0.01")
+        )
+
+    return stats
+
+
+def _budget_rows_for_scenario(
+    db: Session, user_id: int, scenario_id: int,
+):
+    """Aggregatie: recent 'current' budget per categorie + scenario-override.
+
+    Returned: list van dicts met category, current_amount (uit Budget), scenario_amount
+    (uit MortgageScenarioBudget override), effective_amount (override of current),
+    en het totaal.
+    """
+    most_recent = (
+        db.query(Budget.year, Budget.month)
+        .filter(Budget.user_id == user_id)
+        .order_by(Budget.year.desc(), Budget.month.desc())
+        .first()
+    )
+    if not most_recent:
+        return [], Decimal(0), None, None
+
+    year, month = most_recent.year, most_recent.month
+    budgets = (
+        db.query(Budget)
+        .filter(
+            Budget.user_id == user_id,
+            Budget.year == year,
+            Budget.month == month,
+        )
+        .all()
+    )
+    overrides = {
+        b.category_id: Decimal(str(b.amount))
+        for b in db.query(MortgageScenarioBudget)
+        .filter(MortgageScenarioBudget.scenario_id == scenario_id).all()
+    }
+
+    rows = []
+    total = Decimal(0)
+    for b in budgets:
+        current = Decimal(str(b.amount))
+        scen_amount = overrides.get(b.category_id)
+        effective = scen_amount if scen_amount is not None else current
+        rows.append({
+            "category": b.category,
+            "category_id": b.category_id,
+            "current_amount": current,
+            "scenario_amount": scen_amount,
+            "effective_amount": effective,
+        })
+        total += effective
+    rows.sort(key=lambda r: (r["category"].name.lower() if r["category"] else ""))
+    return rows, total, year, month
 
 
 @router.get("/scenarios/{scenario_id}")
@@ -418,49 +571,90 @@ def scenarios_detail(
         to_fin, Decimal(str(scenario.valuation)),
     )
 
-    # Variant-keuze: laagste fixed_years uit scenario.variants (GJA-29), anders
-    # de laagste rentevast die in de tabel staat.
-    chosen_variant = None
-    if scenario.variants:
-        chosen_variant = min(scenario.variants, key=lambda v: v.fixed_years)
-        fixed_years = chosen_variant.fixed_years
-    else:
-        fixed_years = min((r.fixed_years for r in rates), default=10)
+    # Bereken per variant de vergelijkingsdata.
+    variants_sorted = sorted(scenario.variants, key=lambda v: v.fixed_years)
+    variant_stats = [
+        _variant_stats(v, ann_principal, ltv_fraction, rates, household)
+        for v in variants_sorted
+    ]
 
-    rate = None
-    rate_override = chosen_variant.interest_rate_override if chosen_variant else None
-    if rate_override is not None:
-        rate = Decimal(str(rate_override))
-    else:
-        rate = mortgage_calc.pick_rate(rates, fixed_years, ltv_fraction)
-
-    schedule = []
-    monthly_payment = Decimal("0")
-    net_month = Decimal("0")
-    first_5y_interest = Decimal("0")
-    first_5y_refund = Decimal("0")
-    if rate is not None and ann_principal > 0:
+    # Default weergave: laagste-rentevast variant voor aflossingstabel (zoals
+    # GJA-28). Als geen variants, fallback naar rate-tabel direct.
+    default_stats = variant_stats[0] if variant_stats else None
+    if default_stats and default_stats["rate"] is not None:
+        fixed_years = default_stats["fixed_years"]
+        rate = default_stats["rate"]
+        rate_missing = False
         schedule = list(
-            mortgage_calc.amortization_schedule(ann_principal, rate, years=30)
+            mortgage_calc.amortization_schedule(ann_principal, rate, 30)
         )
         monthly_payment = schedule[0].payment if schedule else Decimal("0")
-        net_month = mortgage_calc.net_monthly(
-            monthly_payment,
-            rate,
-            ann_principal,
-            Decimal(str(household.tax_rate)),
-            Decimal(str(household.notional_rent_value)),
+        net_month = default_stats["net_monthly"]
+        first_5y_interest = sum(
+            (row.interest for row in schedule[:60]), Decimal(0),
         )
-        # Eerste 5 jaar rente-totaal; renteaftrek-som.
-        months_5y = schedule[:60]
-        first_5y_interest = sum((row.interest for row in months_5y), Decimal(0))
-        yearly_notional = Decimal(str(household.notional_rent_value))
+        first_5y_refund = default_stats["first_5y_total_cost"]  # niet direct refund, maar placeholder
+        # eigenlijke refund som:
+        first_5y_refund = Decimal(0)
         tax_rate_dec = Decimal(str(household.tax_rate))
+        yearly_notional = Decimal(str(household.notional_rent_value))
         for year_offset in range(5):
             year_rows = schedule[year_offset * 12:(year_offset + 1) * 12]
             year_interest = sum((row.interest for row in year_rows), Decimal(0))
             deductible = max(year_interest - yearly_notional, Decimal(0))
             first_5y_refund += deductible * tax_rate_dec
+    else:
+        # Fallback: geen variant of geen rate gevonden.
+        fixed_years = default_stats["fixed_years"] if default_stats else min(
+            (r.fixed_years for r in rates), default=10,
+        )
+        rate = None
+        rate_missing = True
+        schedule = []
+        monthly_payment = Decimal("0")
+        net_month = Decimal("0")
+        first_5y_interest = Decimal("0")
+        first_5y_refund = Decimal("0")
+
+    # Budget-impact.
+    budget_rows, budget_total, budget_year, budget_month = _budget_rows_for_scenario(
+        db, user.id, scenario.id,
+    )
+    salary_sum = (
+        Decimal(str(household.salary_primary)) + Decimal(str(household.salary_secondary))
+    )
+    variant_leftover = []
+    variant_leftover_pairs = []  # tuples (stats, leftover) voor gemakkelijke iteratie
+    for vs in variant_stats:
+        if vs["rate_missing"]:
+            variant_leftover.append(None)
+            variant_leftover_pairs.append((vs, None))
+        else:
+            total_load = vs["net_monthly"] + vs["pim_monthly"] + vs["interest_only_monthly"]
+            leftover = (salary_sum - budget_total - total_load).quantize(Decimal("0.01"))
+            variant_leftover.append(leftover)
+            variant_leftover_pairs.append((vs, leftover))
+
+    available_fixed_years = sorted({r.fixed_years for r in rates}) or [5, 10, 15, 20, 30]
+    missing_fixed_years = [
+        fy for fy in available_fixed_years
+        if fy not in {v.fixed_years for v in variants_sorted}
+    ]
+
+    # Chart.js data: max reeksen uitlijnen op 30 jaar.
+    chart_labels = list(range(1, 31))
+    chart_series = []
+    for vs in variant_stats:
+        if vs["rate_missing"]:
+            continue
+        series_data = [float(v) for v in vs["net_monthly_by_year"]]
+        # zeropad tot 30 lengte als korter.
+        while len(series_data) < 30:
+            series_data.append(series_data[-1] if series_data else 0)
+        chart_series.append({
+            "label": f"{vs['fixed_years']}j rentevast",
+            "data": series_data[:30],
+        })
 
     return templates.TemplateResponse(
         "mortgage/scenario_detail.html",
@@ -475,14 +669,175 @@ def scenarios_detail(
             "ltv_fraction": ltv_fraction,
             "fixed_years": fixed_years,
             "rate": rate,
-            "rate_missing": rate is None,
+            "rate_missing": rate_missing,
             "monthly_payment": monthly_payment,
             "net_monthly": net_month,
             "schedule": schedule,
             "first_5y_interest": first_5y_interest,
             "first_5y_refund": first_5y_refund,
+            "variant_stats": variant_stats,
+            "missing_fixed_years": missing_fixed_years,
+            "available_fixed_years": available_fixed_years,
+            "budget_rows": budget_rows,
+            "budget_total": budget_total,
+            "budget_year": budget_year,
+            "budget_month": budget_month,
+            "salary_sum": salary_sum,
+            "variant_leftover": variant_leftover,
+            "variant_leftover_pairs": variant_leftover_pairs,
+            "chart_labels": chart_labels,
+            "chart_series": chart_series,
             "flash": request.query_params.get("flash"),
         },
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Variants CRUD
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+@router.post("/scenarios/{scenario_id}/variants")
+def variants_add(
+    scenario_id: int,
+    request: Request,
+    fixed_years: str = Form(...),
+    interest_rate_override: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    user = _require_admin(request, db)
+    scenario = _get_scenario(db, user.id, scenario_id)
+    try:
+        years = int(fixed_years)
+    except (TypeError, ValueError):
+        return RedirectResponse(
+            f"/hypotheek/scenarios/{scenario.id}?flash=variant_invalid",
+            status_code=302,
+        )
+    if years <= 0:
+        return RedirectResponse(
+            f"/hypotheek/scenarios/{scenario.id}?flash=variant_invalid",
+            status_code=302,
+        )
+
+    existing = db.query(MortgageVariant).filter(
+        MortgageVariant.scenario_id == scenario.id,
+        MortgageVariant.fixed_years == years,
+    ).first()
+    if existing:
+        return RedirectResponse(
+            f"/hypotheek/scenarios/{scenario.id}?flash=variant_duplicate",
+            status_code=302,
+        )
+
+    override_value = None
+    if interest_rate_override.strip():
+        parsed = _parse_percent(interest_rate_override)
+        if parsed > 0:
+            override_value = parsed
+
+    db.add(MortgageVariant(
+        scenario_id=scenario.id,
+        fixed_years=years,
+        interest_rate_override=override_value,
+    ))
+    db.commit()
+    return RedirectResponse(
+        f"/hypotheek/scenarios/{scenario.id}?flash=variant_added", status_code=302,
+    )
+
+
+@router.post("/scenarios/{scenario_id}/variants/{variant_id}/delete")
+def variants_delete(
+    scenario_id: int, variant_id: int,
+    request: Request, db: Session = Depends(get_db),
+):
+    user = _require_admin(request, db)
+    scenario = _get_scenario(db, user.id, scenario_id)
+    variant = db.query(MortgageVariant).filter(
+        MortgageVariant.id == variant_id,
+        MortgageVariant.scenario_id == scenario.id,
+    ).first()
+    if variant:
+        db.delete(variant)
+        db.commit()
+    return RedirectResponse(
+        f"/hypotheek/scenarios/{scenario.id}?flash=variant_deleted", status_code=302,
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Scenario budget-overrides
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+@router.post("/scenarios/{scenario_id}/budgets")
+def scenario_budget_upsert(
+    scenario_id: int,
+    request: Request,
+    category_id: str = Form(...),
+    amount: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    user = _require_admin(request, db)
+    scenario = _get_scenario(db, user.id, scenario_id)
+    try:
+        cat_id = int(category_id)
+    except (TypeError, ValueError):
+        return RedirectResponse(
+            f"/hypotheek/scenarios/{scenario.id}?flash=budget_invalid",
+            status_code=302,
+        )
+    # Alleen eigen categorieën mogen overschreven worden.
+    cat = db.query(Category).filter(
+        Category.id == cat_id, Category.user_id == user.id,
+    ).first()
+    if not cat:
+        raise HTTPException(status_code=404, detail="Categorie niet gevonden")
+
+    value = _parse_decimal(amount)
+    existing = db.query(MortgageScenarioBudget).filter(
+        MortgageScenarioBudget.scenario_id == scenario.id,
+        MortgageScenarioBudget.category_id == cat_id,
+    ).first()
+    if existing:
+        existing.amount = value
+    else:
+        db.add(MortgageScenarioBudget(
+            scenario_id=scenario.id, category_id=cat_id, amount=value,
+        ))
+    db.commit()
+    return RedirectResponse(
+        f"/hypotheek/scenarios/{scenario.id}?flash=budget_saved", status_code=302,
+    )
+
+
+@router.post("/scenarios/{scenario_id}/budgets/reset")
+def scenario_budget_reset(
+    scenario_id: int,
+    request: Request,
+    category_id: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    """Verwijder één override → categorie valt terug op user's standaard-budget."""
+    user = _require_admin(request, db)
+    scenario = _get_scenario(db, user.id, scenario_id)
+    try:
+        cat_id = int(category_id)
+    except (TypeError, ValueError):
+        return RedirectResponse(
+            f"/hypotheek/scenarios/{scenario.id}?flash=budget_invalid",
+            status_code=302,
+        )
+    existing = db.query(MortgageScenarioBudget).filter(
+        MortgageScenarioBudget.scenario_id == scenario.id,
+        MortgageScenarioBudget.category_id == cat_id,
+    ).first()
+    if existing:
+        db.delete(existing)
+        db.commit()
+    return RedirectResponse(
+        f"/hypotheek/scenarios/{scenario.id}?flash=budget_reset", status_code=302,
     )
 
 
