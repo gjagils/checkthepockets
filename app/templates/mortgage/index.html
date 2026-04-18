@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Hypotheek - Check Your Pockets{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Hypotheek</h1>
+</div>
+
+<div class="card" style="margin-bottom:1.5rem;">
+    <p class="muted" style="margin-bottom:0;">
+        Reken scenario's door voor potentiële woonhuizen: wat doet een bod met de
+        maandlasten, vergeleken over meerdere rentevast-periodes? De fundering
+        (datamodel, admin-only route) staat. Beheer van huishoud-instellingen,
+        rente-tabel en scenarios volgt in de volgende issues.
+    </p>
+</div>
+
+{% if scenarios %}
+<div class="card">
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Scenario</th>
+                    <th class="text-right">Taxatie</th>
+                    <th class="text-right">Bod</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in scenarios %}
+                <tr>
+                    <td>{{ s.name }}</td>
+                    <td class="text-right">€ {{ s.valuation | euro0 }}</td>
+                    <td class="text-right">€ {{ s.offer | euro0 }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="card" style="text-align:center; padding:3rem;">
+    <p class="muted">Nog niet ingericht. Scenarios komen beschikbaar in een volgende iteratie.</p>
+</div>
+{% endif %}
+{% endblock %}

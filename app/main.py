@@ -9,7 +9,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.auth import LoginRequired, get_current_user
 from app.database import get_db
-from app.routers import auth, transactions, accounts, categories, rules, budgets, recurring, dashboard, savings, analytics, portfolio, networth, settings, admin, banking, inbox, persons
+from app.routers import auth, transactions, accounts, categories, rules, budgets, recurring, dashboard, savings, analytics, portfolio, networth, settings, admin, banking, inbox, persons, mortgage
 from app.scheduler import start_scheduler
 
 from app.config import SECRET_KEY
@@ -94,6 +94,7 @@ app.include_router(settings.router)
 app.include_router(admin.router)
 app.include_router(banking.router)
 app.include_router(inbox.router)
+app.include_router(mortgage.router)
 
 
 @app.on_event("startup")
