@@ -84,6 +84,7 @@
                 <a href="/portfolio?type=metal" class="{{ 'active' if path.startswith('/portfolio') and portfolio_type == 'metal' }}">Edelmetaal</a>
             {% elif main_active == 'hypotheek' %}
                 <a href="/hypotheek" class="{{ 'active' if path == '/hypotheek' }}">Overzicht</a>
+                <a href="/hypotheek/scenarios" class="{{ 'active' if path.startswith('/hypotheek/scenarios') }}">Scenarios</a>
                 <a href="/hypotheek/huishouden" class="{{ 'active' if path.startswith('/hypotheek/huishouden') }}">Huishouden</a>
                 <a href="/hypotheek/rentes" class="{{ 'active' if path.startswith('/hypotheek/rentes') }}">Rentes</a>
             {% elif main_active == 'rekeningen' %}
@@ -140,6 +141,7 @@
                     <a href="/hypotheek" class="m-nav-main {{ 'active' if main_active == 'hypotheek' }}">Hypotheek</a>
                     <div class="m-nav-children">
                         <a href="/hypotheek" class="{{ 'active' if path == '/hypotheek' }}">Overzicht</a>
+                        <a href="/hypotheek/scenarios" class="{{ 'active' if path.startswith('/hypotheek/scenarios') }}">Scenarios</a>
                         <a href="/hypotheek/huishouden" class="{{ 'active' if path.startswith('/hypotheek/huishouden') }}">Huishouden</a>
                         <a href="/hypotheek/rentes" class="{{ 'active' if path.startswith('/hypotheek/rentes') }}">Rentes</a>
                     </div>

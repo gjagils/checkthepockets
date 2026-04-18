@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Hypotheek — Scenarios - Check Your Pockets{% endblock %}
+{% block content %}
+<div class="page-header" style="display:flex; justify-content:space-between; align-items:center;">
+    <h1>Scenarios</h1>
+    <a href="/hypotheek/scenarios/nieuw" class="btn btn-primary">+ Nieuw scenario</a>
+</div>
+
+{% if flash == 'created' %}
+<div class="card" style="margin-bottom:1rem; background:#e7f5e7; border:1px solid #4caf50;">
+    <strong>✓</strong> Scenario aangemaakt.
+</div>
+{% elif flash == 'archived' %}
+<div class="card" style="margin-bottom:1rem; background:#e7f5e7; border:1px solid #4caf50;">
+    <strong>✓</strong> Scenario gearchiveerd.
+</div>
+{% elif flash == 'unarchived' %}
+<div class="card" style="margin-bottom:1rem; background:#e7f5e7; border:1px solid #4caf50;">
+    <strong>✓</strong> Scenario hersteld.
+</div>
+{% endif %}
+
+{% if scenarios %}
+<div class="card">
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Naam</th>
+                    <th class="text-right">Taxatie</th>
+                    <th class="text-right">Bod</th>
+                    <th class="text-right">Verbouwing</th>
+                    <th>Energielabel</th>
+                    <th class="text-right">Acties</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in scenarios %}
+                <tr {% if s.is_archived %}style="opacity:0.55;"{% endif %}>
+                    <td>
+                        <a href="/hypotheek/scenarios/{{ s.id }}">{{ s.name }}</a>
+                        {% if s.is_archived %}<span class="muted">(gearchiveerd)</span>{% endif %}
+                    </td>
+                    <td class="text-right">€ {{ s.valuation | euro0 }}</td>
+                    <td class="text-right">€ {{ s.offer | euro0 }}</td>
+                    <td class="text-right">€ {{ s.renovation_cost | euro0 }}</td>
+                    <td>{{ s.energy_label or '—' }}</td>
+                    <td class="text-right">
+                        {% if s.is_archived %}
+                        <form method="post" action="/hypotheek/scenarios/{{ s.id }}/unarchive" style="display:inline;">
+                            <button type="submit" class="btn btn-sm">Herstellen</button>
+                        </form>
+                        {% else %}
+                        <a href="/hypotheek/scenarios/{{ s.id }}/edit" class="btn btn-sm">Bewerken</a>
+                        <form method="post" action="/hypotheek/scenarios/{{ s.id }}/delete"
+                              style="display:inline;"
+                              onsubmit="return confirm('Scenario archiveren?');">
+                            <button type="submit" class="btn btn-sm btn-danger">Archiveer</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="card" style="text-align:center; padding:2rem;">
+    <p class="muted" style="margin-bottom:1rem;">
+        {% if show_archived %}
+        Geen gearchiveerde scenarios.
+        {% else %}
+        Nog geen scenarios. Maak er een aan om de berekening te starten.
+        {% endif %}
+    </p>
+    <a href="/hypotheek/scenarios/nieuw" class="btn btn-primary">+ Nieuw scenario</a>
+</div>
+{% endif %}
+
+<div style="margin-top:1rem;">
+    {% if show_archived %}
+    <a href="/hypotheek/scenarios" class="muted">Verberg gearchiveerde</a>
+    {% else %}
+    {% if archived_count %}
+    <a href="/hypotheek/scenarios?show_archived=1" class="muted">Toon gearchiveerde ({{ archived_count }})</a>
+    {% endif %}
+    {% endif %}
+</div>
+{% endblock %}
