@@ -53,7 +53,8 @@ async def add_inbox_count(request: Request, call_next):
 
 @app.get("/")
 def landing(request: Request):
-    """Landing page — redirect to dashboard if already logged in."""
+    """Landing page — redirect to user's preferred start page if logged in."""
+    from app.auth import user_start_page
     from app.database import SessionLocal
     db = SessionLocal()
     try:
@@ -63,7 +64,7 @@ def landing(request: Request):
     finally:
         db.close()
     if user:
-        return RedirectResponse("/dashboard", status_code=302)
+        return RedirectResponse(user_start_page(user), status_code=302)
     return _landing_templates.TemplateResponse("landing.html", {"request": request})
 
 

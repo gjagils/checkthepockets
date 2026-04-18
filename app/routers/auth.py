@@ -13,6 +13,9 @@ from app.auth import (
     set_session_cookie,
     get_current_user,
     require_login,
+    user_start_page,
+    allowed_start_pages,
+    START_PAGE_OPTIONS,
     COOKIE_NAME,
 )
 from app.config import (
@@ -113,7 +116,7 @@ def _consume_token(db: Session, token: str, token_type: str) -> AuthToken | None
 def login_page(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
     if user:
-        return RedirectResponse("/dashboard", status_code=302)
+        return RedirectResponse(user_start_page(user), status_code=302)
     return templates.TemplateResponse("auth/login.html", {
         "request": request,
         "google_login_enabled": google_login_enabled(),
@@ -165,7 +168,7 @@ def login(
     user.last_login_at = datetime.datetime.utcnow()
     db.commit()
 
-    response = RedirectResponse("/dashboard", status_code=302)
+    response = RedirectResponse(user_start_page(user), status_code=302)
     return set_session_cookie(response, user.id)
 
 
@@ -177,7 +180,7 @@ def login(
 def register_page(request: Request, invite: str = "", db: Session = Depends(get_db)):
     user = get_current_user(request, db)
     if user:
-        return RedirectResponse("/dashboard", status_code=302)
+        return RedirectResponse(user_start_page(user), status_code=302)
 
     if not REGISTRATION_OPEN:
         # Validate invite token before showing the form
@@ -263,7 +266,7 @@ def register(
             {"request": request, "email": user.email, "mode": "sent"},
         )
 
-    response = RedirectResponse("/dashboard", status_code=302)
+    response = RedirectResponse(user_start_page(user), status_code=302)
     return set_session_cookie(response, user.id)
 
 
@@ -378,12 +381,48 @@ def reset_password(
 # Settings
 # ──────────────────────────────────────────────────────────────────────────────
 
+def _settings_ctx(request: Request, user: User, **extra) -> dict:
+    """Basiscontext voor auth/settings.html (zodat elke render alle vaste
+    opties ontvangt zoals de startpagina-dropdown)."""
+    ctx = {
+        "request": request,
+        "user": user,
+        "start_page_options": allowed_start_pages(user),
+    }
+    ctx.update(extra)
+    return ctx
+
+
 @router.get("/settings")
 def settings_page(request: Request, db: Session = Depends(get_db)):
     user = require_login(request, db)
     return templates.TemplateResponse(
+        "auth/settings.html", _settings_ctx(request, user),
+    )
+
+
+@router.post("/settings/start-page")
+def update_start_page(
+    request: Request,
+    start_page: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    user = require_login(request, db)
+    options = allowed_start_pages(user)
+    if not any(opt["path"] == start_page for opt in options):
+        return templates.TemplateResponse(
+            "auth/settings.html",
+            _settings_ctx(
+                request, user,
+                start_page_error="Onbekende startpagina-optie.",
+            ),
+            status_code=400,
+        )
+    user.start_page = start_page
+    db.commit()
+    return templates.TemplateResponse(
         "auth/settings.html",
-        {"request": request, "user": user},
+        _settings_ctx(request, user, start_page_success="Startpagina opgeslagen."),
     )
 
 
@@ -408,7 +447,7 @@ def change_password(
     if errors:
         return templates.TemplateResponse(
             "auth/settings.html",
-            {"request": request, "user": user, "errors": errors},
+            _settings_ctx(request, user, errors=errors),
             status_code=400,
         )
 
@@ -417,7 +456,7 @@ def change_password(
 
     return templates.TemplateResponse(
         "auth/settings.html",
-        {"request": request, "user": user, "success": "Wachtwoord succesvol gewijzigd"},
+        _settings_ctx(request, user, success="Wachtwoord succesvol gewijzigd"),
     )
 
 
@@ -440,7 +479,7 @@ def update_digest_preferences(
 
     return templates.TemplateResponse(
         "auth/settings.html",
-        {"request": request, "user": user, "digest_success": "Digest-voorkeuren opgeslagen"},
+        _settings_ctx(request, user, digest_success="Digest-voorkeuren opgeslagen"),
     )
 
 
@@ -455,7 +494,7 @@ def delete_account(
     if not verify_password(confirm_password, user.password_hash):
         return templates.TemplateResponse(
             "auth/settings.html",
-            {"request": request, "user": user, "delete_error": "Wachtwoord is onjuist"},
+            _settings_ctx(request, user, delete_error="Wachtwoord is onjuist"),
             status_code=400,
         )
 
@@ -478,7 +517,7 @@ def delete_all_transactions(
     if not verify_password(confirm_password, user.password_hash):
         return templates.TemplateResponse(
             "auth/settings.html",
-            {"request": request, "user": user, "tx_delete_error": "Wachtwoord is onjuist"},
+            _settings_ctx(request, user, tx_delete_error="Wachtwoord is onjuist"),
             status_code=400,
         )
 
@@ -488,7 +527,7 @@ def delete_all_transactions(
 
     return templates.TemplateResponse(
         "auth/settings.html",
-        {"request": request, "user": user, "success": f"{deleted} transactie(s) verwijderd."},
+        _settings_ctx(request, user, success=f"{deleted} transactie(s) verwijderd."),
     )
 
 
@@ -571,7 +610,7 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
     user.last_login_at = datetime.datetime.utcnow()
     db.commit()
 
-    response = RedirectResponse("/dashboard", status_code=302)
+    response = RedirectResponse(user_start_page(user), status_code=302)
     return set_session_cookie(response, user.id)
 
 

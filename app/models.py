@@ -48,6 +48,9 @@ class User(Base):
     weekly_digest_hour = Column(Integer, default=8)           # 0..23 in Europe/Amsterdam
     weekly_digest_last_sent_at = Column(DateTime, nullable=True)
 
+    # Startpagina: de route die getoond wordt bij inloggen of bezoek aan "/".
+    start_page = Column(String(100), default="/dashboard")
+
     accounts = relationship("Account", back_populates="user", cascade="all, delete-orphan")
     categories = relationship("Category", back_populates="user", cascade="all, delete-orphan")
     savings_plans = relationship("SavingsPlan", back_populates="user", cascade="all, delete-orphan")

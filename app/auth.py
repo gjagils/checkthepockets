@@ -62,3 +62,40 @@ def set_session_cookie(response: RedirectResponse, user_id: int) -> RedirectResp
         samesite="lax",
     )
     return response
+
+
+# Whitelist van toegestane startpagina-routes. Label voor de UI-dropdown.
+# `admin_only` weert opties uit het menu van niet-admins.
+START_PAGE_OPTIONS = [
+    {"path": "/dashboard", "label": "Dashboard", "admin_only": False},
+    {"path": "/transactions", "label": "Transacties", "admin_only": False},
+    {"path": "/budgets", "label": "Budgetten", "admin_only": False},
+    {"path": "/savings", "label": "Sparen", "admin_only": False},
+    {"path": "/portfolio", "label": "Portfolio", "admin_only": False},
+    {"path": "/analytics", "label": "Analyse", "admin_only": False},
+    {"path": "/accounts", "label": "Rekeningen", "admin_only": False},
+    {"path": "/hypotheek", "label": "Hypotheek", "admin_only": True},
+]
+
+
+def allowed_start_pages(user: User) -> list[dict]:
+    """Opties die deze user mag kiezen (admins zien ook admin-only pagina's)."""
+    return [
+        opt for opt in START_PAGE_OPTIONS
+        if not opt["admin_only"] or user.is_admin
+    ]
+
+
+def user_start_page(user: User | None) -> str:
+    """Route voor inlog/landing — valt terug op /dashboard als de keuze niet
+    meer geldig is voor deze user (bv. admin-only pagina na rol-wijziging)."""
+    default = "/dashboard"
+    if user is None:
+        return default
+    pref = (user.start_page or "").strip()
+    if not pref:
+        return default
+    for opt in allowed_start_pages(user):
+        if opt["path"] == pref:
+            return pref
+    return default
