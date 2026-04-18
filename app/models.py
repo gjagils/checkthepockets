@@ -1,4 +1,6 @@
 import datetime
+from decimal import Decimal
+
 from sqlalchemy import (
     Column,
     Integer,
@@ -479,6 +481,94 @@ class BankConnection(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     user = relationship("User")
+
+
+class HouseholdFinance(Base):
+    """Stabiele huishoud-waardes die alle hypotheek-scenarios gebruiken."""
+    __tablename__ = "household_finance"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True)
+
+    salary_primary = Column(Numeric(12, 2), default=0)
+    salary_primary_name = Column(String(100), nullable=True)
+    salary_secondary = Column(Numeric(12, 2), default=0)
+    salary_secondary_name = Column(String(100), nullable=True)
+
+    existing_mortgage_pim = Column(Numeric(12, 2), default=0)
+    existing_mortgage_interest_only = Column(Numeric(12, 2), default=0)
+    existing_mortgage_interest_only_monthly = Column(Numeric(12, 2), default=0)
+    existing_mortgage_pim_rate = Column(Numeric(6, 4), default=0)
+    existing_mortgage_pim_refund_rate = Column(Numeric(6, 4), default=0)
+
+    current_home_debt = Column(Numeric(12, 2), default=0)
+    tax_rate = Column(Numeric(6, 4), default=Decimal("0.3697"))
+    notional_rent_value = Column(Numeric(12, 2), default=Decimal("3600"))
+    purchase_costs_pct = Column(Numeric(6, 4), default=Decimal("0.025"))
+    selling_costs_pct = Column(Numeric(6, 4), default=Decimal("0.015"))
+
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+    user = relationship("User")
+
+
+class MortgageRateTable(Base):
+    """Rente-tabel per user: rentevast × LTV-bucket → %."""
+    __tablename__ = "mortgage_rate_table"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    fixed_years = Column(Integer, nullable=False)
+    ltv_max_pct = Column(Numeric(6, 4), nullable=False)
+    interest_rate = Column(Numeric(6, 4), nullable=False)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+    user = relationship("User")
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "fixed_years", "ltv_max_pct", name="uq_rate_user_fixed_ltv"),
+    )
+
+
+class MortgageScenario(Base):
+    """Een hypotheek-scenario voor één potentieel huis."""
+    __tablename__ = "mortgage_scenarios"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    name = Column(String(150), nullable=False)
+    valuation = Column(Numeric(12, 2), default=0)
+    offer = Column(Numeric(12, 2), default=0)
+    renovation_cost = Column(Numeric(12, 2), default=0)
+    own_contribution = Column(Numeric(12, 2), default=0)
+    sale_old_home = Column(Numeric(12, 2), default=0)
+    energy_label = Column(String(2), default="A")
+    notes = Column(Text, nullable=True)
+    is_archived = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+    user = relationship("User")
+    variants = relationship(
+        "MortgageVariant", back_populates="scenario", cascade="all, delete-orphan"
+    )
+
+
+class MortgageVariant(Base):
+    """Rentevast-keuze binnen één hypotheek-scenario."""
+    __tablename__ = "mortgage_variants"
+
+    id = Column(Integer, primary_key=True)
+    scenario_id = Column(Integer, ForeignKey("mortgage_scenarios.id", ondelete="CASCADE"), nullable=False)
+    fixed_years = Column(Integer, nullable=False)
+    interest_rate_override = Column(Numeric(6, 4), nullable=True)
+
+    scenario = relationship("MortgageScenario", back_populates="variants")
+
+    __table_args__ = (
+        UniqueConstraint("scenario_id", "fixed_years", name="uq_variant_scenario_fixed"),
+    )
 
 
 class PortfolioPriceSnapshot(Base):

@@ -25,6 +25,7 @@
         else 'financien' if path in ['/transactions', '/categories', '/rules', '/recurring'] or path.startswith('/transactions')
         else 'budgetten' if path.startswith('/budgets') or path.startswith('/savings')
         else 'portfolio' if path.startswith('/analytics') or path.startswith('/portfolio') or path.startswith('/networth')
+        else 'hypotheek' if path.startswith('/hypotheek')
         else 'rekeningen' if path.startswith('/accounts') or path.startswith('/import') or path.startswith('/banking') or path.startswith('/persons')
         else '' %}
     {% set portfolio_type = request.query_params.get('type') if path.startswith('/portfolio') else None %}
@@ -51,6 +52,9 @@
                 <a href="/transactions" class="{{ 'active' if main_active == 'financien' }}">Financiën</a>
                 <a href="/budgets" class="{{ 'active' if main_active == 'budgetten' }}">Budgetten</a>
                 <a href="/portfolio" class="{{ 'active' if main_active == 'portfolio' }}">Portfolio</a>
+                {% if user.is_admin %}
+                <a href="/hypotheek" class="{{ 'active' if main_active == 'hypotheek' }}">Hypotheek</a>
+                {% endif %}
                 <a href="/accounts" class="{{ 'active' if main_active == 'rekeningen' }}">Rekeningen</a>
             </div>
             <div class="nav-user-section">
@@ -126,6 +130,12 @@
                         <a href="/portfolio?type=metal" class="{{ 'active' if path.startswith('/portfolio') and portfolio_type == 'metal' }}">Edelmetaal</a>
                     </div>
                 </div>
+
+                {% if user.is_admin %}
+                <div class="m-nav-group {{ 'open' if main_active == 'hypotheek' }}">
+                    <a href="/hypotheek" class="m-nav-main {{ 'active' if main_active == 'hypotheek' }}">Hypotheek</a>
+                </div>
+                {% endif %}
 
                 <div class="m-nav-group {{ 'open' if main_active == 'rekeningen' }}">
                     <a href="/accounts" class="m-nav-main {{ 'active' if main_active == 'rekeningen' }}">Rekeningen</a>
