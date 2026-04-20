@@ -2,12 +2,13 @@
 from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from app import mortgage_calc
 from app.auth import require_login
 from app.database import get_db
+from app.funda_parser import FundaParseError, fetch_funda
 from app.models import (
     Budget,
     Category,
@@ -493,6 +494,25 @@ def scenarios_new(request: Request, db: Session = Depends(get_db)):
         "mortgage/scenario_form.html",
         {"request": request, "user": user, "scenario": None, "mode": "new"},
     )
+
+
+@router.post("/scenarios/funda-lookup")
+def scenarios_funda_lookup(
+    request: Request,
+    url: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """Parse een Funda-URL en geef de scenario-velden terug als JSON.
+
+    De front-end gebruikt dit om het formulier vooraf in te vullen. Bij fouten
+    retourneren we een 4xx met een NL-leesbare boodschap — niet een stack-trace.
+    """
+    _require_admin(request, db)
+    try:
+        parsed = fetch_funda(url)
+    except FundaParseError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    return JSONResponse(parsed)
 
 
 def _auto_create_variants(db: Session, user_id: int, scenario: MortgageScenario) -> None:
