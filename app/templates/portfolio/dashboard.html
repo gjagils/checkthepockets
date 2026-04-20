@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+{% block title %}Kapitaal-dashboard - Check Your Pockets{% endblock %}
+{% block container_class %}container-wide{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Kapitaal-dashboard</h1>
+</div>
+
+<p class="muted" style="margin-bottom:1.25rem;">
+    Sparen + beleggingen per persoon. Huidige stand plus 12-maanden projectie
+    op basis van forecast-spaarlijnen en belegging-groei+storting.
+</p>
+
+{% set persons = data.persons %}
+{% if not persons %}
+<div class="card" style="text-align:center; padding:3rem;">
+    <p class="muted">Voeg eerst <a href="/portfolio">personen</a> toe om het dashboard te vullen.</p>
+</div>
+{% else %}
+
+<!-- Filter tabs: Samen + per persoon -->
+<div class="portfolio-tabs" style="display:flex; gap:0.4rem; flex-wrap:wrap; margin-bottom:1.25rem;">
+    <a href="/portfolio/dashboard" class="btn btn-sm {% if selected == 'samen' %}btn-primary{% endif %}">Samen</a>
+    {% for p in persons %}
+    <a href="/portfolio/dashboard?person={{ p.id }}" class="btn btn-sm {% if selected == p.id|string %}btn-primary{% endif %}">{{ p.name }}</a>
+    {% endfor %}
+</div>
+
+<!-- Huidige totalen per persoon -->
+<div class="accounts-grid" style="margin-bottom:1.5rem;">
+    {% for p in persons %}
+    {% set totals = data.current_totals[p.id] %}
+    <div class="card" {% if selected == p.id|string %}style="border-left:4px solid var(--ctp-denim);"{% endif %}>
+        <h2 style="margin-bottom:0.5rem;">{{ p.name }}</h2>
+        <div style="display:grid; grid-template-columns:1fr auto; gap:0.25rem 1rem; font-size:0.95rem;">
+            <span class="muted">Sparen</span>
+            <span class="text-right nowrap">&euro;&nbsp;{{ totals.savings|euro }}</span>
+            <span class="muted">Beleggen (bruto)</span>
+            <span class="text-right nowrap">&euro;&nbsp;{{ totals.portfolio_gross|euro }}</span>
+            <span class="muted">Beleggen (netto na fee)</span>
+            <span class="text-right nowrap">&euro;&nbsp;{{ totals.portfolio_net|euro }}</span>
+            <span style="font-weight:600; border-top:1px solid var(--ctp-border); padding-top:0.4rem;">Totaal (bruto)</span>
+            <span class="text-right nowrap" style="font-weight:600; border-top:1px solid var(--ctp-border); padding-top:0.4rem;">&euro;&nbsp;{{ totals.total_gross|euro }}</span>
+            <span style="font-weight:600;">Contant totaal</span>
+            <span class="text-right nowrap" style="font-weight:600;">&euro;&nbsp;{{ totals.total_net|euro }}</span>
+        </div>
+    </div>
+    {% endfor %}
+
+    {% if persons|length > 1 %}
+    {% set st = data.samen_totals %}
+    <div class="card" {% if selected == 'samen' %}style="border-left:4px solid var(--ctp-denim);"{% endif %}>
+        <h2 style="margin-bottom:0.5rem;">Samen</h2>
+        <div style="display:grid; grid-template-columns:1fr auto; gap:0.25rem 1rem; font-size:0.95rem;">
+            <span class="muted">Sparen</span>
+            <span class="text-right nowrap">&euro;&nbsp;{{ st.savings|euro }}</span>
+            <span class="muted">Beleggen (bruto)</span>
+            <span class="text-right nowrap">&euro;&nbsp;{{ st.portfolio_gross|euro }}</span>
+            <span class="muted">Beleggen (netto na fee)</span>
+            <span class="text-right nowrap">&euro;&nbsp;{{ st.portfolio_net|euro }}</span>
+            <span style="font-weight:600; border-top:1px solid var(--ctp-border); padding-top:0.4rem;">Totaal (bruto)</span>
+            <span class="text-right nowrap" style="font-weight:600; border-top:1px solid var(--ctp-border); padding-top:0.4rem;">&euro;&nbsp;{{ st.total_gross|euro }}</span>
+            <span style="font-weight:600;">Contant totaal</span>
+            <span class="text-right nowrap" style="font-weight:600;">&euro;&nbsp;{{ st.total_net|euro }}</span>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Projectie-chart -->
+<div class="card">
+    <h2>Projectie — komende {{ data.months_ahead }} maanden</h2>
+    <p class="muted" style="margin-bottom:1rem;">
+        {% if selected == 'samen' %}Alle personen gecombineerd.{% else %}Alleen <strong>{{ data.person_name_by_id[selected|int] }}</strong> — klik op een tab hierboven om te wisselen.{% endif %}
+    </p>
+    <div style="position:relative; height:340px;">
+        <canvas id="capitalChart"></canvas>
+    </div>
+</div>
+
+<!-- Breakdown -->
+{% if data.savings_breakdown %}
+<details class="card" style="margin-top:1.5rem;">
+    <summary style="cursor:pointer; font-weight:600; font-size:1.05rem;">Spaarrekeningen ({{ data.savings_breakdown|length }})</summary>
+    <div class="table-wrap" style="margin-top:0.75rem;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Rekening</th>
+                    <th class="text-right">Huidig saldo</th>
+                    <th class="text-right">Projectie +{{ data.months_ahead }}m</th>
+                    <th>Eigenaren</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for acc in data.savings_breakdown %}
+                <tr>
+                    <td>
+                        {{ acc.name }}
+                        {% if not acc.has_plan %}<br><span class="muted" style="font-size:0.8rem;">geen spaarplan dit jaar</span>{% endif %}
+                    </td>
+                    <td class="text-right nowrap">&euro;&nbsp;{{ acc.current_total|euro }}</td>
+                    <td class="text-right nowrap">&euro;&nbsp;{{ acc.projected_total|euro }}</td>
+                    <td>
+                        {% for o in acc.owners %}
+                        <div style="font-size:0.9rem;">
+                            {{ o.person_name }}
+                            <span class="muted">— &euro;&nbsp;{{ o.current|euro }} ({{ (o.share * 100)|round(0) }}%)</span>
+                        </div>
+                        {% endfor %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</details>
+{% endif %}
+
+{% if data.portfolio_breakdown %}
+<details class="card" style="margin-top:1rem;">
+    <summary style="cursor:pointer; font-weight:600; font-size:1.05rem;">Beleggingen ({{ data.portfolio_breakdown|length }})</summary>
+    <div class="table-wrap" style="margin-top:0.75rem;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Asset</th>
+                    <th class="text-right">Bruto nu</th>
+                    <th class="text-right">Netto na fee</th>
+                    <th class="text-right">Projectie +{{ data.months_ahead }}m</th>
+                    <th>Per persoon</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for asset in data.portfolio_breakdown %}
+                <tr>
+                    <td>{{ asset.name }} <span class="muted" style="font-size:0.8rem;">({{ asset.asset_class }})</span></td>
+                    <td class="text-right nowrap">&euro;&nbsp;{{ asset.current_gross|euro }}</td>
+                    <td class="text-right nowrap">&euro;&nbsp;{{ asset.current_net|euro }}</td>
+                    <td class="text-right nowrap">&euro;&nbsp;{{ asset.projected_gross|euro }}</td>
+                    <td>
+                        {% for o in asset.owners %}
+                        <div style="font-size:0.9rem;">
+                            {{ o.person_name }}
+                            <span class="muted">
+                                — {{ o.quantity|float|round(4) }}× · &euro;&nbsp;{{ o.value|euro }}{% if o.contribution %} ({% if o.contribution > 0 %}+{% endif %}&euro;&nbsp;{{ o.contribution|euro }}/mnd){% endif %}
+                            </span>
+                        </div>
+                        {% endfor %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</details>
+{% endif %}
+
+{% if not data.savings_breakdown and not data.portfolio_breakdown %}
+<div class="card" style="text-align:center; padding:2rem;">
+    <p class="muted">Nog geen spaarrekeningen of beleggingen gekoppeld. Voeg ze toe via <a href="/savings">Sparen</a> of <a href="/portfolio">Portfolio</a>.</p>
+</div>
+{% endif %}
+
+{% endif %}{# persons endif #}
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+{% if data.persons %}
+(function() {
+    var ctx = document.getElementById('capitalChart');
+    if (!ctx) return;
+
+    var labels = {{ data.labels | tojson }};
+    var samen = {{ data.series_samen | tojson }};
+    var perPerson = {{ data.series_per_person | tojson }};
+    var personNames = {{ data.person_name_by_id | tojson }};
+    var selected = {{ selected | tojson }};
+
+    var style = getComputedStyle(document.documentElement);
+    var colorDenim = style.getPropertyValue('--ctp-denim').trim() || '#2563eb';
+    var colorCoin = style.getPropertyValue('--ctp-coin').trim() || '#f2b233';
+
+    var datasets = [];
+    if (selected === 'samen') {
+        datasets.push({
+            label: 'Samen',
+            data: samen,
+            borderColor: colorDenim,
+            backgroundColor: colorDenim + '1a',
+            borderWidth: 2.5,
+            pointRadius: 4,
+            pointBackgroundColor: colorDenim,
+            pointBorderColor: '#fff',
+            pointBorderWidth: 2,
+            fill: true,
+            tension: 0.3,
+        });
+    } else {
+        var pid = selected;
+        datasets.push({
+            label: personNames[pid] || 'Persoon',
+            data: perPerson[pid] || [],
+            borderColor: colorCoin,
+            backgroundColor: colorCoin + '1a',
+            borderWidth: 2.5,
+            pointRadius: 4,
+            pointBackgroundColor: colorCoin,
+            pointBorderColor: '#fff',
+            pointBorderWidth: 2,
+            fill: true,
+            tension: 0.3,
+        });
+    }
+
+    new Chart(ctx, {
+        type: 'line',
+        data: { labels: labels, datasets: datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top',
+                    labels: { usePointStyle: true, padding: 20, font: { size: 13 } }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            if (context.parsed.y === null) return null;
+                            return context.dataset.label + ': \u20ac ' +
+                                context.parsed.y.toLocaleString('nl-NL', {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2
+                                });
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: false,
+                    ticks: {
+                        callback: function(value) {
+                            return '\u20ac ' + value.toLocaleString('nl-NL', {
+                                minimumFractionDigits: 0,
+                                maximumFractionDigits: 0
+                            });
+                        }
+                    },
+                    grid: { color: 'rgba(0,0,0,0.06)' }
+                },
+                x: { grid: { display: false } }
+            }
+        }
+    });
+})();
+{% endif %}
+</script>
+{% endblock %}
