@@ -5,64 +5,86 @@
     <h1>{% if mode == 'edit' %}Scenario bewerken{% else %}Nieuw scenario{% endif %}</h1>
 </div>
 
+{% if mode != 'edit' %}
+<div class="card" style="margin-bottom:1rem;">
+    <h3 style="margin-top:0;">Automatisch invullen vanaf Funda</h3>
+    <p class="muted" style="margin-top:0.25rem;">
+        Plak een Funda-URL en klik op <em>Ophalen</em> om naam, bod en energielabel automatisch in te vullen.
+    </p>
+    <div class="form-group">
+        <label for="funda-url">Funda-URL</label>
+        <input type="url" id="funda-url"
+               placeholder="https://www.funda.nl/koop/..."
+               autocomplete="off">
+    </div>
+    <div style="display:flex; gap:0.5rem; align-items:center;">
+        <button type="button" id="funda-fetch-btn" class="btn">Ophalen</button>
+        <span id="funda-status" class="muted" style="font-size:0.85rem;"></span>
+    </div>
+</div>
+{% endif %}
+
 <form method="post"
       action="{% if mode == 'edit' %}/hypotheek/scenarios/{{ scenario.id }}/edit{% else %}/hypotheek/scenarios{% endif %}">
     <div class="card" style="margin-bottom:1rem;">
-        <div class="form-row">
-            <label>Naam</label>
-            <input type="text" name="name" required maxlength="150"
+        <div class="form-group">
+            <label for="f-name">Naam</label>
+            <input type="text" id="f-name" name="name" required maxlength="150"
                    value="{{ scenario.name if scenario else '' }}"
                    placeholder="bv. Kerkstraat 12">
         </div>
 
-        <div class="form-row">
-            <label>Taxatie (€)</label>
-            <input type="text" name="valuation" inputmode="decimal"
-                   value="{{ '%.2f' | format(scenario.valuation) if scenario else '' }}"
-                   placeholder="450000,00">
+        <div class="form-grid-2">
+            <div class="form-group">
+                <label for="f-valuation">Taxatie (€)</label>
+                <input type="text" id="f-valuation" name="valuation" inputmode="decimal"
+                       value="{{ '%.2f' | format(scenario.valuation) if scenario else '' }}"
+                       placeholder="450000,00">
+            </div>
+
+            <div class="form-group">
+                <label for="f-offer">Bod (€)</label>
+                <input type="text" id="f-offer" name="offer" inputmode="decimal"
+                       value="{{ '%.2f' | format(scenario.offer) if scenario else '' }}"
+                       placeholder="445000,00">
+            </div>
+
+            <div class="form-group">
+                <label for="f-reno">Verbouwkosten (€)</label>
+                <input type="text" id="f-reno" name="renovation_cost" inputmode="decimal"
+                       value="{{ '%.2f' | format(scenario.renovation_cost) if scenario else '0,00' }}"
+                       placeholder="0,00">
+            </div>
+
+            <div class="form-group">
+                <label for="f-own">Eigen inbreng (€)</label>
+                <input type="text" id="f-own" name="own_contribution" inputmode="decimal"
+                       value="{{ '%.2f' | format(scenario.own_contribution) if scenario else '0,00' }}"
+                       placeholder="0,00">
+            </div>
+
+            <div class="form-group">
+                <label for="f-sale">Verwachte verkoop oude woning (€)</label>
+                <input type="text" id="f-sale" name="sale_old_home" inputmode="decimal"
+                       value="{{ '%.2f' | format(scenario.sale_old_home) if scenario else '0,00' }}"
+                       placeholder="0,00">
+            </div>
+
+            <div class="form-group">
+                <label for="f-energy">Energielabel</label>
+                <select id="f-energy" name="energy_label">
+                    {% set current_label = scenario.energy_label if scenario else 'A' %}
+                    {% for label in ['A', 'B', 'C', 'D', 'E', 'F', 'G'] %}
+                    <option value="{{ label }}" {% if current_label == label %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
         </div>
 
-        <div class="form-row">
-            <label>Bod (€)</label>
-            <input type="text" name="offer" inputmode="decimal"
-                   value="{{ '%.2f' | format(scenario.offer) if scenario else '' }}"
-                   placeholder="445000,00">
-        </div>
-
-        <div class="form-row">
-            <label>Verbouwkosten (€)</label>
-            <input type="text" name="renovation_cost" inputmode="decimal"
-                   value="{{ '%.2f' | format(scenario.renovation_cost) if scenario else '0,00' }}"
-                   placeholder="0,00">
-        </div>
-
-        <div class="form-row">
-            <label>Eigen inbreng (€)</label>
-            <input type="text" name="own_contribution" inputmode="decimal"
-                   value="{{ '%.2f' | format(scenario.own_contribution) if scenario else '0,00' }}"
-                   placeholder="0,00">
-        </div>
-
-        <div class="form-row">
-            <label>Verwachte verkoop oude woning (€)</label>
-            <input type="text" name="sale_old_home" inputmode="decimal"
-                   value="{{ '%.2f' | format(scenario.sale_old_home) if scenario else '0,00' }}"
-                   placeholder="0,00">
-        </div>
-
-        <div class="form-row">
-            <label>Energielabel</label>
-            <select name="energy_label">
-                {% set current_label = scenario.energy_label if scenario else 'A' %}
-                {% for label in ['A', 'B', 'C', 'D', 'E', 'F', 'G'] %}
-                <option value="{{ label }}" {% if current_label == label %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-            </select>
-        </div>
-
-        <div class="form-row">
-            <label>Notities</label>
-            <textarea name="notes" rows="3" placeholder="Korte notitie over het huis, straat, bijzonderheden">{{ scenario.notes or '' if scenario else '' }}</textarea>
+        <div class="form-group">
+            <label for="f-notes">Notities</label>
+            <textarea id="f-notes" name="notes" rows="3"
+                      placeholder="Korte notitie over het huis, straat, bijzonderheden">{{ scenario.notes or '' if scenario else '' }}</textarea>
         </div>
     </div>
 
@@ -73,4 +95,75 @@
         <a href="{% if mode == 'edit' %}/hypotheek/scenarios/{{ scenario.id }}{% else %}/hypotheek/scenarios{% endif %}" class="btn">Annuleren</a>
     </div>
 </form>
+
+<style>
+    .form-grid-2 {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0 1rem;
+    }
+    @media (max-width: 560px) {
+        .form-grid-2 { grid-template-columns: 1fr; }
+    }
+</style>
+
+{% if mode != 'edit' %}
+<script>
+(function () {
+    const btn = document.getElementById('funda-fetch-btn');
+    const urlInput = document.getElementById('funda-url');
+    const status = document.getElementById('funda-status');
+
+    function setStatus(msg, isError) {
+        status.textContent = msg || '';
+        status.style.color = isError ? 'var(--ctp-danger, #e78284)' : '';
+    }
+
+    function fmtEuro(n) {
+        // 425000 → "425000,00" voor de inputmode="decimal" velden.
+        if (n == null) return '';
+        return Number(n).toFixed(2).replace('.', ',');
+    }
+
+    btn.addEventListener('click', async function () {
+        const url = (urlInput.value || '').trim();
+        if (!url) {
+            setStatus('Plak eerst een Funda-URL.', true);
+            return;
+        }
+        btn.disabled = true;
+        setStatus('Bezig met ophalen…', false);
+        try {
+            const form = new FormData();
+            form.append('url', url);
+            const resp = await fetch('/hypotheek/scenarios/funda-lookup', {
+                method: 'POST',
+                body: form,
+            });
+            const data = await resp.json();
+            if (!resp.ok) {
+                setStatus(data.error || 'Ophalen mislukt.', true);
+                return;
+            }
+            if (data.name) document.getElementById('f-name').value = data.name;
+            if (data.offer != null) document.getElementById('f-offer').value = fmtEuro(data.offer);
+            if (data.energy_label) {
+                const sel = document.getElementById('f-energy');
+                const opt = Array.from(sel.options).find(o => o.value === data.energy_label);
+                if (opt) sel.value = data.energy_label;
+            }
+            if (data.notes) {
+                const notesEl = document.getElementById('f-notes');
+                if (!notesEl.value.trim()) notesEl.value = data.notes;
+            }
+            setStatus('Ingevuld — controleer de waarden.', false);
+        } catch (err) {
+            setStatus('Netwerkfout — probeer opnieuw.', true);
+        } finally {
+            btn.disabled = false;
+        }
+    });
+})();
+</script>
+{% endif %}
 {% endblock %}
