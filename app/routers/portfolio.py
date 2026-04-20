@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import PortfolioAsset, Person, PortfolioHolding, PortfolioPriceSnapshot
 from app.auth import require_login
+from app.capital_dashboard import build_capital_dashboard
 from app.portfolio_prices import fetch_price, fetch_historical_prices, PRESET_ASSETS
 from app.template_config import templates
 
@@ -200,6 +201,41 @@ def portfolio_overview(
             "filter_type": filter_type,
             "filter_type_label": ASSET_TYPE_LABELS.get(filter_type) if filter_type else None,
             "price_age_days": price_age_days,
+        },
+    )
+
+
+@router.get("/dashboard")
+def capital_dashboard(
+    request: Request,
+    person: str | None = Query(None),
+    db: Session = Depends(get_db),
+):
+    """Kapitaal-dashboard: sparen + beleggen per persoon + Samen-aggregaat.
+
+    Query `person` kiest de zichtbare serie in de grafiek: `samen` (default)
+    of een persoon-ID. De data zelf wordt altijd volledig gegenereerd; de
+    filter bepaalt alleen welke dataset in de chart zichtbaar is.
+    """
+    user = require_login(request, db)
+    data = build_capital_dashboard(db, user.id)
+
+    selected = (person or "samen").strip().lower()
+    if selected != "samen":
+        try:
+            selected_int = int(selected)
+        except ValueError:
+            selected_int = None
+        if selected_int is None or selected_int not in {p.id for p in data["persons"]}:
+            selected = "samen"
+
+    return templates.TemplateResponse(
+        "portfolio/dashboard.html",
+        {
+            "request": request,
+            "user": user,
+            "data": data,
+            "selected": selected,
         },
     )
 
