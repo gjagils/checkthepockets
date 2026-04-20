@@ -9,6 +9,13 @@
     </form>
 </div>
 
+<div class="portfolio-tabs" style="display:flex; gap:0.4rem; flex-wrap:wrap; margin-bottom:1.25rem;">
+    <a href="/portfolio" class="btn btn-sm {% if not filter_type %}btn-primary{% endif %}">Alles</a>
+    <a href="/portfolio?type=stock" class="btn btn-sm {% if filter_type == 'stock' %}btn-primary{% endif %}">Beleggingen</a>
+    <a href="/portfolio?type=crypto" class="btn btn-sm {% if filter_type == 'crypto' %}btn-primary{% endif %}">Crypto</a>
+    <a href="/portfolio?type=metal" class="btn btn-sm {% if filter_type == 'metal' %}btn-primary{% endif %}">Edelmetaal</a>
+</div>
+
 {% if filter_type == 'stock' %}
 <div class="card" style="border-left:4px solid var(--ctp-coin); margin-bottom:1.5rem;">
     <p style="margin:0;">
@@ -50,7 +57,7 @@
                 <label>Vooringesteld</label>
                 <select id="preset-select" onchange="fillPreset(this.value)" style="width:100%; padding:0.5rem; border:2px solid var(--ctp-border); border-radius:var(--ctp-radius-sm);">
                     <option value="">-- Kies of vul handmatig in --</option>
-                    {% for p in preset_assets %}
+                    {% for p in preset_assets if not filter_type or p.asset_class == filter_type %}
                     <option value='{{ p.name }}|{{ p.symbol }}|{{ p.asset_class }}|{{ p.unit }}'>{{ p.name }} ({{ p.symbol }})</option>
                     {% endfor %}
                 </select>
