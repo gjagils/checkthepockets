@@ -79,9 +79,7 @@
                 <a href="/analytics" class="{{ 'active' if path == '/analytics' }}">Analyse</a>
                 <a href="/analytics/stats" class="{{ 'active' if path == '/analytics/stats' }}">Statistieken</a>
                 <a href="/analytics/query" class="{{ 'active' if path == '/analytics/query' }}">Query</a>
-                <a href="/portfolio?type=stock" class="{{ 'active' if path.startswith('/portfolio') and portfolio_type == 'stock' }}">Beleggingen</a>
-                <a href="/portfolio?type=crypto" class="{{ 'active' if path.startswith('/portfolio') and portfolio_type == 'crypto' }}">Crypto</a>
-                <a href="/portfolio?type=metal" class="{{ 'active' if path.startswith('/portfolio') and portfolio_type == 'metal' }}">Edelmetaal</a>
+                <a href="/portfolio" class="{{ 'active' if path.startswith('/portfolio') }}">Portfolio</a>
             {% elif main_active == 'hypotheek' %}
                 <a href="/hypotheek" class="{{ 'active' if path == '/hypotheek' }}">Overzicht</a>
                 <a href="/hypotheek/scenarios" class="{{ 'active' if path.startswith('/hypotheek/scenarios') }}">Scenarios</a>
@@ -130,9 +128,7 @@
                         <a href="/analytics" class="{{ 'active' if path == '/analytics' }}">Analyse</a>
                         <a href="/analytics/stats" class="{{ 'active' if path == '/analytics/stats' }}">Statistieken</a>
                         <a href="/analytics/query" class="{{ 'active' if path == '/analytics/query' }}">Query</a>
-                        <a href="/portfolio?type=stock" class="{{ 'active' if path.startswith('/portfolio') and portfolio_type == 'stock' }}">Beleggingen</a>
-                        <a href="/portfolio?type=crypto" class="{{ 'active' if path.startswith('/portfolio') and portfolio_type == 'crypto' }}">Crypto</a>
-                        <a href="/portfolio?type=metal" class="{{ 'active' if path.startswith('/portfolio') and portfolio_type == 'metal' }}">Edelmetaal</a>
+                        <a href="/portfolio" class="{{ 'active' if path.startswith('/portfolio') }}">Portfolio</a>
                     </div>
                 </div>
 
