@@ -391,6 +391,7 @@
         </div>
         <form method="post" action="/savings/{{ plan.id }}/quick-add" style="padding:1rem 1.25rem;">
             <input type="hidden" name="remaining_suggestions" id="qa-remaining-suggestions" value="">
+            <input type="hidden" name="accepted_suggestion_idx" id="qa-accepted-idx" value="">
 
             <!-- ── Stap 1 — Categorie ─────────────────────── -->
             <h4 style="margin:0 0 0.5rem; font-size:0.85rem; text-transform:uppercase; color:var(--muted);">1. Categorie</h4>
@@ -659,6 +660,7 @@ function openQuickAddFromSuggestion(rowEl) {
     var name = (rowEl.querySelector('.sug-name') || {}).value || '';
     var amount = (rowEl.querySelector('.sug-amount') || {}).value || '0';
     var freq = (rowEl.querySelector('.sug-frequency') || {}).value || 'monthly';
+    var idx = rowEl.dataset.idx || '';
 
     openQuickAdd();
 
@@ -692,10 +694,16 @@ function openQuickAddFromSuggestion(rowEl) {
     var matchValue = document.querySelector('#qa-rule-fields input[name="rule_match_value"]');
     if (matchValue) matchValue.value = name;
 
-    // Bewaar overige voorstellen zodat die na submit blijven staan
+    // Bewaar overige voorstellen zodat die na submit blijven staan.
+    // De backend verwijdert het geaccepteerde voorstel (accepted_suggestion_idx)
+    // zodat het niet opnieuw getoond wordt.
     var remainingInput = document.getElementById('qa-remaining-suggestions');
     if (remainingInput) {
         remainingInput.value = window.AI_SUGGESTIONS_B64 || '';
+    }
+    var idxInput = document.getElementById('qa-accepted-idx');
+    if (idxInput) {
+        idxInput.value = idx;
     }
 }
 function qaPrefillName() {

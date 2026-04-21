@@ -141,7 +141,11 @@ h1, h2, h3, h4 {
     font-family: var(--font-heading);
     font-weight: 800;
     letter-spacing: -0.01em;
-    color: var(--text-white);
+    /* Use the theme-aware default text color so headings contrast with their
+       surface automatically. In light mode the card background is white, so
+       --text-white would render invisibly. Places that need explicitly white
+       headings on a dark nav bg set their own color. */
+    color: var(--text);
 }
 
 a { color: var(--sky); text-decoration: none; }
