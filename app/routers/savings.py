@@ -1,4 +1,7 @@
+import base64
+import binascii
 import datetime
+import json
 from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Depends, Request, Form, Query
@@ -1092,7 +1095,10 @@ def quick_add_line(
     amount_10: str = Form(""), amount_11: str = Form(""), amount_12: str = Form(""),
     # Als we vanuit een AI-voorstel komen, geven we de gehele suggesties-lijst
     # (base64) door zodat de resterende voorstellen na redirect blijven staan.
+    # `accepted_suggestion_idx` is de 0-based index van het voorstel dat zojuist
+    # geaccepteerd werd — die wordt uit de lijst gefilterd.
     remaining_suggestions: str = Form(""),
+    accepted_suggestion_idx: str = Form(""),
     db: Session = Depends(get_db),
 ):
     """Maak in één POST een categorie (optioneel nieuw), optioneel een rule die
@@ -1262,10 +1268,33 @@ def quick_add_line(
     db.commit()
 
     if remaining_suggestions.strip():
-        return RedirectResponse(
-            f"/savings/{plan_id}?suggestions={remaining_suggestions}",
-            status_code=302,
-        )
+        # Verwijder het geaccepteerde voorstel uit de base64-JSON-lijst zodat
+        # het niet opnieuw verschijnt in de UI na redirect.
+        next_suggestions = remaining_suggestions
+        if accepted_suggestion_idx.strip():
+            try:
+                idx = int(accepted_suggestion_idx)
+                raw = base64.b64decode(remaining_suggestions.encode()).decode()
+                arr = json.loads(raw)
+                if isinstance(arr, list) and 0 <= idx < len(arr):
+                    del arr[idx]
+                    if arr:
+                        next_suggestions = base64.b64encode(
+                            json.dumps(arr).encode()
+                        ).decode()
+                    else:
+                        next_suggestions = ""
+            except (ValueError, binascii.Error, json.JSONDecodeError):
+                # Bij parse-fouten vallen we terug op de originele lijst;
+                # de gebruiker ziet dan één keer een "dubbel" voorstel maar
+                # de rest van de flow werkt.
+                pass
+
+        if next_suggestions:
+            return RedirectResponse(
+                f"/savings/{plan_id}?suggestions={next_suggestions}",
+                status_code=302,
+            )
     return RedirectResponse(f"/savings/{plan_id}", status_code=302)
 
 
