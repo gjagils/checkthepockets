@@ -1,3 +1,5 @@
+import datetime
+
 from fastapi import APIRouter, Depends, Request, Form
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
@@ -5,9 +7,21 @@ from sqlalchemy.orm import Session
 from app.auth import require_login
 from app.database import get_db
 from app.models import Person
+from app.person_utils import format_age_nl
 from app.template_config import templates
 
 router = APIRouter(prefix="/persons")
+
+
+def _parse_birthdate(raw: str) -> datetime.date | None:
+    """HTML `<input type="date">` levert ISO-formaat; lege input = None."""
+    clean = (raw or "").strip()
+    if not clean:
+        return None
+    try:
+        return datetime.date.fromisoformat(clean)
+    except ValueError:
+        return None
 
 
 @router.get("")
@@ -21,7 +35,12 @@ def list_persons(request: Request, db: Session = Depends(get_db)):
     )
     return templates.TemplateResponse(
         "persons/list.html",
-        {"request": request, "user": user, "persons": persons},
+        {
+            "request": request,
+            "user": user,
+            "persons": persons,
+            "format_age_nl": format_age_nl,
+        },
     )
 
 
@@ -29,6 +48,7 @@ def list_persons(request: Request, db: Session = Depends(get_db)):
 def create_person(
     request: Request,
     name: str = Form(...),
+    birthdate: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
@@ -40,7 +60,12 @@ def create_person(
             .filter(Person.user_id == user.id)
             .count()
         )
-        db.add(Person(user_id=user.id, name=clean, sort_order=max_order))
+        db.add(Person(
+            user_id=user.id,
+            name=clean,
+            birthdate=_parse_birthdate(birthdate),
+            sort_order=max_order,
+        ))
         db.commit()
     return RedirectResponse("/persons", status_code=302)
 
@@ -50,6 +75,7 @@ def rename_person(
     person_id: int,
     request: Request,
     name: str = Form(...),
+    birthdate: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
@@ -61,6 +87,7 @@ def rename_person(
     clean = name.strip()
     if person and clean:
         person.name = clean
+        person.birthdate = _parse_birthdate(birthdate)
         db.commit()
     return RedirectResponse("/persons", status_code=302)
 
