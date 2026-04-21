@@ -197,26 +197,25 @@
 {% endif %}
 
 {% if ai_suggestions %}
+<script>window.AI_SUGGESTIONS_B64 = "{{ request.query_params.get('suggestions', '')|e }}";</script>
 <div class="card" style="margin-bottom:1rem; border-left:4px solid var(--gold);">
     <h3 style="margin-bottom:0.75rem;">✨ AI-voorstellen voor spaarplan</h3>
     <p class="muted" style="font-size:0.82rem; margin-bottom:0.75rem;">Op basis van je transacties. Pas aan en voeg toe, of sla over.</p>
     {% for s in ai_suggestions %}
-    <form method="post" action="/savings/{{ plan.id }}/accept-suggestion" style="padding:0.75rem 0; border-bottom:1px solid var(--border);">
-        {# Pass the raw suggestions param so remaining survive after accepting one #}
-        <input type="hidden" name="remaining_suggestions" value="{{ request.query_params.get('suggestions', '') }}">
+    <div class="ai-suggestion-row" data-idx="{{ loop.index0 }}" style="padding:0.75rem 0; border-bottom:1px solid var(--border);">
         {% if s.reasoning %}<p class="muted" style="font-size:0.78rem; margin-bottom:0.5rem;">💡 {{ s.reasoning }}</p>{% endif %}
         <div style="display:flex; gap:0.5rem; align-items:end; flex-wrap:wrap;">
             <div class="form-group" style="flex:2; min-width:150px; margin:0;">
                 <label style="font-size:0.72rem; text-transform:uppercase; color:var(--muted);">Naam</label>
-                <input type="text" name="name" value="{{ s.name }}" style="font-size:0.85rem; padding:0.3rem 0.5rem;">
+                <input type="text" class="sug-name" value="{{ s.name }}" style="font-size:0.85rem; padding:0.3rem 0.5rem;">
             </div>
             <div class="form-group" style="flex:1; min-width:80px; margin:0;">
                 <label style="font-size:0.72rem; text-transform:uppercase; color:var(--muted);">Bedrag</label>
-                <input type="number" step="0.01" name="amount" value="{{ '%.2f'|format(s.amount) }}" style="font-size:0.85rem; padding:0.3rem 0.5rem;">
+                <input type="number" step="0.01" class="sug-amount" value="{{ '%.2f'|format(s.amount) }}" style="font-size:0.85rem; padding:0.3rem 0.5rem;">
             </div>
             <div class="form-group" style="flex:1; min-width:100px; margin:0;">
                 <label style="font-size:0.72rem; text-transform:uppercase; color:var(--muted);">Frequentie</label>
-                <select name="frequency" style="font-size:0.85rem; padding:0.3rem 0.5rem;">
+                <select class="sug-frequency" style="font-size:0.85rem; padding:0.3rem 0.5rem;">
                     {% for fk, fl in frequency_labels.items() %}
                     <option value="{{ fk }}" {% if fk == s.frequency %}selected{% endif %}>{{ fl }}</option>
                     {% endfor %}
@@ -224,14 +223,17 @@
             </div>
             <div class="form-group" style="min-width:80px; margin:0;">
                 <label style="font-size:0.72rem; text-transform:uppercase; color:var(--muted);">Type</label>
-                <select name="is_income" style="font-size:0.85rem; padding:0.3rem 0.5rem;">
+                <select class="sug-is-income" style="font-size:0.85rem; padding:0.3rem 0.5rem;">
                     <option value="0" {% if not s.is_income %}selected{% endif %}>Uitgave</option>
                     <option value="1" {% if s.is_income %}selected{% endif %}>Inkomen</option>
                 </select>
             </div>
-            <button type="submit" class="btn btn-sm btn-accent" style="white-space:nowrap;">✓ Toevoegen</button>
+            <button type="button" class="btn btn-sm btn-accent" style="white-space:nowrap;"
+                    onclick="openQuickAddFromSuggestion(this.closest('.ai-suggestion-row'))">
+                ⚙ Toevoegen &amp; koppelen
+            </button>
         </div>
-    </form>
+    </div>
     {% endfor %}
 </div>
 {% endif %}
@@ -388,6 +390,7 @@
             <button type="button" class="btn btn-sm" onclick="closeQuickAdd()">✕</button>
         </div>
         <form method="post" action="/savings/{{ plan.id }}/quick-add" style="padding:1rem 1.25rem;">
+            <input type="hidden" name="remaining_suggestions" id="qa-remaining-suggestions" value="">
 
             <!-- ── Stap 1 — Categorie ─────────────────────── -->
             <h4 style="margin:0 0 0.5rem; font-size:0.85rem; text-transform:uppercase; color:var(--muted);">1. Categorie</h4>
@@ -646,6 +649,54 @@ function qaToggleCategoryMode(mode) {
 }
 function qaToggleRule(checked) {
     document.getElementById('qa-rule-fields').style.display = checked ? '' : 'none';
+}
+
+// Open Snel toevoegen vanuit een AI-voorstel: modal openen met voorgevulde
+// waarden (naam, bedrag, frequentie) en de matching-regel vast aanvinken met
+// de voorstel-naam als match-tekst. De gebruiker kiest zelf nog de categorie.
+function openQuickAddFromSuggestion(rowEl) {
+    if (!rowEl) return;
+    var name = (rowEl.querySelector('.sug-name') || {}).value || '';
+    var amount = (rowEl.querySelector('.sug-amount') || {}).value || '0';
+    var freq = (rowEl.querySelector('.sug-frequency') || {}).value || 'monthly';
+
+    openQuickAdd();
+
+    // Plan-rij velden
+    var nameInput = document.getElementById('qa-line-name');
+    if (nameInput) {
+        nameInput.value = name;
+        // Voorkom dat qaPrefillName onze naam overschrijft als de gebruiker een
+        // categorie kiest — we hebben bewust de suggestie-naam overgenomen.
+        nameInput.dataset.userEdited = '1';
+    }
+    var freqSelect = document.getElementById('qa-frequency');
+    if (freqSelect) {
+        freqSelect.value = freq;
+        qaToggleTargetMonth(freq);
+    }
+    var defAmountInput = document.querySelector('#qa-default-amount-group input[name="default_amount"]');
+    if (defAmountInput) {
+        // amount komt als "123.45" uit <input type=number>; modal verwacht komma
+        defAmountInput.value = String(amount).replace('.', ',');
+    }
+
+    // Rule aanvinken + match-tekst vullen
+    var ruleCheckbox = document.getElementById('qa-create-rule');
+    if (ruleCheckbox && !ruleCheckbox.checked) {
+        ruleCheckbox.checked = true;
+        qaToggleRule(true);
+    }
+    var matchField = document.querySelector('#qa-rule-fields select[name="rule_match_field"]');
+    if (matchField) matchField.value = 'description';
+    var matchValue = document.querySelector('#qa-rule-fields input[name="rule_match_value"]');
+    if (matchValue) matchValue.value = name;
+
+    // Bewaar overige voorstellen zodat die na submit blijven staan
+    var remainingInput = document.getElementById('qa-remaining-suggestions');
+    if (remainingInput) {
+        remainingInput.value = window.AI_SUGGESTIONS_B64 || '';
+    }
 }
 function qaPrefillName() {
     var nameInput = document.getElementById('qa-line-name');
