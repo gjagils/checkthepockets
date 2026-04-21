@@ -345,3 +345,104 @@ def test_dashboard_unknown_person_falls_back_to_samen(db_session):
     assert resp.status_code == 200
     # Default-tekst voor Samen zit in de pagina
     assert "Alle personen gecombineerd" in resp.text
+
+
+# ── Kind-prognose op 18e (GJA-35) ─────────────────────────────────────
+
+def _make_child(db, user, name, birthdate):
+    p = Person(user_id=user.id, name=name, birthdate=birthdate)
+    db.add(p)
+    db.commit()
+    db.refresh(p)
+    return p
+
+
+def test_children_forecast_empty_when_no_birthdate(db_session):
+    alice = _make_user(db_session)
+    _make_person(db_session, alice, name="Volwassene")
+    data = build_capital_dashboard(db_session, alice.id)
+    assert data["children_forecast"] == []
+
+
+def test_children_forecast_excludes_persons_18_or_older(db_session):
+    alice = _make_user(db_session)
+    today = datetime.date(2026, 4, 20)
+    _make_child(db_session, alice, "Tim", datetime.date(2005, 4, 19))  # 21
+    _make_child(db_session, alice, "Suze", datetime.date(2018, 6, 1))  # 7
+    data = build_capital_dashboard(db_session, alice.id, today=today)
+    names = [c["person_name"] for c in data["children_forecast"]]
+    assert names == ["Suze"]
+
+
+def test_children_forecast_portfolio_matches_base_projection(db_session):
+    """Acceptatiecriterium: klopt op 1 cent met /portfolio-projectie voor een
+    eenvoudige case (1 asset, 1 holding, 12 mnd vooruit)."""
+    alice = _make_user(db_session)
+    # Geboortedatum zodat 18e precies over 12 maanden valt.
+    today = datetime.date(2026, 4, 20)
+    bd = datetime.date(today.year - 17, today.month, 15)
+    kid = _make_child(db_session, alice, "Milou", bd)
+
+    asset = _make_asset(
+        db_session, alice, price=Decimal("100"), growth_pct=Decimal("1"),
+    )
+    _make_holding(db_session, alice, asset, kid,
+                  qty=Decimal("10"), contrib=Decimal("50"))
+
+    data = build_capital_dashboard(db_session, alice.id, today=today)
+    forecast = data["children_forecast"][0]
+    assert forecast["person_name"] == "Milou"
+    assert forecast["months_ahead"] == 12
+    # Reken: value_0 = 10*100 = 1000. Stap: (v + 50) * 1.01.
+    expected = Decimal("1000")
+    growth = Decimal("1.01")
+    for _ in range(12):
+        expected = (expected + Decimal("50")) * growth
+    assert forecast["projected_portfolio"] == expected
+    # En huidige waarde == series_per_person[0] voor dit kind.
+    assert forecast["current_portfolio"] == Decimal("1000")
+
+
+def test_children_forecast_shared_savings_account_splits_equally(db_session):
+    alice = _make_user(db_session)
+    today = datetime.date(2026, 4, 20)
+    parent = _make_person(db_session, alice, name="Ouder")
+    # Kind al bijna 18 (verjaardag over een paar dagen) → 0 mnd vooruit.
+    kid = _make_child(
+        db_session, alice, "Bram",
+        datetime.date(today.year - 18, today.month, 28),
+    )
+    acc = _make_account(db_session, alice, owners=[parent, kid], name="Samen")
+    _make_plan_with_monthly_net(
+        db_session, alice, acc, today.year,
+        starting_balance=4000, monthly_income=0, monthly_expense=0,
+    )
+    data = build_capital_dashboard(db_session, alice.id, today=today)
+    forecast = next(c for c in data["children_forecast"]
+                    if c["person_name"] == "Bram")
+    # Verdeling 50/50 → kind-aandeel = 2000, en geen groei want months_ahead = 0.
+    assert forecast["months_ahead"] == 0
+    assert forecast["current_savings"] == Decimal("2000")
+    assert forecast["projected_savings"] == Decimal("2000")
+
+
+def test_children_forecast_zero_total_when_no_holdings_or_savings(db_session):
+    alice = _make_user(db_session)
+    today = datetime.date(2026, 4, 20)
+    kid = _make_child(
+        db_session, alice, "Lev",
+        datetime.date(2020, 6, 15),
+    )
+    data = build_capital_dashboard(db_session, alice.id, today=today)
+    forecast = data["children_forecast"][0]
+    assert forecast["person_id"] == kid.id
+    assert forecast["current_total"] == Decimal("0")
+    assert forecast["projected_total"] == Decimal("0")
+
+
+def test_children_forecast_label_contains_month_and_year(db_session):
+    alice = _make_user(db_session)
+    today = datetime.date(2026, 4, 20)
+    _make_child(db_session, alice, "Noor", datetime.date(2018, 5, 10))
+    data = build_capital_dashboard(db_session, alice.id, today=today)
+    assert data["children_forecast"][0]["eighteenth_month_label"] == "mei 2036"
