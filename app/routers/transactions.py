@@ -183,9 +183,14 @@ def _available_tx_years(db, user_id: int, current_year_num: int) -> list[int]:
 
 
 def _build_tx_query(db, user, account_id, category_id, tag_id, search,
-                    date_from, date_to, amount_min, amount_max):
+                    date_from, date_to, amount_min, amount_max,
+                    include_excluded: bool = False):
     """Shared filter logic used by list view, export, and duplicates.
     Note: tag_id parameter is retained for backward call compatibility but ignored.
+
+    `include_excluded=True` toont ook uitgesloten transacties — gebruikt door
+    de list-view met `?show_excluded=1` zodat de gebruiker een per ongeluk
+    uitgesloten transactie kan terugzetten.
     """
     query = (
         db.query(Transaction)
@@ -201,7 +206,8 @@ def _build_tx_query(db, user, account_id, category_id, tag_id, search,
         .scalar_subquery()
     )
     query = query.filter(Transaction.id.notin_(split_parent_ids))
-    query = query.filter(Transaction.is_excluded == 0)
+    if not include_excluded:
+        query = query.filter(Transaction.is_excluded == 0)
     query = query.filter(Transaction.is_projected == 0)
 
     if account_id:
@@ -281,6 +287,7 @@ def transaction_list(
     amount_max: str | None = Query(None),
     back: str = Query(""),         # optionele deep-link-terug (bijv. /savings/42)
     back_label: str = Query(""),   # tekst op de terugknop
+    show_excluded: str = Query(""),  # "1" → toon ook uitgesloten transacties
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
@@ -326,9 +333,11 @@ def transaction_list(
         next_month = this_month
         period_label = "Alle periodes"
 
+    include_excluded = show_excluded.strip() in ("1", "true", "on", "yes")
     query = _build_tx_query(
         db, user, account_id, category_id, None,
         search, date_from, date_to, amount_min, amount_max,
+        include_excluded=include_excluded,
     )
 
     total = query.count()
@@ -430,6 +439,8 @@ def transaction_list(
         filter_params["amount_min"] = amount_min
     if amount_max:
         filter_params["amount_max"] = amount_max
+    if include_excluded:
+        filter_params["show_excluded"] = "1"
 
     # Get categories grouped by account_id -> parent -> children
     all_cats = (
@@ -515,6 +526,7 @@ def transaction_list(
             # Back-knop: alleen relatieve paden toestaan (geen open redirects).
             "back_url": back if back.startswith("/") and not back.startswith("//") else "",
             "back_label": (back_label or "Terug")[:80],
+            "show_excluded": include_excluded,
         },
     )
 
