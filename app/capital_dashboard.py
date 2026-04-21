@@ -20,6 +20,11 @@ from app.models import (
     SavingsLine,
     SavingsPlan,
 )
+from app.person_utils import (
+    age_years,
+    eighteenth_month_label_nl,
+    months_until_18,
+)
 
 
 MONTH_LABELS_NL = [
@@ -393,6 +398,10 @@ def build_capital_dashboard(
         "total_net": samen_savings + samen_net,
     }
 
+    children_forecast = _build_children_forecast(
+        db, user_id, persons, accounts, assets, holdings, today,
+    )
+
     return {
         "persons": persons,
         "person_name_by_id": person_name_by_id,
@@ -404,4 +413,99 @@ def build_capital_dashboard(
         "savings_breakdown": savings_breakdown,
         "portfolio_breakdown": portfolio_breakdown,
         "months_ahead": months_ahead,
+        "children_forecast": children_forecast,
     }
+
+
+def _build_children_forecast(
+    db: Session,
+    user_id: int,
+    persons: list[Person],
+    accounts: list[Account],
+    assets: list[PortfolioAsset],
+    holdings: list[PortfolioHolding],
+    today: datetime.date,
+) -> list[dict]:
+    """Prognose per kind (<18 met geboortedatum) op de maand van hun 18e.
+
+    Hergebruikt `_portfolio_timeline_for_holding` en
+    `_savings_timeline_for_account` zodat de projectie 1-op-1 hetzelfde is als
+    de 12-maanden-grafiek — maar met een kind-specifieke horizon.
+    """
+    children = [
+        p for p in persons
+        if p.birthdate is not None and (age_years(p.birthdate, today) or 0) < 18
+    ]
+    if not children:
+        return []
+
+    # Bepaal welke jaren aan spaarplannen we nodig hebben: van huidig jaar tot
+    # het jaar van de oudste kind-18e. Anders blijft het saldo vlak voor jaren
+    # zonder plan (ook prima — spec: "anders alleen startsaldo").
+    max_18_year = max(c.birthdate.year + 18 for c in children)
+    needed_years = set(range(today.year, max_18_year + 1))
+    plans_map = _fetch_plans(db, user_id, needed_years)
+    plan_starts: dict[tuple[int, int], Decimal] = {}
+    plan_deltas: dict[tuple[int, int], list[Decimal]] = {}
+    for key, plan in plans_map.items():
+        plan_starts[key] = _plan_effective_start(db, plan)
+        plan_deltas[key] = _plan_monthly_deltas(plan)
+
+    holdings_by_person: dict[int, list[PortfolioHolding]] = {}
+    for h in holdings:
+        holdings_by_person.setdefault(h.person_id, []).append(h)
+    assets_by_id = {a.id: a for a in assets}
+
+    results = []
+    for child in children:
+        months = months_until_18(child.birthdate, today) or 0
+
+        # Portfolio: som over alle holdings van dit kind, ieder met N=months.
+        current_portfolio = Decimal("0")
+        projected_portfolio = Decimal("0")
+        for h in holdings_by_person.get(child.id, []):
+            asset = assets_by_id.get(h.asset_id)
+            if asset is None:
+                continue
+            qty = h.quantity or Decimal("0")
+            contribution = h.monthly_contribution_eur or Decimal("0")
+            if qty == 0 and contribution == 0:
+                continue
+            timeline = _portfolio_timeline_for_holding(
+                qty, asset.current_price_eur or Decimal("0"),
+                contribution, asset.monthly_growth_pct or Decimal("0"),
+                months,
+            )
+            current_portfolio += timeline[0]
+            projected_portfolio += timeline[-1]
+
+        # Sparen: voor elk account waar kind mede-eigenaar is → share * timeline.
+        current_savings = Decimal("0")
+        projected_savings = Decimal("0")
+        for acc in accounts:
+            owners = list(acc.owners)
+            if not owners or child not in owners:
+                continue
+            share = Decimal("1") / Decimal(len(owners))
+            timeline = _savings_timeline_for_account(
+                plans_map, plan_starts, plan_deltas, acc.id, today, months,
+            )
+            current_savings += timeline[0] * share
+            projected_savings += timeline[-1] * share
+
+        results.append({
+            "person_id": child.id,
+            "person_name": child.name,
+            "birthdate": child.birthdate,
+            "age": age_years(child.birthdate, today),
+            "months_ahead": months,
+            "eighteenth_month_label": eighteenth_month_label_nl(child.birthdate, today),
+            "current_portfolio": current_portfolio,
+            "projected_portfolio": projected_portfolio,
+            "current_savings": current_savings,
+            "projected_savings": projected_savings,
+            "current_total": current_portfolio + current_savings,
+            "projected_total": projected_portfolio + projected_savings,
+        })
+
+    return results

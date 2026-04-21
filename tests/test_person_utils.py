@@ -3,7 +3,12 @@ from __future__ import annotations
 
 import datetime
 
-from app.person_utils import age_years, format_age_nl
+from app.person_utils import (
+    age_years,
+    eighteenth_month_label_nl,
+    format_age_nl,
+    months_until_18,
+)
 
 
 def test_age_years_none_without_birthdate():
@@ -59,3 +64,45 @@ def test_format_age_nl_one_year():
     bd = datetime.date(2025, 4, 21)
     today = datetime.date(2026, 4, 21)
     assert format_age_nl(bd, today) == "1 jaar"
+
+
+# ── months_until_18 ─────────────────────────────────────────────────────
+
+def test_months_until_18_none_without_birthdate():
+    assert months_until_18(None) is None
+
+
+def test_months_until_18_none_when_already_18():
+    bd = datetime.date(2000, 1, 1)
+    today = datetime.date(2026, 4, 21)
+    assert months_until_18(bd, today) is None
+
+
+def test_months_until_18_zero_in_birthday_month():
+    # Acceptatiecriterium: kind wordt deze maand 18 → prognose = huidige waarde.
+    bd = datetime.date(2008, 4, 21)
+    today = datetime.date(2026, 4, 1)  # nog voor 18e verjaardag
+    assert months_until_18(bd, today) == 0
+
+
+def test_months_until_18_counts_months_to_birthday_month():
+    # Geboren mei 2018. Op 21 apr 2026 is leeftijd 7, wordt 18 in mei 2036.
+    bd = datetime.date(2018, 5, 10)
+    today = datetime.date(2026, 4, 21)
+    # (2036-2026)*12 + (5-4) = 121
+    assert months_until_18(bd, today) == 121
+
+
+def test_months_until_18_after_birthday_this_year():
+    # Geboren januari 2020, vandaag september 2026 → leeftijd 6, wordt 18 jan 2038.
+    bd = datetime.date(2020, 1, 15)
+    today = datetime.date(2026, 9, 10)
+    # (2038-2026)*12 + (1-9) = 144 - 8 = 136
+    assert months_until_18(bd, today) == 136
+
+
+def test_eighteenth_month_label_nl():
+    bd = datetime.date(2018, 5, 10)
+    assert eighteenth_month_label_nl(bd) == "mei 2036"
+    bd2 = datetime.date(2020, 12, 31)
+    assert eighteenth_month_label_nl(bd2) == "december 2038"

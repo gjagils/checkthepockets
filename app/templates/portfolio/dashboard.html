@@ -67,6 +67,50 @@
     {% endif %}
 </div>
 
+{% if data.children_forecast %}
+<!-- Kind-prognose op 18e -->
+<div class="card" style="margin-bottom:1.5rem;">
+    <h2 style="margin-bottom:0.25rem;">Kinderen — prognose op 18e</h2>
+    <p class="muted" style="margin-bottom:1rem; font-size:0.9rem;">
+        Projectie t/m de maand waarin het kind 18 wordt. Portfolio groeit mee met
+        maandelijkse storting + groei-percentage; sparen gebruikt eventuele
+        spaarplannen voor die jaren.
+    </p>
+    <div class="accounts-grid">
+        {% for c in data.children_forecast %}
+        <div class="card" style="background:var(--ctp-card-alt, var(--ctp-bg)); border:1px solid var(--ctp-border);">
+            <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:0.25rem;">
+                <h3 style="margin:0; font-size:1.05rem;">{{ c.person_name }}</h3>
+                <span class="muted" style="font-size:0.85rem;">{{ c.age }} jaar</span>
+            </div>
+            <p class="muted" style="font-size:0.85rem; margin-bottom:0.6rem;">
+                Wordt 18 in {{ c.eighteenth_month_label }}
+                {% if c.months_ahead == 0 %}<br><em>Deze maand — prognose = huidige waarde.</em>{% else %}<span style="margin-left:0.2rem;">({{ c.months_ahead }} mnd)</span>{% endif %}
+            </p>
+            {% if c.current_total == 0 and c.projected_total == 0 %}
+            <p class="muted" style="font-size:0.9rem;">Geen beleggingen of spaarrekeningen gekoppeld. &euro;&nbsp;0</p>
+            {% else %}
+            <div style="display:grid; grid-template-columns:1fr auto; gap:0.25rem 1rem; font-size:0.95rem;">
+                <span class="muted">Portfolio nu</span>
+                <span class="text-right nowrap">&euro;&nbsp;{{ c.current_portfolio|euro }}</span>
+                <span class="muted">Sparen nu</span>
+                <span class="text-right nowrap">&euro;&nbsp;{{ c.current_savings|euro }}</span>
+                <span style="font-weight:600; border-top:1px solid var(--ctp-border); padding-top:0.35rem;">Totaal nu</span>
+                <span class="text-right nowrap" style="font-weight:600; border-top:1px solid var(--ctp-border); padding-top:0.35rem;">&euro;&nbsp;{{ c.current_total|euro }}</span>
+                <span class="muted" style="padding-top:0.4rem;">Portfolio op 18e</span>
+                <span class="text-right nowrap" style="padding-top:0.4rem;">&euro;&nbsp;{{ c.projected_portfolio|euro }}</span>
+                <span class="muted">Sparen op 18e</span>
+                <span class="text-right nowrap">&euro;&nbsp;{{ c.projected_savings|euro }}</span>
+                <span style="font-weight:600; color:var(--ctp-denim);">Totaal op 18e</span>
+                <span class="text-right nowrap" style="font-weight:600; color:var(--ctp-denim);">&euro;&nbsp;{{ c.projected_total|euro }}</span>
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
 <!-- Projectie-chart -->
 <div class="card">
     <h2>Projectie — komende {{ data.months_ahead }} maanden</h2>
