@@ -1070,6 +1070,110 @@ def delete_line(
     return RedirectResponse(f"/savings/{plan_id}", status_code=302)
 
 
+@router.get("/{plan_id}/match-preview")
+def match_preview(
+    plan_id: int,
+    request: Request,
+    match_field: str = Query("description"),
+    match_value: str = Query(""),
+    limit: int = Query(15, ge=1, le=50),
+    db: Session = Depends(get_db),
+):
+    """Live voorvertoning van welke transacties op deze rekening matchen met
+    de gegeven rule-criteria. Gebruikt door de Snel toevoegen-modal zodat de
+    gebruiker ziet welke transacties een nieuwe rule zou raken vóór het
+    aanmaken."""
+    user = require_login(request, db)
+
+    plan = (
+        db.query(SavingsPlan)
+        .filter(SavingsPlan.id == plan_id, SavingsPlan.user_id == user.id)
+        .first()
+    )
+    if not plan:
+        return JSONResponse({"ok": False, "error": "not_found"}, status_code=404)
+
+    value = (match_value or "").strip()
+    if len(value) < 2:
+        return JSONResponse(
+            {"ok": True, "total": 0, "uncategorized_total": 0, "items": []}
+        )
+
+    if match_field not in ("description", "counterparty", "counterparty_iban"):
+        match_field = "description"
+
+    # description/counterparty/counterparty_iban zijn EncryptedText — we moeten
+    # in Python filteren omdat SQL LIKE op ciphertext werkt. In de praktijk
+    # is het aantal transacties per account klein genoeg (orden duizenden
+    # max) dat dit binnen ~100ms past.
+    all_txs = (
+        db.query(Transaction)
+        .filter(
+            Transaction.account_id == plan.account_id,
+            Transaction.is_excluded == 0,
+            Transaction.is_projected == 0,
+        )
+        .order_by(Transaction.date.desc(), Transaction.id.desc())
+        .all()
+    )
+
+    needle = value.lower()
+    matched: list[Transaction] = []
+    for tx in all_txs:
+        if match_field == "counterparty":
+            haystack = (tx.counterparty or "").lower()
+        elif match_field == "counterparty_iban":
+            haystack = (tx.counterparty_iban or "").lower()
+        else:
+            haystack = (tx.description or "").lower()
+        if needle in haystack:
+            matched.append(tx)
+
+    total = len(matched)
+    uncategorized_total = sum(1 for tx in matched if tx.category_id is None)
+    rows = matched[:limit]
+
+    # Categorie-naam lookup in één query
+    cat_ids = {r.category_id for r in rows if r.category_id is not None}
+    cat_names: dict[int, str] = {}
+    if cat_ids:
+        for c in db.query(Category).filter(Category.id.in_(cat_ids)).all():
+            cat_names[c.id] = c.name
+
+    def _fmt_amount(val: Decimal) -> str:
+        sign = "-" if val < 0 else ""
+        abs_val = abs(val)
+        whole, frac = f"{abs_val:.2f}".split(".")
+        # NL-format thousands separator
+        whole_fmt = ""
+        for i, ch in enumerate(reversed(whole)):
+            if i and i % 3 == 0:
+                whole_fmt = "." + whole_fmt
+            whole_fmt = ch + whole_fmt
+        return f"{sign}€\u00a0{whole_fmt},{frac}"
+
+    items = []
+    for tx in rows:
+        label = tx.counterparty or tx.description or "—"
+        if len(label) > 80:
+            label = label[:77] + "…"
+        items.append({
+            "date": tx.date.strftime("%d-%m-%Y") if tx.date else "",
+            "label": label,
+            "description": tx.description or "",
+            "amount": float(tx.amount or 0),
+            "amount_formatted": _fmt_amount(tx.amount or Decimal("0")),
+            "current_category": cat_names.get(tx.category_id) if tx.category_id else None,
+        })
+
+    return JSONResponse({
+        "ok": True,
+        "total": total,
+        "uncategorized_total": uncategorized_total,
+        "items": items,
+    })
+
+
 @router.post("/{plan_id}/quick-add")
 def quick_add_line(
     plan_id: int,
