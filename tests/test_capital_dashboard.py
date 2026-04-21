@@ -178,12 +178,13 @@ def test_dashboard_person_only_savings(db_session):
     # Huidig saldo = 1000 + 4 * 300 = 2200 (na maanden 1..4)
     assert totals["savings"] == Decimal("2200")
     assert totals["portfolio_gross"] == Decimal("0")
-    # Projectie: vanaf apr (2200) nog 8 maanden +300 tot dec (4600),
-    # daarna vlak (geen plan volgend jaar). +12m = 4600.
+    # Projectie: vanaf apr (2200) nog 8 maanden +300 tot dec (4600). Voor
+    # jan..apr 2027 is er geen plan, dus de fallback herbruikt het 2026-plan
+    # (+300/mnd). series[-1] = 4600 + 4*300 = 5800.
     series = data["series_per_person"][gerd.id]
     assert series[0] == 2200.0
-    assert series[8] == 4600.0  # dec
-    assert series[-1] == 4600.0
+    assert series[8] == 4600.0  # dec 2026
+    assert series[-1] == 5800.0  # apr 2027 via fallback
 
 
 def test_dashboard_person_only_portfolio(db_session):
@@ -446,3 +447,31 @@ def test_children_forecast_label_contains_month_and_year(db_session):
     _make_child(db_session, alice, "Noor", datetime.date(2018, 5, 10))
     data = build_capital_dashboard(db_session, alice.id, today=today)
     assert data["children_forecast"][0]["eighteenth_month_label"] == "mei 2036"
+
+
+def test_children_forecast_falls_back_to_last_plan_for_future_years(db_session):
+    """Als er voor toekomstige jaren geen spaarplan bestaat, rolt het meest
+    recente plan voor dat account door. Een ouder kan dus één keer een plan
+    aanmaken en de prognose blijft doorgroeien tot de 18e verjaardag."""
+    alice = _make_user(db_session)
+    today = datetime.date(2026, 4, 20)
+    # Kind wordt exact over 24 maanden (april 2028) 18.
+    kid = _make_child(
+        db_session, alice, "Suze",
+        datetime.date(2010, 4, 20),
+    )
+    acc = _make_account(db_session, alice, owners=[kid], name="Suze spaar")
+    # ALLEEN 2026-plan: netto +€100 per maand. Geen plan voor 2027 of 2028.
+    _make_plan_with_monthly_net(
+        db_session, alice, acc, today.year,
+        starting_balance=0, monthly_income=100, monthly_expense=0,
+    )
+    data = build_capital_dashboard(db_session, alice.id, today=today)
+    forecast = next(c for c in data["children_forecast"]
+                    if c["person_name"] == "Suze")
+    # months_ahead = 24 (april 2026 → april 2028).
+    assert forecast["months_ahead"] == 24
+    # current = 4 maanden 2026 al opgeteld (jan..apr) = €400.
+    assert forecast["current_savings"] == Decimal("400")
+    # projected = current + 24 maanden × €100 fallback-doorroll = €2800.
+    assert forecast["projected_savings"] == Decimal("2800")

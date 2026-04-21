@@ -110,6 +110,27 @@ def _build_labels(today: datetime.date, months_ahead: int) -> list[str]:
     return labels
 
 
+def _deltas_for_year_with_fallback(
+    account_id: int,
+    year: int,
+    plan_deltas: dict[tuple[int, int], list[Decimal]],
+) -> list[Decimal] | None:
+    """Deltas voor (account, year) met fallback op het meest recente plan-jaar.
+
+    Als er voor `year` geen plan is, zoeken we het grootste plan-jaar
+    <= `year` voor datzelfde account. Zo rolt een spaarplan oneindig door
+    naar jaren waarvoor de gebruiker nog geen nieuw plan heeft aangemaakt —
+    met dezelfde maandbedragen en dezelfde jaarlijkse €1000-in-januari-piek.
+    Geeft None terug als er voor dit account helemaal geen plan bestaat.
+    """
+    if (account_id, year) in plan_deltas:
+        return plan_deltas[(account_id, year)]
+    candidates = [y for (a, y) in plan_deltas if a == account_id and y <= year]
+    if not candidates:
+        return None
+    return plan_deltas[(account_id, max(candidates))]
+
+
 def _savings_timeline_for_account(
     plans_map: dict[tuple[int, int], SavingsPlan],
     plan_starts: dict[tuple[int, int], Decimal],
@@ -122,8 +143,10 @@ def _savings_timeline_for_account(
 
     - Voor de huidige maand: startsaldo + deltas jan..current_month.
     - Voor vooruit: stap-voor-stap de delta van die kalendermaand optellen.
-    - Wrap-around naar volgend jaar werkt als er een plan voor dat jaar bestaat;
-      anders blijft saldo vlak (geen extra delta).
+    - Voor jaren zonder expliciet plan vallen we terug op het meest recente
+      plan-jaar voor dit account (`_deltas_for_year_with_fallback`), zodat
+      een spaarritme oneindig doorrolt naar de toekomst tot er een nieuw
+      plan voor dat jaar gemaakt wordt.
     """
     current_year = today.year
     current_month = today.month
@@ -144,9 +167,9 @@ def _savings_timeline_for_account(
         year_offset = (month_idx - 1) // 12
         m = ((month_idx - 1) % 12) + 1
         year = current_year + year_offset
-        key = (account_id, year)
-        if key in plan_deltas:
-            balance += plan_deltas[key][m]
+        deltas = _deltas_for_year_with_fallback(account_id, year, plan_deltas)
+        if deltas is not None:
+            balance += deltas[m]
         timeline.append(balance)
 
     return timeline
@@ -440,8 +463,10 @@ def _build_children_forecast(
         return []
 
     # Bepaal welke jaren aan spaarplannen we nodig hebben: van huidig jaar tot
-    # het jaar van de oudste kind-18e. Anders blijft het saldo vlak voor jaren
-    # zonder plan (ook prima — spec: "anders alleen startsaldo").
+    # het jaar van de oudste kind-18e. Voor jaren zonder plan rolt
+    # `_savings_timeline_for_account` het meest recente plan door
+    # (`_deltas_for_year_with_fallback`), dus ook één 2026-plan projecteert
+    # netjes door tot de 18e verjaardag.
     max_18_year = max(c.birthdate.year + 18 for c in children)
     needed_years = set(range(today.year, max_18_year + 1))
     plans_map = _fetch_plans(db, user_id, needed_years)
