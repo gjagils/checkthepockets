@@ -449,6 +449,59 @@ def test_children_forecast_label_contains_month_and_year(db_session):
     assert data["children_forecast"][0]["eighteenth_month_label"] == "mei 2036"
 
 
+def test_children_forecast_fallback_skips_one_off_and_custom_regels(db_session):
+    """Eenmalige / onregelmatige regels (frequency=custom/one-off) worden in
+    de fallback-doorroll NIET opnieuw toegepast in volgende jaren; alleen
+    terugkerende regels (monthly/quarterly/biannual/yearly) rollen door."""
+    alice = _make_user(db_session)
+    today = datetime.date(2026, 4, 20)
+    # Kind wordt over 24 maanden 18.
+    kid = _make_child(
+        db_session, alice, "Mila",
+        datetime.date(2010, 4, 20),
+    )
+    acc = _make_account(db_session, alice, owners=[kid], name="Mila spaar")
+    plan = SavingsPlan(
+        user_id=alice.id, account_id=acc.id, year=today.year,
+        starting_balance=Decimal("0"),
+    )
+    db_session.add(plan)
+    db_session.flush()
+    # Recurring: €50 inkomen per maand
+    recur = SavingsLine(
+        plan_id=plan.id, name="Maandelijks", is_income=1,
+        annual_budget=Decimal("0"), frequency="monthly",
+        default_amount=Decimal("50"),
+    )
+    # Custom: €1000 eenmalige storting in januari
+    one_off = SavingsLine(
+        plan_id=plan.id, name="Eenmalig", is_income=1,
+        annual_budget=Decimal("0"), frequency="custom",
+        default_amount=Decimal("0"),
+    )
+    db_session.add_all([recur, one_off])
+    db_session.flush()
+    for m in range(1, 13):
+        db_session.add(SavingsEntry(line_id=recur.id, month=m,
+                                    amount=Decimal("50"), status="forecast"))
+    db_session.add(SavingsEntry(line_id=one_off.id, month=1,
+                                amount=Decimal("1000"), status="forecast"))
+    db_session.commit()
+
+    data = build_capital_dashboard(db_session, alice.id, today=today)
+    forecast = next(c for c in data["children_forecast"]
+                    if c["person_name"] == "Mila")
+    assert forecast["months_ahead"] == 24
+    # current_savings (apr 2026): 4 mnd recurring × 50 = 200, plus eenmalige
+    # januari-storting 1000 → 1200.
+    assert forecast["current_savings"] == Decimal("1200")
+    # projected (apr 2028, 24 mnd vooruit): alleen recurring rolt door,
+    # de €1000 custom wordt NIET opnieuw in jan 2027/jan 2028 toegepast.
+    # Totaal recurring over 28 maanden (jan 2026 .. apr 2028) = 28 × 50 = 1400.
+    # Plus eenmalige €1000 (alleen jan 2026) = 2400.
+    assert forecast["projected_savings"] == Decimal("2400")
+
+
 def test_children_forecast_falls_back_to_last_plan_for_future_years(db_session):
     """Als er voor toekomstige jaren geen spaarplan bestaat, rolt het meest
     recente plan voor dat account door. Een ouder kan dus één keer een plan

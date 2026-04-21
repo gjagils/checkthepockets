@@ -35,15 +35,31 @@ MONTH_LABELS_NL = [
 PROJECTION_MONTHS_AHEAD = 12
 
 
-def _plan_monthly_deltas(plan: SavingsPlan) -> list[Decimal]:
+# Frequenties die als "terugkerend" tellen voor de fallback-projectie naar
+# toekomstige jaren zonder eigen plan. `one-off` en `custom` worden bewust
+# overgeslagen: die modelleren vaak eenmalige gebeurtenissen (erfenis, grote
+# uitgave, losse-maand-bijdrage) die je niet automatisch naar volgende jaren
+# wilt doorrollen.
+RECURRING_FREQUENCIES = frozenset({"monthly", "quarterly", "biannual", "yearly"})
+
+
+def _plan_monthly_deltas(
+    plan: SavingsPlan, recurring_only: bool = False,
+) -> list[Decimal]:
     """Netto maand-delta (inkomsten − uitgaven) per maand 1..12 voor één plan.
 
     Lege/None-entries tellen als 0. Gebaseerd op forecast-bedragen — we doen
     bewust geen transactie-lookup hier: het dashboard toont *plan*-gebaseerde
     projectie, niet een achteraf-analyse.
+
+    Met `recurring_only=True` worden alleen regels met een terugkerende
+    frequentie meegenomen (zie `RECURRING_FREQUENCIES`). Gebruikt door de
+    fallback-doorroll naar toekomstige jaren zonder eigen plan.
     """
     deltas = [Decimal("0")] * 13  # index 0 unused; 1..12 zijn de maanden
     for line in plan.lines:
+        if recurring_only and line.frequency not in RECURRING_FREQUENCIES:
+            continue
         is_income = bool(line.is_income)
         for entry in line.entries:
             if entry.amount is None:
@@ -114,27 +130,36 @@ def _deltas_for_year_with_fallback(
     account_id: int,
     year: int,
     plan_deltas: dict[tuple[int, int], list[Decimal]],
+    plan_recurring_deltas: dict[tuple[int, int], list[Decimal]],
 ) -> list[Decimal] | None:
     """Deltas voor (account, year) met fallback op het meest recente plan-jaar.
 
-    Als er voor `year` geen plan is, zoeken we het grootste plan-jaar
-    <= `year` voor datzelfde account. Zo rolt een spaarplan oneindig door
-    naar jaren waarvoor de gebruiker nog geen nieuw plan heeft aangemaakt —
-    met dezelfde maandbedragen en dezelfde jaarlijkse €1000-in-januari-piek.
+    Als er voor `year` een expliciet plan bestaat: gebruik alle deltas van
+    dat plan (inclusief eenmalige/onregelmatige regels — die horen bij dat
+    specifieke jaar).
+
+    Als er geen plan voor `year` is: val terug op de **terugkerende**
+    deltas van het meest recente plan-jaar voor dit account. Eenmalige en
+    onregelmatige regels worden bewust niet doorgerold — die modelleren
+    vaak eenmalige gebeurtenissen (erfenis, grote uitgave) die niet elk
+    jaar opnieuw moeten plaatsvinden. Gebruik frequentie `yearly` als je
+    wél elk jaar op dezelfde maand een terugkerend bedrag wilt hebben.
+
     Geeft None terug als er voor dit account helemaal geen plan bestaat.
     """
     if (account_id, year) in plan_deltas:
         return plan_deltas[(account_id, year)]
-    candidates = [y for (a, y) in plan_deltas if a == account_id and y <= year]
+    candidates = [y for (a, y) in plan_recurring_deltas if a == account_id and y <= year]
     if not candidates:
         return None
-    return plan_deltas[(account_id, max(candidates))]
+    return plan_recurring_deltas[(account_id, max(candidates))]
 
 
 def _savings_timeline_for_account(
     plans_map: dict[tuple[int, int], SavingsPlan],
     plan_starts: dict[tuple[int, int], Decimal],
     plan_deltas: dict[tuple[int, int], list[Decimal]],
+    plan_recurring_deltas: dict[tuple[int, int], list[Decimal]],
     account_id: int,
     today: datetime.date,
     months_ahead: int,
@@ -167,7 +192,9 @@ def _savings_timeline_for_account(
         year_offset = (month_idx - 1) // 12
         m = ((month_idx - 1) % 12) + 1
         year = current_year + year_offset
-        deltas = _deltas_for_year_with_fallback(account_id, year, plan_deltas)
+        deltas = _deltas_for_year_with_fallback(
+            account_id, year, plan_deltas, plan_recurring_deltas,
+        )
         if deltas is not None:
             balance += deltas[m]
         timeline.append(balance)
@@ -245,9 +272,11 @@ def build_capital_dashboard(
     plans_map = _fetch_plans(db, user_id, needed_years)
     plan_starts: dict[tuple[int, int], Decimal] = {}
     plan_deltas: dict[tuple[int, int], list[Decimal]] = {}
+    plan_recurring_deltas: dict[tuple[int, int], list[Decimal]] = {}
     for key, plan in plans_map.items():
         plan_starts[key] = _plan_effective_start(db, plan)
         plan_deltas[key] = _plan_monthly_deltas(plan)
+        plan_recurring_deltas[key] = _plan_monthly_deltas(plan, recurring_only=True)
 
     savings_timeline_by_person: dict[int, list[Decimal]] = {
         pid: [Decimal("0")] * (months_ahead + 1) for pid in person_ids
@@ -261,7 +290,8 @@ def build_capital_dashboard(
         share = Decimal("1") / Decimal(len(owners))
 
         timeline = _savings_timeline_for_account(
-            plans_map, plan_starts, plan_deltas, acc.id, today, months_ahead,
+            plans_map, plan_starts, plan_deltas, plan_recurring_deltas,
+            acc.id, today, months_ahead,
         )
 
         owner_entries = []
@@ -472,9 +502,11 @@ def _build_children_forecast(
     plans_map = _fetch_plans(db, user_id, needed_years)
     plan_starts: dict[tuple[int, int], Decimal] = {}
     plan_deltas: dict[tuple[int, int], list[Decimal]] = {}
+    plan_recurring_deltas: dict[tuple[int, int], list[Decimal]] = {}
     for key, plan in plans_map.items():
         plan_starts[key] = _plan_effective_start(db, plan)
         plan_deltas[key] = _plan_monthly_deltas(plan)
+        plan_recurring_deltas[key] = _plan_monthly_deltas(plan, recurring_only=True)
 
     holdings_by_person: dict[int, list[PortfolioHolding]] = {}
     for h in holdings:
@@ -513,7 +545,8 @@ def _build_children_forecast(
                 continue
             share = Decimal("1") / Decimal(len(owners))
             timeline = _savings_timeline_for_account(
-                plans_map, plan_starts, plan_deltas, acc.id, today, months,
+                plans_map, plan_starts, plan_deltas, plan_recurring_deltas,
+                acc.id, today, months,
             )
             current_savings += timeline[0] * share
             projected_savings += timeline[-1] * share
