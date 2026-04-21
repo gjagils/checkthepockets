@@ -11,10 +11,14 @@
         kapitaalontwikkeling zien per persoon of per duo (bijv. "Samen", "Partner",
         "Ikzelf", "Kind 1", "Kind 2"). Een rekening kan meerdere eigenaren hebben.
     </p>
-    <form method="post" action="/persons" style="display:flex; gap:0.5rem; max-width:480px;">
+    <form method="post" action="/persons" style="display:flex; gap:0.5rem; flex-wrap:wrap; max-width:640px;">
         <input type="text" name="name" placeholder="Nieuwe persoon"
                required class="budget-input"
-               style="flex:1; text-align:left; width:auto;">
+               style="flex:2; text-align:left; min-width:180px; width:auto;">
+        <input type="date" name="birthdate"
+               title="Geboortedatum (optioneel)"
+               class="budget-input"
+               style="flex:1; text-align:left; min-width:150px; width:auto;">
         <button type="submit" class="btn btn-primary">Toevoegen</button>
     </form>
 </div>
@@ -26,7 +30,8 @@
             <thead>
                 <tr>
                     <th style="width:60px;">Volgorde</th>
-                    <th>Naam</th>
+                    <th>Naam &amp; geboortedatum</th>
+                    <th style="width:90px;">Leeftijd</th>
                     <th class="text-right" style="width:180px;">Acties</th>
                 </tr>
             </thead>
@@ -46,12 +51,21 @@
                         </form>
                     </td>
                     <td>
-                        <form method="post" action="/persons/{{ person.id }}/rename" style="display:flex; gap:0.5rem;">
+                        <form method="post" action="/persons/{{ person.id }}/rename"
+                              style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
                             <input type="text" name="name" value="{{ person.name }}"
                                    class="budget-input"
-                                   style="flex:1; text-align:left; width:auto; max-width:320px;">
+                                   style="flex:2; text-align:left; min-width:140px; width:auto; max-width:260px;">
+                            <input type="date" name="birthdate"
+                                   title="Geboortedatum (optioneel)"
+                                   value="{{ person.birthdate.isoformat() if person.birthdate else '' }}"
+                                   class="budget-input"
+                                   style="flex:1; text-align:left; min-width:150px; width:auto; max-width:170px;">
                             <button type="submit" class="btn btn-sm">Opslaan</button>
                         </form>
+                    </td>
+                    <td class="muted">
+                        {% if person.birthdate %}{{ format_age_nl(person.birthdate) }}{% else %}—{% endif %}
                     </td>
                     <td class="text-right">
                         <form method="post" action="/persons/{{ person.id }}/delete" style="display:inline;"

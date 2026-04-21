@@ -355,6 +355,7 @@ class Person(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     name = Column(String(100), nullable=False)
+    birthdate = Column(Date, nullable=True)
     sort_order = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
