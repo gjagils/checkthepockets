@@ -389,9 +389,12 @@
             <h3>Snel toevoegen</h3>
             <button type="button" class="btn btn-sm" onclick="closeQuickAdd()">✕</button>
         </div>
-        <form method="post" action="/savings/{{ plan.id }}/quick-add" style="padding:1rem 1.25rem;">
+        <form method="post" action="/savings/{{ plan.id }}/quick-add"
+              style="display:flex; flex-direction:column; flex:1 1 auto; min-height:0; overflow:hidden;">
             <input type="hidden" name="remaining_suggestions" id="qa-remaining-suggestions" value="">
             <input type="hidden" name="accepted_suggestion_idx" id="qa-accepted-idx" value="">
+
+            <div class="modal-body" style="padding:1rem 1.25rem; overflow-y:auto; flex:1 1 auto; min-height:0;">
 
             <!-- ── Stap 1 — Categorie ─────────────────────── -->
             <h4 style="margin:0 0 0.5rem; font-size:0.85rem; text-transform:uppercase; color:var(--muted);">1. Categorie</h4>
@@ -450,7 +453,15 @@
                 </div>
                 <div class="form-group">
                     <label>Match-tekst (bevat)</label>
-                    <input type="text" name="rule_match_value" placeholder="bv. RENTE" >
+                    <input type="text" name="rule_match_value" id="qa-rule-match-value"
+                           placeholder="bv. RENTE"
+                           oninput="qaSchedulePreview()">
+                </div>
+                <div id="qa-rule-preview" style="margin-top:0.5rem; display:none;">
+                    <div id="qa-rule-preview-header" class="muted" style="font-size:0.75rem; margin-bottom:0.25rem;"></div>
+                    <div id="qa-rule-preview-list"
+                         style="max-height:180px; overflow-y:auto; border:1px solid var(--border); border-radius:var(--ctp-radius-sm); background:var(--surface-2);">
+                    </div>
                 </div>
                 <p class="muted" style="font-size:0.75rem; margin-top:0.4rem;">De regel wordt direct toegepast op bestaande, nog ongecategoriseerde transacties van deze rekening.</p>
             </div>
@@ -495,7 +506,9 @@
                 </div>
             </div>
 
-            <div class="modal-footer" style="margin-top:1rem; padding-top:0.75rem; border-top:1px solid var(--border); display:flex; gap:0.5rem; justify-content:flex-end;">
+            </div><!-- /.modal-body -->
+
+            <div class="modal-footer" style="display:flex; gap:0.5rem; justify-content:flex-end;">
                 <button type="button" class="btn btn-sm" onclick="closeQuickAdd()">Annuleren</button>
                 <button type="submit" class="btn btn-primary">Toevoegen</button>
             </div>
@@ -650,7 +663,86 @@ function qaToggleCategoryMode(mode) {
 }
 function qaToggleRule(checked) {
     document.getElementById('qa-rule-fields').style.display = checked ? '' : 'none';
+    if (checked) {
+        // Vernieuw preview als de match-tekst al ingevuld is (bv. vanuit suggestie)
+        qaRefreshMatchPreview();
+    } else {
+        var box = document.getElementById('qa-rule-preview');
+        if (box) box.style.display = 'none';
+    }
 }
+
+// Live preview: welke transacties matchen deze rule op deze rekening?
+var __qaPreviewTimer = null;
+function qaSchedulePreview() {
+    if (__qaPreviewTimer) clearTimeout(__qaPreviewTimer);
+    __qaPreviewTimer = setTimeout(qaRefreshMatchPreview, 250);
+}
+
+function qaRefreshMatchPreview() {
+    var box = document.getElementById('qa-rule-preview');
+    var header = document.getElementById('qa-rule-preview-header');
+    var list = document.getElementById('qa-rule-preview-list');
+    if (!box || !list || !header) return;
+
+    var field = (document.querySelector('#qa-rule-fields select[name="rule_match_field"]') || {}).value || 'description';
+    var value = (document.getElementById('qa-rule-match-value') || {}).value || '';
+    value = value.trim();
+
+    if (value.length < 2) {
+        box.style.display = 'none';
+        return;
+    }
+
+    var params = new URLSearchParams({ match_field: field, match_value: value });
+    fetch('/savings/{{ plan.id }}/match-preview?' + params.toString(), {
+        headers: { 'Accept': 'application/json' },
+    })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (!data || !data.ok) {
+                box.style.display = 'none';
+                return;
+            }
+            box.style.display = '';
+            var total = data.total || 0;
+            var uncat = data.uncategorized_total || 0;
+            header.textContent = total === 0
+                ? 'Geen matches op deze rekening.'
+                : 'Match: ' + total + ' transactie' + (total === 1 ? '' : 's') +
+                  ' (' + uncat + ' nog zonder categorie) — eerste ' + (data.items || []).length + ' getoond:';
+
+            list.innerHTML = '';
+            (data.items || []).forEach(function (tx) {
+                var row = document.createElement('div');
+                row.style.cssText = 'display:flex; gap:0.5rem; padding:0.35rem 0.6rem; border-bottom:1px solid var(--border); font-size:0.78rem;';
+                row.innerHTML =
+                    '<span style="color:var(--muted); width:72px; flex-shrink:0;">' + (tx.date || '') + '</span>' +
+                    '<span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="' +
+                      (tx.description || '').replace(/"/g, '&quot;') + '">' + (tx.label || '') + '</span>' +
+                    '<span style="color:var(--muted); width:110px; flex-shrink:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' +
+                      (tx.current_category || '—') + '</span>' +
+                    '<span style="width:80px; flex-shrink:0; text-align:right; font-weight:600; color:' +
+                      (tx.amount < 0 ? 'var(--red)' : 'var(--green)') + ';">' +
+                      (tx.amount_formatted || '') + '</span>';
+                list.appendChild(row);
+            });
+            if ((data.items || []).length === 0 && total === 0) {
+                list.innerHTML = '<div style="padding:0.5rem 0.6rem; font-size:0.78rem; color:var(--muted);">(geen resultaten)</div>';
+            }
+        })
+        .catch(function () {
+            box.style.display = 'none';
+        });
+}
+
+// Als de gebruiker het match-veld omwisselt, ook de preview ververen.
+document.addEventListener('DOMContentLoaded', function () {
+    var fieldSel = document.querySelector('#qa-rule-fields select[name="rule_match_field"]');
+    if (fieldSel) {
+        fieldSel.addEventListener('change', qaSchedulePreview);
+    }
+});
 
 // Open Snel toevoegen vanuit een AI-voorstel: modal openen met voorgevulde
 // waarden (naam, bedrag, frequentie) en de matching-regel vast aanvinken met
@@ -705,6 +797,9 @@ function openQuickAddFromSuggestion(rowEl) {
     if (idxInput) {
         idxInput.value = idx;
     }
+
+    // Trigger preview direct, want we hebben zojuist een match-tekst ingevuld.
+    qaRefreshMatchPreview();
 }
 function qaPrefillName() {
     var nameInput = document.getElementById('qa-line-name');
