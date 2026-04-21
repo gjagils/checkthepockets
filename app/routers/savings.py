@@ -1090,6 +1090,9 @@ def quick_add_line(
     amount_4: str = Form(""), amount_5: str = Form(""), amount_6: str = Form(""),
     amount_7: str = Form(""), amount_8: str = Form(""), amount_9: str = Form(""),
     amount_10: str = Form(""), amount_11: str = Form(""), amount_12: str = Form(""),
+    # Als we vanuit een AI-voorstel komen, geven we de gehele suggesties-lijst
+    # (base64) door zodat de resterende voorstellen na redirect blijven staan.
+    remaining_suggestions: str = Form(""),
     db: Session = Depends(get_db),
 ):
     """Maak in één POST een categorie (optioneel nieuw), optioneel een rule die
@@ -1258,6 +1261,11 @@ def quick_add_line(
 
     db.commit()
 
+    if remaining_suggestions.strip():
+        return RedirectResponse(
+            f"/savings/{plan_id}?suggestions={remaining_suggestions}",
+            status_code=302,
+        )
     return RedirectResponse(f"/savings/{plan_id}", status_code=302)
 
 
