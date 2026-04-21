@@ -548,6 +548,8 @@ class MortgageScenario(Base):
     sale_old_home = Column(Numeric(12, 2), default=0)
     energy_label = Column(String(2), default="A")
     notes = Column(Text, nullable=True)
+    funda_url = Column(String(500), nullable=True)
+    photo_url = Column(String(500), nullable=True)
     is_archived = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)

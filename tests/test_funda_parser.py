@@ -1,9 +1,10 @@
-"""Tests voor app.funda_parser (GJA-32).
+"""Tests voor app.funda_parser (GJA-32, uitgebreid in GJA-33).
 
 We testen `parse_funda_html` pure met gemockte HTML — geen netwerk. De
 endpoint-integratie testen we via TestClient + monkeypatch op `fetch_funda`.
 """
 import os
+import pathlib
 import tempfile
 
 import pytest
@@ -192,6 +193,110 @@ def test_parse_rejects_non_price_numbers():
         html,
     )
     assert result["offer"] is None
+
+
+# ── Foto-URL extractie (GJA-33) ──────────────────────────────────────────
+
+def test_parse_photo_from_og_image():
+    html = """<html><head>
+<meta property="og:image" content="https://cloud.funda.nl/x/123_large.jpg">
+</head><body></body></html>"""
+    result = parse_funda_html(
+        "https://www.funda.nl/koop/utrecht/huis-1-teststraat-1/",
+        html,
+    )
+    assert result["photo_url"] == "https://cloud.funda.nl/x/123_large.jpg"
+
+
+def test_parse_photo_from_jsonld_image_array():
+    html = """<script type="application/ld+json">
+{"@type":"Residence","image":["https://cdn.funda.nl/a.jpg","https://cdn.funda.nl/b.jpg"],
+ "offers":{"price":300000}}
+</script>"""
+    result = parse_funda_html(
+        "https://www.funda.nl/koop/delft/huis-1-straat-1/",
+        html,
+    )
+    assert result["photo_url"] == "https://cdn.funda.nl/a.jpg"
+
+
+def test_parse_photo_prefers_og_over_jsonld():
+    html = """<html><head>
+<meta property="og:image" content="https://og.example/preferred.jpg">
+</head><script type="application/ld+json">
+{"@type":"Residence","image":["https://ld.example/fallback.jpg"],
+ "offers":{"price":300000}}
+</script></html>"""
+    result = parse_funda_html(
+        "https://www.funda.nl/koop/delft/huis-1-straat-1/",
+        html,
+    )
+    assert result["photo_url"] == "https://og.example/preferred.jpg"
+
+
+def test_parse_photo_missing_is_none():
+    html = '<script>{"asking_price": 300000}</script>'
+    result = parse_funda_html(
+        "https://www.funda.nl/koop/delft/huis-1-straat-1/",
+        html,
+    )
+    assert result["photo_url"] is None
+
+
+# ── Prijs-parser robuustheid (GJA-33) ────────────────────────────────────
+
+def test_parse_price_from_selling_price_key():
+    """Funda's nieuwe `salePrice` / `offeringPrice`-sleutels moeten werken."""
+    html = '<script>{"salePrice": 550000, "other": 1}</script>'
+    result = parse_funda_html(
+        "https://www.funda.nl/koop/utrecht/huis-1-a-1/",
+        html,
+    )
+    assert result["offer"] == 550000
+
+
+def test_parse_price_from_transfer_of_ownership():
+    """Geneste `transferOfOwnership.price` uit Next-payload."""
+    html = (
+        '<script>{"transferOfOwnership":{"price":625000,"status":"BESCHIKBAAR"}}</script>'
+    )
+    result = parse_funda_html(
+        "https://www.funda.nl/koop/utrecht/huis-1-a-1/",
+        html,
+    )
+    assert result["offer"] == 625000
+
+
+def test_parse_price_from_pricing_offering_price():
+    html = '<script>{"pricing":{"offeringPrice":450000,"priceCondition":"KK"}}</script>'
+    result = parse_funda_html(
+        "https://www.funda.nl/koop/utrecht/huis-1-a-1/",
+        html,
+    )
+    assert result["offer"] == 450000
+
+
+# ── Beemdgrassingel-fixture: prijs + foto + energielabel ─────────────────
+
+_FIXTURE_DIR = pathlib.Path(__file__).parent / "fixtures"
+
+
+def _load_fixture(name: str) -> str:
+    return (_FIXTURE_DIR / name).read_text(encoding="utf-8")
+
+
+def test_parse_beemdgrassingel_fixture():
+    """Regressie: echte Funda-markup (Next-payload) moet volledig werken."""
+    html = _load_fixture("funda_beemdgrassingel.html")
+    result = parse_funda_html(
+        "https://www.funda.nl/detail/koop/vleuten/huis-beemdgrassingel-26/43318514/",
+        html,
+    )
+    assert result["name"] == "Beemdgrassingel 26, Vleuten"
+    assert result["offer"] == 725000
+    assert result["energy_label"] == "A"
+    assert result["photo_url"] and "cloud.funda.nl" in result["photo_url"]
+    assert result["photo_url"].endswith("_large.jpg")
 
 
 # ── Endpoint integratie ──────────────────────────────────────────────────

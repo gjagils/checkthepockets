@@ -5,27 +5,31 @@
     <h1>{% if mode == 'edit' %}Scenario bewerken{% else %}Nieuw scenario{% endif %}</h1>
 </div>
 
-{% if mode != 'edit' %}
-<div class="card" style="margin-bottom:1rem;">
-    <h3 style="margin-top:0;">Automatisch invullen vanaf Funda</h3>
-    <p class="muted" style="margin-top:0.25rem;">
-        Plak een Funda-URL en klik op <em>Ophalen</em> om naam, bod en energielabel automatisch in te vullen.
-    </p>
-    <div class="form-group">
-        <label for="funda-url">Funda-URL</label>
-        <input type="url" id="funda-url"
-               placeholder="https://www.funda.nl/koop/..."
-               autocomplete="off">
-    </div>
-    <div style="display:flex; gap:0.5rem; align-items:center;">
-        <button type="button" id="funda-fetch-btn" class="btn">Ophalen</button>
-        <span id="funda-status" class="muted" style="font-size:0.85rem;"></span>
-    </div>
-</div>
-{% endif %}
-
 <form method="post"
       action="{% if mode == 'edit' %}/hypotheek/scenarios/{{ scenario.id }}/edit{% else %}/hypotheek/scenarios{% endif %}">
+    <div class="card" style="margin-bottom:1rem;">
+        <h3 style="margin-top:0;">{% if mode == 'edit' %}Funda-link{% else %}Automatisch invullen vanaf Funda{% endif %}</h3>
+        {% if mode != 'edit' %}
+        <p class="muted" style="margin-top:0.25rem;">
+            Plak een Funda-URL en klik op <em>Ophalen</em>. Taxatie wordt gelijk aan de vraagprijs, Bod wordt automatisch 15% hoger.
+        </p>
+        {% endif %}
+        <div class="form-group">
+            <label for="f-funda-url">Funda-URL</label>
+            <input type="url" id="f-funda-url" name="funda_url"
+                   value="{{ scenario.funda_url or '' if scenario else '' }}"
+                   placeholder="https://www.funda.nl/koop/..."
+                   autocomplete="off">
+        </div>
+        {% if mode != 'edit' %}
+        <div style="display:flex; gap:0.5rem; align-items:center;">
+            <button type="button" id="funda-fetch-btn" class="btn">Ophalen</button>
+            <span id="funda-status" class="muted" style="font-size:0.85rem;"></span>
+        </div>
+        {% endif %}
+        <input type="hidden" id="f-photo-url" name="photo_url"
+               value="{{ scenario.photo_url or '' if scenario else '' }}">
+    </div>
     <div class="card" style="margin-bottom:1rem;">
         <div class="form-group">
             <label for="f-name">Naam</label>
@@ -111,7 +115,7 @@
 <script>
 (function () {
     const btn = document.getElementById('funda-fetch-btn');
-    const urlInput = document.getElementById('funda-url');
+    const urlInput = document.getElementById('f-funda-url');
     const status = document.getElementById('funda-status');
 
     function setStatus(msg, isError) {
@@ -146,7 +150,14 @@
                 return;
             }
             if (data.name) document.getElementById('f-name').value = data.name;
-            if (data.offer != null) document.getElementById('f-offer').value = fmtEuro(data.offer);
+            // Prijs-afgeleiden: taxatie = vraagprijs, bod = round(vraagprijs × 1.15)
+            if (data.offer != null) {
+                const price = Number(data.offer);
+                if (!Number.isNaN(price) && price > 0) {
+                    document.getElementById('f-valuation').value = fmtEuro(price);
+                    document.getElementById('f-offer').value = fmtEuro(Math.round(price * 1.15));
+                }
+            }
             if (data.energy_label) {
                 const sel = document.getElementById('f-energy');
                 const opt = Array.from(sel.options).find(o => o.value === data.energy_label);
@@ -156,7 +167,14 @@
                 const notesEl = document.getElementById('f-notes');
                 if (!notesEl.value.trim()) notesEl.value = data.notes;
             }
-            setStatus('Ingevuld — controleer de waarden.', false);
+            if (data.photo_url) {
+                document.getElementById('f-photo-url').value = data.photo_url;
+            }
+            if (data.offer == null) {
+                setStatus('Vraagprijs niet gevonden — vul taxatie/bod handmatig in.', true);
+            } else {
+                setStatus('Ingevuld — controleer de waarden.', false);
+            }
         } catch (err) {
             setStatus('Netwerkfout — probeer opnieuw.', true);
         } finally {

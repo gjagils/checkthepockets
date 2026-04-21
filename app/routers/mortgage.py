@@ -447,6 +447,8 @@ def _apply_scenario_form(
     sale_old_home: str,
     energy_label: str,
     notes: str,
+    funda_url: str = "",
+    photo_url: str = "",
 ) -> None:
     s.name = name.strip() or s.name or "Naamloos scenario"
     s.valuation = _parse_decimal(valuation)
@@ -456,6 +458,8 @@ def _apply_scenario_form(
     s.sale_old_home = _parse_decimal(sale_old_home)
     s.energy_label = (energy_label or "A").strip()[:2].upper() or "A"
     s.notes = notes.strip() or None
+    s.funda_url = (funda_url or "").strip()[:500] or None
+    s.photo_url = (photo_url or "").strip()[:500] or None
 
 
 @router.get("/scenarios")
@@ -537,6 +541,8 @@ def scenarios_create(
     sale_old_home: str = Form(""),
     energy_label: str = Form("A"),
     notes: str = Form(""),
+    funda_url: str = Form(""),
+    photo_url: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = _require_admin(request, db)
@@ -551,6 +557,8 @@ def scenarios_create(
         sale_old_home=sale_old_home,
         energy_label=energy_label,
         notes=notes,
+        funda_url=funda_url,
+        photo_url=photo_url,
     )
     db.add(s)
     db.commit()
@@ -1020,6 +1028,8 @@ def scenarios_edit(
     sale_old_home: str = Form(""),
     energy_label: str = Form("A"),
     notes: str = Form(""),
+    funda_url: str = Form(""),
+    photo_url: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = _require_admin(request, db)
@@ -1034,6 +1044,8 @@ def scenarios_edit(
         sale_old_home=sale_old_home,
         energy_label=energy_label,
         notes=notes,
+        funda_url=funda_url,
+        photo_url=photo_url,
     )
     db.commit()
     return RedirectResponse(

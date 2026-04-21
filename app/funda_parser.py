@@ -161,13 +161,74 @@ def _extract_price(html: str, jsonld: list[dict[str, Any]]) -> int | None:
         if val:
             return val
 
-    # 3. JSON-fragmenten in Nuxt-payload: "asking_price":425000 of "koopprijs":"€ 425.000"
-    for key in ("asking_price", "koopprijs", "askingPrice"):
-        m = re.search(rf'"{key}"\s*:\s*("?[\d.,\s€]+"?)', html)
-        if m:
-            val = _coerce_int(m.group(1))
+    # 3. JSON-fragmenten in Nuxt/Next-payload. Funda wisselt tussen sleutels
+    #    `asking_price`, `askingPrice`, `salePrice`, `offeringPrice` en legt ze
+    #    soms diep genest in `transferOfOwnership` of `pricing`. We proberen
+    #    alle bekende varianten — eerste die een realistisch bedrag oplevert
+    #    wint.
+    candidate_keys = (
+        "asking_price",
+        "askingPrice",
+        "salePrice",
+        "sale_price",
+        "offeringPrice",
+        "offering_price",
+        "koopprijs",
+        "rentPrice",  # alleen voor symmetrie, niet relevant voor koop
+    )
+    for key in candidate_keys:
+        for match in re.finditer(
+            rf'"{key}"\s*:\s*("?[\d.,\s€]+"?)', html,
+        ):
+            val = _coerce_int(match.group(1))
             if val:
                 return val
+
+    # 4. Funda's nieuwere Next-markup neemt prijs op als `"price": <int>` onder
+    #    `transferOfOwnership` of `pricing`. Zoek het containerblok en graaf
+    #    de eerste price-integer daaruit.
+    for container in ("transferOfOwnership", "pricing"):
+        for match in re.finditer(
+            rf'"{container}"\s*:\s*\{{([^{{}}]{{0,400}})\}}', html,
+        ):
+            inner = match.group(1)
+            p = re.search(r'"(?:price|askingPrice|sellingPrice)"\s*:\s*(\d{5,9})', inner)
+            if p:
+                val = _coerce_int(p.group(1))
+                if val:
+                    return val
+
+    return None
+
+
+def _extract_photo_url(html: str, jsonld: list[dict[str, Any]]) -> str | None:
+    """Eerste foto: og:image (primair), daarna JSON-LD image-array (fallback)."""
+    m = re.search(
+        r'<meta[^>]+property="og:image"[^>]+content="([^"]+)"',
+        html,
+        re.IGNORECASE,
+    )
+    if m:
+        url = unescape(m.group(1)).strip()
+        if url.startswith(("http://", "https://")):
+            return url
+
+    for block in jsonld:
+        image = block.get("image")
+        if isinstance(image, list):
+            for item in image:
+                if isinstance(item, str) and item.startswith(("http://", "https://")):
+                    return item
+                if isinstance(item, dict):
+                    u = item.get("url") or item.get("contentUrl")
+                    if isinstance(u, str) and u.startswith(("http://", "https://")):
+                        return u
+        elif isinstance(image, str) and image.startswith(("http://", "https://")):
+            return image
+        elif isinstance(image, dict):
+            u = image.get("url") or image.get("contentUrl")
+            if isinstance(u, str) and u.startswith(("http://", "https://")):
+                return u
 
     return None
 
@@ -274,6 +335,7 @@ def parse_funda_html(url: str, html: str) -> dict:
     price = _extract_price(html, jsonld)
     energy_label = _extract_energy_label(html, jsonld)
     facts = _extract_summary_facts(html, jsonld)
+    photo_url = _extract_photo_url(html, jsonld)
 
     name_parts = [p for p in (street, city) if p]
     name = ", ".join(name_parts) if name_parts else None
@@ -288,6 +350,7 @@ def parse_funda_html(url: str, html: str) -> dict:
         "offer": price,
         "energy_label": energy_label,
         "notes": "\n".join(facts) if facts else None,
+        "photo_url": photo_url,
     }
     return result
 
