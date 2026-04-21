@@ -4,13 +4,33 @@
 <div class="page-header" style="display:flex; justify-content:space-between; align-items:center; gap:1rem;">
     <div>
         <h1 style="margin-bottom:0.25rem;">{{ scenario.name }}</h1>
-        <div class="muted">Energielabel {{ scenario.energy_label or '—' }}{% if scenario.is_archived %} · <em>gearchiveerd</em>{% endif %}</div>
+        <div class="muted">
+            Energielabel {{ scenario.energy_label or '—' }}
+            {% if scenario.is_archived %} · <em>gearchiveerd</em>{% endif %}
+            {% if scenario.funda_url %}
+             · <a href="{{ scenario.funda_url }}" target="_blank" rel="noopener">↗ Bekijk op Funda</a>
+            {% endif %}
+        </div>
     </div>
     <div style="display:flex; gap:0.5rem;">
         <a href="/hypotheek/scenarios/{{ scenario.id }}/edit" class="btn">Bewerken</a>
         <a href="/hypotheek/scenarios" class="btn">← Terug</a>
     </div>
 </div>
+
+{% if scenario.photo_url %}
+<div class="card" style="margin-bottom:1rem; padding:0; overflow:hidden;">
+    {% if scenario.funda_url %}
+    <a href="{{ scenario.funda_url }}" target="_blank" rel="noopener" title="Bekijk op Funda">
+        <img src="{{ scenario.photo_url }}" alt="Foto {{ scenario.name }}"
+             style="width:100%; max-width:600px; max-height:320px; object-fit:cover; display:block;">
+    </a>
+    {% else %}
+    <img src="{{ scenario.photo_url }}" alt="Foto {{ scenario.name }}"
+         style="width:100%; max-width:600px; max-height:320px; object-fit:cover; display:block;">
+    {% endif %}
+</div>
+{% endif %}
 
 {% if flash == 'created' %}
 <div class="card" style="margin-bottom:1rem; background:#e7f5e7; border:1px solid #4caf50;"><strong>✓</strong> Scenario aangemaakt.</div>
