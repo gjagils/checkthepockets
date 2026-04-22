@@ -115,8 +115,12 @@ def _extract_years(cell: str) -> int | None:
 
 
 # LTV-header tokens → bovenlimiet als fractie.
+# Volgorde is significant: meer-specifieke tokens (">90", "100%") staan boven
+# het generieke "90%", anders matcht ">90%" met "90%" en botst met "≤90%".
 _LTV_HEADER_MAP = [
     ("nhg", None),          # overslaan
+    (">90", Decimal("1.00")),
+    ("100%", Decimal("1.00")),
     ("≤65", Decimal("0.65")),
     ("<=65", Decimal("0.65")),
     ("65%", Decimal("0.65")),
@@ -126,8 +130,6 @@ _LTV_HEADER_MAP = [
     ("≤90", Decimal("0.90")),
     ("<=90", Decimal("0.90")),
     ("90%", Decimal("0.90")),
-    (">90", Decimal("1.00")),
-    ("100%", Decimal("1.00")),
 ]
 
 

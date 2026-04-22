@@ -203,3 +203,141 @@ def test_non_admin_cannot_access_bulk_endpoints(db_session):
     client = _client(user.id)
     assert client.post("/hypotheek/rentes/bulk/preview", data={"raw_text": ""}).status_code == 404
     assert client.post("/hypotheek/rentes/bulk/import", data={"raw_text": ""}).status_code == 404
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Screenshot upload (GJA-40)
+# ──────────────────────────────────────────────────────────────────────────────
+
+# Exact de 13 rijen uit de ABN-voorbeeld-screenshot in het issue, als wat het
+# vision-model terug hoort te geven. Onze parser slaat "Variabel" en de
+# NHG-kolom over → 12 rentevast × 4 LTV-buckets = 48 geïmporteerde rijen.
+ABN_SAMPLE_OCR_OUTPUT = (
+    "\tNHG\t≤65%\t≤85%\t≤90%\t>90%\n"
+    "Variabel\t3,60%\t3,65%\t3,80%\t3,95%\t4,05%\n"
+    "1 jaar vast\t3,79%\t3,80%\t3,85%\t3,86%\t3,89%\n"
+    "2 jaar vast\t3,76%\t3,77%\t3,82%\t3,83%\t3,86%\n"
+    "3 jaar vast\t3,76%\t3,77%\t3,82%\t3,83%\t3,86%\n"
+    "5 jaar vast\t3,71%\t3,75%\t3,80%\t3,81%\t3,83%\n"
+    "6 jaar vast\t3,75%\t3,99%\t4,04%\t4,05%\t4,07%\n"
+    "7 jaar vast\t3,77%\t4,01%\t4,06%\t4,07%\t4,09%\n"
+    "10 jaar vast\t3,75%\t4,04%\t4,05%\t4,06%\t4,07%\n"
+    "12 jaar vast\t3,96%\t4,22%\t4,24%\t4,29%\t4,40%\n"
+    "15 jaar vast\t4,10%\t4,26%\t4,37%\t4,51%\t4,58%\n"
+    "17 jaar vast\t4,11%\t4,26%\t4,37%\t4,51%\t4,58%\n"
+    "20 jaar vast\t4,29%\t4,44%\t4,53%\t4,61%\t4,72%\n"
+    "30 jaar vast\t4,48%\t4,62%\t4,69%\t4,76%\t4,82%\n"
+)
+
+
+def _png_bytes(size: int = 500) -> bytes:
+    """Een minimale maar geldig-ogende PNG-blob (headers zonder echte pixels).
+    Het AI-model wordt toch gemonkeypatched — de server valideert alleen
+    content-type en grootte.
+    """
+    return b"\x89PNG\r\n\x1a\n" + b"\x00" * size
+
+
+def test_screenshot_ocr_success_triggers_preview(db_session, monkeypatch):
+    """Happy path: OCR geeft de ABN-tekst terug → preview toont 48 nieuwe rijen."""
+    from app import mortgage_rate_ocr
+
+    admin = _make_user(db_session, "admin", is_admin=1)
+    calls = {"n": 0}
+
+    def fake_ocr(image_bytes, media_type):
+        calls["n"] += 1
+        return mortgage_rate_ocr.OCRResult(ok=True, text=ABN_SAMPLE_OCR_OUTPUT)
+
+    monkeypatch.setattr("app.routers.mortgage.extract_rate_text", fake_ocr)
+
+    resp = _client(admin.id).post(
+        "/hypotheek/rentes/bulk/screenshot",
+        files={"image": ("abn.png", _png_bytes(), "image/png")},
+    )
+    assert resp.status_code == 200, resp.text
+    assert calls["n"] == 1
+    # Preview-indicators
+    assert "Voorvertoning" in resp.text
+    # 12 rentevast-labels × 4 LTV-buckets = 48 rijen — check een paar concrete waarden
+    assert "30 jaar" in resp.text
+    # De raw OCR-tekst zit in de textarea zodat de user kan corrigeren vóór import
+    assert "3,79" in resp.text
+
+
+def test_screenshot_ocr_output_matches_paste_flow(db_session, monkeypatch):
+    """Als paste-flow én screenshot-flow dezelfde tekst zien, moeten beide
+    hetzelfde aantal rijen opleveren in de preview (48, ABN 12×4 grid)."""
+    from app import mortgage_rate_ocr
+    admin = _make_user(db_session, "admin", is_admin=1)
+
+    parsed = parse_bulk_rates(ABN_SAMPLE_OCR_OUTPUT)
+    assert not parsed.has_errors, parsed.errors
+    assert len(parsed.rows) == 48
+
+    monkeypatch.setattr(
+        "app.routers.mortgage.extract_rate_text",
+        lambda b, m: mortgage_rate_ocr.OCRResult(ok=True, text=ABN_SAMPLE_OCR_OUTPUT),
+    )
+    resp = _client(admin.id).post(
+        "/hypotheek/rentes/bulk/screenshot",
+        files={"image": ("abn.png", _png_bytes(), "image/png")},
+    )
+    assert resp.status_code == 200
+
+
+def test_screenshot_ocr_failure_shows_error(db_session, monkeypatch):
+    from app import mortgage_rate_ocr
+    admin = _make_user(db_session, "admin", is_admin=1)
+
+    monkeypatch.setattr(
+        "app.routers.mortgage.extract_rate_text",
+        lambda b, m: mortgage_rate_ocr.OCRResult(
+            ok=False, error="Kon geen rente-tabel herkennen in de afbeelding."
+        ),
+    )
+    resp = _client(admin.id).post(
+        "/hypotheek/rentes/bulk/screenshot",
+        files={"image": ("wazig.png", _png_bytes(), "image/png")},
+    )
+    assert resp.status_code == 400
+    assert "Kon geen rente-tabel herkennen" in resp.text
+    # Paste-textarea blijft functioneel — de paste-form staat nog op dezelfde pagina
+    assert 'action="/hypotheek/rentes/bulk/preview"' in resp.text
+
+
+def test_screenshot_rejects_non_admin(db_session):
+    user = _make_user(db_session, "bob", is_admin=0)
+    resp = _client(user.id).post(
+        "/hypotheek/rentes/bulk/screenshot",
+        files={"image": ("abn.png", _png_bytes(), "image/png")},
+    )
+    assert resp.status_code == 404
+
+
+def test_ocr_helper_rejects_invalid_media_type():
+    from app.mortgage_rate_ocr import extract_rate_text
+    res = extract_rate_text(b"\x00" * 10, "application/pdf")
+    assert res.ok is False
+    assert "PNG" in (res.error or "") or "toegestaan" in (res.error or "")
+
+
+def test_ocr_helper_rejects_oversize_image():
+    from app.mortgage_rate_ocr import extract_rate_text, MAX_IMAGE_BYTES
+    res = extract_rate_text(b"\x00" * (MAX_IMAGE_BYTES + 1), "image/png")
+    assert res.ok is False
+    assert "5 MB" in (res.error or "")
+
+
+def test_ocr_helper_rejects_empty_image():
+    from app.mortgage_rate_ocr import extract_rate_text
+    res = extract_rate_text(b"", "image/png")
+    assert res.ok is False
+
+
+def test_ocr_helper_without_api_key(monkeypatch):
+    from app import mortgage_rate_ocr
+    monkeypatch.setattr(mortgage_rate_ocr, "ANTHROPIC_API_KEY", "")
+    res = mortgage_rate_ocr.extract_rate_text(b"\x89PNG\r\n\x1a\n" + b"\x00" * 50, "image/png")
+    assert res.ok is False
+    assert "niet geconfigureerd" in (res.error or "")

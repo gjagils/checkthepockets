@@ -1,7 +1,7 @@
 """Hypotheek-rekenmodule — alleen toegankelijk voor admins."""
 from decimal import Decimal, InvalidOperation
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -18,6 +18,7 @@ from app.models import (
     MortgageScenarioBudget,
     MortgageVariant,
 )
+from app.mortgage_rate_ocr import extract_rate_text
 from app.mortgage_rate_parser import (
     ParsedRate,
     compare_with_existing,
@@ -350,6 +351,61 @@ def rates_bulk_preview(
             "flash": None,
             "error": None,
             "bulk_raw_text": raw_text,
+            "bulk_parsed": parse_result,
+            "bulk_new_rows": new_rows,
+            "bulk_update_rows": update_rows,
+            "bulk_mode": "preview",
+        },
+    )
+
+
+@router.post("/rentes/bulk/screenshot")
+async def rates_bulk_screenshot(
+    request: Request,
+    image: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    """Accepteer een screenshot, haal er tab-tekst uit via Claude vision en
+    render dezelfde preview als de paste-flow. De gebruiker kan de tekst
+    zien/corrigeren in de textarea vóór definitieve import."""
+    user = _require_admin(request, db)
+
+    existing = _rates_for_user(db, user.id)
+
+    image_bytes = await image.read()
+    media_type = image.content_type or ""
+    ocr = extract_rate_text(image_bytes, media_type)
+
+    if not ocr.ok:
+        return templates.TemplateResponse(
+            "mortgage/rates.html",
+            {
+                "request": request,
+                "user": user,
+                "rates": existing,
+                "flash": None,
+                "error": None,
+                "bulk_raw_text": "",
+                "bulk_parsed": None,
+                "bulk_new_rows": [],
+                "bulk_update_rows": [],
+                "bulk_mode": None,
+                "bulk_error": ocr.error,
+            },
+            status_code=400,
+        )
+
+    parse_result = parse_bulk_rates(ocr.text)
+    new_rows, update_rows = compare_with_existing(parse_result.rows, existing)
+    return templates.TemplateResponse(
+        "mortgage/rates.html",
+        {
+            "request": request,
+            "user": user,
+            "rates": existing,
+            "flash": "screenshot_parsed",
+            "error": None,
+            "bulk_raw_text": ocr.text,
             "bulk_parsed": parse_result,
             "bulk_new_rows": new_rows,
             "bulk_update_rows": update_rows,
