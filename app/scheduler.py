@@ -4,8 +4,10 @@ Background scheduler for periodic tasks.
 Uses APScheduler to run scheduled background jobs.
 """
 
+import functools
 import json
 import logging
+import traceback
 from datetime import datetime, timedelta
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -17,6 +19,55 @@ logger = logging.getLogger(__name__)
 
 NL_TZ = pytz_timezone("Europe/Amsterdam")
 scheduler = BackgroundScheduler(timezone=NL_TZ)
+
+_SUMMARY_MAX_LEN = 5000
+
+
+def logged_job(job_id: str):
+    """Decorator die start + eindlog schrijft naar `scheduler_run_log`.
+
+    De onderliggende job-functie mag een korte status-string returnen
+    (bv. `"3 digests verzonden"`); die wordt opgeslagen in `summary`.
+    Bij een exception wordt de traceback bewaard en de fout verder
+    geraised zodat APScheduler zelf ook z'n `job_error`-hooks triggert.
+    """
+
+    def decorator(fn):
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            from app.database import SessionLocal
+            from app.models import SchedulerRunLog
+
+            db = SessionLocal()
+            log = SchedulerRunLog(
+                job_id=job_id,
+                status="running",
+                started_at=datetime.utcnow(),
+            )
+            db.add(log)
+            db.commit()
+            db.refresh(log)
+
+            try:
+                result = fn(*args, **kwargs)
+                log.status = "ok"
+                log.summary = (str(result) if result is not None else "")[:_SUMMARY_MAX_LEN]
+                return result
+            except Exception:
+                log.status = "error"
+                log.summary = traceback.format_exc()[:_SUMMARY_MAX_LEN]
+                logger.exception("Scheduler job %s faalde", job_id)
+                raise
+            finally:
+                log.finished_at = datetime.utcnow()
+                try:
+                    db.commit()
+                finally:
+                    db.close()
+
+        return wrapper
+
+    return decorator
 
 
 def compute_digest_stats(db, user_id: int, now_utc: datetime | None = None):
@@ -55,10 +106,14 @@ def compute_digest_stats(db, user_id: int, now_utc: datetime | None = None):
     return per_account, uncat_total, new_total
 
 
+@logged_job("weekly_digest")
 def _run_weekly_digests():
     """Hourly tick: stuurt een digest naar users waarvan nu het ingestelde
     dag+uur (Europe/Amsterdam) overeenkomt en die hem de afgelopen 6 dagen
-    nog niet hebben gehad. Skip lege weken (0 nieuw + 0 uncat)."""
+    nog niet hebben gehad. Skip lege weken (0 nieuw + 0 uncat).
+
+    Returns een korte string met aantallen voor de scheduler-log.
+    """
     from app.database import SessionLocal
     from app.models import User
     from app.email_service import send_weekly_digest
@@ -67,6 +122,10 @@ def _run_weekly_digests():
     now_weekday = now_nl.weekday()
     now_hour = now_nl.hour
     threshold = datetime.utcnow() - timedelta(days=6)
+
+    sent_count = 0
+    failed_count = 0
+    skipped_count = 0
 
     db = SessionLocal()
     try:
@@ -82,13 +141,15 @@ def _run_weekly_digests():
             .all()
         )
         if not candidates:
-            return
+            return "geen kandidaten voor dit uur"
 
         for user in candidates:
             if user.weekly_digest_last_sent_at and user.weekly_digest_last_sent_at > threshold:
+                skipped_count += 1
                 continue
             per_account, uncat_total, new_total = compute_digest_stats(db, user.id)
             if new_total == 0 and uncat_total == 0:
+                skipped_count += 1
                 continue
             sent = send_weekly_digest(
                 to=user.email,
@@ -100,23 +161,33 @@ def _run_weekly_digests():
             if sent:
                 user.weekly_digest_last_sent_at = datetime.utcnow()
                 db.commit()
+                sent_count += 1
                 logger.info("Weekly digest verzonden naar %s (new=%d, uncat=%d)",
                             user.email, new_total, uncat_total)
             else:
+                failed_count += 1
                 logger.warning("Weekly digest verzenden faalde voor %s", user.email)
-    except Exception as e:
-        logger.error("Weekly digest run faalde: %s", e)
-        db.rollback()
     finally:
         db.close()
 
+    return (
+        f"{sent_count} verzonden, {failed_count} mislukt, {skipped_count} overgeslagen "
+        f"({len(candidates)} kandidaten)"
+    )
 
+
+@logged_job("bank_sync")
 def _sync_all_bank_connections():
-    """Sync transactions for all active bank connections."""
+    """Sync transactions for all active bank connections.
+
+    Returns een korte string met aantallen voor de scheduler-log.
+    """
     from app.database import SessionLocal
     from app.models import Account, BankConnection, Transaction, Rule
     from app.parsers.base import ParsedTransaction
     from app.rules_engine import apply_rules_to_transaction
+
+    total_imported = 0
 
     db = SessionLocal()
     try:
@@ -127,7 +198,7 @@ def _sync_all_bank_connections():
 
         if not connections:
             logger.info("Bank sync: geen actieve koppelingen gevonden")
-            return
+            return "geen actieve koppelingen"
 
         from app import enable_banking
         from app.routers.banking import _map_eb_transactions
@@ -200,6 +271,7 @@ def _sync_all_bank_connections():
                 if imported:
                     logger.info("Bank sync: %d transacties geimporteerd voor %s (%s)",
                                 imported, conn.bank_name, iban)
+                    total_imported += imported
 
             conn.last_synced_at = datetime.utcnow()
 
@@ -224,10 +296,7 @@ def _sync_all_bank_connections():
         db.commit()
 
         logger.info("Bank sync voltooid voor %d koppelingen", len(connections))
-
-    except Exception as e:
-        logger.error("Bank sync mislukt: %s", e)
-        db.rollback()
+        return f"{total_imported} tx geïmporteerd uit {len(connections)} koppeling(en)"
     finally:
         db.close()
 

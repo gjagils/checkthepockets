@@ -619,3 +619,16 @@ class PortfolioPriceSnapshot(Base):
     __table_args__ = (
         UniqueConstraint("asset_id", "year", "month", name="uq_price_snapshot_asset_year_month"),
     )
+
+
+class SchedulerRunLog(Base):
+    """Eén rij per scheduler-job-uitvoering; gebruikt door /admin/scheduler."""
+
+    __tablename__ = "scheduler_run_log"
+
+    id = Column(Integer, primary_key=True)
+    job_id = Column(String(64), nullable=False, index=True)
+    started_at = Column(DateTime, default=datetime.datetime.utcnow, index=True, nullable=False)
+    finished_at = Column(DateTime, nullable=True)
+    status = Column(String(16), nullable=False, default="running")  # running|ok|error
+    summary = Column(Text, nullable=True)
