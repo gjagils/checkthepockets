@@ -15,6 +15,28 @@
 <div class="alert alert-error">{{ import_error }}</div>
 {% endif %}
 
+<!-- Profielgegevens -->
+<div class="card">
+    <h2>Profiel</h2>
+    <p style="color:var(--muted); font-size:0.9rem; margin-bottom:1rem;">
+        Gebruikersnaam <strong>{{ user.username }}</strong>. Je e-mailadres wordt gebruikt voor
+        de weekly digest en eventuele account-meldingen.
+    </p>
+    {% if email_success %}<div class="alert alert-success">{{ email_success }}</div>{% endif %}
+    {% if email_error %}<div class="alert alert-danger">{{ email_error }}</div>{% endif %}
+    <form method="post" action="/settings/email" class="filter-bar" style="flex-wrap:wrap; align-items:flex-end;">
+        <div class="form-group" style="flex:1; min-width:240px;">
+            <label for="profile_email">E-mailadres</label>
+            <input type="email" id="profile_email" name="email"
+                   value="{{ user.email or '' }}" placeholder="jij@voorbeeld.nl"
+                   autocomplete="email">
+        </div>
+        <div class="form-group" style="align-self:flex-end;">
+            <button type="submit" class="btn btn-primary">Opslaan</button>
+        </div>
+    </form>
+</div>
+
 <!-- Startpagina -->
 {% if start_page_options %}
 <div class="card">
