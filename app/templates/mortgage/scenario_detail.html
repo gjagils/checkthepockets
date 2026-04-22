@@ -66,11 +66,83 @@
 <div class="card" style="margin-bottom:1.5rem;">
     <h2 style="margin:0 0 0.75rem 0; font-size:1.1rem;">Afgeleide waardes</h2>
     <div class="kv-grid">
-        <div><span class="muted">Te financieren</span><br><strong>€ {{ to_finance | euro0 }}</strong></div>
-        <div><span class="muted">Waarvan annuïtair</span><br>€ {{ annuity_principal | euro0 }}</div>
-        <div><span class="muted">Overwaarde oude woning</span><br>€ {{ overwaarde | euro0 }}</div>
-        <div><span class="muted">LTV</span><br>{{ "%.2f" | format(ltv_fraction * 100) }}%</div>
+        <div><span class="muted">Aankoopkosten ({{ "%.2f" | format(scenario.purchase_fee_pct) }}%)</span><br>€ {{ fin.purchase_fee | euro0 }}</div>
+        <div><span class="muted">Verkoopkosten ({{ "%.2f" | format(scenario.sale_fee_pct) }}%)</span><br>€ {{ fin.sale_fee | euro0 }}</div>
+        <div><span class="muted">Overwaarde oude woning</span><br>€ {{ fin.overwaarde | euro0 }}</div>
+        <div><span class="muted">Som bestaande hypotheken</span><br>€ {{ fin.existing_total | euro0 }}</div>
+        <div><span class="muted">Te financieren</span><br><strong>€ {{ fin.te_financieren | euro0 }}</strong></div>
+        <div><span class="muted">Nieuwe annuïteit</span><br>€ {{ fin.nieuwe_annuiteit | euro0 }}</div>
+        <div><span class="muted">LTV nieuw</span><br>{{ "%.2f" | format(fin.ltv_fraction * 100) }}%</div>
     </div>
+</div>
+
+{# ─── Bestaande hypotheken (LIN-44) ──────────────────────────────────────── #}
+<div class="card" id="existing-mortgages" style="margin-bottom:1.5rem;">
+    <h2 style="margin:0 0 0.75rem 0; font-size:1.1rem;">Bestaande hypotheken</h2>
+    {% if scenario.existing_mortgages %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Naam</th>
+                    <th class="text-right">Saldo</th>
+                    <th>Type</th>
+                    <th class="text-right">Rente</th>
+                    <th class="text-right">Resterend (mnd)</th>
+                    <th class="text-right">Mnd-last</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for em in scenario.existing_mortgages %}
+                <tr>
+                    <form method="post" action="/hypotheek/scenarios/{{ scenario.id }}/existing-mortgages/{{ em.id }}/edit">
+                        <td><input type="text" name="name" value="{{ em.name }}" class="inline-input"></td>
+                        <td class="text-right"><input type="number" step="0.01" name="balance_eur" value="{{ em.balance_eur }}" class="inline-input" style="text-align:right;"></td>
+                        <td>
+                            <select name="mortgage_type" class="inline-input">
+                                <option value="annuity" {% if em.mortgage_type == 'annuity' %}selected{% endif %}>Annuïtair</option>
+                                <option value="interest_only" {% if em.mortgage_type == 'interest_only' %}selected{% endif %}>Aflossingsvrij</option>
+                            </select>
+                        </td>
+                        <td class="text-right"><input type="number" step="0.001" name="rate_pct" value="{{ em.rate_pct if em.rate_pct is not none else '' }}" class="inline-input" style="text-align:right; width:5rem;"></td>
+                        <td class="text-right"><input type="number" step="1" name="months_remaining" value="{{ em.months_remaining if em.months_remaining is not none else '' }}" class="inline-input" style="text-align:right; width:5rem;"></td>
+                        <td class="text-right">
+                            <input type="number" step="0.01" name="monthly_payment_eur" placeholder="€ {{ em.monthly_payment_eur | default('auto') }}" value="{{ em.monthly_payment_eur if em.monthly_payment_eur is not none else '' }}" class="inline-input" style="text-align:right; width:6rem;" title="Laat leeg voor auto-berekening">
+                        </td>
+                        <td style="display:flex; gap:0.25rem; flex-wrap:wrap;">
+                            <button type="submit" class="btn btn-sm btn-primary">Opslaan</button>
+                    </form>
+                            <form method="post" action="/hypotheek/scenarios/{{ scenario.id }}/existing-mortgages/{{ em.id }}/delete" style="display:inline;" onsubmit="return confirm('Verwijder deze bestaande hypotheek?')">
+                                <button type="submit" class="btn btn-sm btn-danger">×</button>
+                            </form>
+                        </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <p class="muted" style="margin:0.75rem 0 0.5rem 0; font-size:0.85rem;">Totaal: € {{ fin.existing_total | euro0 }} saldo · € {{ fin.existing_monthly_total | euro0 }} per maand.</p>
+    {% else %}
+    <p class="muted" style="margin:0 0 0.75rem 0; font-size:0.9rem;">Nog geen bestaande hypotheken aan dit scenario gekoppeld.</p>
+    {% endif %}
+
+    <form method="post" action="/hypotheek/scenarios/{{ scenario.id }}/existing-mortgages" style="margin-top:0.75rem;">
+        <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:flex-end;">
+            <div><label class="muted" style="font-size:0.8rem;">Naam</label><br><input type="text" name="name" placeholder="Pim" required></div>
+            <div><label class="muted" style="font-size:0.8rem;">Saldo €</label><br><input type="number" step="0.01" name="balance_eur" placeholder="135000" required></div>
+            <div><label class="muted" style="font-size:0.8rem;">Type</label><br>
+                <select name="mortgage_type">
+                    <option value="annuity">Annuïtair</option>
+                    <option value="interest_only">Aflossingsvrij</option>
+                </select>
+            </div>
+            <div><label class="muted" style="font-size:0.8rem;">Rente %</label><br><input type="number" step="0.001" name="rate_pct" placeholder="4.0"></div>
+            <div><label class="muted" style="font-size:0.8rem;">Resterend (mnd)</label><br><input type="number" step="1" name="months_remaining" placeholder="300"></div>
+            <div><label class="muted" style="font-size:0.8rem;">Mnd-last € (optioneel)</label><br><input type="number" step="0.01" name="monthly_payment_eur" placeholder="auto"></div>
+            <button type="submit" class="btn btn-primary">+ Hypotheek toevoegen</button>
+        </div>
+    </form>
 </div>
 
 {# ─── Varianten ───────────────────────────────────────────────────────────── #}

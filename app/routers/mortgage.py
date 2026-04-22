@@ -17,6 +17,7 @@ from app.models import (
     MortgageScenario,
     MortgageScenarioBudget,
     MortgageVariant,
+    ScenarioExistingMortgage,
 )
 from app.mortgage_rate_ocr import extract_rate_text
 from app.mortgage_rate_parser import (
@@ -505,6 +506,8 @@ def _apply_scenario_form(
     notes: str,
     funda_url: str = "",
     photo_url: str = "",
+    purchase_fee_pct: str = "",
+    sale_fee_pct: str = "",
 ) -> None:
     s.name = name.strip() or s.name or "Naamloos scenario"
     s.valuation = _parse_decimal(valuation)
@@ -516,6 +519,15 @@ def _apply_scenario_form(
     s.notes = notes.strip() or None
     s.funda_url = (funda_url or "").strip()[:500] or None
     s.photo_url = (photo_url or "").strip()[:500] or None
+    # LIN-44: aan/verkoopkosten als percentage; leeg → default.
+    if purchase_fee_pct.strip():
+        s.purchase_fee_pct = _parse_decimal(purchase_fee_pct, default=Decimal("2.5"))
+    elif s.purchase_fee_pct is None:
+        s.purchase_fee_pct = Decimal("2.5")
+    if sale_fee_pct.strip():
+        s.sale_fee_pct = _parse_decimal(sale_fee_pct, default=Decimal("1.5"))
+    elif s.sale_fee_pct is None:
+        s.sale_fee_pct = Decimal("1.5")
 
 
 @router.get("/scenarios")
@@ -599,6 +611,8 @@ def scenarios_create(
     notes: str = Form(""),
     funda_url: str = Form(""),
     photo_url: str = Form(""),
+    purchase_fee_pct: str = Form(""),
+    sale_fee_pct: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = _require_admin(request, db)
@@ -615,6 +629,8 @@ def scenarios_create(
         notes=notes,
         funda_url=funda_url,
         photo_url=photo_url,
+        purchase_fee_pct=purchase_fee_pct,
+        sale_fee_pct=sale_fee_pct,
     )
     db.add(s)
     db.commit()
@@ -770,25 +786,13 @@ def scenarios_detail(
     household = _get_or_create_household(db, user.id)
     rates = _rates_for_user(db, user.id)
 
-    to_fin = mortgage_calc.to_finance(
-        Decimal(str(scenario.offer)),
-        Decimal(str(scenario.renovation_cost)),
-        Decimal(str(scenario.own_contribution)),
-        Decimal(str(household.purchase_costs_pct)),
-    )
-    ow = mortgage_calc.overwaarde(
-        Decimal(str(scenario.sale_old_home)),
-        Decimal(str(household.current_home_debt)),
-        Decimal(str(household.selling_costs_pct)),
-    )
-    ann_principal = mortgage_calc.annuity_principal(
-        to_fin,
-        Decimal(str(household.existing_mortgage_pim)),
-        Decimal(str(household.existing_mortgage_interest_only)),
-    )
-    ltv_fraction = mortgage_calc.ltv(
-        to_fin, Decimal(str(scenario.valuation)),
-    )
+    # LIN-44: één helper berekent alle afgeleide bedragen uit het scenario zelf
+    # (incl. bestaande hypotheken en per-scenario aan/verkoopkosten).
+    fin = mortgage_calc.compute_scenario_financials(scenario)
+    to_fin = fin.te_financieren
+    ow = fin.overwaarde
+    ann_principal = fin.nieuwe_annuiteit
+    ltv_fraction = fin.ltv_fraction
 
     # Bereken per variant de vergelijkingsdata.
     variants_sorted = sorted(scenario.variants, key=lambda v: v.fixed_years)
@@ -882,6 +886,7 @@ def scenarios_detail(
             "user": user,
             "scenario": scenario,
             "household": household,
+            "fin": fin,  # LIN-44: alle afgeleide waardes gebundeld
             "to_finance": to_fin,
             "overwaarde": ow,
             "annuity_principal": ann_principal,
@@ -1086,6 +1091,8 @@ def scenarios_edit(
     notes: str = Form(""),
     funda_url: str = Form(""),
     photo_url: str = Form(""),
+    purchase_fee_pct: str = Form(""),
+    sale_fee_pct: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = _require_admin(request, db)
@@ -1102,6 +1109,8 @@ def scenarios_edit(
         notes=notes,
         funda_url=funda_url,
         photo_url=photo_url,
+        purchase_fee_pct=purchase_fee_pct,
+        sale_fee_pct=sale_fee_pct,
     )
     db.commit()
     return RedirectResponse(
@@ -1130,4 +1139,124 @@ def scenarios_unarchive(
     db.commit()
     return RedirectResponse(
         "/hypotheek/scenarios?show_archived=1&flash=unarchived", status_code=302,
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Bestaande hypotheken per scenario (LIN-44)
+# ──────────────────────────────────────────────────────────────────────────────
+
+_EXISTING_TYPES = ("annuity", "interest_only")
+
+
+def _clean_existing_type(value: str) -> str:
+    v = (value or "").strip().lower()
+    return v if v in _EXISTING_TYPES else "annuity"
+
+
+def _existing_mortgage_for(
+    db: Session, user_id: int, scenario_id: int, em_id: int,
+) -> ScenarioExistingMortgage:
+    em = (
+        db.query(ScenarioExistingMortgage)
+        .join(MortgageScenario, ScenarioExistingMortgage.scenario_id == MortgageScenario.id)
+        .filter(
+            ScenarioExistingMortgage.id == em_id,
+            ScenarioExistingMortgage.scenario_id == scenario_id,
+            MortgageScenario.user_id == user_id,
+        )
+        .first()
+    )
+    if not em:
+        raise HTTPException(status_code=404, detail="Bestaande hypotheek niet gevonden")
+    return em
+
+
+@router.post("/scenarios/{scenario_id}/existing-mortgages")
+def existing_mortgage_create(
+    scenario_id: int,
+    request: Request,
+    name: str = Form(""),
+    balance_eur: str = Form("0"),
+    mortgage_type: str = Form("annuity"),
+    rate_pct: str = Form(""),
+    months_remaining: str = Form(""),
+    monthly_payment_eur: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    user = _require_admin(request, db)
+    scenario = _get_scenario(db, user.id, scenario_id)
+    last = (
+        db.query(ScenarioExistingMortgage)
+        .filter(ScenarioExistingMortgage.scenario_id == scenario.id)
+        .order_by(ScenarioExistingMortgage.sort_order.desc())
+        .first()
+    )
+    next_order = ((last.sort_order if last else -1) + 1)
+
+    em = ScenarioExistingMortgage(
+        scenario_id=scenario.id,
+        name=(name.strip() or "Bestaande hypotheek")[:100],
+        balance_eur=_parse_decimal(balance_eur),
+        mortgage_type=_clean_existing_type(mortgage_type),
+        rate_pct=(_parse_decimal(rate_pct) if rate_pct.strip() else None),
+        months_remaining=(int(months_remaining) if months_remaining.strip().isdigit() else None),
+        monthly_payment_eur=(
+            _parse_decimal(monthly_payment_eur) if monthly_payment_eur.strip() else None
+        ),
+        sort_order=next_order,
+    )
+    db.add(em)
+    db.commit()
+    return RedirectResponse(
+        f"/hypotheek/scenarios/{scenario.id}#existing-mortgages",
+        status_code=302,
+    )
+
+
+@router.post("/scenarios/{scenario_id}/existing-mortgages/{em_id}/edit")
+def existing_mortgage_edit(
+    scenario_id: int,
+    em_id: int,
+    request: Request,
+    name: str = Form(""),
+    balance_eur: str = Form("0"),
+    mortgage_type: str = Form("annuity"),
+    rate_pct: str = Form(""),
+    months_remaining: str = Form(""),
+    monthly_payment_eur: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    user = _require_admin(request, db)
+    em = _existing_mortgage_for(db, user.id, scenario_id, em_id)
+
+    em.name = (name.strip() or em.name)[:100]
+    em.balance_eur = _parse_decimal(balance_eur)
+    em.mortgage_type = _clean_existing_type(mortgage_type)
+    em.rate_pct = (_parse_decimal(rate_pct) if rate_pct.strip() else None)
+    em.months_remaining = (int(months_remaining) if months_remaining.strip().isdigit() else None)
+    em.monthly_payment_eur = (
+        _parse_decimal(monthly_payment_eur) if monthly_payment_eur.strip() else None
+    )
+    db.commit()
+    return RedirectResponse(
+        f"/hypotheek/scenarios/{scenario_id}#existing-mortgages",
+        status_code=302,
+    )
+
+
+@router.post("/scenarios/{scenario_id}/existing-mortgages/{em_id}/delete")
+def existing_mortgage_delete(
+    scenario_id: int,
+    em_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    user = _require_admin(request, db)
+    em = _existing_mortgage_for(db, user.id, scenario_id, em_id)
+    db.delete(em)
+    db.commit()
+    return RedirectResponse(
+        f"/hypotheek/scenarios/{scenario_id}#existing-mortgages",
+        status_code=302,
     )

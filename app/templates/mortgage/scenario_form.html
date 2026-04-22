@@ -83,6 +83,20 @@
                     {% endfor %}
                 </select>
             </div>
+
+            <div class="form-group">
+                <label for="f-purchase-fee">Aankoopkosten (%)</label>
+                <input type="number" step="0.01" id="f-purchase-fee" name="purchase_fee_pct"
+                       value="{{ '%.2f' | format(scenario.purchase_fee_pct) if scenario and scenario.purchase_fee_pct is not none else '2.50' }}"
+                       placeholder="2.50">
+            </div>
+
+            <div class="form-group">
+                <label for="f-sale-fee">Verkoopkosten (%)</label>
+                <input type="number" step="0.01" id="f-sale-fee" name="sale_fee_pct"
+                       value="{{ '%.2f' | format(scenario.sale_fee_pct) if scenario and scenario.sale_fee_pct is not none else '1.50' }}"
+                       placeholder="1.50">
+            </div>
         </div>
 
         <div class="form-group">
