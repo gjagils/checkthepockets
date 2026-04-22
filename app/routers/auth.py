@@ -492,6 +492,8 @@ def send_test_digest(request: Request, db: Session = Depends(get_db)):
     `weekly_digest_last_sent_at` wordt bewust NIET geüpdatet, zodat de echte
     wekelijkse digest deze week alsnog plaatsvindt.
     """
+    import logging
+    log = logging.getLogger(__name__)
     user = require_login(request, db)
 
     if not user.email:
@@ -500,9 +502,33 @@ def send_test_digest(request: Request, db: Session = Depends(get_db)):
             _settings_ctx(request, user, digest_test_error="Geen e-mailadres gevonden voor je account."),
         )
 
+    # Pre-flight diagnostic: rapporteer aan de gebruiker als de Resend-key
+    # ontbreekt, in plaats van een generieke "Versturen mislukt".
+    from app.config import RESEND_API_KEY, RESEND_FROM_EMAIL
+    if not RESEND_API_KEY:
+        log.warning(
+            "Testdigest aangevraagd door %s maar RESEND_API_KEY is leeg — "
+            "stel de env-var in op de deploy en herstart de container.",
+            user.username,
+        )
+        return templates.TemplateResponse(
+            "auth/settings.html",
+            _settings_ctx(
+                request, user,
+                digest_test_error=(
+                    "RESEND_API_KEY is niet ingesteld op deze deploy. "
+                    "Voeg 'm toe in Portainer (env-var) en redeploy."
+                ),
+            ),
+        )
+
     from app.scheduler import compute_digest_stats
     from app.email_service import send_weekly_digest
 
+    log.info(
+        "Testdigest start: user=%s to=%s from=%s",
+        user.username, user.email, RESEND_FROM_EMAIL,
+    )
     per_account, uncat_total, new_total = compute_digest_stats(db, user.id)
     sent = send_weekly_digest(
         to=user.email,
@@ -512,6 +538,7 @@ def send_test_digest(request: Request, db: Session = Depends(get_db)):
         new_total=new_total,
     )
     if sent:
+        log.info("Testdigest succesvol verzonden naar %s", user.email)
         return templates.TemplateResponse(
             "auth/settings.html",
             _settings_ctx(
@@ -519,11 +546,21 @@ def send_test_digest(request: Request, db: Session = Depends(get_db)):
                 digest_test_success=f"Testdigest verzonden naar {user.email}. Check ook je spam-folder.",
             ),
         )
+    log.error(
+        "Testdigest mislukt voor %s — Resend gaf een error terug "
+        "(check container-logs voor stacktrace).",
+        user.email,
+    )
     return templates.TemplateResponse(
         "auth/settings.html",
         _settings_ctx(
             request, user,
-            digest_test_error="Versturen mislukt. Check de RESEND_API_KEY in je deploy of de logs.",
+            digest_test_error=(
+                "Versturen mislukt. Mogelijke oorzaken: from-domein niet "
+                f"geverifieerd in Resend ({RESEND_FROM_EMAIL}), API-key "
+                "verlopen, of je test-mail mag alleen naar het account-"
+                "geregistreerde e-mailadres (gratis tier zonder eigen domein)."
+            ),
         ),
     )
 

@@ -1,4 +1,6 @@
 import hashlib
+import logging
+import os
 import time
 
 from fastapi import FastAPI, Request
@@ -6,6 +8,15 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
+
+# Initialiseer root logger voordat we app-modules importeren — anders blijven
+# logger.info/warning-calls in scheduler.py, email_service.py etc. stil omdat
+# de default root-level WARNING is en er geen handler op stdout staat.
+# LOG_LEVEL kan via env-var worden overschreven (DEBUG/INFO/WARNING/ERROR).
+logging.basicConfig(
+    level=os.getenv("LOG_LEVEL", "INFO").upper(),
+    format="%(asctime)s %(levelname)-8s [%(name)s] %(message)s",
+)
 
 from app.auth import LoginRequired, get_current_user
 from app.database import get_db
