@@ -17,7 +17,9 @@ from app.models import (
     MortgageScenario,
     MortgageScenarioBudget,
     MortgageVariant,
+    Person,
     ScenarioExistingMortgage,
+    ScenarioPersonContribution,
 )
 from app.mortgage_rate_ocr import extract_rate_text
 from app.mortgage_rate_parser import (
@@ -508,6 +510,8 @@ def _apply_scenario_form(
     photo_url: str = "",
     purchase_fee_pct: str = "",
     sale_fee_pct: str = "",
+    municipal_cost_factor: str = "",
+    insurance_cost_factor: str = "",
 ) -> None:
     s.name = name.strip() or s.name or "Naamloos scenario"
     s.valuation = _parse_decimal(valuation)
@@ -528,6 +532,19 @@ def _apply_scenario_form(
         s.sale_fee_pct = _parse_decimal(sale_fee_pct, default=Decimal("1.5"))
     elif s.sale_fee_pct is None:
         s.sale_fee_pct = Decimal("1.5")
+    # LIN-45: factoren; leeg → default 1.5.
+    if municipal_cost_factor.strip():
+        s.municipal_cost_factor = _parse_decimal(
+            municipal_cost_factor, default=Decimal("1.5")
+        )
+    elif s.municipal_cost_factor is None:
+        s.municipal_cost_factor = Decimal("1.5")
+    if insurance_cost_factor.strip():
+        s.insurance_cost_factor = _parse_decimal(
+            insurance_cost_factor, default=Decimal("1.5")
+        )
+    elif s.insurance_cost_factor is None:
+        s.insurance_cost_factor = Decimal("1.5")
 
 
 @router.get("/scenarios")
@@ -613,6 +630,8 @@ def scenarios_create(
     photo_url: str = Form(""),
     purchase_fee_pct: str = Form(""),
     sale_fee_pct: str = Form(""),
+    municipal_cost_factor: str = Form(""),
+    insurance_cost_factor: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = _require_admin(request, db)
@@ -631,6 +650,8 @@ def scenarios_create(
         photo_url=photo_url,
         purchase_fee_pct=purchase_fee_pct,
         sale_fee_pct=sale_fee_pct,
+        municipal_cost_factor=municipal_cost_factor,
+        insurance_cost_factor=insurance_cost_factor,
     )
     db.add(s)
     db.commit()
@@ -726,13 +747,18 @@ def _variant_stats(
 
 
 def _budget_rows_for_scenario(
-    db: Session, user_id: int, scenario_id: int,
+    db: Session,
+    user_id: int,
+    scenario: MortgageScenario,
+    *,
+    existing_monthly_total: Decimal,
+    new_annuity_monthly: Decimal,
 ):
-    """Aggregatie: recent 'current' budget per categorie + scenario-override.
+    """Bouw scenario-budget-rijen via `mortgage_calc.build_scenario_budget_rows`.
 
-    Returned: list van dicts met category, current_amount (uit Budget), scenario_amount
-    (uit MortgageScenarioBudget override), effective_amount (override of current),
-    en het totaal.
+    Returnt `(rows, total, year, month)` waarbij `rows` nu een lijst van
+    `ScenarioBudgetRow`-dataclasses is — het template leest attributes via
+    dot-notatie.
     """
     most_recent = (
         db.query(Budget.year, Budget.month)
@@ -754,26 +780,17 @@ def _budget_rows_for_scenario(
         .all()
     )
     overrides = {
-        b.category_id: Decimal(str(b.amount))
+        b.category_id: b
         for b in db.query(MortgageScenarioBudget)
-        .filter(MortgageScenarioBudget.scenario_id == scenario_id).all()
+        .filter(MortgageScenarioBudget.scenario_id == scenario.id).all()
     }
-
-    rows = []
-    total = Decimal(0)
-    for b in budgets:
-        current = Decimal(str(b.amount))
-        scen_amount = overrides.get(b.category_id)
-        effective = scen_amount if scen_amount is not None else current
-        rows.append({
-            "category": b.category,
-            "category_id": b.category_id,
-            "current_amount": current,
-            "scenario_amount": scen_amount,
-            "effective_amount": effective,
-        })
-        total += effective
-    rows.sort(key=lambda r: (r["category"].name.lower() if r["category"] else ""))
+    rows, total = mortgage_calc.build_scenario_budget_rows(
+        scenario=scenario,
+        budgets=budgets,
+        overrides_by_cat=overrides,
+        existing_monthly_total=existing_monthly_total,
+        new_annuity_monthly=new_annuity_monthly,
+    )
     return rows, total, year, month
 
 
@@ -839,9 +856,50 @@ def scenarios_detail(
         first_5y_interest = Decimal("0")
         first_5y_refund = Decimal("0")
 
-    # Budget-impact.
+    # Budget-impact. LIN-45: factor-engine + hypotheek-som gebruikt de monthly-
+    # last van de default variant (laagste rentevast). Fallback op 0 bij geen rate.
+    new_annuity_monthly = monthly_payment if not rate_missing else Decimal("0")
     budget_rows, budget_total, budget_year, budget_month = _budget_rows_for_scenario(
-        db, user.id, scenario.id,
+        db, user.id, scenario,
+        existing_monthly_total=fin.existing_monthly_total,
+        new_annuity_monthly=new_annuity_monthly,
+    )
+
+    # LIN-45: person contributions + coverage.
+    persons = (
+        db.query(Person)
+        .filter(Person.user_id == user.id)
+        .order_by(Person.sort_order, Person.name)
+        .all()
+    )
+    contributions_by_person_id = {
+        c.person_id: c for c in db.query(ScenarioPersonContribution)
+        .filter(ScenarioPersonContribution.scenario_id == scenario.id)
+        .all()
+    }
+    contribution_rows = []
+    total_contrib = Decimal("0")
+    for p in persons:
+        c = contributions_by_person_id.get(p.id)
+        amount = Decimal(str(c.monthly_contribution_eur)) if c else Decimal("0")
+        contribution_rows.append({
+            "person": p,
+            "amount": amount,
+        })
+        total_contrib += amount
+    # Totaal maandlast = nieuwe net-monthly + bestaande hypotheken + rest-budget
+    scenario_monthly_total = (
+        net_month + fin.existing_monthly_total + (budget_total - (
+            # Mortgage-categorieën staan al in budget_total; voorkom dubbeltelling
+            sum(
+                (r.effective_amount for r in budget_rows
+                 if r.cost_scale_type == "mortgage"),
+                Decimal("0"),
+            )
+        ))
+    ).quantize(Decimal("0.01"))
+    coverage = mortgage_calc.compute_scenario_coverage(
+        scenario_monthly_total, [r["amount"] for r in contribution_rows],
     )
     salary_sum = (
         Decimal(str(household.salary_primary)) + Decimal(str(household.salary_secondary))
@@ -902,6 +960,9 @@ def scenarios_detail(
             "variant_stats": variant_stats,
             "missing_fixed_years": missing_fixed_years,
             "available_fixed_years": available_fixed_years,
+            "contribution_rows": contribution_rows,
+            "coverage": coverage,
+            "scenario_monthly_total": scenario_monthly_total,
             "budget_rows": budget_rows,
             "budget_total": budget_total,
             "budget_year": budget_year,
@@ -1026,9 +1087,11 @@ def scenario_budget_upsert(
     ).first()
     if existing:
         existing.amount = value
+        existing.source = "manual"
     else:
         db.add(MortgageScenarioBudget(
             scenario_id=scenario.id, category_id=cat_id, amount=value,
+            source="manual",
         ))
     db.commit()
     return RedirectResponse(
@@ -1093,6 +1156,8 @@ def scenarios_edit(
     photo_url: str = Form(""),
     purchase_fee_pct: str = Form(""),
     sale_fee_pct: str = Form(""),
+    municipal_cost_factor: str = Form(""),
+    insurance_cost_factor: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = _require_admin(request, db)
@@ -1111,6 +1176,8 @@ def scenarios_edit(
         photo_url=photo_url,
         purchase_fee_pct=purchase_fee_pct,
         sale_fee_pct=sale_fee_pct,
+        municipal_cost_factor=municipal_cost_factor,
+        insurance_cost_factor=insurance_cost_factor,
     )
     db.commit()
     return RedirectResponse(
@@ -1259,4 +1326,48 @@ def existing_mortgage_delete(
     return RedirectResponse(
         f"/hypotheek/scenarios/{scenario_id}#existing-mortgages",
         status_code=302,
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Person contributions (LIN-45)
+# ──────────────────────────────────────────────────────────────────────────────
+
+@router.post("/scenarios/{scenario_id}/contributions")
+def scenario_contribution_upsert(
+    scenario_id: int,
+    request: Request,
+    person_id: str = Form(...),
+    amount: str = Form("0"),
+    db: Session = Depends(get_db),
+):
+    user = _require_admin(request, db)
+    scenario = _get_scenario(db, user.id, scenario_id)
+    try:
+        pid = int(person_id)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="Ongeldige person_id")
+
+    person = db.query(Person).filter(
+        Person.id == pid, Person.user_id == user.id,
+    ).first()
+    if not person:
+        raise HTTPException(status_code=404, detail="Persoon niet gevonden")
+
+    value = _parse_decimal(amount)
+    existing = db.query(ScenarioPersonContribution).filter(
+        ScenarioPersonContribution.scenario_id == scenario.id,
+        ScenarioPersonContribution.person_id == pid,
+    ).first()
+    if existing:
+        existing.monthly_contribution_eur = value
+    else:
+        db.add(ScenarioPersonContribution(
+            scenario_id=scenario.id,
+            person_id=pid,
+            monthly_contribution_eur=value,
+        ))
+    db.commit()
+    return RedirectResponse(
+        f"/hypotheek/scenarios/{scenario.id}#contributions", status_code=302,
     )
