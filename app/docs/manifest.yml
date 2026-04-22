@@ -4,6 +4,31 @@ categories:
     title_en: "Getting started"
     icon: "🚀"
     order: 1
+  - slug: transacties
+    title_nl: "Transacties"
+    title_en: "Transactions"
+    icon: "💸"
+    order: 2
+  - slug: budgetten
+    title_nl: "Budgetten"
+    title_en: "Budgets"
+    icon: "📊"
+    order: 3
+  - slug: portfolio
+    title_nl: "Portfolio"
+    title_en: "Portfolio"
+    icon: "📈"
+    order: 4
+  - slug: hypotheek
+    title_nl: "Hypotheek"
+    title_en: "Mortgage"
+    icon: "🏠"
+    order: 5
+  - slug: rekeningen
+    title_nl: "Rekeningen"
+    title_en: "Accounts"
+    icon: "🏦"
+    order: 6
   - slug: admin
     title_nl: "Admin & onderhoud"
     title_en: "Admin & maintenance"

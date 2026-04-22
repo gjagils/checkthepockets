@@ -320,3 +320,58 @@ def test_admin_sidebar_hides_admin_for_non_admin(user):
     assert resp.status_code == 200
     body = resp.text
     assert "Admin &amp; onderhoud" not in body
+
+
+# ── Part 4: content backfill per hoofdcategorie ---------------------------
+
+@pytest.mark.parametrize("slug,title_nl", [
+    ("transacties", "Transacties"),
+    ("budgetten", "Budgetten"),
+    ("portfolio", "Portfolio"),
+    ("hypotheek", "Hypotheek"),
+    ("rekeningen", "Rekeningen"),
+])
+def test_main_category_visible_on_index(user, slug, title_nl):
+    client = _login(user.id)
+    resp = client.get("/info")
+    assert resp.status_code == 200
+    body = resp.text
+    assert f'href="/info/{slug}"' in body
+    assert title_nl in body
+
+
+@pytest.mark.parametrize("cat,art", [
+    ("transacties", "categoriseren"),
+    ("budgetten", "sparen-snel-toevoegen"),
+    ("portfolio", "assets-toevoegen"),
+    ("hypotheek", "scenarios"),
+    ("rekeningen", "bankkoppeling"),
+])
+def test_main_category_article_renders_nl_and_en(user, cat, art):
+    client = _login(user.id)
+    resp_nl = client.get(f"/info/{cat}/{art}")
+    assert resp_nl.status_code == 200
+    assert "info-fallback-banner" not in resp_nl.text
+
+    resp_en = client.get(f"/info/{cat}/{art}?lang=en")
+    assert resp_en.status_code == 200
+    assert "info-fallback-banner" not in resp_en.text
+
+
+def test_main_categories_are_ordered_below_getting_started(user):
+    """Categorieën moeten in manifest-volgorde verschijnen in de grid.
+
+    De grid staat tussen `info-category-grid` en het eerstvolgende `</div>`;
+    we zoeken alleen daarbinnen zodat de top-nav links niet in de weg zitten.
+    """
+    client = _login(user.id)
+    body = client.get("/info").text
+    start = body.index("info-category-grid")
+    grid = body[start:]
+    idx_gs = grid.index("/info/getting-started")
+    idx_tx = grid.index("/info/transacties")
+    idx_bg = grid.index("/info/budgetten")
+    idx_pf = grid.index("/info/portfolio")
+    idx_hy = grid.index("/info/hypotheek")
+    idx_rk = grid.index("/info/rekeningen")
+    assert idx_gs < idx_tx < idx_bg < idx_pf < idx_hy < idx_rk
