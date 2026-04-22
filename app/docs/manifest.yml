@@ -1,0 +1,6 @@
+categories:
+  - slug: getting-started
+    title_nl: "Aan de slag"
+    title_en: "Getting started"
+    icon: "🚀"
+    order: 1

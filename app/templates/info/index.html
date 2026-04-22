@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Help · Check Your Pockets{% endblock %}
+{% block container_class %}container-wide{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Help</h1>
+</div>
+
+{% if not categories %}
+<div class="card">
+    <p>Nog geen help-content beschikbaar.</p>
+</div>
+{% else %}
+<div class="info-category-grid">
+    {% for cat in categories %}
+    <a href="/info/{{ cat.slug }}" class="info-category-card">
+        <span class="info-category-icon">{{ cat.icon }}</span>
+        <span class="info-category-title">{{ cat.title(lang) }}</span>
+    </a>
+    {% endfor %}
+</div>
+{% endif %}
+{% endblock %}
