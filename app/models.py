@@ -551,6 +551,9 @@ class MortgageScenario(Base):
     renovation_cost = Column(Numeric(12, 2), default=0)
     own_contribution = Column(Numeric(12, 2), default=0)
     sale_old_home = Column(Numeric(12, 2), default=0)
+    # Per-scenario aan/verkoopkosten (LIN-44). Percentages, default 2,5 / 1,5.
+    purchase_fee_pct = Column(Numeric(5, 2), nullable=False, default=Decimal("2.5"))
+    sale_fee_pct = Column(Numeric(5, 2), nullable=False, default=Decimal("1.5"))
     energy_label = Column(String(2), default="A")
     notes = Column(Text, nullable=True)
     funda_url = Column(String(500), nullable=True)
@@ -563,6 +566,31 @@ class MortgageScenario(Base):
     variants = relationship(
         "MortgageVariant", back_populates="scenario", cascade="all, delete-orphan"
     )
+    existing_mortgages = relationship(
+        "ScenarioExistingMortgage",
+        back_populates="scenario",
+        cascade="all, delete-orphan",
+        order_by="ScenarioExistingMortgage.sort_order, ScenarioExistingMortgage.id",
+    )
+
+
+class ScenarioExistingMortgage(Base):
+    """Bestaande hypotheek die in dit scenario wordt meegenomen (LIN-44)."""
+    __tablename__ = "scenario_existing_mortgages"
+
+    id = Column(Integer, primary_key=True)
+    scenario_id = Column(
+        Integer, ForeignKey("mortgage_scenarios.id", ondelete="CASCADE"), nullable=False, index=True,
+    )
+    name = Column(String(100), nullable=False)
+    balance_eur = Column(Numeric(12, 2), nullable=False, default=0)
+    mortgage_type = Column(String(20), nullable=False, default="annuity")  # "annuity" | "interest_only"
+    rate_pct = Column(Numeric(6, 3), nullable=True)
+    months_remaining = Column(Integer, nullable=True)
+    monthly_payment_eur = Column(Numeric(10, 2), nullable=True)
+    sort_order = Column(Integer, default=0, nullable=False)
+
+    scenario = relationship("MortgageScenario", back_populates="existing_mortgages")
 
 
 class MortgageVariant(Base):
