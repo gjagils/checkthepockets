@@ -37,6 +37,11 @@
                     nog nooit
                 {% endif %}
             </div>
+            {% if _bank.missing_uid %}
+            <div style="margin-top:0.25rem; padding:0.3rem 0.5rem; border-left:3px solid var(--ctp-coin); background:rgba(242,140,40,0.08); font-size:0.75rem;">
+                ⚠ Gekoppeld via IBAN-fallback (geen <code>external_uid</code> op deze rekening). Bij volgende sync wordt mogelijk een nieuw account aangemaakt — sync één keer en check of transacties hier blijven landen.
+            </div>
+            {% endif %}
             {% if _bank.connection_id %}
             <div style="padding-left:1.4rem; margin-top:0.25rem;">
                 <a href="/banking/sync/{{ _bank.connection_id }}" class="btn btn-sm" style="padding:0.15rem 0.5rem; font-size:0.75rem;">Nu synchroniseren →</a>
