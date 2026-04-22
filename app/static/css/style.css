@@ -2022,3 +2022,29 @@ a.cell-display:hover { text-decoration: none; color: inherit; }
     border-radius: 4px;
     font-size: 0.9rem;
 }
+
+/* ── Info search (LIN-38 part 5) ─────────────────────────────────────── */
+.info-topbar-tools {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+.info-search {
+    display: inline-flex;
+}
+.info-search-input {
+    padding: 0.35rem 0.65rem;
+    font-size: 0.85rem;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    min-width: 220px;
+    transition: border-color 0.15s;
+}
+.info-search-input:focus {
+    outline: none;
+    border-color: var(--orange);
+}
+.info-page-title { margin: 0; }

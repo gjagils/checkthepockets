@@ -1,0 +1,31 @@
+{# Client-side search input. JS filtert elementen met [data-search-index] in de actieve pagina. #}
+<div class="info-search">
+    <input type="text"
+           class="info-search-input"
+           id="info-search-input"
+           placeholder="{{ 'Search articles…' if lang == 'en' else 'Zoek artikelen…' }}"
+           autocomplete="off"
+           aria-label="{{ 'Search' if lang == 'en' else 'Zoeken' }}">
+</div>
+<script>
+(function() {
+    var input = document.getElementById('info-search-input');
+    if (!input) return;
+    var items = document.querySelectorAll('[data-search-index]');
+    var debounceTimer = null;
+
+    function applyFilter() {
+        var q = input.value.trim().toLowerCase();
+        items.forEach(function(el) {
+            var idx = el.getAttribute('data-search-index') || '';
+            var match = !q || idx.indexOf(q) !== -1;
+            el.style.display = match ? '' : 'none';
+        });
+    }
+
+    input.addEventListener('input', function() {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(applyFilter, 60);
+    });
+})();
+</script>

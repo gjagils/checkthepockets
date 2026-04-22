@@ -358,6 +358,53 @@ def test_main_category_article_renders_nl_and_en(user, cat, art):
     assert "info-fallback-banner" not in resp_en.text
 
 
+# ── Part 5: client-side search ---------------------------------------------
+
+def test_info_index_renders_search_input(user):
+    client = _login(user.id)
+    body = client.get("/info").text
+    assert 'id="info-search-input"' in body
+    assert "data-search-index" in body
+
+
+def test_info_category_page_renders_search_and_indices(user):
+    client = _login(user.id)
+    body = client.get("/info/getting-started").text
+    assert 'id="info-search-input"' in body
+    # Article-list items hebben data-search-index met lowercase title
+    assert 'data-search-index="welkom bij check your pockets' in body
+    assert 'data-search-index="je eerste csv-import' in body
+
+
+def test_info_article_page_renders_search_and_sidebar_indices(user):
+    client = _login(user.id)
+    body = client.get("/info/getting-started/welcome").text
+    assert 'id="info-search-input"' in body
+    # Sidebar-link heeft data-search-index
+    assert 'data-search-index="welkom bij check your pockets' in body
+
+
+def test_search_placeholder_respects_language(user):
+    client = _login(user.id)
+    resp_nl = client.get("/info?lang=nl")
+    assert 'placeholder="Zoek artikelen' in resp_nl.text
+    resp_en = client.get("/info?lang=en")
+    assert 'placeholder="Search articles' in resp_en.text
+
+
+def test_search_index_includes_both_languages_on_category_cards(user):
+    """Zoeken op EN-title moet werken, ook als UI op NL staat."""
+    client = _login(user.id)
+    body = client.get("/info?lang=nl").text
+    # Engelse titel van "Aan de slag" = "Getting started" — moet in index zitten
+    assert "getting started" in body.lower()
+    # Concreet: data-search-index bevat "getting started" naast "aan de slag"
+    import re
+    matches = re.findall(r'data-search-index="([^"]+)"', body)
+    gs_idx = next(i for i in matches if "aan de slag" in i)
+    assert "getting started" in gs_idx
+
+
 def test_main_categories_are_ordered_below_getting_started(user):
     """Categorieën moeten in manifest-volgorde verschijnen in de grid.
 

@@ -2,9 +2,12 @@
 {% block title %}Help · Check Your Pockets{% endblock %}
 {% block container_class %}container-wide{% endblock %}
 {% block content %}
-<div class="page-header">
-    <h1>Help</h1>
-    {% include "info/_lang_switcher.html" %}
+<div class="info-topbar">
+    <h1 class="info-page-title">Help</h1>
+    <div class="info-topbar-tools">
+        {% include "info/_search.html" %}
+        {% include "info/_lang_switcher.html" %}
+    </div>
 </div>
 
 {% if not categories %}
@@ -14,7 +17,9 @@
 {% else %}
 <div class="info-category-grid">
     {% for cat in categories %}
-    <a href="/info/{{ cat.slug }}" class="info-category-card">
+    <a href="/info/{{ cat.slug }}"
+       class="info-category-card"
+       data-search-index="{{ (cat.title('nl') ~ ' ' ~ cat.title('en') ~ ' ' ~ cat.slug) | lower }}">
         <span class="info-category-icon">{{ cat.icon }}</span>
         <span class="info-category-title">{{ cat.title(lang) }}</span>
     </a>
