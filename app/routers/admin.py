@@ -88,6 +88,28 @@ def toggle_admin(user_id: int, request: Request, db: Session = Depends(get_db)):
     return RedirectResponse("/admin/users", status_code=302)
 
 
+@router.post("/users/{user_id}/email")
+def admin_update_user_email(
+    user_id: int,
+    request: Request,
+    email: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """Laat een admin het e-mailadres van een user (zichzelf of ander)
+    wijzigen. Basis validatie via _clean_email in auth-module."""
+    _require_admin(request, db)
+    from app.routers.auth import _clean_email
+    target = db.query(User).filter(User.id == user_id).first()
+    if not target:
+        return RedirectResponse("/admin/users", status_code=302)
+    cleaned = _clean_email(email)
+    if cleaned is None:
+        return RedirectResponse("/admin/users?email_error=invalid", status_code=302)
+    target.email = cleaned or None
+    db.commit()
+    return RedirectResponse("/admin/users?email_ok=1", status_code=302)
+
+
 @router.post("/users/{user_id}/delete")
 def delete_user(user_id: int, request: Request, db: Session = Depends(get_db)):
     admin = _require_admin(request, db)

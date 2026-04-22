@@ -16,6 +16,13 @@
 </div>
 {% endif %}
 
+{% if request.query_params.get('email_ok') %}
+<div class="alert alert-success">E-mailadres bijgewerkt.</div>
+{% endif %}
+{% if request.query_params.get('email_error') == 'invalid' %}
+<div class="alert alert-danger">Ongeldig e-mailadres — moet ongeveer lijken op <code>naam@domein.nl</code>.</div>
+{% endif %}
+
 {% if encrypt_result is defined %}
 <div class="alert alert-success">
     {% if encrypt_result == 0 %}
@@ -89,7 +96,14 @@
                     <strong>{{ u.username }}</strong>
                     {% if u.id == user.id %}<span class="pill pill-sky" style="font-size:.7rem;">jij</span>{% endif %}
                 </td>
-                <td>{{ u.email or '—' }}</td>
+                <td>
+                    <form method="post" action="/admin/users/{{ u.id }}/email" style="display:flex; gap:0.3rem; align-items:center;">
+                        <input type="email" name="email" value="{{ u.email or '' }}"
+                               placeholder="—"
+                               style="flex:1; min-width:160px; padding:0.25rem 0.4rem; font-size:0.85rem;">
+                        <button type="submit" class="btn btn-sm" title="E-mailadres opslaan">✓</button>
+                    </form>
+                </td>
                 <td>
                     {% if u.is_admin %}
                     <span class="pill pill-gold">Admin</span>

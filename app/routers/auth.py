@@ -460,6 +460,50 @@ def change_password(
     )
 
 
+def _clean_email(raw: str) -> str | None:
+    """Basis e-mail-validatie: strip whitespace, lowercase, verwacht één '@'
+    met iets ervoor en iets erna. Geen volledige RFC-validatie — we willen
+    alleen overduidelijke typos afvangen. Return None als ongeldig."""
+    if raw is None:
+        return None
+    cleaned = raw.strip().lower()
+    if not cleaned:
+        return ""  # explicitly cleared
+    if " " in cleaned or cleaned.count("@") != 1:
+        return None
+    local, _, domain = cleaned.partition("@")
+    if not local or not domain or "." not in domain:
+        return None
+    return cleaned
+
+
+@router.post("/settings/email")
+def update_email(
+    request: Request,
+    email: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """Laat een user zijn/haar eigen e-mailadres zetten of wijzigen. Geen
+    verificatie-flow — dit is een kleine-gebruikersgroep app, we vertrouwen
+    de eigenaar."""
+    user = require_login(request, db)
+    cleaned = _clean_email(email)
+    if cleaned is None:
+        return templates.TemplateResponse(
+            "auth/settings.html",
+            _settings_ctx(request, user, email_error="Geen geldig e-mailadres."),
+        )
+    user.email = cleaned or None
+    db.commit()
+    return templates.TemplateResponse(
+        "auth/settings.html",
+        _settings_ctx(
+            request, user,
+            email_success=("E-mailadres opgeslagen." if cleaned else "E-mailadres verwijderd."),
+        ),
+    )
+
+
 @router.post("/settings/digest")
 def update_digest_preferences(
     request: Request,
