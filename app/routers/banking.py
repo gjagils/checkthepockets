@@ -32,6 +32,16 @@ def _is_banking_allowed(user) -> bool:
     return bool(SUPER_ADMIN_USERNAME and user.username == SUPER_ADMIN_USERNAME)
 
 
+def _normalize_iban(value: str | None) -> str | None:
+    """Canoniek IBAN: spaties weg, uppercase. Voorkomt match-misses door
+    verschillen tussen API-responses (NL81 BUNQ 2088 ...) en DB-records
+    (NL81BUNQ2088...)."""
+    if not value:
+        return None
+    clean = "".join(value.split()).upper()
+    return clean or None
+
+
 # ── Bank selection page ─────────────────────────────────────────────────────
 
 
@@ -266,7 +276,7 @@ async def sync_transactions(connection_id: int, request: Request, db: Session = 
     # Find IBAN for this account from stored data
     stored_accounts = json.loads(conn.accounts_json or "[]")
     account_info = next((a for a in stored_accounts if a["uid"] == account_uid), None)
-    account_iban = account_info["iban"] if account_info else None
+    account_iban = _normalize_iban(account_info["iban"]) if account_info else None
 
     from app import enable_banking
     logger.info("Bank sync gestart: %s account=%s from=%s to=%s", conn.bank_name, account_uid, date_from, date_to)
@@ -311,9 +321,19 @@ async def sync_transactions(connection_id: int, request: Request, db: Session = 
             },
         )
 
-    # Find or create the Account record. We matchen primair op external_uid
-    # (de stabiele Enable Banking account_uid) zodat meerdere rekeningen bij
-    # dezelfde bank, of rekeningen zonder IBAN, nooit samenvallen.
+    # Find or create the Account record.
+    #
+    # Match-strategie (in volgorde):
+    #   1. Primair op external_uid (stabiele Enable Banking account_uid).
+    #   2. Fallback op (bank, genormaliseerde IBAN) — ook als het Account
+    #      al een external_uid heeft die verschilt van de huidige. Dat
+    #      dekt: reauthorisatie na 90 dagen (nieuwe uid voor zelfde
+    #      rekening) én legacy accounts aangemaakt vóór external_uid-kolom.
+    #
+    # Pas nadat we een Account hebben gevonden óf nieuw aangemaakt, wordt
+    # external_uid op de huidige sync-uid gezet. Zo kan een sync nooit
+    # meer stiekem een nieuw duplicate Account aanmaken als er al een
+    # bestaand Account voor dezelfde bank+IBAN is.
     bank_key = conn.bank_name.lower().replace(" ", "_")
     display = (conn.display_name or conn.bank_name).strip()
     preferred_name = f"{display} - {account_iban}" if account_iban else display
@@ -321,18 +341,48 @@ async def sync_transactions(connection_id: int, request: Request, db: Session = 
         Account.user_id == user.id,
         Account.external_uid == account_uid,
     ).first()
+    matched_by = "external_uid" if account else None
+
     if not account and account_iban:
-        # Legacy fallback: account dat eerder is aangemaakt zonder external_uid
-        account = db.query(Account).filter(
-            Account.user_id == user.id,
-            Account.bank == bank_key,
-            Account.iban == account_iban,
-            Account.external_uid.is_(None),
-        ).first()
-        if account:
-            account.external_uid = account_uid
+        # Zoek alle accounts met gelijke bank + genormaliseerde IBAN.
+        # We matchen in Python omdat bestaande DB-records whitespace of
+        # andere casing kunnen hebben (pre-normalisatie).
+        iban_candidates = (
+            db.query(Account)
+            .filter(
+                Account.user_id == user.id,
+                Account.bank == bank_key,
+                Account.iban.isnot(None),
+            )
+            .all()
+        )
+        normalized_matches = [
+            a for a in iban_candidates
+            if _normalize_iban(a.iban) == account_iban
+        ]
+        if normalized_matches:
+            # Prefereer een match zonder external_uid (legacy). Anders pak
+            # de eerste; we linken alsnog — maar loggen een WARNING zodat
+            # we multi-uid-scenario's in het oog houden.
+            legacy = [a for a in normalized_matches if a.external_uid is None]
+            if legacy:
+                account = legacy[0]
+                matched_by = "iban_legacy_fallback"
+            else:
+                account = normalized_matches[0]
+                matched_by = "iban_fallback_reauth"
+                logger.warning(
+                    "Bank sync: matched Account id=%s op IBAN %s terwijl het "
+                    "al een andere external_uid=%s had; nieuwe uid=%s werd "
+                    "gelinkt. Mogelijk reauthorisatie.",
+                    account.id, account_iban, account.external_uid, account_uid,
+                )
+
     if account:
-        if account_iban and not account.iban:
+        # Zet/updat external_uid en IBAN canoniek op het Account record.
+        if account.external_uid != account_uid:
+            account.external_uid = account_uid
+        if account_iban and _normalize_iban(account.iban) != account_iban:
             account.iban = account_iban
         # Synchroniseer de naam met de connection-display_name, tenzij de
         # gebruiker het account handmatig een custom naam heeft gegeven.
@@ -341,6 +391,10 @@ async def sync_transactions(connection_id: int, request: Request, db: Session = 
             account.name.startswith(p) for p in autogen_prefixes
         ):
             account.name = preferred_name
+        logger.info(
+            "Bank sync: using existing Account id=%s name=%s matched_by=%s",
+            account.id, account.name, matched_by,
+        )
     else:
         account = Account(
             user_id=user.id,
@@ -351,6 +405,15 @@ async def sync_transactions(connection_id: int, request: Request, db: Session = 
         )
         db.add(account)
         db.flush()
+        # WAARSCHUWING: een sync die een nieuw Account aanmaakt is verdacht
+        # voor een bestaande gebruiker — verwachte flow is dat het Account
+        # al bestaat (aangemaakt bij connect). Log zichtbaar zodat we dit
+        # type situaties bij toekomstige bugs in één oogopslag zien.
+        logger.warning(
+            "Bank sync: created NEW Account id=%s name=%s bank=%s iban=%s "
+            "uid=%s — check of er géén ander Account voor deze IBAN bestaat.",
+            account.id, account.name, bank_key, account_iban, account_uid,
+        )
 
     # Import transactions (skip duplicates)
     active_rules = db.query(Rule).filter(Rule.user_id == user.id, Rule.is_active == 1).all()
