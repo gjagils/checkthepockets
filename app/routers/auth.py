@@ -483,6 +483,51 @@ def update_digest_preferences(
     )
 
 
+@router.post("/settings/digest/test")
+def send_test_digest(request: Request, db: Session = Depends(get_db)):
+    """Verstuur direct een digest-mail naar de huidige user, zonder de 6-dagen-
+    skip te triggeren of te wachten op de wekelijkse cron-tick. Gebruikt om
+    SMTP/Resend-config te valideren zonder tot het ingestelde dag+uur te wachten.
+
+    `weekly_digest_last_sent_at` wordt bewust NIET geüpdatet, zodat de echte
+    wekelijkse digest deze week alsnog plaatsvindt.
+    """
+    user = require_login(request, db)
+
+    if not user.email:
+        return templates.TemplateResponse(
+            "auth/settings.html",
+            _settings_ctx(request, user, digest_test_error="Geen e-mailadres gevonden voor je account."),
+        )
+
+    from app.scheduler import compute_digest_stats
+    from app.email_service import send_weekly_digest
+
+    per_account, uncat_total, new_total = compute_digest_stats(db, user.id)
+    sent = send_weekly_digest(
+        to=user.email,
+        username=user.username,
+        per_account=per_account,
+        uncat_total=uncat_total,
+        new_total=new_total,
+    )
+    if sent:
+        return templates.TemplateResponse(
+            "auth/settings.html",
+            _settings_ctx(
+                request, user,
+                digest_test_success=f"Testdigest verzonden naar {user.email}. Check ook je spam-folder.",
+            ),
+        )
+    return templates.TemplateResponse(
+        "auth/settings.html",
+        _settings_ctx(
+            request, user,
+            digest_test_error="Versturen mislukt. Check de RESEND_API_KEY in je deploy of de logs.",
+        ),
+    )
+
+
 @router.post("/settings/delete-account")
 def delete_account(
     request: Request,
