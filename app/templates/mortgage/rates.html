@@ -75,6 +75,26 @@
         </div>
     </form>
 
+    <div style="margin-top:1rem; padding-top:1rem; border-top:1px dashed var(--border);">
+        <p class="muted" style="margin:0 0 0.5rem 0; font-size:0.9rem;">
+            <strong>Of upload een screenshot</strong> van de ABN-tariefpagina
+            (alleen de tabel is voldoende). De app zet 'm via AI om naar
+            tab-gescheiden tekst en laat een voorvertoning zien — werkt ook met
+            foto's van een scherm.
+        </p>
+        <form method="post" action="/hypotheek/rentes/bulk/screenshot" enctype="multipart/form-data">
+            <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+                <input type="file" name="image" accept="image/png,image/jpeg,image/webp" required>
+                <button type="submit" class="btn btn-primary">Screenshot uploaden →</button>
+            </div>
+        </form>
+        {% if bulk_error %}
+        <div style="background:var(--red-bg); color:var(--red); border:1px solid var(--red); padding:0.5rem 0.75rem; margin-top:0.5rem; border-radius:4px; font-size:0.9rem;">
+            {{ bulk_error }}
+        </div>
+        {% endif %}
+    </div>
+
     {% if bulk_parsed is defined and bulk_parsed is not none %}
     <hr style="margin:1rem 0;">
     <h3 style="margin:0 0 0.5rem 0; font-size:1rem;">Voorvertoning</h3>
