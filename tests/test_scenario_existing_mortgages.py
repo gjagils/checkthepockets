@@ -115,6 +115,31 @@ def test_helper_user_story_with_two_existing():
     assert fin.ltv_fraction == Decimal("0.7185")
 
 
+def test_helper_pim_excluded_from_ltv_but_counts_in_financing():
+    """Pim (privé) telt WEL mee in overwaarde-aftrek en nieuwe-annuïteit-
+    dekking, maar NIET in de LTV-berekening. ABN (bank) telt wel overal mee."""
+    s = _build_scenario(existing_mortgages=[
+        _existing(name="Pim", balance_eur=Decimal("135000"),
+                  mortgage_type="annuity",
+                  rate_pct=Decimal("6.0"), months_remaining=300,
+                  counts_in_ltv=0),
+        _existing(name="ABN", balance_eur=Decimal("144000"),
+                  mortgage_type="interest_only",
+                  rate_pct=Decimal("1.76"), months_remaining=None,
+                  counts_in_ltv=1),
+    ])
+    fin = compute_scenario_financials(s)
+
+    # Overwaarde + nieuwe annuiteit: ongewijzigd (Pim trekt nog mee in aftrek)
+    assert fin.existing_total == Decimal("279000.00")
+    assert fin.overwaarde == Decimal("390800.00")
+    assert fin.nieuwe_annuiteit == Decimal("637075.00")
+    # LTV gebruikt alleen bank-hypotheken: (144k + 637075) / 1275k = 61,26%
+    # Zonder de exclude zou dit 71,85% zijn — de privé-lening drukt m'n LTV
+    # niet op.
+    assert fin.ltv_fraction == Decimal("0.6126")
+
+
 def test_helper_legacy_scenario_without_existing():
     """Scenario zonder bestaande hypotheken → existing_total=0, rest werkt."""
     s = _build_scenario()

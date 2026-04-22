@@ -596,6 +596,12 @@ class ScenarioExistingMortgage(Base):
     months_remaining = Column(Integer, nullable=True)
     monthly_payment_eur = Column(Numeric(10, 2), nullable=True)
     sort_order = Column(Integer, default=0, nullable=False)
+    # Wanneer 0 telt deze hypotheek niet mee in de LTV-berekening van de
+    # nieuwe financiering. Gebruikt voor privé-leningen (bv. van familie/Pim)
+    # die juridisch geen hypotheek-recht op het nieuwe pand krijgen, terwijl
+    # ze wel deel zijn van de dekking (overwaarde-aftrek + nieuwe-annuïteit).
+    # Default 1 = meetellen (normaal gedrag voor bank-hypotheken).
+    counts_in_ltv = Column(Integer, nullable=False, default=1)
 
     scenario = relationship("MortgageScenario", back_populates="existing_mortgages")
 

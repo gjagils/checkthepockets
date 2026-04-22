@@ -209,10 +209,17 @@ def compute_scenario_financials(scenario) -> ScenarioFinancials:
 
     existing_lines: list[dict] = []
     existing_total = Decimal("0")
+    existing_total_ltv = Decimal("0")  # som van alleen de hypotheken die
+                                        # de bank ziet als onderpand-schuld
     existing_monthly_total = Decimal("0")
     for m in getattr(scenario, "existing_mortgages", []) or []:
         bal = Decimal(str(m.balance_eur or 0))
         existing_total += bal
+        # `counts_in_ltv` bestaat pas sinds migratie 051; val terug op True
+        # voor oudere stubs/tests die het veld niet zetten.
+        in_ltv = bool(getattr(m, "counts_in_ltv", 1))
+        if in_ltv:
+            existing_total_ltv += bal
         monthly = existing_mortgage_monthly(
             balance=bal,
             mortgage_type=m.mortgage_type or "annuity",
@@ -231,6 +238,7 @@ def compute_scenario_financials(scenario) -> ScenarioFinancials:
             "rate_pct": m.rate_pct,
             "months_remaining": m.months_remaining,
             "monthly": monthly,
+            "counts_in_ltv": in_ltv,
         })
 
     overwaarde_amount = max(Decimal(0), sale_old - existing_total - sale_fee)
@@ -239,9 +247,12 @@ def compute_scenario_financials(scenario) -> ScenarioFinancials:
         Decimal(0),
         te_financieren - own_contrib - overwaarde_amount - existing_total,
     )
-    total_debt = existing_total + nieuwe_annuiteit
+    # LTV gebruikt alleen de hypotheken waarvan de bank mee-rekent (zie
+    # counts_in_ltv). Privé-leningen zoals een familie-hypotheek tellen dus
+    # niet mee voor de loan-to-value die de bank gebruikt.
+    total_debt_for_ltv = existing_total_ltv + nieuwe_annuiteit
     ltv_fraction = (
-        (total_debt / valuation).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+        (total_debt_for_ltv / valuation).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
         if valuation > 0 else Decimal(0)
     )
 

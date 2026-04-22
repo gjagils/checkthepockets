@@ -1255,6 +1255,7 @@ def existing_mortgage_create(
     rate_pct: str = Form(""),
     months_remaining: str = Form(""),
     monthly_payment_eur: str = Form(""),
+    counts_in_ltv: str = Form("1"),
     db: Session = Depends(get_db),
 ):
     user = _require_admin(request, db)
@@ -1277,6 +1278,7 @@ def existing_mortgage_create(
         monthly_payment_eur=(
             _parse_decimal(monthly_payment_eur) if monthly_payment_eur.strip() else None
         ),
+        counts_in_ltv=1 if counts_in_ltv.strip() in ("1", "on", "true", "yes") else 0,
         sort_order=next_order,
     )
     db.add(em)
@@ -1298,6 +1300,7 @@ def existing_mortgage_edit(
     rate_pct: str = Form(""),
     months_remaining: str = Form(""),
     monthly_payment_eur: str = Form(""),
+    counts_in_ltv: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = _require_admin(request, db)
@@ -1311,6 +1314,11 @@ def existing_mortgage_edit(
     em.monthly_payment_eur = (
         _parse_decimal(monthly_payment_eur) if monthly_payment_eur.strip() else None
     )
+    # Checkbox: als-ie niet in de form zit (unchecked) krijgen we "". 0 = uit,
+    # anders meetellen. Default blijft "1" zodat bestaande bank-hypotheken
+    # door normaal submitten niet uitgeschakeld worden als de checkbox op
+    # "1" staat.
+    em.counts_in_ltv = 1 if counts_in_ltv.strip() in ("1", "on", "true", "yes") else 0
     db.commit()
     return RedirectResponse(
         f"/hypotheek/scenarios/{scenario_id}#existing-mortgages",

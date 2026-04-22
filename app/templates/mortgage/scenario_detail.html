@@ -119,6 +119,7 @@
                     <th class="text-right">Rente</th>
                     <th class="text-right">Resterend (mnd)</th>
                     <th class="text-right">Mnd-last</th>
+                    <th class="text-center" title="Telt mee in de LTV-berekening voor de bank">LTV</th>
                     <th></th>
                 </tr>
             </thead>
@@ -138,6 +139,9 @@
                         <td class="text-right"><input type="number" step="1" name="months_remaining" value="{{ em.months_remaining if em.months_remaining is not none else '' }}" class="inline-input" style="text-align:right; width:5rem;"></td>
                         <td class="text-right">
                             <input type="number" step="0.01" name="monthly_payment_eur" placeholder="€ {{ em.monthly_payment_eur | default('auto') }}" value="{{ em.monthly_payment_eur if em.monthly_payment_eur is not none else '' }}" class="inline-input" style="text-align:right; width:6rem;" title="Laat leeg voor auto-berekening">
+                        </td>
+                        <td class="text-center" title="Vink uit voor privé-leningen die buiten de bank-LTV vallen">
+                            <input type="checkbox" name="counts_in_ltv" value="1" {% if em.counts_in_ltv %}checked{% endif %}>
                         </td>
                         <td style="display:flex; gap:0.25rem; flex-wrap:wrap;">
                             <button type="submit" class="btn btn-sm btn-primary">Opslaan</button>
@@ -169,6 +173,7 @@
             <div><label class="muted" style="font-size:0.8rem;">Rente %</label><br><input type="number" step="0.001" name="rate_pct" placeholder="4.0"></div>
             <div><label class="muted" style="font-size:0.8rem;">Resterend (mnd)</label><br><input type="number" step="1" name="months_remaining" placeholder="300"></div>
             <div><label class="muted" style="font-size:0.8rem;">Mnd-last € (optioneel)</label><br><input type="number" step="0.01" name="monthly_payment_eur" placeholder="auto"></div>
+            <div style="align-self:center;"><label class="muted" style="font-size:0.8rem; display:flex; align-items:center; gap:0.35rem; cursor:pointer;"><input type="checkbox" name="counts_in_ltv" value="1" checked> Telt mee in LTV</label></div>
             <button type="submit" class="btn btn-primary">+ Hypotheek toevoegen</button>
         </div>
     </form>
