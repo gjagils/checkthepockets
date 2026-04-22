@@ -770,12 +770,18 @@ def _budget_rows_for_scenario(
         return [], Decimal(0), None, None
 
     year, month = most_recent.year, most_recent.month
+    # Alleen uitgave-categorieën meenemen in de scenario-budget-vergelijking.
+    # Inkomen-categorieën (bv. "Gerd-Jan/Nelleke" salaris) horen niet in het
+    # maandbudget-overzicht — dat wordt op de salary-kant al verrekend als
+    # huishouden-inkomen in de leftover-berekening.
     budgets = (
         db.query(Budget)
+        .join(Category, Category.id == Budget.category_id)
         .filter(
             Budget.user_id == user_id,
             Budget.year == year,
             Budget.month == month,
+            Category.is_income == 0,
         )
         .all()
     )
