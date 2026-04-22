@@ -1979,3 +1979,46 @@ a.cell-display:hover { text-decoration: none; color: inherit; }
 .info-article-list li:last-child { border-bottom: none; }
 .info-article-list a { color: var(--orange); font-weight: 600; text-decoration: none; }
 .info-article-list a:hover { text-decoration: underline; }
+
+/* ── Info: topbar, language switcher, fallback banner (LIN-38 part 2) ─── */
+.info-topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+    flex-wrap: wrap;
+}
+.info-topbar .info-breadcrumbs { margin: 0; }
+
+.info-lang-switcher {
+    display: inline-flex;
+    gap: 0;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--surface);
+}
+.info-lang-btn {
+    padding: 0.3rem 0.7rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--muted);
+    text-decoration: none;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+}
+.info-lang-btn + .info-lang-btn { border-left: 1px solid var(--border); }
+.info-lang-btn:hover { background: var(--surface-2); color: var(--text); }
+.info-lang-btn.is-active { background: var(--orange); color: var(--text-white); }
+
+.info-fallback-banner {
+    margin: 0 0 1.25rem 0;
+    padding: 0.65rem 0.9rem;
+    border-left: 3px solid var(--orange);
+    background: var(--orange-bg);
+    color: var(--text);
+    border-radius: 4px;
+    font-size: 0.9rem;
+}

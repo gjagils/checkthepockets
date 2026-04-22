@@ -149,3 +149,81 @@ def test_info_requires_login():
     resp = client.get("/info")
     assert resp.status_code == 302
     assert resp.headers["location"] == "/login"
+
+
+# ── Part 2: cookie + fallback + switcher -----------------------------------
+
+def test_info_query_sets_lang_cookie(user):
+    client = _login(user.id)
+    resp = client.get("/info?lang=en", follow_redirects=False)
+    assert resp.status_code == 200
+    assert resp.cookies.get("info_lang") == "en"
+
+
+def test_info_cookie_is_used_when_no_query(user):
+    client = _login(user.id)
+    # Set cookie via een expliciete request
+    client.get("/info?lang=en")
+    # Zonder query-param → cookie bepaalt de taal
+    resp = client.get("/info")
+    assert resp.status_code == 200
+    assert "Getting started" in resp.text
+    assert "Aan de slag" not in resp.text
+
+
+def test_info_query_overrides_cookie(user):
+    client = _login(user.id)
+    client.get("/info?lang=en")  # zet cookie op en
+    resp = client.get("/info?lang=nl")
+    assert resp.status_code == 200
+    assert "Aan de slag" in resp.text
+    # Cookie is nu geüpdatet naar nl
+    assert resp.cookies.get("info_lang") == "nl"
+
+
+def test_info_invalid_cookie_falls_back_to_default(user):
+    client = _login(user.id)
+    client.cookies.set("info_lang", "fr")
+    resp = client.get("/info")
+    assert resp.status_code == 200
+    # Default = nl
+    assert "Aan de slag" in resp.text
+
+
+def test_info_fallback_banner_when_translation_missing(user):
+    """NL-only artikel opgevraagd met ?lang=en → fallback-banner + NL content."""
+    client = _login(user.id)
+    resp = client.get("/info/getting-started/first-import?lang=en")
+    assert resp.status_code == 200
+    body = resp.text
+    assert "info-fallback-banner" in body
+    assert "not yet available in English" in body
+    # De NL-content is zichtbaar
+    assert "Je eerste CSV-import" in body
+
+
+def test_info_no_fallback_banner_when_translation_exists(user):
+    client = _login(user.id)
+    resp = client.get("/info/getting-started/welcome?lang=en")
+    assert resp.status_code == 200
+    body = resp.text
+    assert "info-fallback-banner" not in body
+
+
+def test_info_lang_switcher_renders(user):
+    client = _login(user.id)
+    resp = client.get("/info?lang=nl")
+    assert resp.status_code == 200
+    body = resp.text
+    assert "info-lang-switcher" in body
+    # NL is actief, EN niet
+    assert 'href="/info?lang=nl"' in body
+    assert 'href="/info?lang=en"' in body
+
+
+def test_info_lang_switcher_preserves_current_path(user):
+    client = _login(user.id)
+    resp = client.get("/info/getting-started/welcome")
+    body = resp.text
+    assert 'href="/info/getting-started/welcome?lang=nl"' in body
+    assert 'href="/info/getting-started/welcome?lang=en"' in body
