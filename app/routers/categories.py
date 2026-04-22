@@ -175,6 +175,7 @@ def edit_category(
     exclude_from_budget: int = Form(0),
     exclude_from_totals: int = Form(0),
     parent_id: int = Form(-1),  # -1 = niet opgegeven, 0 = hoofdcategorie, >0 = onder die parent
+    cost_scale_type: str = Form(""),
     redirect_account_id: int = Form(0),
     redirect_show_archived: int = Form(0),
     db: Session = Depends(get_db),
@@ -210,6 +211,11 @@ def edit_category(
     cat.color = color.strip() or None
     cat.exclude_from_budget = exclude_from_budget
     cat.exclude_from_totals = exclude_from_totals
+    # LIN-45: cost_scale_type voor scenario-factors (municipal/insurance/mortgage).
+    _allowed_scale = {"municipal", "insurance", "mortgage"}
+    cat.cost_scale_type = (
+        cost_scale_type.strip() if cost_scale_type.strip() in _allowed_scale else None
+    )
 
     # Hiërarchie-wijziging (alleen als de gebruiker parent_id heeft meegestuurd)
     #   parent_id == -1 → veld ontbreekt in het formulier, niks veranderen.

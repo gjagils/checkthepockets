@@ -127,6 +127,9 @@ class Category(Base):
     exclude_from_budget = Column(Integer, default=0)
     exclude_from_totals = Column(Integer, default=0)
     is_archived = Column(Integer, default=0)
+    # LIN-45: markering waarmee een scenario-factor wordt toegepast.
+    # Waardes: "municipal" | "insurance" | "mortgage" | NULL (geen auto-factor).
+    cost_scale_type = Column(String(20), nullable=True)
 
     user = relationship("User", back_populates="categories")
     account = relationship("Account", back_populates="categories")
@@ -554,6 +557,10 @@ class MortgageScenario(Base):
     # Per-scenario aan/verkoopkosten (LIN-44). Percentages, default 2,5 / 1,5.
     purchase_fee_pct = Column(Numeric(5, 2), nullable=False, default=Decimal("2.5"))
     sale_fee_pct = Column(Numeric(5, 2), nullable=False, default=Decimal("1.5"))
+    # LIN-45: schaal-factoren die op auto-overrides worden toegepast
+    # (municipal = OZB/heffingen, insurance = opstal/inboedel).
+    municipal_cost_factor = Column(Numeric(4, 2), nullable=False, default=Decimal("1.50"))
+    insurance_cost_factor = Column(Numeric(4, 2), nullable=False, default=Decimal("1.50"))
     energy_label = Column(String(2), default="A")
     notes = Column(Text, nullable=True)
     funda_url = Column(String(500), nullable=True)
@@ -621,6 +628,9 @@ class MortgageScenarioBudget(Base):
         Integer, ForeignKey("categories.id", ondelete="CASCADE"), nullable=False,
     )
     amount = Column(Numeric(12, 2), nullable=False, default=0)
+    # LIN-45: "auto" = laatst gezet door factor-engine / hypotheek-som,
+    # "manual" = user heeft de waarde expliciet vastgelegd (wint van auto).
+    source = Column(String(10), nullable=False, default="manual")
 
     scenario = relationship("MortgageScenario")
     category = relationship("Category")
@@ -628,6 +638,29 @@ class MortgageScenarioBudget(Base):
     __table_args__ = (
         UniqueConstraint(
             "scenario_id", "category_id", name="uq_scenario_budget_scenario_category",
+        ),
+    )
+
+
+class ScenarioPersonContribution(Base):
+    """Maandbijdrage van één persoon aan één scenario (LIN-45)."""
+    __tablename__ = "scenario_person_contributions"
+
+    id = Column(Integer, primary_key=True)
+    scenario_id = Column(
+        Integer, ForeignKey("mortgage_scenarios.id", ondelete="CASCADE"), nullable=False, index=True,
+    )
+    person_id = Column(
+        Integer, ForeignKey("persons.id", ondelete="CASCADE"), nullable=False, index=True,
+    )
+    monthly_contribution_eur = Column(Numeric(10, 2), nullable=False, default=0)
+
+    scenario = relationship("MortgageScenario")
+    person = relationship("Person")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "scenario_id", "person_id", name="uq_scenario_person_contribution",
         ),
     )
 

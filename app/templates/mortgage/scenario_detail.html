@@ -319,7 +319,14 @@
             <tbody>
                 {% for row in budget_rows %}
                 <tr>
-                    <td>{{ row.category.name if row.category else '—' }}</td>
+                    <td>
+                        {{ row.category_name }}
+                        {% if row.source == 'auto' %}
+                            <span class="pill" style="background:var(--orange-bg); color:var(--orange); margin-left:0.35rem; font-size:0.7rem;" title="Auto-berekend via scenario-factor of hypotheek-som">auto</span>
+                        {% elif row.source == 'manual' %}
+                            <span class="pill" style="background:var(--border); color:var(--muted); margin-left:0.35rem; font-size:0.7rem;" title="Handmatig vastgezet">manual</span>
+                        {% endif %}
+                    </td>
                     <td class="text-right">€ {{ row.current_amount | euro }}</td>
                     <td class="text-right">
                         <form method="post" action="/hypotheek/scenarios/{{ scenario.id }}/budgets"
@@ -365,6 +372,55 @@
     <p class="muted" style="margin:0;">Geen budget-data gevonden om maandbudget-impact te berekenen. Stel eerst budgetten in.</p>
 </div>
 {% endif %}
+
+{# ─── Bijdrage per persoon + dekking (LIN-45) ───────────────────────────── #}
+<div class="card" id="contributions" style="margin-bottom:1.5rem;">
+    <h2 style="margin:0 0 0.75rem 0; font-size:1.1rem;">Bijdrage per persoon</h2>
+    {% if contribution_rows %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr><th>Persoon</th><th class="text-right">Bijdrage / maand</th><th></th></tr>
+            </thead>
+            <tbody>
+                {% for row in contribution_rows %}
+                <tr>
+                    <td>{{ row.person.name }}</td>
+                    <td class="text-right">
+                        <form method="post" action="/hypotheek/scenarios/{{ scenario.id }}/contributions"
+                              style="display:flex; gap:0.35rem; justify-content:flex-end; align-items:center;">
+                            <input type="hidden" name="person_id" value="{{ row.person.id }}">
+                            <input type="number" step="0.01" name="amount" value="{{ '%.2f' | format(row.amount) }}"
+                                   style="width:7rem; text-align:right;">
+                            <button type="submit" class="btn btn-sm">Opslaan</button>
+                        </form>
+                    </td>
+                    <td></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="kv-grid" style="margin-top:1rem;">
+        <div><span class="muted">Totale maandlasten scenario</span><br><strong>€ {{ coverage.monthly_total | euro }}</strong></div>
+        <div><span class="muted">Totaal bijdragen</span><br>€ {{ coverage.contributions_total | euro }}</div>
+        <div>
+            <span class="muted">Dekking</span><br>
+            {% if coverage.covered %}
+            <span class="pill" style="background:var(--orange-bg); color:var(--orange);">Gedekt</span>
+            {% else %}
+            <span class="pill" style="background:var(--red-bg); color:var(--red);">Tekort</span>
+            {% endif %}
+        </div>
+        <div>
+            <span class="muted">Verschil</span><br>
+            <strong style="color: {% if coverage.difference >= 0 %}var(--orange){% else %}var(--red){% endif %};">€ {{ coverage.difference | euro }}</strong>
+        </div>
+    </div>
+    {% else %}
+    <p class="muted" style="margin:0;">Geen personen in het huishouden. Voeg eerst personen toe onder <a href="/persons">Rekeningen › Personen</a>.</p>
+    {% endif %}
+</div>
 
 {# ─── Aflossingstabel ───────────────────────────────────────────────────── #}
 {% if rate_missing %}

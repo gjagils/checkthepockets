@@ -97,6 +97,20 @@
                        value="{{ '%.2f' | format(scenario.sale_fee_pct) if scenario and scenario.sale_fee_pct is not none else '1.50' }}"
                        placeholder="1.50">
             </div>
+
+            <div class="form-group">
+                <label for="f-municipal-factor">Factor gemeentelijke kosten</label>
+                <input type="number" step="0.01" id="f-municipal-factor" name="municipal_cost_factor"
+                       value="{{ '%.2f' | format(scenario.municipal_cost_factor) if scenario and scenario.municipal_cost_factor is not none else '1.50' }}"
+                       placeholder="1.50">
+            </div>
+
+            <div class="form-group">
+                <label for="f-insurance-factor">Factor verzekeringen</label>
+                <input type="number" step="0.01" id="f-insurance-factor" name="insurance_cost_factor"
+                       value="{{ '%.2f' | format(scenario.insurance_cost_factor) if scenario and scenario.insurance_cost_factor is not none else '1.50' }}"
+                       placeholder="1.50">
+            </div>
         </div>
 
         <div class="form-group">

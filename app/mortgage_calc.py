@@ -258,6 +258,115 @@ def compute_scenario_financials(scenario) -> ScenarioFinancials:
     )
 
 
+@dataclass
+class ScenarioBudgetRow:
+    """Één rij voor de scenario-budget-tabel (LIN-45).
+
+    `scenario_amount` is None wanneer er geen override is (bv. categorie zonder
+    `cost_scale_type` en zonder expliciete manual override). Templates tonen
+    dan het current-bedrag als placeholder.
+    """
+    category_id: int
+    category_name: str
+    current_amount: Decimal
+    scenario_amount: Decimal | None
+    effective_amount: Decimal
+    source: str  # "auto" | "manual" | "none"
+    cost_scale_type: str | None
+
+
+def build_scenario_budget_rows(
+    *,
+    scenario,
+    budgets,             # list[Budget] voor de laatste maand
+    overrides_by_cat,    # dict[cat_id -> MortgageScenarioBudget]
+    existing_monthly_total: Decimal,
+    new_annuity_monthly: Decimal,
+) -> tuple[list[ScenarioBudgetRow], Decimal]:
+    """Pas factors en hypotheek-som toe op de scenario-budget-rijen.
+
+    Regels:
+    - `source == "manual"` op een override → user-waarde wint, geen auto-factor.
+    - Category `cost_scale_type == "mortgage"` → effectief bedrag wordt vervangen
+      door `existing_monthly_total + new_annuity_monthly` (tenzij manueel gezet).
+    - Category `cost_scale_type == "municipal"` → effectief bedrag =
+      `current * scenario.municipal_cost_factor` (tenzij manueel).
+    - Category `cost_scale_type == "insurance"` → idem met `insurance_cost_factor`.
+    - Geen scale-type + geen override → effectief = current (onveranderd).
+    """
+    municipal_factor = Decimal(str(getattr(scenario, "municipal_cost_factor", "1.50") or "1.50"))
+    insurance_factor = Decimal(str(getattr(scenario, "insurance_cost_factor", "1.50") or "1.50"))
+    mortgage_total = _round_cent(
+        Decimal(str(existing_monthly_total or 0)) + Decimal(str(new_annuity_monthly or 0))
+    )
+
+    rows: list[ScenarioBudgetRow] = []
+    total = Decimal("0")
+    for b in budgets:
+        current = Decimal(str(b.amount or 0))
+        override = overrides_by_cat.get(b.category_id)
+        cat = b.category
+        scale_type = getattr(cat, "cost_scale_type", None) if cat else None
+
+        # Handmatig override wint altijd.
+        if override is not None and (override.source == "manual"):
+            scen_amount: Decimal | None = Decimal(str(override.amount or 0))
+            source = "manual"
+        elif scale_type == "mortgage":
+            scen_amount = mortgage_total
+            source = "auto"
+        elif scale_type == "municipal":
+            scen_amount = _round_cent(current * municipal_factor)
+            source = "auto"
+        elif scale_type == "insurance":
+            scen_amount = _round_cent(current * insurance_factor)
+            source = "auto"
+        elif override is not None:
+            scen_amount = Decimal(str(override.amount or 0))
+            source = override.source or "auto"
+        else:
+            scen_amount = None
+            source = "none"
+
+        effective = scen_amount if scen_amount is not None else current
+        total += effective
+
+        rows.append(ScenarioBudgetRow(
+            category_id=b.category_id,
+            category_name=(cat.name if cat else f"#{b.category_id}"),
+            current_amount=_round_cent(current),
+            scenario_amount=(_round_cent(scen_amount) if scen_amount is not None else None),
+            effective_amount=_round_cent(effective),
+            source=source,
+            cost_scale_type=scale_type,
+        ))
+
+    rows.sort(key=lambda r: r.category_name.lower())
+    return rows, _round_cent(total)
+
+
+@dataclass
+class ScenarioCoverage:
+    """Samenvatting voor de dekkings-kaart (LIN-45)."""
+    monthly_total: Decimal
+    contributions_total: Decimal
+    difference: Decimal
+    covered: bool
+
+
+def compute_scenario_coverage(
+    monthly_total: Decimal, contributions: list[Decimal],
+) -> ScenarioCoverage:
+    total = _round_cent(sum((Decimal(str(c or 0)) for c in contributions), Decimal("0")))
+    diff = _round_cent(total - Decimal(str(monthly_total or 0)))
+    return ScenarioCoverage(
+        monthly_total=_round_cent(Decimal(str(monthly_total or 0))),
+        contributions_total=total,
+        difference=diff,
+        covered=(total >= Decimal(str(monthly_total or 0))),
+    )
+
+
 def net_monthly(
     monthly_payment: Decimal,
     annual_rate: Decimal,
