@@ -8,7 +8,10 @@
         <span class="info-breadcrumb-sep">›</span>
         <span>{{ category.title(lang) }}</span>
     </div>
-    {% include "info/_lang_switcher.html" %}
+    <div class="info-topbar-tools">
+        {% include "info/_search.html" %}
+        {% include "info/_lang_switcher.html" %}
+    </div>
 </div>
 
 <div class="info-layout">
@@ -21,7 +24,7 @@
         {% else %}
         <ul class="info-article-list">
             {% for art in articles %}
-            <li>
+            <li data-search-index="{{ (art.title ~ ' ' ~ art.summary ~ ' ' ~ art.slug) | lower }}">
                 <a href="/info/{{ category.slug }}/{{ art.slug }}">{{ art.title }}</a>
                 {% if art.summary %}<span class="muted"> — {{ art.summary }}</span>{% endif %}
             </li>

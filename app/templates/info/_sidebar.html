@@ -10,7 +10,8 @@
         <div class="info-sidebar-articles">
             {% for art in sidebar_articles %}
             <a href="/info/{{ cat.slug }}/{{ art.slug }}"
-               class="{% if article is defined and article.meta.slug == art.slug %}is-active{% endif %}">
+               class="{% if article is defined and article.meta.slug == art.slug %}is-active{% endif %}"
+               data-search-index="{{ (art.title ~ ' ' ~ art.summary ~ ' ' ~ art.slug) | lower }}">
                 {{ art.title }}
             </a>
             {% endfor %}
