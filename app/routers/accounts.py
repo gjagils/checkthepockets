@@ -43,25 +43,48 @@ def accounts_list(request: Request, db: Session = Depends(get_db)):
         .all()
     )
     bank_info_by_account_id: dict[int, dict] = {}
+    # Twee lookups: primair op stabiele Enable-Banking uid, secundair op
+    # (bank, iban). De IBAN-fallback dekt accounts die ooit via CSV zijn
+    # aangemaakt vóór een latere bankkoppeling — die hebben external_uid=NULL
+    # maar horen wel bij een actieve connection.
     uid_to_conn: dict[str, BankConnection] = {}
+    iban_to_conn: dict[tuple[str, str], BankConnection] = {}
     for conn in connections:
         try:
             stored = json.loads(conn.accounts_json or "[]")
         except (ValueError, TypeError):
             stored = []
+        bank_key = (conn.bank_name or "").lower().replace(" ", "_")
         for entry in stored:
-            uid = entry.get("uid") if isinstance(entry, dict) else None
+            if not isinstance(entry, dict):
+                continue
+            uid = entry.get("uid")
             if uid:
                 uid_to_conn[uid] = conn
+            iban = (entry.get("iban") or "").replace(" ", "").upper()
+            if iban and bank_key:
+                iban_to_conn[(bank_key, iban)] = conn
 
     for acc in accounts:
-        conn = uid_to_conn.get(acc.external_uid) if acc.external_uid else None
+        conn = None
+        match_reason = None
+        if acc.external_uid:
+            conn = uid_to_conn.get(acc.external_uid)
+            if conn:
+                match_reason = "uid"
+        if conn is None and acc.iban:
+            iban_key = acc.iban.replace(" ", "").upper()
+            conn = iban_to_conn.get(((acc.bank or "").lower(), iban_key))
+            if conn:
+                match_reason = "iban_fallback"
         if conn:
             bank_info_by_account_id[acc.id] = {
                 "is_linked": True,
                 "connection_id": conn.id,
                 "connection_name": conn.display_name or conn.bank_name,
                 "last_synced_at": conn.last_synced_at,
+                "match_reason": match_reason,
+                "missing_uid": match_reason == "iban_fallback",
             }
         else:
             bank_info_by_account_id[acc.id] = {
@@ -69,6 +92,8 @@ def accounts_list(request: Request, db: Session = Depends(get_db)):
                 "connection_id": None,
                 "connection_name": None,
                 "last_synced_at": None,
+                "match_reason": None,
+                "missing_uid": False,
             }
 
     # Datum laatste echte transactie per account — handig als referentie voor
