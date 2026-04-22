@@ -376,6 +376,26 @@ def sync_projected_transactions(user_id: int, year: int, month: int, db: Session
             if _cleanup_legacy_projected_hashes(db, item.id, year, month):
                 changed = True
 
+            # Backfill account_id vanuit gekoppelde echte transacties wanneer NULL.
+            # Voorkomt dat de projection op de laagst-id rekening (default_account) belandt
+            # terwijl de recurring al een duidelijk bedoeld account heeft via linked tx.
+            if not item.account_id:
+                most_used_account_id = (
+                    db.query(Transaction.account_id)
+                    .filter(
+                        Transaction.recurring_id == item.id,
+                        Transaction.is_projected == 0,
+                        Transaction.account_id.isnot(None),
+                    )
+                    .group_by(Transaction.account_id)
+                    .order_by(func.count(Transaction.id).desc(), Transaction.account_id.asc())
+                    .limit(1)
+                    .scalar()
+                )
+                if most_used_account_id:
+                    item.account_id = most_used_account_id
+                    changed = True
+
             if not _is_active_in_month(item, year, month):
                 # Clean up any stale projected tx for this item+period
                 proj_hash = _projected_hash(item.id, year, month)
@@ -459,6 +479,12 @@ def cleanup_matched_projected(user_id: int, db: Session) -> None:
                 continue
             if not item.is_active:
                 # Recurring item was deactivated — remove projection
+                db.delete(proj)
+                changed = True
+                continue
+            # Projection op een andere rekening dan het item nu expliciet heeft
+            # (bv. gemaakt toen item.account_id nog NULL was en op fallback belandde)
+            if item.account_id and proj.account_id != item.account_id:
                 db.delete(proj)
                 changed = True
                 continue
