@@ -594,6 +594,41 @@ def exclude_old_uncategorized(
     return RedirectResponse(redirect_to, status_code=302)
 
 
+@router.post("/transactions/{transaction_id}/move-account")
+def move_transaction_to_account(
+    request: Request,
+    transaction_id: int,
+    target_account_id: int = Form(...),
+    redirect_to: str = Form("/transactions"),
+    db: Session = Depends(get_db),
+):
+    """Verplaats één transactie naar een andere rekening van dezelfde gebruiker.
+
+    Bedoeld om misroutering door bank-imports of CSV-imports met de hand te
+    corrigeren (bv. een bunq-transactie die op ABN belandde).
+    """
+    user = require_login(request, db)
+
+    tx = (
+        db.query(Transaction)
+        .join(Account, Account.id == Transaction.account_id)
+        .filter(Transaction.id == transaction_id, Account.user_id == user.id)
+        .first()
+    )
+    if not tx:
+        return RedirectResponse(redirect_to, status_code=302)
+
+    target = (
+        db.query(Account)
+        .filter(Account.id == target_account_id, Account.user_id == user.id)
+        .first()
+    )
+    if target and target.id != tx.account_id:
+        tx.account_id = target.id
+        db.commit()
+    return RedirectResponse(redirect_to, status_code=302)
+
+
 @router.post("/transactions/{transaction_id}/exclude")
 def exclude_transaction(
     request: Request,
