@@ -265,3 +265,95 @@ def test_projected_tx_null_account_visible_everywhere(db_session):
     resp = client.get(f"/transactions?month=2026-02&account_id={a1.id}")
     assert resp.status_code == 200
     assert "LegacyRec" in resp.text
+
+
+def test_null_account_backfills_from_linked_transactions(db_session):
+    """GJA-37: recurring zonder account_id + linked tx op bunq → projection op bunq,
+    item.account_id wordt gebackfilled."""
+    from app.routers.recurring import sync_projected_transactions
+
+    alice = _make_user(db_session)
+    cat = _make_category(db_session, alice)
+    abn = _make_account(db_session, alice, "ABN")   # laagste id → oude fallback
+    bunq = _make_account(db_session, alice, "BUNQ")
+
+    # Seed: minstens 1 echte tx per account zodat sync_projected niet pre-first-tx skipt
+    for acc in (abn, bunq):
+        h = hashlib.sha256(f"seed37-{acc.id}".encode()).hexdigest()
+        db_session.add(Transaction(
+            account_id=acc.id, date=date(2026, 1, 15),
+            amount=Decimal("-100"), currency="EUR",
+            description="seed", import_hash=h,
+        ))
+    db_session.commit()
+
+    # Legacy recurring zonder account
+    rec = RecurringTransaction(
+        user_id=alice.id, account_id=None, name="Spotify",
+        amount_expected=Decimal("-9.99"), frequency="monthly", category_id=cat.id,
+    )
+    db_session.add(rec)
+    db_session.commit()
+    db_session.refresh(rec)
+
+    # 3 echte gelinkte transacties op bunq
+    for i, day in enumerate((10, 11, 12)):
+        h = hashlib.sha256(f"spotify-link-{i}".encode()).hexdigest()
+        db_session.add(Transaction(
+            account_id=bunq.id, date=date(2026, 1, day),
+            amount=Decimal("-9.99"), currency="EUR",
+            description="Spotify", import_hash=h,
+            recurring_id=rec.id, is_projected=0,
+        ))
+    db_session.commit()
+
+    # Sync projected voor februari
+    sync_projected_transactions(alice.id, 2026, 2, db_session)
+
+    db_session.refresh(rec)
+    assert rec.account_id == bunq.id, "account_id moet gebackfilled zijn naar bunq"
+
+    proj = (
+        db_session.query(Transaction)
+        .filter(Transaction.recurring_id == rec.id, Transaction.is_projected == 1)
+        .one()
+    )
+    assert proj.account_id == bunq.id, "projection moet op bunq staan, niet op abn-fallback"
+
+
+def test_stale_projection_on_fallback_gets_cleaned(db_session):
+    """Projection ooit gemaakt op fallback-rekening wordt verwijderd nadat
+    item.account_id is gezet naar de correcte rekening."""
+    from app.routers.recurring import cleanup_matched_projected
+
+    alice = _make_user(db_session)
+    cat = _make_category(db_session, alice)
+    abn = _make_account(db_session, alice, "ABN")
+    bunq = _make_account(db_session, alice, "BUNQ")
+
+    rec = RecurringTransaction(
+        user_id=alice.id, account_id=bunq.id, name="Spotify",
+        amount_expected=Decimal("-9.99"), frequency="monthly", category_id=cat.id,
+    )
+    db_session.add(rec)
+    db_session.commit()
+    db_session.refresh(rec)
+
+    # Stale projection zit nog op ABN (fallback van voor de backfill)
+    stale_hash = hashlib.sha256(f"proj-stale-{rec.id}".encode()).hexdigest()
+    db_session.add(Transaction(
+        account_id=abn.id, date=date(2026, 2, 1),
+        amount=Decimal("-9.99"), currency="EUR",
+        description="Spotify", import_hash=stale_hash,
+        recurring_id=rec.id, is_projected=1,
+    ))
+    db_session.commit()
+
+    cleanup_matched_projected(alice.id, db_session)
+
+    remaining = (
+        db_session.query(Transaction)
+        .filter(Transaction.recurring_id == rec.id, Transaction.is_projected == 1)
+        .all()
+    )
+    assert len(remaining) == 0, "stale projection op ABN moet zijn opgeruimd"
