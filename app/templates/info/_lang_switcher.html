@@ -1,0 +1,9 @@
+{# Taal-switcher: twee knoppen die terugverwijzen naar de huidige pagina met ?lang=. #}
+<div class="info-lang-switcher" role="group" aria-label="{{ 'Language' if lang == 'en' else 'Taal' }}">
+    <a href="{{ current_path }}?lang=nl"
+       class="info-lang-btn {% if lang == 'nl' %}is-active{% endif %}"
+       aria-pressed="{{ 'true' if lang == 'nl' else 'false' }}">NL</a>
+    <a href="{{ current_path }}?lang=en"
+       class="info-lang-btn {% if lang == 'en' %}is-active{% endif %}"
+       aria-pressed="{{ 'true' if lang == 'en' else 'false' }}">EN</a>
+</div>

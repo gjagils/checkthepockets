@@ -2,17 +2,29 @@
 {% block title %}{{ article.meta.title }} · Help · Check Your Pockets{% endblock %}
 {% block container_class %}container-wide{% endblock %}
 {% block content %}
-<div class="info-breadcrumbs">
-    <a href="/info">Help</a>
-    <span class="info-breadcrumb-sep">›</span>
-    <a href="/info/{{ category.slug }}">{{ category.title(lang) }}</a>
-    <span class="info-breadcrumb-sep">›</span>
-    <span>{{ article.meta.title }}</span>
+<div class="info-topbar">
+    <div class="info-breadcrumbs">
+        <a href="/info">Help</a>
+        <span class="info-breadcrumb-sep">›</span>
+        <a href="/info/{{ category.slug }}">{{ category.title(lang) }}</a>
+        <span class="info-breadcrumb-sep">›</span>
+        <span>{{ article.meta.title }}</span>
+    </div>
+    {% include "info/_lang_switcher.html" %}
 </div>
 
 <div class="info-layout">
     {% include "info/_sidebar.html" %}
     <article class="info-article">
+        {% if article.meta.lang != article.meta.requested_lang %}
+        <div class="info-fallback-banner" role="status">
+            {% if article.meta.requested_lang == 'en' %}
+            This article is not yet available in English — showing the Dutch version.
+            {% else %}
+            Dit artikel is nog niet vertaald — je ziet de Engelse versie.
+            {% endif %}
+        </div>
+        {% endif %}
         {{ article.html|safe }}
         {% if article.meta.updated %}
         <p class="info-article-updated muted">

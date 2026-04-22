@@ -2,10 +2,13 @@
 {% block title %}{{ category.title(lang) }} · Help · Check Your Pockets{% endblock %}
 {% block container_class %}container-wide{% endblock %}
 {% block content %}
-<div class="info-breadcrumbs">
-    <a href="/info">Help</a>
-    <span class="info-breadcrumb-sep">›</span>
-    <span>{{ category.title(lang) }}</span>
+<div class="info-topbar">
+    <div class="info-breadcrumbs">
+        <a href="/info">Help</a>
+        <span class="info-breadcrumb-sep">›</span>
+        <span>{{ category.title(lang) }}</span>
+    </div>
+    {% include "info/_lang_switcher.html" %}
 </div>
 
 <div class="info-layout">
