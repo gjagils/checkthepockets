@@ -40,6 +40,26 @@ def user():
         db.close()
 
 
+@pytest.fixture
+def admin_user():
+    db = SessionLocal()
+    try:
+        db.query(User).delete()
+        db.commit()
+        u = User(
+            username="admin",
+            email="admin@example.com",
+            password_hash=hash_password("pw"),
+            is_admin=1,
+        )
+        db.add(u)
+        db.commit()
+        db.refresh(u)
+        yield u
+    finally:
+        db.close()
+
+
 def _login(user_id: int) -> TestClient:
     c = TestClient(app)
     c.cookies.set("session", create_session_cookie(user_id))
@@ -227,3 +247,76 @@ def test_info_lang_switcher_preserves_current_path(user):
     body = resp.text
     assert 'href="/info/getting-started/welcome?lang=nl"' in body
     assert 'href="/info/getting-started/welcome?lang=en"' in body
+
+
+# ── Part 3: admin-only filtering ------------------------------------------
+
+def test_admin_category_hidden_for_non_admin(user):
+    client = _login(user.id)
+    resp = client.get("/info")
+    assert resp.status_code == 200
+    body = resp.text
+    # Admin-categorie mag niet in de grid verschijnen (Jinja escapet & → &amp;)
+    assert "Admin &amp; onderhoud" not in body
+    assert "/info/admin" not in body
+
+
+def test_admin_category_visible_for_admin(admin_user):
+    client = _login(admin_user.id)
+    resp = client.get("/info")
+    assert resp.status_code == 200
+    body = resp.text
+    assert "Admin &amp; onderhoud" in body
+    assert 'href="/info/admin"' in body
+
+
+def test_non_admin_gets_redirected_from_admin_category(user):
+    client = _login(user.id)
+    resp = client.get("/info/admin", follow_redirects=False)
+    assert resp.status_code == 302
+    assert resp.headers["location"] == "/info"
+
+
+def test_non_admin_gets_redirected_from_admin_article(user):
+    client = _login(user.id)
+    resp = client.get("/info/admin/backup-restore", follow_redirects=False)
+    assert resp.status_code == 302
+    assert resp.headers["location"] == "/info"
+
+
+def test_admin_can_read_admin_category(admin_user):
+    client = _login(admin_user.id)
+    resp = client.get("/info/admin")
+    assert resp.status_code == 200
+    assert "Backup en restore" in resp.text
+
+
+def test_admin_can_read_admin_article(admin_user):
+    client = _login(admin_user.id)
+    resp = client.get("/info/admin/backup-restore")
+    assert resp.status_code == 200
+    body = resp.text
+    assert "Backup en restore" in body
+    # De pg_dump-instructie uit de issue moet er in staan
+    assert "pg_dump" in body
+    assert "ctp-backup-" in body
+
+
+def test_admin_article_english_variant(admin_user):
+    client = _login(admin_user.id)
+    resp = client.get("/info/admin/backup-restore?lang=en")
+    assert resp.status_code == 200
+    body = resp.text
+    assert "Backup and restore" in body
+    assert "pg_dump" in body
+    # Geen fallback-banner — EN bestaat
+    assert "info-fallback-banner" not in body
+
+
+def test_admin_sidebar_hides_admin_for_non_admin(user):
+    """Sidebar van een niet-admin-pagina mag de admin-categorie niet tonen."""
+    client = _login(user.id)
+    resp = client.get("/info/getting-started")
+    assert resp.status_code == 200
+    body = resp.text
+    assert "Admin &amp; onderhoud" not in body

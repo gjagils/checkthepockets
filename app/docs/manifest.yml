@@ -4,3 +4,9 @@ categories:
     title_en: "Getting started"
     icon: "🚀"
     order: 1
+  - slug: admin
+    title_nl: "Admin & onderhoud"
+    title_en: "Admin & maintenance"
+    icon: "🔧"
+    order: 99
+    admin_only: true
