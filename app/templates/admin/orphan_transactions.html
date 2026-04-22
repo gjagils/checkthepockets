@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Verdachte transacties - Admin{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Verdachte transacties</h1>
+    <a href="/admin/users" class="btn btn-sm">← Admin</a>
+</div>
+
+<div class="card" style="margin-bottom:1rem;">
+    <p class="muted" style="margin:0;">
+        Transacties waarvan de tegenpartij-IBAN of omschrijving suggereert dat ze bij een
+        <strong>andere bank/rekening</strong> horen dan waar ze nu op staan. Detecteert bv. een
+        "bunq Payday" op een ABN-rekening terwijl je ook een bunq-rekening hebt.
+        Gebruik het tx-actiepaneel op <a href="/transactions">/transactions</a> (›-knop) en
+        <em>↪ Verplaats rekening</em> om ze te corrigeren.
+    </p>
+    <p class="muted" style="font-size:0.82rem; margin-top:0.5rem; margin-bottom:0;">
+        Gescanned: {{ total_scanned }} transacties · Verdacht: {{ suspicious|length }}
+    </p>
+</div>
+
+{% if suspicious %}
+<div class="card" style="padding:0; overflow:visible;">
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Datum</th>
+                    <th>Omschrijving</th>
+                    <th>Tegenpartij</th>
+                    <th>IBAN tegenpartij</th>
+                    <th class="text-right">Bedrag</th>
+                    <th>Staat nu op</th>
+                    <th>Reden(en)</th>
+                    <th>Suggestie</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in suspicious %}
+                {% set tx = item.tx %}
+                <tr>
+                    <td class="nowrap">{{ tx.date.strftime('%d-%m-%Y') }}</td>
+                    <td style="max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ tx.description or '' }}">
+                        {{ tx.description or '—' }}
+                    </td>
+                    <td>{{ tx.counterparty or '—' }}</td>
+                    <td class="muted" style="font-size:0.78rem;">{{ tx.counterparty_iban or '—' }}</td>
+                    <td class="text-right nowrap {% if tx.amount >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
+                        &euro;&nbsp;{{ tx.amount|euro }}
+                    </td>
+                    <td>
+                        <span class="pill">{{ item.account.bank|upper }}</span>
+                        <span style="font-size:0.8rem;">{{ item.account.name }}</span>
+                    </td>
+                    <td style="font-size:0.78rem;">
+                        {% for r in item.reasons %}
+                        <div>⚠ {{ r }}</div>
+                        {% endfor %}
+                    </td>
+                    <td>
+                        {% if item.suggested_account %}
+                        <span class="muted" style="font-size:0.8rem;">→ {{ item.suggested_account.name }}</span>
+                        {% else %}
+                        <span class="muted" style="font-size:0.8rem;">geen suggestie</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if item.suggested_account %}
+                        <form method="post" action="/transactions/{{ tx.id }}/move-account" style="display:inline;">
+                            <input type="hidden" name="redirect_to" value="/admin/orphan-transactions">
+                            <input type="hidden" name="target_account_id" value="{{ item.suggested_account.id }}">
+                            <button type="submit" class="btn btn-sm btn-accent"
+                                    onclick="return confirm('Verplaats naar {{ item.suggested_account.name }}?')">
+                                ↪ Verplaats
+                            </button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="card" style="text-align:center; padding:2rem;">
+    <p class="muted" style="margin:0;">✓ Geen verdachte transacties gevonden.</p>
+</div>
+{% endif %}
+{% endblock %}
