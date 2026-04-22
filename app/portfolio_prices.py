@@ -143,13 +143,31 @@ def _fetch_metal_history(symbol: str, months: int) -> dict:
     return monthly
 
 
-# Common preset assets with their API symbols
+# Common preset assets with their API symbols. spread_pct = % onder spot dat
+# wordt toegepast op de gefetchte prijs (raw spot − spread). Voor edelmetalen
+# benadert 0,6% de Goldrepublic-prijs goed; crypto's hebben kleinere spreads
+# en blijven op 0.
 PRESET_ASSETS = [
-    {"name": "Goud", "symbol": "XAU", "asset_class": "metal", "unit": "troy oz"},
-    {"name": "Zilver", "symbol": "XAG", "asset_class": "metal", "unit": "troy oz"},
-    {"name": "Bitcoin", "symbol": "bitcoin", "asset_class": "crypto", "unit": "BTC"},
-    {"name": "Ethereum", "symbol": "ethereum", "asset_class": "crypto", "unit": "ETH"},
-    {"name": "Solana", "symbol": "solana", "asset_class": "crypto", "unit": "SOL"},
-    {"name": "XRP", "symbol": "ripple", "asset_class": "crypto", "unit": "XRP"},
-    {"name": "Cardano", "symbol": "cardano", "asset_class": "crypto", "unit": "ADA"},
+    {"name": "Goud", "symbol": "XAU", "asset_class": "metal", "unit": "troy oz", "spread_pct": "0.60"},
+    {"name": "Zilver", "symbol": "XAG", "asset_class": "metal", "unit": "troy oz", "spread_pct": "0.60"},
+    {"name": "Bitcoin", "symbol": "bitcoin", "asset_class": "crypto", "unit": "BTC", "spread_pct": "0"},
+    {"name": "Ethereum", "symbol": "ethereum", "asset_class": "crypto", "unit": "ETH", "spread_pct": "0"},
+    {"name": "Solana", "symbol": "solana", "asset_class": "crypto", "unit": "SOL", "spread_pct": "0"},
+    {"name": "XRP", "symbol": "ripple", "asset_class": "crypto", "unit": "XRP", "spread_pct": "0"},
+    {"name": "Cardano", "symbol": "cardano", "asset_class": "crypto", "unit": "ADA", "spread_pct": "0"},
 ]
+
+
+def apply_spread(price: Decimal | None, spread_pct: Decimal | None) -> Decimal | None:
+    """Pas een spread (% onder spot) toe op een raw prijs.
+
+    Goldrepublic-style brokers verkopen onder de spot-prijs; door spread_pct
+    op `asset.spread_pct` te zetten benaderen we hun werkelijke koers zonder
+    een aparte data-feed. None of 0 → ongewijzigd.
+    """
+    if price is None:
+        return None
+    if not spread_pct:
+        return price
+    factor = Decimal("1") - (Decimal(spread_pct) / Decimal("100"))
+    return price * factor

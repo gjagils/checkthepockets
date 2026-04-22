@@ -343,6 +343,10 @@ class PortfolioAsset(Base):
     monthly_growth_pct = Column(Numeric(6, 2), default=0)
     cashout_fee_fixed_eur = Column(Numeric(12, 2), default=0)
     cashout_fee_pct = Column(Numeric(6, 2), default=0)
+    # Spread (% lager dan spot) die op de gehaalde prijs wordt toegepast bij
+    # auto-fetch. Voor edelmetalen via Goldrepublic-achtige bronnen ligt dit
+    # rond 0,6% onder spot. 0 = geen aanpassing (raw spot price).
+    spread_pct = Column(Numeric(6, 2), default=0)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     user = relationship("User", back_populates="portfolio_assets")

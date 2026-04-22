@@ -58,7 +58,7 @@
                 <select id="preset-select" onchange="fillPreset(this.value)" style="width:100%; padding:0.5rem; border:2px solid var(--ctp-border); border-radius:var(--ctp-radius-sm);">
                     <option value="">-- Kies of vul handmatig in --</option>
                     {% for p in preset_assets if not filter_type or p.asset_class == filter_type %}
-                    <option value='{{ p.name }}|{{ p.symbol }}|{{ p.asset_class }}|{{ p.unit }}'>{{ p.name }} ({{ p.symbol }})</option>
+                    <option value='{{ p.name }}|{{ p.symbol }}|{{ p.asset_class }}|{{ p.unit }}|{{ p.spread_pct or "0" }}'>{{ p.name }} ({{ p.symbol }})</option>
                     {% endfor %}
                 </select>
             </div>
@@ -111,6 +111,10 @@
                     <label>Opname fee (%) <span class="muted" style="font-weight:normal;">(optioneel)</span></label>
                     <input type="text" name="cashout_fee_pct" placeholder="0,00" inputmode="decimal">
                 </div>
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+                <label>Spread t.o.v. spot (%) <span class="muted" style="font-weight:normal;">(0,6 voor goud/zilver via Goldrepublic; 0 = raw spot)</span></label>
+                <input type="text" name="spread_pct" id="asset-spread-pct" placeholder="0,00" inputmode="decimal">
             </div>
             <button type="submit" class="btn btn-primary">Toevoegen</button>
         </form>
@@ -280,6 +284,7 @@
                     <th>Handmatige prijs</th>
                     <th title="Vaste opnamekosten in euro">Opname fee (&euro;)</th>
                     <th title="Variabele opnamekosten als percentage">Opname fee (%)</th>
+                    <th title="Spread t.o.v. spot bij auto-fetch (bv. 0,6 voor Goldrepublic-achtige goud/zilver)">Spread (%)</th>
                     <th></th>
                     <th></th>
                 </tr>
@@ -297,6 +302,7 @@
                     <td><input type="text" name="manual_price" placeholder="{{ "%.2f"|format(asset.current_price_eur) }}" class="budget-input" style="width:100px;"></td>
                     <td><input type="text" name="cashout_fee_fixed_eur" value="{{ asset.cashout_fee_fixed_eur or 0 }}" class="budget-input" style="width:80px;"></td>
                     <td><input type="text" name="cashout_fee_pct" value="{{ asset.cashout_fee_pct or 0 }}" class="budget-input" style="width:70px;"></td>
+                    <td><input type="text" name="spread_pct" value="{{ asset.spread_pct or 0 }}" class="budget-input" style="width:60px;" title="% onder spot bij auto-fetch"></td>
                     <td><button type="submit" class="btn btn-sm">Opslaan</button></td>
                     </form>
                     <td>
@@ -373,6 +379,10 @@ function fillPreset(val) {
     document.getElementById('asset-symbol').value = parts[1];
     document.getElementById('asset-class').value = parts[2];
     document.getElementById('asset-unit').value = parts[3];
+    var spreadEl = document.getElementById('asset-spread-pct');
+    if (spreadEl && parts[4] !== undefined) {
+        spreadEl.value = String(parts[4]).replace('.', ',');
+    }
     toggleStockFields(parts[2]);
 }
 

@@ -9,7 +9,12 @@ from app.database import get_db
 from app.models import PortfolioAsset, Person, PortfolioHolding, PortfolioPriceSnapshot
 from app.auth import require_login
 from app.capital_dashboard import build_capital_dashboard
-from app.portfolio_prices import fetch_price, fetch_historical_prices, PRESET_ASSETS
+from app.portfolio_prices import (
+    fetch_price,
+    fetch_historical_prices,
+    apply_spread,
+    PRESET_ASSETS,
+)
 from app.template_config import templates
 
 router = APIRouter(prefix="/portfolio")
@@ -286,6 +291,7 @@ def add_asset(
     manual_price: str = Form(""),
     cashout_fee_fixed_eur: str = Form("0"),
     cashout_fee_pct: str = Form("0"),
+    spread_pct: str = Form("0"),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
@@ -318,6 +324,12 @@ def add_asset(
         )
     except (InvalidOperation, ValueError):
         asset.cashout_fee_pct = Decimal("0")
+    try:
+        asset.spread_pct = Decimal(
+            (spread_pct or "0").strip().replace(",", ".") or "0"
+        )
+    except (InvalidOperation, ValueError):
+        asset.spread_pct = Decimal("0")
 
     # Optional manual initial price (useful for stocks where there's no auto-fetch)
     manual = manual_price.strip().replace(",", ".")
@@ -346,6 +358,7 @@ def edit_asset(
     exchange: str | None = Form(None),
     cashout_fee_fixed_eur: str | None = Form(None),
     cashout_fee_pct: str | None = Form(None),
+    spread_pct: str | None = Form(None),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
@@ -392,6 +405,13 @@ def edit_asset(
         try:
             asset.cashout_fee_pct = Decimal(
                 cashout_fee_pct.strip().replace(",", ".") or "0"
+            )
+        except (InvalidOperation, ValueError):
+            pass
+    if spread_pct is not None:
+        try:
+            asset.spread_pct = Decimal(
+                spread_pct.strip().replace(",", ".") or "0"
             )
         except (InvalidOperation, ValueError):
             pass
@@ -538,29 +558,34 @@ def refresh_prices(
             skipped_stocks += 1
             continue
 
-        # Fetch current price
-        price = fetch_price(asset.symbol, asset.asset_class)
+        # Fetch current price + apply per-asset spread (bv. Goldrepublic ~0,6%
+        # onder spot voor edelmetalen). spread_pct=0 → ongewijzigd.
+        spread = asset.spread_pct or Decimal("0")
+        raw_price = fetch_price(asset.symbol, asset.asset_class)
+        price = apply_spread(raw_price, spread)
         if price is not None:
             asset.current_price_eur = price
             asset.price_updated_at = datetime.datetime.utcnow()
             updated += 1
 
-        # Fetch and store historical prices
+        # Fetch and store historical prices (zelfde spread toegepast zodat de
+        # waardeverloop-grafiek consistent is met de huidige prijs).
         history = fetch_historical_prices(asset.symbol, asset.asset_class, months=12)
         for (year, month), hist_price in history.items():
+            adjusted = apply_spread(hist_price, spread)
             existing = db.query(PortfolioPriceSnapshot).filter(
                 PortfolioPriceSnapshot.asset_id == asset.id,
                 PortfolioPriceSnapshot.year == year,
                 PortfolioPriceSnapshot.month == month,
             ).first()
             if existing:
-                existing.price_eur = hist_price
+                existing.price_eur = adjusted
             else:
                 snapshot = PortfolioPriceSnapshot(
                     asset_id=asset.id,
                     year=year,
                     month=month,
-                    price_eur=hist_price,
+                    price_eur=adjusted,
                 )
                 db.add(snapshot)
 
