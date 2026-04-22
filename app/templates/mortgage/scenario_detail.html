@@ -1,18 +1,19 @@
 {% extends "base.html" %}
 {% block title %}{{ scenario.name }} — Hypotheek - Check Your Pockets{% endblock %}
 {% block content %}
-<div class="page-header" style="display:flex; justify-content:space-between; align-items:center; gap:1rem;">
+<div class="scenario-header">
     <div>
-        <h1 style="margin-bottom:0.25rem;">{{ scenario.name }}</h1>
-        <div class="muted">
-            Energielabel {{ scenario.energy_label or '—' }}
-            {% if scenario.is_archived %} · <em>gearchiveerd</em>{% endif %}
+        <h1 class="scenario-title">{{ scenario.name }}</h1>
+        <div class="scenario-subtitle">
+            <span>Energielabel {{ scenario.energy_label or '—' }}</span>
+            {% if scenario.is_archived %}<span>·</span><em>gearchiveerd</em>{% endif %}
             {% if scenario.funda_url %}
-             · <a href="{{ scenario.funda_url }}" target="_blank" rel="noopener">↗ Bekijk op Funda</a>
+            <span>·</span>
+            <a href="{{ scenario.funda_url }}" target="_blank" rel="noopener">↗ Bekijk op Funda</a>
             {% endif %}
         </div>
     </div>
-    <div style="display:flex; gap:0.5rem;">
+    <div class="scenario-header-actions">
         <a href="/hypotheek/scenarios/{{ scenario.id }}/edit" class="btn">Bewerken</a>
         <a href="/hypotheek/scenarios" class="btn">← Terug</a>
     </div>
@@ -52,27 +53,55 @@
 
 <div class="card" style="margin-bottom:1.5rem;">
     <h2 style="margin:0 0 0.75rem 0; font-size:1.1rem;">Invoer</h2>
-    <div class="kv-grid">
-        <div><span class="muted">Taxatie</span><br>€ {{ scenario.valuation | euro0 }}</div>
-        <div><span class="muted">Bod</span><br>€ {{ scenario.offer | euro0 }}</div>
-        <div><span class="muted">Verbouwing</span><br>€ {{ scenario.renovation_cost | euro0 }}</div>
-        <div><span class="muted">Eigen inbreng</span><br>€ {{ scenario.own_contribution | euro0 }}</div>
-        <div><span class="muted">Verkoop oude woning</span><br>€ {{ scenario.sale_old_home | euro0 }}</div>
-        <div><span class="muted">Energielabel</span><br>{{ scenario.energy_label or '—' }}</div>
+    <div class="scenario-grid">
+        <div class="scenario-kpi"><span class="kpi-label">Taxatie</span><span class="kpi-value">€ {{ scenario.valuation | euro0 }}</span></div>
+        <div class="scenario-kpi"><span class="kpi-label">Bod</span><span class="kpi-value">€ {{ scenario.offer | euro0 }}</span></div>
+        <div class="scenario-kpi"><span class="kpi-label">Verbouwing</span><span class="kpi-value">€ {{ scenario.renovation_cost | euro0 }}</span></div>
+        <div class="scenario-kpi"><span class="kpi-label">Eigen inbreng</span><span class="kpi-value">€ {{ scenario.own_contribution | euro0 }}</span></div>
+        <div class="scenario-kpi"><span class="kpi-label">Verkoop oude woning</span><span class="kpi-value">€ {{ scenario.sale_old_home | euro0 }}</span></div>
+        <div class="scenario-kpi"><span class="kpi-label">Energielabel</span><span class="kpi-value">{{ scenario.energy_label or '—' }}</span></div>
     </div>
     {% if scenario.notes %}<p class="muted" style="margin-top:0.75rem; margin-bottom:0;">{{ scenario.notes }}</p>{% endif %}
 </div>
 
-<div class="card" style="margin-bottom:1.5rem;">
+<div class="card scenario-card-derived" style="margin-bottom:1.5rem;">
     <h2 style="margin:0 0 0.75rem 0; font-size:1.1rem;">Afgeleide waardes</h2>
-    <div class="kv-grid">
-        <div><span class="muted">Aankoopkosten ({{ "%.2f" | format(scenario.purchase_fee_pct) }}%)</span><br>€ {{ fin.purchase_fee | euro0 }}</div>
-        <div><span class="muted">Verkoopkosten ({{ "%.2f" | format(scenario.sale_fee_pct) }}%)</span><br>€ {{ fin.sale_fee | euro0 }}</div>
-        <div><span class="muted">Overwaarde oude woning</span><br>€ {{ fin.overwaarde | euro0 }}</div>
-        <div><span class="muted">Som bestaande hypotheken</span><br>€ {{ fin.existing_total | euro0 }}</div>
-        <div><span class="muted">Te financieren</span><br><strong>€ {{ fin.te_financieren | euro0 }}</strong></div>
-        <div><span class="muted">Nieuwe annuïteit</span><br>€ {{ fin.nieuwe_annuiteit | euro0 }}</div>
-        <div><span class="muted">LTV nieuw</span><br>{{ "%.2f" | format(fin.ltv_fraction * 100) }}%</div>
+    <div class="scenario-grid">
+        <div class="scenario-kpi">
+            <span class="kpi-label">Aankoopkosten ({{ "%.2f" | format(scenario.purchase_fee_pct) }}%)</span>
+            <span class="kpi-value">€ {{ fin.purchase_fee | euro0 }}</span>
+            <span class="kpi-hint">= bod × {{ "%.2f" | format(scenario.purchase_fee_pct) }}%</span>
+        </div>
+        <div class="scenario-kpi">
+            <span class="kpi-label">Verkoopkosten ({{ "%.2f" | format(scenario.sale_fee_pct) }}%)</span>
+            <span class="kpi-value">€ {{ fin.sale_fee | euro0 }}</span>
+            <span class="kpi-hint">= verkoop × {{ "%.2f" | format(scenario.sale_fee_pct) }}%</span>
+        </div>
+        <div class="scenario-kpi">
+            <span class="kpi-label">Overwaarde oude woning</span>
+            <span class="kpi-value">€ {{ fin.overwaarde | euro0 }}</span>
+            <span class="kpi-hint">= verkoop − bestaande − verkoopkosten</span>
+        </div>
+        <div class="scenario-kpi">
+            <span class="kpi-label">Som bestaande hypotheken</span>
+            <span class="kpi-value">€ {{ fin.existing_total | euro0 }}</span>
+            <span class="kpi-hint">loopt door in nieuwe pand</span>
+        </div>
+        <div class="scenario-kpi">
+            <span class="kpi-label">Te financieren</span>
+            <span class="kpi-value"><strong>€ {{ fin.te_financieren | euro0 }}</strong></span>
+            <span class="kpi-hint">= bod + verbouwing + aankoopkosten</span>
+        </div>
+        <div class="scenario-kpi">
+            <span class="kpi-label">Nieuwe annuïteit</span>
+            <span class="kpi-value">€ {{ fin.nieuwe_annuiteit | euro0 }}</span>
+            <span class="kpi-hint">= te_financieren − inbreng − overwaarde − bestaand</span>
+        </div>
+        <div class="scenario-kpi">
+            <span class="kpi-label">LTV nieuw</span>
+            <span class="kpi-value">{{ "%.2f" | format(fin.ltv_fraction * 100) }}%</span>
+            <span class="kpi-hint">= (bestaand + nieuwe) / taxatie</span>
+        </div>
     </div>
 </div>
 
@@ -151,7 +180,7 @@
 
     {% if variant_stats %}
     <div class="table-wrap">
-        <table>
+        <table class="scenario-variants-table">
             <thead>
                 <tr>
                     <th>Rentevast</th>
@@ -350,10 +379,18 @@
                     </td>
                 </tr>
                 {% endfor %}
-                <tr style="border-top:2px solid #999;">
-                    <td><strong>Totaal budget / maand</strong></td>
-                    <td class="text-right"><strong>€ {{ budget_total | euro }}</strong></td>
-                    <td></td><td></td>
+                {% set _current_sum = namespace(value=0) %}
+                {% for row in budget_rows %}{% set _current_sum.value = _current_sum.value + row.current_amount %}{% endfor %}
+                {% set _delta = budget_total - _current_sum.value %}
+                <tr class="scenario-budget-total">
+                    <td>Totaal</td>
+                    <td class="text-right">€ {{ _current_sum.value | euro }}</td>
+                    <td class="text-right">€ {{ budget_total | euro }}</td>
+                    <td class="scenario-budget-delta {% if _delta > 0 %}neg{% elif _delta < 0 %}pos{% endif %}"
+                        style="text-align:right; padding-right:0.6rem;"
+                        title="Verschil scenario − huidig (positief = duurder bij dit scenario)">
+                        {% if _delta > 0 %}+{% endif %}€ {{ _delta | euro }}
+                    </td>
                 </tr>
                 <tr>
                     <td class="muted">Totaal salaris / maand</td>
