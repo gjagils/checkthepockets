@@ -27,6 +27,7 @@
         else 'portfolio' if path.startswith('/analytics') or path.startswith('/portfolio') or path.startswith('/networth')
         else 'hypotheek' if path.startswith('/hypotheek')
         else 'rekeningen' if path.startswith('/accounts') or path.startswith('/import') or path.startswith('/banking') or path.startswith('/persons')
+        else 'info' if path.startswith('/info')
         else '' %}
     {% set portfolio_type = request.query_params.get('type') if path.startswith('/portfolio') else None %}
     {% set inbox_count = request.state.inbox_count if request.state.inbox_count is defined else 0 %}
@@ -59,6 +60,7 @@
             </div>
             <div class="nav-user-section">
                 <button class="theme-toggle" id="theme-toggle-btn" onclick="toggleTheme()" title="Thema wisselen">🌙</button>
+                <a href="/info" class="nav-link-subtle nav-help-link {{ 'active' if main_active == 'info' }}" title="Help">? Help</a>
                 {% if user.is_admin %}
                 <a href="/admin/users" class="nav-link-subtle nav-admin-link {{ 'active' if path.startswith('/admin') }}" title="Admin">⚙ Admin</a>
                 {% endif %}
@@ -157,6 +159,7 @@
                 </div>
             </nav>
             <div class="mobile-drawer-footer">
+                <a href="/info" class="m-nav-main {{ 'active' if main_active == 'info' }}">? Help</a>
                 {% if user.is_admin %}
                 <a href="/admin/users" class="m-nav-main {{ 'active' if path.startswith('/admin') }}">⚙ Admin</a>
                 {% endif %}

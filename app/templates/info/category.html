@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}{{ category.title(lang) }} · Help · Check Your Pockets{% endblock %}
+{% block container_class %}container-wide{% endblock %}
+{% block content %}
+<div class="info-breadcrumbs">
+    <a href="/info">Help</a>
+    <span class="info-breadcrumb-sep">›</span>
+    <span>{{ category.title(lang) }}</span>
+</div>
+
+<div class="info-layout">
+    {% set sidebar_articles = articles %}
+    {% include "info/_sidebar.html" %}
+    <section class="info-content">
+        <h1>{{ category.icon }} {{ category.title(lang) }}</h1>
+        {% if not articles %}
+        <p class="muted">Nog geen artikelen in deze categorie.</p>
+        {% else %}
+        <ul class="info-article-list">
+            {% for art in articles %}
+            <li>
+                <a href="/info/{{ category.slug }}/{{ art.slug }}">{{ art.title }}</a>
+                {% if art.summary %}<span class="muted"> — {{ art.summary }}</span>{% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}

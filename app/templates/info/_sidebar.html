@@ -1,0 +1,21 @@
+{# Reusable sidebar: lijst van categorieën (cat.slug + cat.title(lang)). Actieve categorie krijgt .is-active; actief artikel .is-active. #}
+<aside class="info-sidebar">
+    {% for cat in categories %}
+    <div class="info-sidebar-group {% if category is defined and category.slug == cat.slug %}is-active{% endif %}">
+        <a href="/info/{{ cat.slug }}" class="info-sidebar-cat">
+            <span>{{ cat.icon }}</span>
+            <span>{{ cat.title(lang) }}</span>
+        </a>
+        {% if category is defined and category.slug == cat.slug and sidebar_articles is defined %}
+        <div class="info-sidebar-articles">
+            {% for art in sidebar_articles %}
+            <a href="/info/{{ cat.slug }}/{{ art.slug }}"
+               class="{% if article is defined and article.meta.slug == art.slug %}is-active{% endif %}">
+                {{ art.title }}
+            </a>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</aside>

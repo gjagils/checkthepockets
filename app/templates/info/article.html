@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}{{ article.meta.title }} · Help · Check Your Pockets{% endblock %}
+{% block container_class %}container-wide{% endblock %}
+{% block content %}
+<div class="info-breadcrumbs">
+    <a href="/info">Help</a>
+    <span class="info-breadcrumb-sep">›</span>
+    <a href="/info/{{ category.slug }}">{{ category.title(lang) }}</a>
+    <span class="info-breadcrumb-sep">›</span>
+    <span>{{ article.meta.title }}</span>
+</div>
+
+<div class="info-layout">
+    {% include "info/_sidebar.html" %}
+    <article class="info-article">
+        {{ article.html|safe }}
+        {% if article.meta.updated %}
+        <p class="info-article-updated muted">
+            {% if lang == 'en' %}Last updated{% else %}Laatst bijgewerkt{% endif %}: {{ article.meta.updated }}
+        </p>
+        {% endif %}
+    </article>
+</div>
+{% endblock %}
