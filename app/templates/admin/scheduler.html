@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Admin — Scheduler - Check Your Pockets{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Scheduler</h1>
+    <div style="display:flex; gap:0.5rem;">
+        <a href="/admin/users" class="btn">Terug naar gebruikers</a>
+    </div>
+</div>
+
+{% if request.query_params.get('flash') == 'triggered' %}
+<div class="alert alert-success" style="margin-bottom:1rem;">Job is gestart. Resultaat verschijnt hieronder bij "Recente runs".</div>
+{% endif %}
+{% if request.query_params.get('error') == 'unknown_job' %}
+<div class="alert alert-danger" style="margin-bottom:1rem;">Onbekende job.</div>
+{% endif %}
+{% if request.query_params.get('error') == 'trigger_failed' %}
+<div class="alert alert-danger" style="margin-bottom:1rem;">Kon de job niet starten.</div>
+{% endif %}
+
+<div class="card" style="margin-bottom:1.5rem;">
+    <h2 style="margin:0 0 0.75rem 0; font-size:1.1rem;">Ingeplande jobs</h2>
+    {% if not jobs %}
+    <p class="muted">Scheduler draait niet, of er zijn geen jobs ingepland (bv. omdat `ENABLE_BANKING_APP_ID` niet gezet is).</p>
+    {% else %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Job ID</th>
+                    <th>Trigger</th>
+                    <th>Volgende run</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for job in jobs %}
+                <tr>
+                    <td><code>{{ job.id }}</code></td>
+                    <td class="muted" style="font-size:0.85rem;">{{ job.trigger }}</td>
+                    <td class="nowrap">
+                        {% if job.next_run_time %}{{ job.next_run_time.strftime('%Y-%m-%d %H:%M:%S %Z') }}{% else %}—{% endif %}
+                    </td>
+                    <td>
+                        <form method="post" action="/admin/scheduler/run" style="display:inline;"
+                              onsubmit="return confirm('Job {{ job.id }} nu uitvoeren?')">
+                            <input type="hidden" name="job_id" value="{{ job.id }}">
+                            <button type="submit" class="btn btn-sm btn-primary">Run nu</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</div>
+
+<div class="card">
+    <h2 style="margin:0 0 0.75rem 0; font-size:1.1rem;">Recente runs (laatste 30)</h2>
+    {% if not recent_runs %}
+    <p class="muted">Nog geen run-historie.</p>
+    {% else %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Job</th>
+                    <th>Start</th>
+                    <th>Duur</th>
+                    <th>Status</th>
+                    <th>Samenvatting</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in recent_runs %}
+                {% set duration = ((r.finished_at - r.started_at).total_seconds() | round(1)) if r.finished_at and r.started_at else None %}
+                <tr>
+                    <td><code>{{ r.job_id }}</code></td>
+                    <td class="nowrap" style="font-size:0.85rem;">{{ r.started_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                    <td class="nowrap">
+                        {% if duration is not none %}{{ duration }}s{% else %}<span class="muted">—</span>{% endif %}
+                    </td>
+                    <td>
+                        {% if r.status == 'ok' %}
+                            <span class="pill" style="background:var(--green-bg, #ddf3dd); color:var(--green, #2e7d32);">OK</span>
+                        {% elif r.status == 'error' %}
+                            <span class="pill" style="background:var(--red-bg); color:var(--red);">Error</span>
+                        {% else %}
+                            <span class="pill" style="background:var(--border); color:var(--muted);">{{ r.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if r.summary %}
+                        <details>
+                            <summary class="muted" style="cursor:pointer; font-size:0.85rem;">
+                                {% set first_line = r.summary.split('\n')[0][:100] %}
+                                {{ first_line }}{% if r.summary|length > first_line|length %} …{% endif %}
+                            </summary>
+                            <pre style="background:var(--surface-2); padding:0.5rem 0.75rem; border-radius:4px; font-size:0.8rem; white-space:pre-wrap; overflow-x:auto; margin-top:0.3rem;">{{ r.summary }}</pre>
+                        </details>
+                        {% else %}
+                        <span class="muted">—</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

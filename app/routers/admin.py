@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.database import get_db
-from app.models import User, AuthToken, Account, Transaction
+from app.models import User, AuthToken, Account, Transaction, SchedulerRunLog
 from app.auth import require_login
 from app.config import SUPER_ADMIN_USERNAME
 from app.email_service import send_invite_email
@@ -409,3 +409,86 @@ def admin_orphan_transactions(request: Request, db: Session = Depends(get_db)):
             "total_scanned": len(transactions),
         },
     )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Scheduler dashboard (LIN-42)
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _scheduled_jobs_info():
+    """Snapshot van APScheduler: ingeplande jobs + next-run + trigger-beschrijving.
+
+    Draait defensief — een scheduler die niet is gestart retourneert gewoon [].
+    """
+    try:
+        from app.scheduler import scheduler
+        jobs = scheduler.get_jobs()
+    except Exception:
+        return []
+    out = []
+    for job in jobs:
+        out.append({
+            "id": job.id,
+            "trigger": str(job.trigger),
+            "next_run_time": getattr(job, "next_run_time", None),
+            "name": getattr(job, "name", None) or job.id,
+        })
+    return out
+
+
+@router.get("/scheduler")
+def admin_scheduler(request: Request, db: Session = Depends(get_db)):
+    admin = _require_admin(request, db)
+    jobs = _scheduled_jobs_info()
+    recent_runs = (
+        db.query(SchedulerRunLog)
+        .order_by(SchedulerRunLog.started_at.desc())
+        .limit(30)
+        .all()
+    )
+    return templates.TemplateResponse(
+        "admin/scheduler.html",
+        {
+            "request": request,
+            "user": admin,
+            "jobs": jobs,
+            "recent_runs": recent_runs,
+        },
+    )
+
+
+_RUNNABLE_JOBS = {
+    "weekly_digest": "app.scheduler._run_weekly_digests",
+    "bank_sync": "app.scheduler._sync_all_bank_connections",
+}
+
+
+@router.post("/scheduler/run")
+def admin_scheduler_run(
+    request: Request,
+    job_id: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    """Start een bekende job meteen. De `logged_job`-decorator zorgt voor een
+    log-rij — ook bij een fout.
+    """
+    _require_admin(request, db)
+    target = _RUNNABLE_JOBS.get(job_id)
+    if not target:
+        return RedirectResponse("/admin/scheduler?error=unknown_job", status_code=302)
+
+    module_path, fn_name = target.rsplit(".", 1)
+    import importlib
+    try:
+        mod = importlib.import_module(module_path)
+        fn = getattr(mod, fn_name)
+        # Catch fouten zodat de UI niet breekt — de decorator bewaart de traceback
+        # sowieso in de log-rij.
+        try:
+            fn()
+        except Exception:
+            pass
+    except Exception:
+        return RedirectResponse("/admin/scheduler?error=trigger_failed", status_code=302)
+
+    return RedirectResponse("/admin/scheduler?flash=triggered", status_code=302)
