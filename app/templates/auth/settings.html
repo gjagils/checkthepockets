@@ -77,6 +77,8 @@
         Je kunt 'm altijd weer uitschakelen. Standaard staat hij uit.
     </p>
     {% if digest_success %}<div class="alert alert-success">{{ digest_success }}</div>{% endif %}
+    {% if digest_test_success %}<div class="alert alert-success">{{ digest_test_success }}</div>{% endif %}
+    {% if digest_test_error %}<div class="alert alert-danger">{{ digest_test_error }}</div>{% endif %}
     <form method="post" action="/settings/digest" class="filter-bar" style="flex-wrap:wrap; align-items:flex-end;">
         <div class="form-group" style="flex:1; min-width:200px;">
             <label class="check-row">
@@ -103,6 +105,14 @@
         <div class="form-group" style="align-self:flex-end;">
             <button type="submit" class="btn btn-primary">Opslaan</button>
         </div>
+    </form>
+    <form method="post" action="/settings/digest/test" style="margin-top:0.75rem;">
+        <button type="submit" class="btn btn-sm" title="Verstuur direct een digest om te testen of e-mail werkt">
+            📧 Stuur testdigest nu
+        </button>
+        <span class="muted" style="font-size:0.78rem; margin-left:0.5rem;">
+            Update niet je 'laatst verzonden'-tijd, dus je echte wekelijkse digest gaat gewoon door.
+        </span>
     </form>
 </div>
 
