@@ -52,7 +52,8 @@ def _make_user(db, username="alice", email="alice@example.com"):
 
 
 def _make_account(db, user, name="Main"):
-    a = Account(user_id=user.id, name=name, bank="custom", iban=f"NL{user.id:02d}TEST0000000000")
+    iban_slug = name[:4].upper().ljust(4, "_")
+    a = Account(user_id=user.id, name=name, bank="custom", iban=f"NL{user.id:02d}{iban_slug}0000000000")
     db.add(a)
     db.commit()
     db.refresh(a)
@@ -179,5 +180,74 @@ def test_post_category_for_other_users_transaction_is_rejected(db_session):
     tx = db_session.query(Transaction).filter(Transaction.id == tx_bob.id).one()
     assert tx.category_id is None
     assert tx.is_reviewed == 0
+
+
+# ── Account-filter + actions panel (GJA-36) ─────────────────────────────────
+
+def test_inbox_filters_by_account_id(db_session):
+    alice = _make_user(db_session)
+    a1 = _make_account(db_session, alice, "ABN")
+    a2 = _make_account(db_session, alice, "BUNQ")
+    _make_tx(db_session, a1, counterparty="Albert Heijn", tag="abn1")
+    _make_tx(db_session, a2, counterparty="Jumbo", tag="bunq1")
+
+    client = _login_client(alice.id)
+    resp = client.get(f"/inbox?account_id={a1.id}")
+    assert resp.status_code == 200
+    body = resp.text
+    assert "Albert Heijn" in body
+    assert "Jumbo" not in body
+    assert "1 te categoriseren" in body
+
+
+def test_inbox_account_filter_ignores_foreign_account(db_session):
+    alice = _make_user(db_session, "alice", "a@x.nl")
+    bob = _make_user(db_session, "bob", "b@x.nl")
+    acc_a = _make_account(db_session, alice, "ABN")
+    acc_b = _make_account(db_session, bob, "BobAcc")
+    _make_tx(db_session, acc_a, counterparty="Albert Heijn", tag="abn1")
+
+    # Alice probeert te filteren op Bob's account-id → valt terug op 'geen filter'
+    client = _login_client(alice.id)
+    resp = client.get(f"/inbox?account_id={acc_b.id}")
+    assert resp.status_code == 200
+    assert "Albert Heijn" in resp.text
+
+
+def test_inbox_renders_filter_dropdown_and_action_panel(db_session):
+    alice = _make_user(db_session)
+    acc = _make_account(db_session, alice, "Main")
+    _make_tx(db_session, acc, counterparty="AH", tag="e1")
+
+    client = _login_client(alice.id)
+    body = client.get("/inbox").text
+    # Filter-dropdown met 'Alle rekeningen'
+    assert "Alle rekeningen" in body
+    # Acties-paneel-markup is aanwezig (›-knop + panel)
+    assert "toggleInboxPanel" in body
+    assert "tx-action-panel" in body
+    # Essentiële acties
+    assert "Uitsluiten" in body
+    assert "Koppel terugkerend" in body
+    assert "Splitsen" in body
+
+
+def test_inbox_set_category_preserves_account_filter(db_session):
+    alice = _make_user(db_session)
+    acc = _make_account(db_session, alice, "Main")
+    cat = _make_category(db_session, alice, "Boodschappen")
+    tx = _make_tx(db_session, acc, counterparty="AH", tag="e1")
+
+    client = _login_client(alice.id)
+    resp = client.post(
+        f"/inbox/{tx.id}/category",
+        data={
+            "category_id": str(cat.id),
+            "redirect_to": f"/inbox?account_id={acc.id}",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    assert resp.headers["location"] == f"/inbox?account_id={acc.id}"
 
 

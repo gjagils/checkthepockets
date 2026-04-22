@@ -7,9 +7,22 @@
     <span class="inbox-count-label">{{ inbox_total }} te categoriseren</span>
 </div>
 
+<div class="card" style="margin-bottom:0.75rem;">
+    <div class="tx-filter-bar">
+        <form method="get" action="/inbox" class="tx-inline-form">
+            <select name="account_id" class="select-sm" onchange="this.form.submit()">
+                <option value="">Alle rekeningen</option>
+                {% for acc in accounts %}
+                <option value="{{ acc.id }}" {% if current_account_id == acc.id %}selected{% endif %}>{{ acc.name }}</option>
+                {% endfor %}
+            </select>
+        </form>
+    </div>
+</div>
+
 {% if not transactions %}
 <div class="card inbox-empty">
-    <p>Geen ongecategoriseerde transacties. Goed bezig!</p>
+    <p>Inbox is leeg ✓</p>
 </div>
 {% else %}
 <div class="card">
@@ -23,16 +36,18 @@
                     <th>Categorie</th>
                     <th class="text-right">Bedrag</th>
                     <th class="col-account">Rekening</th>
+                    <th style="width:2.5rem;"></th>
                 </tr>
             </thead>
             <tbody>
                 {% for tx in transactions %}
-                <tr data-txid="{{ tx.id }}">
+                <tr data-txid="{{ tx.id }}"{% if tx.is_excluded %} class="tx-excluded" style="opacity:0.55;"{% endif %}>
                     <td class="nowrap">{{ tx.date.strftime('%d-%m-%Y') }}</td>
                     <td class="desc-cell">{{ tx.description or '-' }}</td>
                     <td class="col-counterparty">{{ tx.counterparty or '-' }}</td>
                     <td class="nowrap">
                         <form method="post" action="/inbox/{{ tx.id }}/category" class="inline-cat-form">
+                            <input type="hidden" name="redirect_to" value="{{ redirect_back }}">
                             <select name="category_id" class="select-sm" onchange="this.form.submit()">
                                 <option value="">-</option>
                                 {% for parent in parents %}
@@ -54,11 +69,70 @@
                         &euro;&nbsp;{{ tx.amount|euro }}
                     </td>
                     <td class="nowrap col-account">{{ tx.account.name }}</td>
+                    <td style="text-align:center; padding:0.3rem;">
+                        <button type="button"
+                                class="tx-action-btn"
+                                id="inboxbtn-{{ tx.id }}"
+                                onclick="toggleInboxPanel({{ tx.id }})"
+                                title="Acties">›</button>
+                    </td>
+                </tr>
+                <tr class="tx-action-panel" id="inboxpanel-{{ tx.id }}" style="display:none;">
+                    <td colspan="7" class="tx-panel-cell">
+                        <div class="tx-panel-inner">
+                            <div class="tx-panel-info">
+                                <strong>{{ tx.counterparty or tx.description or '—' }}</strong>
+                                <span class="muted">{{ tx.date.strftime('%d-%m-%Y') }} &middot; €{{ tx.amount|euro }}</span>
+                            </div>
+                            <div class="tx-panel-footer">
+                                <a href="/transactions/{{ tx.id }}/edit?redirect_to={{ redirect_back }}" class="tx-panel-footer-btn">Bewerken</a>
+                                <span class="tx-panel-footer-sep">·</span>
+                                <a href="/transactions/{{ tx.id }}/split" class="tx-panel-footer-btn">✂ Splitsen</a>
+                                <span class="tx-panel-footer-sep">·</span>
+                                <button type="button" class="tx-panel-footer-btn"
+                                        onclick="document.getElementById('inboxrc-{{ tx.id }}').style.display='inline-flex'">🔄 Koppel terugkerend</button>
+                                <span id="inboxrc-{{ tx.id }}" style="display:none; gap:0.3rem; align-items:center; margin-left:0.3rem;">
+                                    <form method="post" action="/transactions/{{ tx.id }}/link-recurring" style="display:inline-flex; gap:0.3rem; align-items:center;">
+                                        <input type="hidden" name="redirect_to" value="{{ redirect_back }}">
+                                        <select name="recurring_id" style="padding:0.2rem 0.4rem; font-size:0.8rem; max-width:200px;">
+                                            {% for ri in recurring_items %}
+                                            <option value="{{ ri.id }}">{{ ri.name }} (€{{ ri.amount_expected|euro }})</option>
+                                            {% endfor %}
+                                        </select>
+                                        <button type="submit" class="btn btn-sm btn-accent">OK</button>
+                                    </form>
+                                </span>
+                                <span class="tx-panel-footer-sep">·</span>
+                                <form method="post" action="/transactions/{{ tx.id }}/exclude" style="display:inline;">
+                                    <input type="hidden" name="redirect_to" value="{{ redirect_back }}">
+                                    {% if tx.is_excluded %}
+                                    <button type="submit" class="tx-panel-footer-btn" title="Weer tonen in overzichten">Terugzetten</button>
+                                    {% else %}
+                                    <button type="submit" class="tx-panel-footer-btn tx-panel-footer-danger" onclick="return confirm('Transactie uitsluiten?')">Uitsluiten</button>
+                                    {% endif %}
+                                </form>
+                            </div>
+                        </div>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
+
+<script>
+function toggleInboxPanel(id) {
+    var panel = document.getElementById('inboxpanel-' + id);
+    var btn   = document.getElementById('inboxbtn-' + id);
+    var isOpen = panel.style.display !== 'none';
+    document.querySelectorAll('.tx-action-panel').forEach(function(p) { p.style.display = 'none'; });
+    document.querySelectorAll('.tx-action-btn').forEach(function(b) { b.classList.remove('active'); });
+    if (!isOpen) {
+        panel.style.display = 'table-row';
+        btn.classList.add('active');
+    }
+}
+</script>
 {% endif %}
 {% endblock %}

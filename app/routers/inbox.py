@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, Form, Query, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session, joinedload
 
 from app.auth import require_login
 from app.database import get_db
-from app.models import Account, Category, Transaction
+from app.models import Account, Category, RecurringTransaction, Transaction
 from app.template_config import templates
 
 router = APIRouter()
@@ -53,15 +53,52 @@ def _grouped_categories(db: Session, user_id: int):
 
 
 @router.get("/inbox")
-def inbox_page(request: Request, db: Session = Depends(get_db)):
+def inbox_page(
+    request: Request,
+    account_id: str = Query(""),
+    db: Session = Depends(get_db),
+):
     user = require_login(request, db)
 
+    query = _inbox_query(db, user.id)
+
+    # Account-filter (zelfde patroon als /transactions)
+    current_account_id: int | None = None
+    if account_id.strip().isdigit():
+        aid = int(account_id.strip())
+        owned = (
+            db.query(Account)
+            .filter(Account.id == aid, Account.user_id == user.id)
+            .first()
+        )
+        if owned:
+            current_account_id = aid
+            query = query.filter(Transaction.account_id == aid)
+
     transactions = (
-        _inbox_query(db, user.id)
+        query
         .order_by(Transaction.date.desc(), Transaction.id.desc())
         .all()
     )
     parents, children_by_parent = _grouped_categories(db, user.id)
+
+    accounts = (
+        db.query(Account)
+        .filter(Account.user_id == user.id)
+        .order_by(Account.name)
+        .all()
+    )
+    recurring_items = (
+        db.query(RecurringTransaction)
+        .filter(RecurringTransaction.user_id == user.id, RecurringTransaction.is_active == 1)
+        .order_by(RecurringTransaction.name)
+        .all()
+    )
+
+    # Back-link voor acties die via POST naar /transactions/... gaan
+    redirect_back = "/inbox"
+    if current_account_id:
+        redirect_back = f"/inbox?account_id={current_account_id}"
 
     return templates.TemplateResponse(
         "inbox/index.html",
@@ -72,6 +109,10 @@ def inbox_page(request: Request, db: Session = Depends(get_db)):
             "parents": parents,
             "children_by_parent": children_by_parent,
             "inbox_total": len(transactions),
+            "accounts": accounts,
+            "current_account_id": current_account_id,
+            "recurring_items": recurring_items,
+            "redirect_back": redirect_back,
         },
     )
 
@@ -81,6 +122,7 @@ def set_category(
     request: Request,
     transaction_id: int,
     category_id: int = Form(...),
+    redirect_to: str = Form("/inbox"),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
@@ -92,7 +134,7 @@ def set_category(
         .first()
     )
     if not tx:
-        return RedirectResponse("/inbox", status_code=303)
+        return RedirectResponse(redirect_to, status_code=303)
 
     # Verifieer dat de categorie van deze gebruiker is
     cat = (
@@ -101,11 +143,11 @@ def set_category(
         .first()
     )
     if not cat:
-        return RedirectResponse("/inbox", status_code=303)
+        return RedirectResponse(redirect_to, status_code=303)
 
     tx.category_id = cat.id
     tx.assigned_by_rule_id = None
     tx.is_reviewed = 1
     db.commit()
 
-    return RedirectResponse("/inbox", status_code=303)
+    return RedirectResponse(redirect_to, status_code=303)
