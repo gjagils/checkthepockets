@@ -9,6 +9,8 @@
 <div class="accounts-grid">
     {% for acc in accounts %}
     {% set owner_ids = acc.owners | map(attribute='id') | list %}
+    {% set _bank = bank_info_by_account_id.get(acc.id, {}) %}
+    {% set _last_tx = latest_tx_by_account_id.get(acc.id) %}
     <div class="card account-card">
         <h3 style="margin:0 0 0.5rem 0; color:var(--text, #1a1a1a);">{{ acc.name or (acc.iban or acc.bank|upper) }}</h3>
         <div class="account-header">
@@ -18,6 +20,43 @@
         {% if acc.iban %}
         <p class="muted" style="font-size:0.85rem; margin-top:0.5rem;">{{ acc.iban }}</p>
         {% endif %}
+
+        <div style="margin-top:0.5rem; font-size:0.8rem;">
+            {% if _bank.is_linked %}
+            <div style="display:flex; align-items:center; gap:0.4rem;">
+                <span title="Synchroniseert via PSD2-bankkoppeling">📡</span>
+                <span><strong>Bankkoppeling</strong>
+                    {%- if _bank.connection_name %} · {{ _bank.connection_name }}{% endif -%}
+                </span>
+            </div>
+            <div class="muted" style="margin-top:0.15rem; padding-left:1.4rem;">
+                Laatst gesynced:
+                {% if _bank.last_synced_at %}
+                    {{ _bank.last_synced_at.strftime('%d-%m-%Y %H:%M') }}
+                {% else %}
+                    nog nooit
+                {% endif %}
+            </div>
+            {% if _bank.connection_id %}
+            <div style="padding-left:1.4rem; margin-top:0.25rem;">
+                <a href="/banking/sync/{{ _bank.connection_id }}" class="btn btn-sm" style="padding:0.15rem 0.5rem; font-size:0.75rem;">Nu synchroniseren →</a>
+            </div>
+            {% endif %}
+            {% else %}
+            <div style="display:flex; align-items:center; gap:0.4rem;">
+                <span title="Geen bankkoppeling — wordt gevuld via CSV-import">✏️</span>
+                <span><strong>Handmatige CSV-import</strong></span>
+            </div>
+            <div class="muted" style="margin-top:0.15rem; padding-left:1.4rem;">
+                Laatste transactie:
+                {% if _last_tx %}
+                    {{ _last_tx.strftime('%d-%m-%Y') }}
+                {% else %}
+                    nog geen
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
 
         <div style="margin-top:0.75rem; padding-top:0.75rem; border-top:1px solid var(--ctp-border);">
             <div style="font-size:0.8rem; font-weight:600; margin-bottom:0.35rem;">Eigenaar(s)</div>
