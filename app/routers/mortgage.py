@@ -8,7 +8,8 @@ from sqlalchemy.orm import Session
 from app import mortgage_calc
 from app.auth import require_login
 from app.database import get_db
-from app.funda_parser import FundaParseError, fetch_funda
+from app.funda_parser import FundaParseError, fetch_funda, is_funda_url
+from app.move_parser import MoveParseError, fetch_move, is_move_url
 from app.models import (
     Budget,
     Category,
@@ -600,15 +601,25 @@ def scenarios_funda_lookup(
     url: str = Form(""),
     db: Session = Depends(get_db),
 ):
-    """Parse een Funda-URL en geef de scenario-velden terug als JSON.
+    """Parse een Funda- óf Move.nl-URL en geef de scenario-velden terug als JSON.
 
-    De front-end gebruikt dit om het formulier vooraf in te vullen. Bij fouten
-    retourneren we een 4xx met een NL-leesbare boodschap — niet een stack-trace.
+    De front-end gebruikt dit om het formulier vooraf in te vullen. Route wordt
+    bepaald op basis van de host (funda.nl → Funda-parser, move.nl → Move-parser).
+    Bij fouten retourneren we een 4xx met een NL-leesbare boodschap.
     """
     _require_admin(request, db)
+    url = (url or "").strip()
     try:
-        parsed = fetch_funda(url)
-    except FundaParseError as exc:
+        if is_move_url(url):
+            parsed = fetch_move(url)
+        elif is_funda_url(url):
+            parsed = fetch_funda(url)
+        else:
+            return JSONResponse(
+                {"error": "Alleen funda.nl- of move.nl-links worden ondersteund."},
+                status_code=400,
+            )
+    except (FundaParseError, MoveParseError) as exc:
         return JSONResponse({"error": str(exc)}, status_code=400)
     return JSONResponse(parsed)
 
