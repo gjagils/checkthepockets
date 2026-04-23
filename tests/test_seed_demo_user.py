@@ -1,4 +1,4 @@
-"""Tests voor scripts/seed_demo_user.py (LIN-46)."""
+"""Tests voor scripts/seed_demo_user.py + POST /admin/demo/seed (GJA-46)."""
 from __future__ import annotations
 
 import os
@@ -14,19 +14,16 @@ _DB_FILE.close()
 os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
 os.environ["SECRET_KEY"] = "test-secret-key"
 
-from app.auth import verify_password
+from fastapi.testclient import TestClient
+
+from app.auth import create_session_cookie, hash_password, verify_password
 from app.database import Base, SessionLocal, engine
+from app.main import app
 from app.models import (
     Account,
     Budget,
     Category,
-    HouseholdFinance,
-    MortgageRateTable,
-    MortgageScenario,
-    MortgageVariant,
     Person,
-    ScenarioExistingMortgage,
-    ScenarioPersonContribution,
     Transaction,
     User,
 )
@@ -36,7 +33,6 @@ from scripts.seed_demo_user import (
     DEFAULT_USERNAME,
     INBOX_TX,
     MONTHLY_TX,
-    RATE_TABLE,
     seed_demo_user,
 )
 
@@ -52,13 +48,6 @@ def _schema():
 def db_session():
     db = SessionLocal()
     try:
-        # Volledige reset van alle tabellen die de seed kan raken.
-        db.query(ScenarioPersonContribution).delete()
-        db.query(ScenarioExistingMortgage).delete()
-        db.query(MortgageVariant).delete()
-        db.query(MortgageScenario).delete()
-        db.query(MortgageRateTable).delete()
-        db.query(HouseholdFinance).delete()
         db.query(Budget).delete()
         db.query(Transaction).delete()
         db.query(Category).delete()
@@ -74,28 +63,31 @@ def db_session():
         db.close()
 
 
+def _login_client(user_id: int) -> TestClient:
+    client = TestClient(app)
+    client.cookies.set("session", create_session_cookie(user_id))
+    return client
+
+
 # ── Smoke-test: één run produceert het verwachte volume ──────────────────
 
 
 def test_seed_creates_demo_user_with_expected_volume(db_session):
     today = date(2026, 6, 15)  # vaste "vandaag" voor deterministische tellingen
 
-    user = seed_demo_user(today=today, db=db_session)
+    result = seed_demo_user(today=today, db=db_session)
 
-    # User-basics
-    assert user.username == DEFAULT_USERNAME
-    assert user.is_admin == 1
+    user = db_session.query(User).filter_by(username=DEFAULT_USERNAME).one()
+
+    # User-basics — géén admin (hypotheek-toegang komt via GJA-47)
+    assert user.is_admin == 0
     assert user.is_verified == 1
+    assert user.is_active == 1
     assert verify_password(DEFAULT_PASSWORD, user.password_hash)
 
-    # Profile + persons
+    # Personen
     persons = db_session.query(Person).filter_by(user_id=user.id).order_by(Person.sort_order).all()
     assert [p.name for p in persons] == ["Demo Alex", "Demo Sam"]
-
-    hf = db_session.query(HouseholdFinance).filter_by(user_id=user.id).one()
-    assert hf.salary_primary == Decimal("3520.00")
-    assert hf.salary_primary_name == "Demo Alex"
-    assert hf.tax_rate == Decimal("0.3697")
 
     # Accounts + owners
     accounts = db_session.query(Account).filter_by(user_id=user.id).all()
@@ -116,48 +108,26 @@ def test_seed_creates_demo_user_with_expected_volume(db_session):
     assert by_cat["Gemeente & heffingen"].cost_scale_type == "municipal"
     assert by_cat["Salaris"].is_income == 1
 
-    # Transactions: 12 maanden × MONTHLY_TX, beperkt tot ≤ today; + INBOX_TX
+    # Transactions: 12 maanden × MONTHLY_TX (beperkt tot ≤ today) + INBOX_TX
     txs = db_session.query(Transaction).join(Account).filter(Account.user_id == user.id).all()
     inbox_count = sum(1 for t in txs if t.category_id is None)
     assert inbox_count == len(INBOX_TX)
 
-    # Voor today=2026-06-15 horen alle MONTHLY_TX in mei + eerdere maanden mee;
-    # in juni vallen items met day > 15 weg. We tellen flexibel: minstens
-    # 11 volle maanden + 1 partial. Exact: count_full * MONTHLY + count_partial.
     categorised = [t for t in txs if t.category_id is not None]
-    # Minstens 11 volle maanden:
-    assert len(categorised) >= 11 * len(MONTHLY_TX)
-    # En zeker minder dan 12 volle (juni is niet compleet):
-    assert len(categorised) < 12 * len(MONTHLY_TX)
+    # Minstens 11 volle maanden, maximaal 12 (juni 2026 is partial op day=15):
+    assert 11 * len(MONTHLY_TX) <= len(categorised) < 12 * len(MONTHLY_TX)
 
     # Budgetten: 12 maanden × elke categorie met monthly_budget
     budget_specs = [s for s in CATEGORIES if s.monthly_budget is not None]
     budgets = db_session.query(Budget).filter_by(user_id=user.id).all()
     assert len(budgets) == 12 * len(budget_specs)
 
-    # Mortgage scenario + child-rijen
-    scenario = db_session.query(MortgageScenario).filter_by(user_id=user.id).one()
-    assert scenario.name == "Droomhuis Vechtstraat"
-    assert scenario.monthly_refund_usage == Decimal("250.00")
-    assert scenario.woz_value == Decimal("452000.00")
-
-    variants = db_session.query(MortgageVariant).filter_by(scenario_id=scenario.id).all()
-    assert sorted(v.fixed_years for v in variants) == [5, 10, 20]
-
-    existing = (
-        db_session.query(ScenarioExistingMortgage)
-        .filter_by(scenario_id=scenario.id).order_by(ScenarioExistingMortgage.sort_order).all()
-    )
-    assert [e.mortgage_type for e in existing] == ["annuity", "interest_only"]
-    assert existing[1].hra_end_date == date(2031, 12, 31)
-
-    contribs = db_session.query(ScenarioPersonContribution).filter_by(scenario_id=scenario.id).all()
-    assert len(contribs) == 2
-    assert sum(c.monthly_contribution_eur for c in contribs) == Decimal("3300.00")
-
-    # Rente-tabel
-    rates = db_session.query(MortgageRateTable).filter_by(user_id=user.id).all()
-    assert len(rates) == len(RATE_TABLE)
+    # Resultaat-object klopt met DB-state
+    assert result.tx_count == len(txs)
+    assert result.budget_count == len(budgets)
+    assert result.category_count == len(cats)
+    assert result.account_count == len(accounts)
+    assert result.person_count == len(persons)
 
 
 # ── Idempotentie: tweede run wist + heraanmaakt zonder fouten ────────────
@@ -170,7 +140,7 @@ def test_seed_is_idempotent(db_session):
     first_volume = (
         db_session.query(Transaction).count(),
         db_session.query(Budget).count(),
-        db_session.query(MortgageRateTable).count(),
+        db_session.query(Category).count(),
     )
 
     second = seed_demo_user(today=today, db=db_session)
@@ -178,14 +148,12 @@ def test_seed_is_idempotent(db_session):
 
     # Exact één user met die naam (oude is gewist, niet bewaard).
     assert db_session.query(User).filter_by(username=DEFAULT_USERNAME).count() == 1
-    # Exact één scenario en één household — geen dubbele records.
-    assert db_session.query(MortgageScenario).filter_by(user_id=second.id).count() == 1
-    assert db_session.query(HouseholdFinance).filter_by(user_id=second.id).count() == 1
+
     # Totale volumes identiek aan eerste run (geen accumulatie).
     second_volume = (
         db_session.query(Transaction).count(),
         db_session.query(Budget).count(),
-        db_session.query(MortgageRateTable).count(),
+        db_session.query(Category).count(),
     )
     assert first_volume == second_volume
 
@@ -194,8 +162,6 @@ def test_seed_is_idempotent(db_session):
 
 
 def test_seed_does_not_touch_other_users(db_session):
-    from app.auth import hash_password
-
     other = User(
         username="alice", email="alice@x.nl",
         password_hash=hash_password("pw"), is_verified=1,
@@ -212,7 +178,6 @@ def test_seed_does_not_touch_other_users(db_session):
 
     seed_demo_user(today=date(2026, 6, 15), db=db_session)
 
-    # Alice + haar account zijn ongemoeid
     assert db_session.query(User).filter_by(id=other_id).count() == 1
     assert db_session.query(Account).filter_by(id=other_acc_id).count() == 1
 
@@ -221,13 +186,90 @@ def test_seed_does_not_touch_other_users(db_session):
 
 
 def test_seed_accepts_custom_credentials(db_session):
-    user = seed_demo_user(
+    seed_demo_user(
         username="acme-demo",
         password="hunter2hunter2",
         email="acme@example.org",
         today=date(2026, 6, 15),
         db=db_session,
     )
-    assert user.username == "acme-demo"
+    user = db_session.query(User).filter_by(username="acme-demo").one()
     assert user.email == "acme@example.org"
     assert verify_password("hunter2hunter2", user.password_hash)
+
+
+# ── Admin-UI endpoint: POST /admin/demo/seed ─────────────────────────────
+
+
+def _make_admin(db, username="admin"):
+    u = User(
+        username=username, email=f"{username}@x.nl",
+        password_hash=hash_password("pw"), is_verified=1, is_admin=1,
+    )
+    db.add(u)
+    db.commit()
+    db.refresh(u)
+    return u
+
+
+def _make_regular(db, username="bob"):
+    u = User(
+        username=username, email=f"{username}@x.nl",
+        password_hash=hash_password("pw"), is_verified=1, is_admin=0,
+    )
+    db.add(u)
+    db.commit()
+    db.refresh(u)
+    return u
+
+
+def test_admin_demo_seed_endpoint_creates_demo_user(db_session):
+    admin = _make_admin(db_session)
+    admin_id = admin.id
+
+    client = _login_client(admin_id)
+    resp = client.post("/admin/demo/seed")
+
+    assert resp.status_code == 200
+    body = resp.text
+    assert "Demo-user" in body
+    assert "demo" in body  # username in flash
+
+    # Demo-user bestaat nu in de DB
+    demo = db_session.query(User).filter_by(username=DEFAULT_USERNAME).one()
+    assert demo.is_admin == 0
+    assert db_session.query(Account).filter_by(user_id=demo.id).count() == 3
+
+
+def test_admin_demo_seed_is_idempotent_via_endpoint(db_session):
+    admin = _make_admin(db_session)
+    client = _login_client(admin.id)
+
+    client.post("/admin/demo/seed")
+    first_tx = db_session.query(Transaction).count()
+
+    client.post("/admin/demo/seed")
+    second_tx = db_session.query(Transaction).count()
+
+    # Identiek volume — de tweede call heeft niet opgestapeld.
+    assert first_tx == second_tx
+    assert db_session.query(User).filter_by(username=DEFAULT_USERNAME).count() == 1
+
+
+def test_admin_demo_seed_rejects_non_admin(db_session):
+    bob = _make_regular(db_session)
+    client = _login_client(bob.id)
+
+    resp = client.post("/admin/demo/seed")
+    assert resp.status_code == 403
+
+    # Geen demo-user aangemaakt
+    assert db_session.query(User).filter_by(username=DEFAULT_USERNAME).count() == 0
+
+
+def test_admin_demo_seed_rejects_anonymous():
+    client = TestClient(app, follow_redirects=False)
+    resp = client.post("/admin/demo/seed")
+    # Niet ingelogd → login-redirect (302) of 401/403; alle drie wijzen de
+    # aanroep af. We accepteren alle drie zolang er geen data is gewijzigd.
+    assert resp.status_code in (302, 401, 403)
