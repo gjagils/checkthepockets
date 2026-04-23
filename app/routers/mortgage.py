@@ -1009,6 +1009,49 @@ def scenarios_detail(
             variant_leftover.append(leftover)
             variant_leftover_pairs.append((vs, leftover))
 
+    # Kosten / Inkomsten / Resultaat per variant — gestructureerde vergelijking.
+    # Mortgage-categorieën in het budget worden vervangen door de echte nieuwe
+    # annuïteit + bestaande lasten dus subtract-en om dubbeltelling te voorkomen.
+    mortgage_budget_sum = sum(
+        (r.effective_amount for r in budget_rows if r.cost_scale_type == "mortgage"),
+        Decimal("0"),
+    )
+    other_budget_total = (budget_total - mortgage_budget_sum).quantize(Decimal("0.01"))
+    contributions_monthly_total = sum(
+        (c["amount"] for c in contribution_rows), Decimal("0"),
+    ).quantize(Decimal("0.01"))
+
+    for vs in variant_stats:
+        if vs["rate_missing"]:
+            vs["existing_monthly_total"] = Decimal("0.00")
+            vs["other_budget_total"] = other_budget_total
+            vs["total_costs"] = Decimal("0.00")
+            vs["contributions_total"] = contributions_monthly_total
+            vs["total_income"] = Decimal("0.00")
+            vs["resultaat"] = Decimal("0.00")
+            vs["savings_remainder_monthly"] = Decimal("0.00")
+            continue
+        existing_monthly = (
+            Decimal(str(fin.existing_monthly_total))
+            + vs["pim_monthly"]
+            + vs["interest_only_monthly"]
+        ).quantize(Decimal("0.01"))
+        total_costs = (
+            vs["annuity_monthly"] + existing_monthly + other_budget_total
+        ).quantize(Decimal("0.01"))
+        total_income = (
+            contributions_monthly_total + vs["used_monthly_refund"]
+        ).quantize(Decimal("0.01"))
+        vs["existing_monthly_total"] = existing_monthly
+        vs["other_budget_total"] = other_budget_total
+        vs["total_costs"] = total_costs
+        vs["contributions_total"] = contributions_monthly_total
+        vs["total_income"] = total_income
+        vs["resultaat"] = (total_income - total_costs).quantize(Decimal("0.01"))
+        vs["savings_remainder_monthly"] = (
+            vs["annual_savings"] / Decimal(12)
+        ).quantize(Decimal("0.01"))
+
     available_fixed_years = sorted({r.fixed_years for r in rates}) or [5, 10, 15, 20, 30]
     missing_fixed_years = [
         fy for fy in available_fixed_years

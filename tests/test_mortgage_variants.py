@@ -204,8 +204,14 @@ def test_comparison_table_renders_for_all_variants(db_session):
     assert "Vergelijking" in body
     for label in ("5j", "10j", "20j"):
         assert label in body
-    assert "Annuiteit / maand" in body
-    assert "Netto maandlast hypotheek" in body
+    # Kosten / Inkomsten / Resultaat structuur
+    assert "Nieuwe hypotheek" in body
+    assert "Bestaande hypotheeklasten die meegaan" in body
+    assert "Totaal kosten" in body
+    assert "Teruggaaf per maand" in body
+    assert "Totaal inkomsten" in body
+    assert "Resultaat" in body
+    assert "Restant voor spaarrekening" in body
 
 
 def test_refund_usage_splits_into_savings(db_session):
@@ -222,10 +228,10 @@ def test_refund_usage_splits_into_savings(db_session):
         MortgageScenario.user_id == admin.id,
     ).one()
 
-    # Zonder setting: annual_savings = 0 (oude gedrag, alles naar maandlast).
+    # Zonder setting: savings_remainder = 0 (oude gedrag, alles naar maandlast).
     resp = client.get(f"/hypotheek/scenarios/{s.id}")
     assert resp.status_code == 200
-    assert "Spaarbedrag / jaar" in resp.text
+    assert "Restant voor spaarrekening" in resp.text
 
     # Zet een laag gebruik (€50/mnd = €600/jaar). Dat is minder dan de
     # daadwerkelijke refund dus er ontstaat positief spaarbedrag.
