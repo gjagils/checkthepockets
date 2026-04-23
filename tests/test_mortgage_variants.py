@@ -383,9 +383,11 @@ def test_chart_data_present_in_response(db_session):
 
     resp = client.get(f"/hypotheek/scenarios/{s.id}")
     assert resp.status_code == 200
-    # Chart.js CDN geladen + 10j reeks in JSON.
+    # Chart.js CDN geladen + 10j reeks in JSON (zowel netto hypotheek-last als
+    # overschot-lijn krijgen een "10j"-prefix in het dataset-label).
     assert "chart.js" in resp.text.lower()
-    assert "10j rentevast" in resp.text
+    assert "10j netto hypotheek-last" in resp.text
+    assert "10j overschot" in resp.text
 
 
 def test_variant_with_missing_rate_shown_as_dash(db_session):

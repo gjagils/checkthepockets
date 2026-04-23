@@ -739,6 +739,60 @@ def _em_rate_for_date(
     return Decimal(str(em.rate_pct)) / Decimal(100)
 
 
+def _existing_mortgage_yearly_gross(
+    em: ScenarioExistingMortgage, year_offset: int,
+) -> Decimal:
+    """Totale bruto betaling (rente + aflossing) in het doeljaar.
+
+    Voor aflossingsvrij: gelijk aan rente (geen aflossing). Voor annuïtair:
+    de volledige jaartermijn. Respecteert rate_change_date zoals interest-only
+    al doet; voor annuïtair bij een rentesprong mid-year valt 'ie momenteel
+    terug op de gemiddelde rente (acceptabele vereenvoudiging, omdat Pim/ABN
+    in praktijk aflossingsvrij zijn).
+    """
+    bal = Decimal(str(em.balance_eur or 0))
+    if bal <= 0:
+        return Decimal("0")
+
+    today = datetime.date.today()
+    year_start = datetime.date(today.year + year_offset, 1, 1)
+    year_end = datetime.date(today.year + year_offset, 12, 31)
+    mtype = em.mortgage_type or "annuity"
+
+    if mtype == "interest_only":
+        if (
+            em.rate_change_date is not None
+            and em.rate_pct_after is not None
+            and year_start <= em.rate_change_date <= year_end
+        ):
+            pre_rate = _em_rate_for_date(em, year_start)
+            post_rate = _em_rate_for_date(em, em.rate_change_date)
+            if pre_rate is None or post_rate is None:
+                return Decimal("0")
+            months_pre = (em.rate_change_date.month - 1)
+            months_post = 12 - months_pre
+            return (
+                bal * pre_rate * Decimal(months_pre) / Decimal(12)
+                + bal * post_rate * Decimal(months_post) / Decimal(12)
+            ).quantize(Decimal("0.01"))
+        rate = _em_rate_for_date(em, year_start)
+        if rate is None:
+            return Decimal("0")
+        return (bal * rate).quantize(Decimal("0.01"))
+
+    # Annuïtair: PMT per maand × 12. Gebruik een schedule met de rente die
+    # 1 januari geldt.
+    rate = _em_rate_for_date(em, year_start)
+    if rate is None:
+        return Decimal("0")
+    months = int(em.months_remaining) if em.months_remaining else 360
+    years = max(months // 12, 1)
+    pmt_monthly = mortgage_calc._calc_annuity_monthly_from_months(
+        bal, rate, min(months, years * 12),
+    )
+    return (pmt_monthly * Decimal(12)).quantize(Decimal("0.01"))
+
+
 def _existing_mortgage_yearly_interest(
     em: ScenarioExistingMortgage, year_offset: int,
 ) -> Decimal:
@@ -868,6 +922,12 @@ def _variant_stats(
         "net_monthly": Decimal("0.00"),
         "first_5y_total_cost": Decimal("0.00"),
         "net_monthly_by_year": [],
+        # Nieuw: per jaar bestaande-maandlast en gebruikte teruggaaf, zodat
+        # het scenario-chart de totale netto hypotheek-last (inclusief ABN-
+        # rentesprong + PIM-HRA-einde) kan tonen, én een overschot-lijn.
+        "existing_monthly_by_year": [],
+        "used_refund_monthly_by_year": [],
+        "mortgage_net_by_year": [],
         "ewf_yr": ewf_yr,
     }
 
@@ -896,11 +956,15 @@ def _variant_stats(
         annuity_int = sum((r.interest for r in rows), Decimal(0)) if rows else Decimal(0)
         annuity_gross = sum((r.payment for r in rows), Decimal(0)) if rows else Decimal(0)
 
-        # Bestaande leningdelen: rente aftrekbaar tot hra_end_date.
+        # Bestaande leningdelen: rente aftrekbaar tot hra_end_date, plus de
+        # totale bruto maandlast voor het chart.
         existing_int_deductible = Decimal(0)
+        existing_gross_yr = Decimal(0)
         if scenario is not None:
             for em in scenario.existing_mortgages:
                 yr_int = _existing_mortgage_yearly_interest(em, year_offset)
+                yr_gross = _existing_mortgage_yearly_gross(em, year_offset)
+                existing_gross_yr += yr_gross
                 if em.hra_end_date is None or em.hra_end_date > yr_start:
                     existing_int_deductible += yr_int
 
@@ -922,6 +986,20 @@ def _variant_stats(
         if rows:
             year_net = (annuity_gross - year_used) / Decimal(12)
             stats["net_monthly_by_year"].append(year_net.quantize(Decimal("0.01")))
+
+        # Per-jaar reeksen voor het chart.
+        stats["existing_monthly_by_year"].append(
+            (existing_gross_yr / Decimal(12)).quantize(Decimal("0.01"))
+        )
+        stats["used_refund_monthly_by_year"].append(
+            (year_used / Decimal(12)).quantize(Decimal("0.01"))
+        )
+        mortgage_net_monthly = (
+            (annuity_gross + existing_gross_yr - year_used) / Decimal(12)
+        )
+        stats["mortgage_net_by_year"].append(
+            mortgage_net_monthly.quantize(Decimal("0.01"))
+        )
 
     # Vergelijkingstabel-cellen: gemiddelde over rentevast-periode (realistisch,
     # houdt rekening met dalende rente én aflopende HRA van bestaande leningen).
@@ -1204,25 +1282,71 @@ def scenarios_detail(
             vs["annual_savings"] / Decimal(12)
         ).quantize(Decimal("0.01"))
 
+        # Per-jaar surplus (wat blijft er over op de gezamenlijke rekening).
+        # Formule: inkomsten_yr − kosten_yr waar kosten_yr = nieuwe annuïteit +
+        # werkelijke bestaande-maandlast dat jaar + rest-budget, en inkomsten_yr
+        # = bijdragen + werkelijk gebruikte teruggaaf dat jaar.
+        surplus_by_year: list[Decimal] = []
+        for i in range(len(vs["mortgage_net_by_year"])):
+            yr_existing = vs["existing_monthly_by_year"][i]
+            yr_used = vs["used_refund_monthly_by_year"][i]
+            yr_costs = vs["annuity_monthly"] + yr_existing + other_budget_total
+            yr_income = contributions_monthly_total + yr_used
+            surplus_by_year.append((yr_income - yr_costs).quantize(Decimal("0.01")))
+        vs["surplus_by_year"] = surplus_by_year
+
     available_fixed_years = sorted({r.fixed_years for r in rates}) or [5, 10, 15, 20, 30]
     missing_fixed_years = [
         fy for fy in available_fixed_years
         if fy not in {v.fixed_years for v in variants_sorted}
     ]
 
-    # Chart.js data: max reeksen uitlijnen op 30 jaar.
+    # Chart.js data: twee reeksen per variant — totale netto hypotheek-last
+    # (solid) en netto overschot op de gezamenlijke rekening (dashed + area).
+    # Kleuren per rentevast-periode (blauw/oranje/groen), consistent met de
+    # vergelijkingstabel-headers.
     chart_labels = list(range(1, 31))
-    chart_series = []
+    chart_series: list[dict] = []
+    variant_colors = {
+        5: "rgba(54,162,235,1)",    # blauw
+        10: "rgba(255,159,64,1)",   # oranje
+        20: "rgba(75,192,75,1)",    # groen
+    }
+    default_color = "rgba(128,128,128,1)"
+
+    def _pad(series: list[Decimal]) -> list[float]:
+        out = [float(v) for v in series]
+        while len(out) < 30:
+            out.append(out[-1] if out else 0)
+        return out[:30]
+
+    def _soften(rgba: str, alpha: float) -> str:
+        # "rgba(54,162,235,1)" → "rgba(54,162,235,0.15)"
+        return rgba.rsplit(",", 1)[0] + f",{alpha})"
+
     for vs in variant_stats:
         if vs["rate_missing"]:
             continue
-        series_data = [float(v) for v in vs["net_monthly_by_year"]]
-        # zeropad tot 30 lengte als korter.
-        while len(series_data) < 30:
-            series_data.append(series_data[-1] if series_data else 0)
+        color = variant_colors.get(vs["fixed_years"], default_color)
+        label_prefix = f"{vs['fixed_years']}j"
         chart_series.append({
-            "label": f"{vs['fixed_years']}j rentevast",
-            "data": series_data[:30],
+            "label": f"{label_prefix} netto hypotheek-last",
+            "data": _pad(vs["mortgage_net_by_year"]),
+            "borderColor": color,
+            "backgroundColor": "transparent",
+            "borderWidth": 2,
+            "fill": False,
+            "tension": 0.1,
+        })
+        chart_series.append({
+            "label": f"{label_prefix} overschot",
+            "data": _pad(vs.get("surplus_by_year", [])),
+            "borderColor": color,
+            "backgroundColor": _soften(color, 0.15),
+            "borderWidth": 1.5,
+            "borderDash": [6, 3],
+            "fill": "origin",
+            "tension": 0.1,
         })
 
     return templates.TemplateResponse(
