@@ -586,23 +586,53 @@ document.addEventListener('DOMContentLoaded', function () {
     if (typeof Chart === 'undefined') return;
     var ctx = document.getElementById('netMonthlyChart');
     if (!ctx) return;
-    var palette = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b'];
-    var datasets = {{ chart_series | tojson }}.map(function (s, i) {
-        return {
-            label: s.label,
-            data: s.data,
-            borderColor: palette[i % palette.length],
-            backgroundColor: palette[i % palette.length],
-            fill: false, tension: 0.1,
-        };
+    // Dataset-configuratie komt nu volledig uit de backend (route stelt
+    // borderColor/backgroundColor/borderDash/fill in per serie). We nemen de
+    // objecten as-is over en voegen alleen een paar display-defaults toe
+    // mochten ze ontbreken (backward compat voor oude cached pageviews).
+    var datasets = {{ chart_series | tojson }}.map(function (s) {
+        return Object.assign({
+            pointRadius: 2,
+            pointHoverRadius: 4,
+        }, s);
     });
+    // Y-as suggestedMin: kleinste waarde in alle series - €200 marge; niet
+    // onder 0 duwen want dat maakt negatief overschot zichtbaar.
+    var allValues = datasets.reduce(function (acc, ds) {
+        return acc.concat(ds.data || []);
+    }, []).filter(function (v) { return typeof v === 'number' && isFinite(v); });
+    var minVal = allValues.length ? Math.min.apply(null, allValues) : 0;
+    var suggestedMin = Math.floor((minVal - 200) / 100) * 100;
+
     new Chart(ctx, {
         type: 'line',
         data: { labels: {{ chart_labels | tojson }}, datasets: datasets },
         options: {
-            plugins: { title: { display: true, text: 'Netto maandlast per jaar (€)' } },
-            scales: { y: { beginAtZero: false, title: { display: true, text: '€ / maand' } },
-                      x: { title: { display: true, text: 'Jaar' } } },
+            responsive: true,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                title: { display: true, text: 'Netto hypotheek-last + overschot per jaar (€)' },
+                legend: { position: 'bottom' },
+                tooltip: {
+                    callbacks: {
+                        label: function (ctx) {
+                            var v = ctx.parsed.y;
+                            return ctx.dataset.label + ': € ' + (v == null ? '-' : v.toLocaleString('nl-NL', { minimumFractionDigits: 0, maximumFractionDigits: 0 }));
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: false,
+                    suggestedMin: suggestedMin,
+                    title: { display: true, text: '€ / maand' },
+                    ticks: {
+                        callback: function (v) { return '€ ' + v.toLocaleString('nl-NL'); }
+                    }
+                },
+                x: { title: { display: true, text: 'Jaar' } }
+            },
         },
     });
 });
