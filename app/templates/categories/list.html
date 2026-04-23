@@ -278,6 +278,15 @@
                             <div class="form-group">
                                 <label class="check-row"><input type="checkbox" name="exclude_from_totals" value="1" {% if sub.exclude_from_totals %}checked{% endif %}> <span>Uitsluiten van totalen</span></label>
                             </div>
+                            <div class="form-group">
+                                <label>Hypotheek-scaling</label>
+                                <select name="cost_scale_type" title="Bepaalt of scenario-factors deze categorie automatisch schalen">
+                                    <option value="" {% if not sub.cost_scale_type %}selected{% endif %}>Geen</option>
+                                    <option value="municipal" {% if sub.cost_scale_type == 'municipal' %}selected{% endif %}>Gemeentelijk</option>
+                                    <option value="insurance" {% if sub.cost_scale_type == 'insurance' %}selected{% endif %}>Verzekering</option>
+                                    <option value="mortgage" {% if sub.cost_scale_type == 'mortgage' %}selected{% endif %}>Hypotheek</option>
+                                </select>
+                            </div>
                             <div class="form-group" style="align-self:flex-end;">
                                 <button type="submit" class="btn btn-primary btn-sm">Opslaan</button>
                                 <button type="button" class="btn btn-sm" onclick="toggleEdit('cat-{{ sub.id }}')">Annuleren</button>
