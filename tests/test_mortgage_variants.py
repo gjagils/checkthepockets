@@ -204,6 +204,54 @@ def test_comparison_table_renders_for_all_variants(db_session):
     assert "Netto maandlast hypotheek" in body
 
 
+def test_refund_usage_splits_into_savings(db_session):
+    """Als monthly_refund_usage wordt gezet, valt het restant van de jaarlijkse
+    belastingteruggaaf vrij als spaarbedrag en daalt de netto maandlast niet
+    verder dan dat bedrag."""
+    admin = _make_user(db_session)
+    _seed_rates(db_session, admin.id, years=(5,))
+    _client(admin.id).get("/hypotheek/huishouden")
+    client = _client(admin.id)
+    _create_scenario(client)
+    db_session.expire_all()
+    s = db_session.query(MortgageScenario).filter(
+        MortgageScenario.user_id == admin.id,
+    ).one()
+
+    # Zonder setting: annual_savings = 0 (oude gedrag, alles naar maandlast).
+    resp = client.get(f"/hypotheek/scenarios/{s.id}")
+    assert resp.status_code == 200
+    assert "Spaarbedrag / jaar" in resp.text
+
+    # Zet een laag gebruik (€50/mnd = €600/jaar). Dat is minder dan de
+    # daadwerkelijke refund dus er ontstaat positief spaarbedrag.
+    resp = client.post(f"/hypotheek/scenarios/{s.id}/edit", data={
+        "name": s.name, "valuation": "500000", "offer": "485000",
+        "renovation_cost": "0", "own_contribution": "100000",
+        "sale_old_home": "0", "energy_label": "A",
+        "monthly_refund_usage": "50",
+    })
+    assert resp.status_code == 302
+    db_session.expire_all()
+    updated = db_session.query(MortgageScenario).filter(
+        MortgageScenario.id == s.id,
+    ).one()
+    assert updated.monthly_refund_usage == Decimal("50.00")
+
+    # Leeg terugzetten → NULL (oude gedrag).
+    resp = client.post(f"/hypotheek/scenarios/{s.id}/edit", data={
+        "name": s.name, "valuation": "500000", "offer": "485000",
+        "renovation_cost": "0", "own_contribution": "100000",
+        "sale_old_home": "0", "energy_label": "A",
+        "monthly_refund_usage": "",
+    })
+    db_session.expire_all()
+    reset = db_session.query(MortgageScenario).filter(
+        MortgageScenario.id == s.id,
+    ).one()
+    assert reset.monthly_refund_usage is None
+
+
 def test_budget_impact_uses_most_recent_month(db_session):
     admin = _make_user(db_session)
     _seed_rates(db_session, admin.id, years=(5,))

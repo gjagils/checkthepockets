@@ -111,6 +111,14 @@
                        value="{{ '%.2f' | format(scenario.insurance_cost_factor) if scenario and scenario.insurance_cost_factor is not none else '1.50' }}"
                        placeholder="1.50">
             </div>
+
+            <div class="form-group">
+                <label for="f-refund-usage">Teruggaaf naar maandlast (€/mnd)</label>
+                <input type="number" step="0.01" id="f-refund-usage" name="monthly_refund_usage"
+                       value="{{ '%.2f' | format(scenario.monthly_refund_usage) if scenario and scenario.monthly_refund_usage is not none else '' }}"
+                       placeholder="leeg = volledige teruggaaf verrekenen">
+                <small style="color:#6b7280; font-size:0.75rem;">Laat leeg om de volledige HRA-teruggaaf in de maandlast te verrekenen. Vul een bedrag in om de rest als jaarlijks spaarbedrag te zien.</small>
+            </div>
         </div>
 
         <div class="form-group">

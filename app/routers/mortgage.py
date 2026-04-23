@@ -512,6 +512,7 @@ def _apply_scenario_form(
     sale_fee_pct: str = "",
     municipal_cost_factor: str = "",
     insurance_cost_factor: str = "",
+    monthly_refund_usage: str = "",
 ) -> None:
     s.name = name.strip() or s.name or "Naamloos scenario"
     s.valuation = _parse_decimal(valuation)
@@ -545,6 +546,14 @@ def _apply_scenario_form(
         )
     elif s.insurance_cost_factor is None:
         s.insurance_cost_factor = Decimal("1.5")
+    # Teruggaaf-gebruik: leeg → NULL (volledige teruggaaf → maandlast, geen
+    # spaarbedrag). Waarde ≥ 0 → dat deel naar maandlast, rest spaart.
+    if monthly_refund_usage.strip():
+        s.monthly_refund_usage = _parse_decimal(
+            monthly_refund_usage, default=Decimal("0")
+        )
+    else:
+        s.monthly_refund_usage = None
 
 
 @router.get("/scenarios")
@@ -632,6 +641,7 @@ def scenarios_create(
     sale_fee_pct: str = Form(""),
     municipal_cost_factor: str = Form(""),
     insurance_cost_factor: str = Form(""),
+    monthly_refund_usage: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = _require_admin(request, db)
@@ -652,6 +662,7 @@ def scenarios_create(
         sale_fee_pct=sale_fee_pct,
         municipal_cost_factor=municipal_cost_factor,
         insurance_cost_factor=insurance_cost_factor,
+        monthly_refund_usage=monthly_refund_usage,
     )
     db.add(s)
     db.commit()
@@ -666,6 +677,7 @@ def _variant_stats(
     ltv_fraction: Decimal,
     rates,
     household: HouseholdFinance,
+    scenario: MortgageScenario | None = None,
 ):
     """Bereken alle rijen voor deze variant voor de vergelijkingstabel + chart."""
     tax_rate = Decimal(str(household.tax_rate))
@@ -673,6 +685,12 @@ def _variant_stats(
     existing_pim = Decimal(str(household.existing_mortgage_pim))
     existing_pim_rate = Decimal(str(household.existing_mortgage_pim_rate))
     existing_io_monthly = Decimal(str(household.existing_mortgage_interest_only_monthly))
+
+    # Teruggaaf-gebruik per scenario: NULL = volledige teruggaaf → maandlast
+    # (oude gedrag); anders dit bedrag per maand naar maandlast, rest spaart.
+    refund_usage_setting: Decimal | None = None
+    if scenario is not None and scenario.monthly_refund_usage is not None:
+        refund_usage_setting = Decimal(str(scenario.monthly_refund_usage))
 
     override = variant.interest_rate_override
     if override is not None:
@@ -692,6 +710,9 @@ def _variant_stats(
         "pim_monthly": Decimal("0.00"),
         "interest_only_monthly": existing_io_monthly,
         "monthly_refund": Decimal("0.00"),
+        "annual_refund": Decimal("0.00"),
+        "used_monthly_refund": Decimal("0.00"),
+        "annual_savings": Decimal("0.00"),
         "net_monthly": Decimal("0.00"),
         "first_5y_total_cost": Decimal("0.00"),
         "net_monthly_by_year": [],
@@ -707,19 +728,41 @@ def _variant_stats(
         Decimal("0.01")
     )
 
-    # Netto maandlast jaar 1 volgens calc-engine.
-    stats["net_monthly"] = mortgage_calc.net_monthly(
+    # Netto maandlast jaar 1 volgens calc-engine (volledige teruggaaf verrekend).
+    base_net_monthly = mortgage_calc.net_monthly(
         stats["annuity_monthly"], rate, ann_principal, tax_rate, notional,
     )
-    stats["monthly_refund"] = (
-        stats["annuity_monthly"] - stats["net_monthly"]
+    full_monthly_refund = (
+        stats["annuity_monthly"] - base_net_monthly
+    ).quantize(Decimal("0.01"))
+
+    if refund_usage_setting is None:
+        # Oude gedrag: alles naar maandlast.
+        used_monthly = full_monthly_refund
+    else:
+        # User bepaalt bedrag; cap op wat er daadwerkelijk terug komt
+        # (je kunt niet méér inzetten dan je krijgt).
+        used_monthly = min(
+            max(refund_usage_setting, Decimal("0")), full_monthly_refund,
+        )
+
+    stats["monthly_refund"] = full_monthly_refund
+    stats["used_monthly_refund"] = used_monthly.quantize(Decimal("0.01"))
+    stats["annual_refund"] = (full_monthly_refund * Decimal(12)).quantize(Decimal("0.01"))
+    stats["annual_savings"] = (
+        (full_monthly_refund - used_monthly) * Decimal(12)
+    ).quantize(Decimal("0.01"))
+    stats["net_monthly"] = (
+        stats["annuity_monthly"] - used_monthly
     ).quantize(Decimal("0.01"))
 
     if ann_principal > 0:
         schedule = list(
             mortgage_calc.amortization_schedule(ann_principal, rate, 30)
         )
-        # Eerste 5 jaar totale kosten (som van netto-maandlasten).
+        # Netto-maandlast per jaar: teruggaaf-gebruik is een constant bedrag
+        # (user-setting) of volledig (oude gedrag). Rest = spaarbedrag (niet in
+        # deze reeks zichtbaar, alleen in stats["annual_savings"]).
         for year_offset in range(30):
             rows = schedule[year_offset * 12:(year_offset + 1) * 12]
             if not rows:
@@ -728,18 +771,31 @@ def _variant_stats(
             year_gross = sum((r.payment for r in rows), Decimal(0))
             deductible = max(year_interest - notional, Decimal(0))
             year_refund = deductible * tax_rate
-            year_net = (year_gross - year_refund) / Decimal(12)
+            if refund_usage_setting is None:
+                year_used = year_refund
+            else:
+                year_used = min(
+                    max(refund_usage_setting, Decimal("0")) * Decimal(12),
+                    year_refund,
+                )
+            year_net = (year_gross - year_used) / Decimal(12)
             stats["net_monthly_by_year"].append(year_net.quantize(Decimal("0.01")))
-        # Eerste 5 jaar som (60 maanden, gemiddeld):
+        # Eerste 5 jaar totale kosten (bruto minus gebruikte teruggaaf).
         first_60 = schedule[:60]
         gross_60 = sum((r.payment for r in first_60), Decimal(0))
-        interest_60 = sum((r.interest for r in first_60), Decimal(0))
-        refund_approx = Decimal(0)
+        used_total = Decimal(0)
         for year_offset in range(5):
             rows = schedule[year_offset * 12:(year_offset + 1) * 12]
             year_int = sum((r.interest for r in rows), Decimal(0))
-            refund_approx += max(year_int - notional, Decimal(0)) * tax_rate
-        stats["first_5y_total_cost"] = (gross_60 - refund_approx).quantize(
+            year_refund = max(year_int - notional, Decimal(0)) * tax_rate
+            if refund_usage_setting is None:
+                used_total += year_refund
+            else:
+                used_total += min(
+                    max(refund_usage_setting, Decimal("0")) * Decimal(12),
+                    year_refund,
+                )
+        stats["first_5y_total_cost"] = (gross_60 - used_total).quantize(
             Decimal("0.01")
         )
 
@@ -820,7 +876,7 @@ def scenarios_detail(
     # Bereken per variant de vergelijkingsdata.
     variants_sorted = sorted(scenario.variants, key=lambda v: v.fixed_years)
     variant_stats = [
-        _variant_stats(v, ann_principal, ltv_fraction, rates, household)
+        _variant_stats(v, ann_principal, ltv_fraction, rates, household, scenario)
         for v in variants_sorted
     ]
 
@@ -1164,6 +1220,7 @@ def scenarios_edit(
     sale_fee_pct: str = Form(""),
     municipal_cost_factor: str = Form(""),
     insurance_cost_factor: str = Form(""),
+    monthly_refund_usage: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = _require_admin(request, db)
@@ -1184,6 +1241,7 @@ def scenarios_edit(
         sale_fee_pct=sale_fee_pct,
         municipal_cost_factor=municipal_cost_factor,
         insurance_cost_factor=insurance_cost_factor,
+        monthly_refund_usage=monthly_refund_usage,
     )
     db.commit()
     return RedirectResponse(
