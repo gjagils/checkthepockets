@@ -190,6 +190,8 @@ def household_save(
     selling_costs_pct: str = Form(""),
     hra_correction_factor: str = Form(""),
     ewf_pct: str = Form(""),
+    inflation_pct: str = Form(""),
+    contribution_growth_pct: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = _require_admin(request, db)
@@ -221,6 +223,13 @@ def household_save(
     # EWF-percentage: user tikt 0.35 (=%) → opslaan als 0.0035.
     if ewf_pct.strip():
         hf.ewf_pct = _parse_percent(ewf_pct, Decimal("0.0035"))
+    # Inflatie + bijdrage-groei: user tikt 2.5 / 3.0 (=%) → opslaan als 0.025 / 0.030.
+    if inflation_pct.strip():
+        hf.inflation_pct = _parse_percent(inflation_pct, Decimal("0.0250"))
+    if contribution_growth_pct.strip():
+        hf.contribution_growth_pct = _parse_percent(
+            contribution_growth_pct, Decimal("0.0300"),
+        )
 
     db.commit()
     return RedirectResponse("/hypotheek/huishouden?saved=1", status_code=302)
@@ -1286,12 +1295,26 @@ def scenarios_detail(
         # Formule: inkomsten_yr − kosten_yr waar kosten_yr = nieuwe annuïteit +
         # werkelijke bestaande-maandlast dat jaar + rest-budget, en inkomsten_yr
         # = bijdragen + werkelijk gebruikte teruggaaf dat jaar.
+        #
+        # Inflatie (alleen op other_budget_total) en bijdrage-groei worden
+        # samengesteld toegepast (compounded) per jaar.
+        inflation = Decimal(str(
+            getattr(household, "inflation_pct", "0.025") or "0.025"
+        ))
+        contrib_growth = Decimal(str(
+            getattr(household, "contribution_growth_pct", "0.030") or "0.030"
+        ))
+        one = Decimal("1")
         surplus_by_year: list[Decimal] = []
         for i in range(len(vs["mortgage_net_by_year"])):
             yr_existing = vs["existing_monthly_by_year"][i]
             yr_used = vs["used_refund_monthly_by_year"][i]
-            yr_costs = vs["annuity_monthly"] + yr_existing + other_budget_total
-            yr_income = contributions_monthly_total + yr_used
+            infl_factor = (one + inflation) ** i
+            contrib_factor = (one + contrib_growth) ** i
+            yr_other_budget = (other_budget_total * infl_factor).quantize(Decimal("0.01"))
+            yr_contrib = (contributions_monthly_total * contrib_factor).quantize(Decimal("0.01"))
+            yr_costs = vs["annuity_monthly"] + yr_existing + yr_other_budget
+            yr_income = yr_contrib + yr_used
             surplus_by_year.append((yr_income - yr_costs).quantize(Decimal("0.01")))
         vs["surplus_by_year"] = surplus_by_year
 
