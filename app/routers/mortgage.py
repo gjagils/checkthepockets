@@ -192,6 +192,12 @@ def household_save(
     ewf_pct: str = Form(""),
     inflation_pct: str = Form(""),
     contribution_growth_pct: str = Form(""),
+    annual_child_benefit: str = Form(""),
+    annual_private_loan_refund: str = Form(""),
+    annual_extra_primary: str = Form(""),
+    annual_extra_secondary: str = Form(""),
+    annual_vacation_budget: str = Form(""),
+    annual_house_budget: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = _require_admin(request, db)
@@ -230,6 +236,14 @@ def household_save(
         hf.contribution_growth_pct = _parse_percent(
             contribution_growth_pct, Decimal("0.0300"),
         )
+    # Jaar-inkomsten + jaar-uitgaven voor het spaarsaldo-overzicht. Leeg →
+    # op 0 zetten (geen effect).
+    hf.annual_child_benefit = _parse_decimal(annual_child_benefit)
+    hf.annual_private_loan_refund = _parse_decimal(annual_private_loan_refund)
+    hf.annual_extra_primary = _parse_decimal(annual_extra_primary)
+    hf.annual_extra_secondary = _parse_decimal(annual_extra_secondary)
+    hf.annual_vacation_budget = _parse_decimal(annual_vacation_budget)
+    hf.annual_house_budget = _parse_decimal(annual_house_budget)
 
     db.commit()
     return RedirectResponse("/hypotheek/huishouden?saved=1", status_code=302)
@@ -1317,6 +1331,49 @@ def scenarios_detail(
             yr_income = yr_contrib + yr_used
             surplus_by_year.append((yr_income - yr_costs).quantize(Decimal("0.01")))
         vs["surplus_by_year"] = surplus_by_year
+
+        # Jaarlijks spaarsaldo-overzicht per variant. Baseert zich op het
+        # eerste jaar (geen inflatie-compounding) — dit is een indicatie van
+        # "hoeveel spaar ik per jaar bij dit scenario?". Aflossing op de
+        # nieuwe annuïteit wordt ernaast getoond: gemiddelde principal-deel
+        # over de eerste 5 jaar (jaar 1 is laagste aflossing, vandaar avg).
+        monthly_surplus_yr1 = (
+            surplus_by_year[0] if surplus_by_year else Decimal("0")
+        )
+        savings_income_yr = (
+            monthly_surplus_yr1 * Decimal(12)
+            + Decimal(str(household.annual_child_benefit or 0))
+            + Decimal(str(household.annual_private_loan_refund or 0))
+            + Decimal(str(household.annual_extra_primary or 0))
+            + Decimal(str(household.annual_extra_secondary or 0))
+            + vs["annual_savings"]  # rest teruggaaf (onbenut deel HRA)
+        ).quantize(Decimal("0.01"))
+        savings_expense_yr = (
+            Decimal(str(household.annual_vacation_budget or 0))
+            + Decimal(str(household.annual_house_budget or 0))
+        ).quantize(Decimal("0.01"))
+        vs["savings_monthly_surplus"] = (
+            monthly_surplus_yr1 * Decimal(12)
+        ).quantize(Decimal("0.01"))
+        vs["savings_income_yr"] = savings_income_yr
+        vs["savings_expense_yr"] = savings_expense_yr
+        vs["net_annual_savings"] = (
+            savings_income_yr - savings_expense_yr
+        ).quantize(Decimal("0.01"))
+
+        # Gemiddelde aflossing op de nieuwe annuïteit over de eerste 5 jaar.
+        if ann_principal > 0 and rate is not None:
+            sched = list(
+                mortgage_calc.amortization_schedule(ann_principal, rate, 30)
+            )[:60]
+            total_principal_5y = sum(
+                (r.principal for r in sched), Decimal("0"),
+            )
+            vs["avg_annual_amortization_5y"] = (
+                total_principal_5y / Decimal(5)
+            ).quantize(Decimal("0.01"))
+        else:
+            vs["avg_annual_amortization_5y"] = Decimal("0.00")
 
     available_fixed_years = sorted({r.fixed_years for r in rates}) or [5, 10, 15, 20, 30]
     missing_fixed_years = [
