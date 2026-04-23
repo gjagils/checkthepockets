@@ -561,6 +561,10 @@ class MortgageScenario(Base):
     # (municipal = OZB/heffingen, insurance = opstal/inboedel).
     municipal_cost_factor = Column(Numeric(4, 2), nullable=False, default=Decimal("1.50"))
     insurance_cost_factor = Column(Numeric(4, 2), nullable=False, default=Decimal("1.50"))
+    # Hoeveel van de maandelijkse hypotheek-rente-teruggaaf (HRA) daadwerkelijk
+    # wordt gebruikt om de maandlasten te verlagen. De rest valt vrij als
+    # jaarlijks spaarbedrag. NULL = oude gedrag (volledige teruggaaf → maandlast).
+    monthly_refund_usage = Column(Numeric(10, 2), nullable=True)
     energy_label = Column(String(2), default="A")
     notes = Column(Text, nullable=True)
     funda_url = Column(String(500), nullable=True)

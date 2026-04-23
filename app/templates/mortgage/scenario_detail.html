@@ -301,10 +301,30 @@
                     {% if not vs.rate_missing %}<td class="text-right">€ {{ vs.monthly_refund | euro }}</td>{% endif %}
                     {% endfor %}
                 </tr>
+                {% if scenario.monthly_refund_usage is not none %}
+                <tr>
+                    <td class="muted">Teruggaaf naar maandlast</td>
+                    {% for vs in variant_stats %}
+                    {% if not vs.rate_missing %}<td class="text-right">€ {{ vs.used_monthly_refund | euro }}</td>{% endif %}
+                    {% endfor %}
+                </tr>
+                {% endif %}
                 <tr style="border-top:2px solid #999;">
                     <td><strong>Netto maandlast hypotheek</strong></td>
                     {% for vs in variant_stats %}
                     {% if not vs.rate_missing %}<td class="text-right"><strong>€ {{ vs.net_monthly | euro }}</strong></td>{% endif %}
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td class="muted">Belastingteruggaaf / jaar</td>
+                    {% for vs in variant_stats %}
+                    {% if not vs.rate_missing %}<td class="text-right">€ {{ vs.annual_refund | euro }}</td>{% endif %}
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td class="muted">Spaarbedrag / jaar (rest teruggaaf)</td>
+                    {% for vs in variant_stats %}
+                    {% if not vs.rate_missing %}<td class="text-right" style="color:#1f7a1f;">€ {{ vs.annual_savings | euro }}</td>{% endif %}
                     {% endfor %}
                 </tr>
                 {% if budget_rows %}
