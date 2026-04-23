@@ -135,17 +135,18 @@ def test_add_variant_with_override(db_session):
         MortgageScenario.user_id == admin.id,
     ).one()
 
+    # fixed_years=15 is niet in de defaults (5/10/20), dus dit is een nieuwe variant.
     resp = client.post(f"/hypotheek/scenarios/{s.id}/variants", data={
-        "fixed_years": "10", "interest_rate_override": "3,99",
+        "fixed_years": "15", "interest_rate_override": "3,99",
     })
     assert resp.status_code == 302
     assert "flash=variant_added" in resp.headers["location"]
 
     db_session.expire_all()
-    v10 = db_session.query(MortgageVariant).filter(
-        MortgageVariant.scenario_id == s.id, MortgageVariant.fixed_years == 10,
+    v15 = db_session.query(MortgageVariant).filter(
+        MortgageVariant.scenario_id == s.id, MortgageVariant.fixed_years == 15,
     ).one()
-    assert v10.interest_rate_override == Decimal("0.0399")
+    assert v15.interest_rate_override == Decimal("0.0399")
 
 
 def test_add_duplicate_variant_rejected(db_session):
