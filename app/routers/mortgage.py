@@ -1,4 +1,5 @@
 """Hypotheek-rekenmodule — alleen toegankelijk voor admins."""
+import datetime
 from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
@@ -132,6 +133,17 @@ def _parse_percent(value: str, default: Decimal = Decimal("0")) -> Decimal:
     return (raw / Decimal("100")).quantize(Decimal("0.0001"))
 
 
+def _parse_iso_date(value: str) -> datetime.date | None:
+    """Parse ``YYYY-MM-DD``. Lege string / ongeldig → None."""
+    raw = (value or "").strip()
+    if not raw:
+        return None
+    try:
+        return datetime.date.fromisoformat(raw)
+    except ValueError:
+        return None
+
+
 @router.get("")
 def mortgage_index(request: Request, db: Session = Depends(get_db)):
     user = _require_admin(request, db)
@@ -175,6 +187,8 @@ def household_save(
     notional_rent_value: str = Form(""),
     purchase_costs_pct: str = Form(""),
     selling_costs_pct: str = Form(""),
+    hra_correction_factor: str = Form(""),
+    ewf_pct: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = _require_admin(request, db)
@@ -196,6 +210,16 @@ def household_save(
     hf.notional_rent_value = _parse_decimal(notional_rent_value, Decimal("3600"))
     hf.purchase_costs_pct = _parse_percent(purchase_costs_pct, Decimal("0.025"))
     hf.selling_costs_pct = _parse_percent(selling_costs_pct, Decimal("0.015"))
+
+    # Correctiefactor: kleine decimale (0.9482 etc). User tikt 'm direct in,
+    # geen × 100 omzetting.
+    if hra_correction_factor.strip():
+        hf.hra_correction_factor = _parse_decimal(
+            hra_correction_factor, default=Decimal("1.0"),
+        ).quantize(Decimal("0.0001"))
+    # EWF-percentage: user tikt 0.35 (=%) → opslaan als 0.0035.
+    if ewf_pct.strip():
+        hf.ewf_pct = _parse_percent(ewf_pct, Decimal("0.0035"))
 
     db.commit()
     return RedirectResponse("/hypotheek/huishouden?saved=1", status_code=302)
@@ -514,6 +538,7 @@ def _apply_scenario_form(
     municipal_cost_factor: str = "",
     insurance_cost_factor: str = "",
     monthly_refund_usage: str = "",
+    woz_value: str = "",
 ) -> None:
     s.name = name.strip() or s.name or "Naamloos scenario"
     s.valuation = _parse_decimal(valuation)
@@ -555,6 +580,11 @@ def _apply_scenario_form(
         )
     else:
         s.monthly_refund_usage = None
+    # WOZ-waarde (voor EWF-berekening). Leeg → NULL → fallback = taxatie.
+    if woz_value.strip():
+        s.woz_value = _parse_decimal(woz_value, default=Decimal("0"))
+    else:
+        s.woz_value = None
 
 
 @router.get("/scenarios")
@@ -659,6 +689,7 @@ def scenarios_create(
     municipal_cost_factor: str = Form(""),
     insurance_cost_factor: str = Form(""),
     monthly_refund_usage: str = Form(""),
+    woz_value: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = _require_admin(request, db)
@@ -680,12 +711,40 @@ def scenarios_create(
         municipal_cost_factor=municipal_cost_factor,
         insurance_cost_factor=insurance_cost_factor,
         monthly_refund_usage=monthly_refund_usage,
+        woz_value=woz_value,
     )
     db.add(s)
     db.commit()
     db.refresh(s)
     _auto_create_variants(db, user.id, s)
     return RedirectResponse(f"/hypotheek/scenarios/{s.id}?flash=created", status_code=302)
+
+
+def _existing_mortgage_yearly_interest(
+    em: ScenarioExistingMortgage, year_offset: int,
+) -> Decimal:
+    """Rente die dit leningdeel in ``year_offset`` (0 = huidig jaar) maakt.
+
+    * Aflossingsvrij: ``balance × rate_pct/100`` — constant over de looptijd.
+    * Annuïtair: gebruikt een amortization-schedule gebaseerd op
+      ``months_remaining`` om het rentedeel per jaar te bepalen.
+
+    Returnt 0 als rate of balance ontbreekt.
+    """
+    bal = Decimal(str(em.balance_eur or 0))
+    rate_pct = em.rate_pct
+    if bal <= 0 or rate_pct is None:
+        return Decimal("0")
+    rate = Decimal(str(rate_pct)) / Decimal(100)  # stored in %
+
+    if (em.mortgage_type or "annuity") == "interest_only":
+        return (bal * rate).quantize(Decimal("0.01"))
+
+    months = int(em.months_remaining) if em.months_remaining else 360
+    years = max(months // 12, 1)
+    schedule = list(mortgage_calc.amortization_schedule(bal, rate, years))
+    rows = schedule[year_offset * 12:(year_offset + 1) * 12]
+    return sum((r.interest for r in rows), Decimal("0"))
 
 
 def _variant_stats(
@@ -696,12 +755,39 @@ def _variant_stats(
     household: HouseholdFinance,
     scenario: MortgageScenario | None = None,
 ):
-    """Bereken alle rijen voor deze variant voor de vergelijkingstabel + chart."""
+    """Bereken alle rijen voor deze variant voor de vergelijkingstabel + chart.
+
+    HRA wordt per jaar uitgerekend met:
+
+    * Werkelijke rente uit de aflossingstabel (annuïteit) + rente uit bestaande
+      leningdelen die nog HRA-geldig zijn (``hra_end_date``).
+    * EWF als percentage × WOZ-waarde (scenario.woz_value of fallback
+      scenario.valuation).
+    * ``household.hra_correction_factor`` als kalibratie op je echte aangifte.
+
+    Het veld ``annual_refund`` = gemiddelde teruggaaf over de rentevast-periode
+    (5/10/20 jaar), omdat de jaar-1-waarde een boven-schatting is.
+    """
     tax_rate = Decimal(str(household.tax_rate))
-    notional = Decimal(str(household.notional_rent_value))
+    correction = Decimal(
+        str(getattr(household, "hra_correction_factor", "1.0") or "1.0")
+    )
+    ewf_pct = Decimal(
+        str(getattr(household, "ewf_pct", "0.0035") or "0.0035")
+    )
     existing_pim = Decimal(str(household.existing_mortgage_pim))
     existing_pim_rate = Decimal(str(household.existing_mortgage_pim_rate))
     existing_io_monthly = Decimal(str(household.existing_mortgage_interest_only_monthly))
+
+    # WOZ: scenario override, fallback = taxatie, fallback = 0.
+    woz = Decimal("0")
+    if scenario is not None:
+        woz = Decimal(str(
+            scenario.woz_value
+            if scenario.woz_value is not None
+            else scenario.valuation or 0
+        ))
+    ewf_yr = mortgage_calc.ewf_amount(woz, ewf_pct)
 
     # Teruggaaf-gebruik per scenario: NULL = volledige teruggaaf → maandlast
     # (oude gedrag); anders dit bedrag per maand naar maandlast, rest spaart.
@@ -733,39 +819,82 @@ def _variant_stats(
         "net_monthly": Decimal("0.00"),
         "first_5y_total_cost": Decimal("0.00"),
         "net_monthly_by_year": [],
+        "ewf_yr": ewf_yr,
     }
 
     if rate is None:
         return stats
 
-    # Nieuw annuïtair deel.
     stats["annuity_monthly"] = mortgage_calc.pmt(ann_principal, rate, 30)
-    # Bestaande PIM loopt door: rente * principal / 12 (schatting).
     stats["pim_monthly"] = (existing_pim * existing_pim_rate / Decimal(12)).quantize(
         Decimal("0.01")
     )
 
-    # Netto maandlast jaar 1 volgens calc-engine (volledige teruggaaf verrekend).
-    base_net_monthly = mortgage_calc.net_monthly(
-        stats["annuity_monthly"], rate, ann_principal, tax_rate, notional,
+    schedule = (
+        list(mortgage_calc.amortization_schedule(ann_principal, rate, 30))
+        if ann_principal > 0 else []
     )
-    full_monthly_refund = (
-        stats["annuity_monthly"] - base_net_monthly
-    ).quantize(Decimal("0.01"))
+
+    today = datetime.date.today()
+    fixed_years = variant.fixed_years or 5
+    refunds_over_fixed: list[Decimal] = []
+
+    for year_offset in range(30):
+        yr_start = datetime.date(today.year + year_offset, 1, 1)
+
+        # Nieuwe annuïteit — rente altijd aftrekbaar (30-jr loopt sowieso).
+        rows = schedule[year_offset * 12:(year_offset + 1) * 12]
+        annuity_int = sum((r.interest for r in rows), Decimal(0)) if rows else Decimal(0)
+        annuity_gross = sum((r.payment for r in rows), Decimal(0)) if rows else Decimal(0)
+
+        # Bestaande leningdelen: rente aftrekbaar tot hra_end_date.
+        existing_int_deductible = Decimal(0)
+        if scenario is not None:
+            for em in scenario.existing_mortgages:
+                yr_int = _existing_mortgage_yearly_interest(em, year_offset)
+                if em.hra_end_date is None or em.hra_end_date > yr_start:
+                    existing_int_deductible += yr_int
+
+        total_deductible = annuity_int + existing_int_deductible
+        year_refund = mortgage_calc.hra_refund(
+            total_deductible, ewf_yr, tax_rate, correction,
+        )
+
+        if year_offset < fixed_years:
+            refunds_over_fixed.append(year_refund)
+
+        # Netto maandlast nieuwe annuïteit = bruto − inzet teruggaaf per maand.
+        if refund_usage_setting is None:
+            year_used = year_refund
+        else:
+            year_used = min(
+                max(refund_usage_setting, Decimal("0")) * Decimal(12), year_refund,
+            )
+        if rows:
+            year_net = (annuity_gross - year_used) / Decimal(12)
+            stats["net_monthly_by_year"].append(year_net.quantize(Decimal("0.01")))
+
+    # Vergelijkingstabel-cellen: gemiddelde over rentevast-periode (realistisch,
+    # houdt rekening met dalende rente én aflopende HRA van bestaande leningen).
+    if refunds_over_fixed:
+        avg_annual_refund = (
+            sum(refunds_over_fixed, Decimal(0)) / Decimal(len(refunds_over_fixed))
+        ).quantize(Decimal("0.01"))
+    else:
+        avg_annual_refund = Decimal("0.00")
+
+    full_monthly_refund = (avg_annual_refund / Decimal(12)).quantize(Decimal("0.01"))
 
     if refund_usage_setting is None:
-        # Oude gedrag: alles naar maandlast.
         used_monthly = full_monthly_refund
     else:
-        # User bepaalt bedrag; cap op wat er daadwerkelijk terug komt
-        # (je kunt niet méér inzetten dan je krijgt).
         used_monthly = min(
             max(refund_usage_setting, Decimal("0")), full_monthly_refund,
         )
 
     stats["monthly_refund"] = full_monthly_refund
     stats["used_monthly_refund"] = used_monthly.quantize(Decimal("0.01"))
-    stats["annual_refund"] = (full_monthly_refund * Decimal(12)).quantize(Decimal("0.01"))
+    stats["annual_refund"] = avg_annual_refund
     stats["annual_savings"] = (
         (full_monthly_refund - used_monthly) * Decimal(12)
     ).quantize(Decimal("0.01"))
@@ -773,48 +902,11 @@ def _variant_stats(
         stats["annuity_monthly"] - used_monthly
     ).quantize(Decimal("0.01"))
 
-    if ann_principal > 0:
-        schedule = list(
-            mortgage_calc.amortization_schedule(ann_principal, rate, 30)
-        )
-        # Netto-maandlast per jaar: teruggaaf-gebruik is een constant bedrag
-        # (user-setting) of volledig (oude gedrag). Rest = spaarbedrag (niet in
-        # deze reeks zichtbaar, alleen in stats["annual_savings"]).
-        for year_offset in range(30):
-            rows = schedule[year_offset * 12:(year_offset + 1) * 12]
-            if not rows:
-                break
-            year_interest = sum((r.interest for r in rows), Decimal(0))
-            year_gross = sum((r.payment for r in rows), Decimal(0))
-            deductible = max(year_interest - notional, Decimal(0))
-            year_refund = deductible * tax_rate
-            if refund_usage_setting is None:
-                year_used = year_refund
-            else:
-                year_used = min(
-                    max(refund_usage_setting, Decimal("0")) * Decimal(12),
-                    year_refund,
-                )
-            year_net = (year_gross - year_used) / Decimal(12)
-            stats["net_monthly_by_year"].append(year_net.quantize(Decimal("0.01")))
-        # Eerste 5 jaar totale kosten (bruto minus gebruikte teruggaaf).
-        first_60 = schedule[:60]
-        gross_60 = sum((r.payment for r in first_60), Decimal(0))
-        used_total = Decimal(0)
-        for year_offset in range(5):
-            rows = schedule[year_offset * 12:(year_offset + 1) * 12]
-            year_int = sum((r.interest for r in rows), Decimal(0))
-            year_refund = max(year_int - notional, Decimal(0)) * tax_rate
-            if refund_usage_setting is None:
-                used_total += year_refund
-            else:
-                used_total += min(
-                    max(refund_usage_setting, Decimal("0")) * Decimal(12),
-                    year_refund,
-                )
-        stats["first_5y_total_cost"] = (gross_60 - used_total).quantize(
-            Decimal("0.01")
-        )
+    # Eerste 5 jaar totale kosten uit de net_monthly_by_year reeks.
+    if len(stats["net_monthly_by_year"]) >= 5:
+        stats["first_5y_total_cost"] = (
+            sum(stats["net_monthly_by_year"][:5], Decimal(0)) * Decimal(12)
+        ).quantize(Decimal("0.01"))
 
     return stats
 
@@ -1296,6 +1388,7 @@ def scenarios_edit(
     municipal_cost_factor: str = Form(""),
     insurance_cost_factor: str = Form(""),
     monthly_refund_usage: str = Form(""),
+    woz_value: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = _require_admin(request, db)
@@ -1317,6 +1410,7 @@ def scenarios_edit(
         municipal_cost_factor=municipal_cost_factor,
         insurance_cost_factor=insurance_cost_factor,
         monthly_refund_usage=monthly_refund_usage,
+        woz_value=woz_value,
     )
     db.commit()
     return RedirectResponse(
@@ -1389,6 +1483,7 @@ def existing_mortgage_create(
     months_remaining: str = Form(""),
     monthly_payment_eur: str = Form(""),
     counts_in_ltv: str = Form("1"),
+    hra_end_date: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = _require_admin(request, db)
@@ -1412,6 +1507,7 @@ def existing_mortgage_create(
             _parse_decimal(monthly_payment_eur) if monthly_payment_eur.strip() else None
         ),
         counts_in_ltv=1 if counts_in_ltv.strip() in ("1", "on", "true", "yes") else 0,
+        hra_end_date=_parse_iso_date(hra_end_date),
         sort_order=next_order,
     )
     db.add(em)
@@ -1434,6 +1530,7 @@ def existing_mortgage_edit(
     months_remaining: str = Form(""),
     monthly_payment_eur: str = Form(""),
     counts_in_ltv: str = Form(""),
+    hra_end_date: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = _require_admin(request, db)
@@ -1452,6 +1549,7 @@ def existing_mortgage_edit(
     # door normaal submitten niet uitgeschakeld worden als de checkbox op
     # "1" staat.
     em.counts_in_ltv = 1 if counts_in_ltv.strip() in ("1", "on", "true", "yes") else 0
+    em.hra_end_date = _parse_iso_date(hra_end_date)
     db.commit()
     return RedirectResponse(
         f"/hypotheek/scenarios/{scenario_id}#existing-mortgages",

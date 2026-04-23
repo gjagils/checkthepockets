@@ -517,6 +517,13 @@ class HouseholdFinance(Base):
     notional_rent_value = Column(Numeric(12, 2), default=Decimal("3600"))
     purchase_costs_pct = Column(Numeric(6, 4), default=Decimal("0.025"))
     selling_costs_pct = Column(Numeric(6, 4), default=Decimal("0.015"))
+    # HRA-correctiefactor: afwijking tussen modelmatige teruggaaf en werkelijke
+    # aangifte (2025 aangifte €3.043 vs modelberekening €3.209 → factor 0,9482).
+    # Default 1,0 = geen correctie. Kalibreer na elke aangifte.
+    hra_correction_factor = Column(Numeric(5, 4), nullable=False, default=Decimal("1.0000"))
+    # Eigenwoningforfait-percentage. 2026: 0,35% tot drempel, 2,35% daarboven.
+    # Alleen de lage grens is configureerbaar; drempel + hoge tarief staan vast.
+    ewf_pct = Column(Numeric(6, 4), nullable=False, default=Decimal("0.0035"))
 
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
@@ -561,6 +568,9 @@ class MortgageScenario(Base):
     # (municipal = OZB/heffingen, insurance = opstal/inboedel).
     municipal_cost_factor = Column(Numeric(4, 2), nullable=False, default=Decimal("1.50"))
     insurance_cost_factor = Column(Numeric(4, 2), nullable=False, default=Decimal("1.50"))
+    # WOZ-waarde voor eigenwoningforfait. NULL → fallback = valuation (taxatie).
+    # Zet dit als je een WOZ-beschikking hebt die afwijkt van de taxatie.
+    woz_value = Column(Numeric(12, 2), nullable=True)
     # Hoeveel van de maandelijkse hypotheek-rente-teruggaaf (HRA) daadwerkelijk
     # wordt gebruikt om de maandlasten te verlagen. De rest valt vrij als
     # jaarlijks spaarbedrag. NULL = oude gedrag (volledige teruggaaf → maandlast).
@@ -606,6 +616,12 @@ class ScenarioExistingMortgage(Base):
     # ze wel deel zijn van de dekking (overwaarde-aftrek + nieuwe-annuïteit).
     # Default 1 = meetellen (normaal gedrag voor bank-hypotheken).
     counts_in_ltv = Column(Integer, nullable=False, default=1)
+    # Einddatum hypotheekrenteaftrek. Na deze datum telt de rente niet meer
+    # mee voor HRA (de schuld loopt door maar verhuist effectief naar box 3).
+    # Leeg = altijd aftrekbaar (bv. nieuwe annuïteit 30 jr na afsluiten). Voor
+    # oude aflossingsvrije hypotheken (Wet IB 2001, 30-jr-regel): typisch
+    # 30 jaar na fiscale startdatum.
+    hra_end_date = Column(Date, nullable=True)
 
     scenario = relationship("MortgageScenario", back_populates="existing_mortgages")
 

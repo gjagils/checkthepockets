@@ -118,16 +118,29 @@
     <section>
         <h2 style="margin:0 0 0.25rem 0;">Belasting & forfait</h2>
         <p class="muted" style="margin:0 0 0.75rem 0;">
-            Voor renteaftrek en eigen-woning-forfait. Defaults: 36,97% en € 3.600.
+            Voor HRA-berekening. 2026: max aftrektarief 37,56% (inclusief tariefs­aanpassing).
+            EWF-percentage: 0,35% van WOZ tot € 1.340.000 (hardgecodeerde drempel; daarboven 2,35%).
+            <br><strong>Correctiefactor</strong>: werkelijke teruggaaf aangifte / modelmatige teruggaaf.
+            Kalibreer na elke aangifte. Default 1,0 = geen correctie.
         </p>
         <div class="table-wrap">
             <table>
                 <tbody>
                     <tr>
                         <td>Belastingtarief (%)</td>
-                        <td>{{ pct_input("tax_rate", household.tax_rate, "36,97") }}</td>
-                        <td>Eigen woning forfait (€)</td>
+                        <td>{{ pct_input("tax_rate", household.tax_rate, "37,56") }}</td>
+                        <td>Eigen woning forfait (€ — legacy, niet gebruikt als WOZ gezet is)</td>
                         <td>{{ euro_input("notional_rent_value", household.notional_rent_value, "3600,00") }}</td>
+                    </tr>
+                    <tr>
+                        <td>EWF-percentage (%)</td>
+                        <td>{{ pct_input("ewf_pct", household.ewf_pct, "0,35") }}</td>
+                        <td>HRA-correctiefactor</td>
+                        <td>
+                            <input type="text" name="hra_correction_factor" class="budget-input"
+                                   value="{{ '%.4f' % household.hra_correction_factor if household.hra_correction_factor is not none else '1.0000' }}"
+                                   placeholder="1,0000" inputmode="decimal" style="text-align:right;">
+                        </td>
                     </tr>
                 </tbody>
             </table>

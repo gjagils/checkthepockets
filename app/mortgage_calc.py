@@ -399,3 +399,49 @@ def net_monthly(
     annual_refund = deductible * tax_rate
     monthly_refund = annual_refund / Decimal(12)
     return _round_cent(monthly_payment - monthly_refund)
+
+
+# ── Eigenwoningforfait (2026) ───────────────────────────────────────────
+
+# Drempel waarboven het hoge forfait-tarief geldt. Vanaf 2026 is dit € 1,34 mln
+# volgens Belastingdienst-tarieven. Hardcoded omdat de drempel jaarlijks
+# wijzigt en losstaat van user-configuratie.
+EWF_HIGH_THRESHOLD = Decimal("1340000")
+EWF_HIGH_PCT = Decimal("0.0235")
+
+
+def ewf_amount(
+    woz_value: Decimal,
+    ewf_pct_low: Decimal = Decimal("0.0035"),
+) -> Decimal:
+    """Bereken het eigenwoningforfait op basis van de WOZ-waarde.
+
+    * 0,35% (default) tot en met de drempel (€ 1.340.000 in 2026).
+    * 2,35% over het deel boven de drempel.
+    """
+    woz = Decimal(str(woz_value or 0))
+    if woz <= 0:
+        return Decimal("0.00")
+    low = min(woz, EWF_HIGH_THRESHOLD) * Decimal(str(ewf_pct_low))
+    high = max(woz - EWF_HIGH_THRESHOLD, Decimal("0")) * EWF_HIGH_PCT
+    return _round_cent(low + high)
+
+
+def hra_refund(
+    deductible_interest_yr: Decimal,
+    ewf_yr: Decimal,
+    tax_rate: Decimal,
+    correction_factor: Decimal = Decimal("1.0000"),
+) -> Decimal:
+    """Werkelijke teruggaaf per jaar.
+
+    Formule: ``max(0, rente_aftrekbaar − EWF) × tarief × correctiefactor``.
+
+    De `correction_factor` corrigeert voor afwijkingen tussen de modelmatige
+    teruggaaf en de werkelijke aangifte (o.a. heffingskortingen, afrondingen,
+    tariefsaanpassingen). Default 1,0 = geen correctie; kalibreer met
+    `werkelijke_teruggaaf / (aftrekbare_rente − EWF) / tarief`.
+    """
+    saldo = max(Decimal(str(deductible_interest_yr or 0)) - Decimal(str(ewf_yr or 0)), Decimal("0"))
+    factor = Decimal(str(correction_factor or "1.0"))
+    return _round_cent(saldo * Decimal(str(tax_rate)) * factor)
