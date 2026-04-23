@@ -604,15 +604,21 @@ def scenarios_funda_lookup(
     return JSONResponse(parsed)
 
 
+DEFAULT_VARIANT_FIXED_YEARS = (5, 10, 20)
+
+
 def _auto_create_variants(db: Session, user_id: int, scenario: MortgageScenario) -> None:
-    """Maak 1 variant per distinct rentevast-periode uit de rate-tabel van de user."""
-    fixed_years_list = sorted({
-        r.fixed_years for r in db.query(MortgageRateTable)
-        .filter(MortgageRateTable.user_id == user_id).all()
-    })
-    for fy in fixed_years_list:
+    """Maak standaard-varianten voor 5, 10 en 20 jaar rentevast (idempotent)."""
+    existing = {v.fixed_years for v in scenario.variants}
+    added = False
+    for fy in DEFAULT_VARIANT_FIXED_YEARS:
+        if fy in existing:
+            continue
         db.add(MortgageVariant(scenario_id=scenario.id, fixed_years=fy))
-    db.commit()
+        added = True
+    if added:
+        db.commit()
+        db.refresh(scenario)
 
 
 @router.post("/scenarios")
@@ -806,6 +812,8 @@ def scenarios_detail(
 ):
     user = _require_admin(request, db)
     scenario = _get_scenario(db, user.id, scenario_id)
+    if not scenario.variants:
+        _auto_create_variants(db, user.id, scenario)
     household = _get_or_create_household(db, user.id)
     rates = _rates_for_user(db, user.id)
 

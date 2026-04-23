@@ -89,7 +89,7 @@ def _create_scenario(client, name="H") -> int:
     })
 
 
-def test_auto_create_variants_from_rate_table(db_session):
+def test_auto_create_default_variants(db_session):
     admin = _make_user(db_session)
     _seed_rates(db_session, admin.id, years=(5, 10, 20))
     _client(admin.id).get("/hypotheek/huishouden")  # seed household
@@ -107,7 +107,7 @@ def test_auto_create_variants_from_rate_table(db_session):
     assert fixed == [5, 10, 20]
 
 
-def test_variants_empty_when_no_rates(db_session):
+def test_default_variants_created_without_rate_table(db_session):
     admin = _make_user(db_session)
     _client(admin.id).get("/hypotheek/huishouden")
     client = _client(admin.id)
@@ -116,9 +116,12 @@ def test_variants_empty_when_no_rates(db_session):
     s = db_session.query(MortgageScenario).filter(
         MortgageScenario.user_id == admin.id,
     ).one()
-    assert db_session.query(MortgageVariant).filter(
-        MortgageVariant.scenario_id == s.id,
-    ).count() == 0
+    fixed = sorted(
+        v.fixed_years for v in db_session.query(MortgageVariant).filter(
+            MortgageVariant.scenario_id == s.id,
+        ).all()
+    )
+    assert fixed == [5, 10, 20]
 
 
 def test_add_variant_with_override(db_session):
