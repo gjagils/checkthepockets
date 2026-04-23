@@ -138,7 +138,12 @@
                         <td class="text-right"><input type="number" step="0.001" name="rate_pct" value="{{ em.rate_pct if em.rate_pct is not none else '' }}" class="inline-input" style="text-align:right; width:5rem;"></td>
                         <td class="text-right"><input type="number" step="1" name="months_remaining" value="{{ em.months_remaining if em.months_remaining is not none else '' }}" class="inline-input" style="text-align:right; width:5rem;"></td>
                         <td class="text-right">
-                            <input type="number" step="0.01" name="monthly_payment_eur" placeholder="€ {{ em.monthly_payment_eur | default('auto') }}" value="{{ em.monthly_payment_eur if em.monthly_payment_eur is not none else '' }}" class="inline-input" style="text-align:right; width:6rem;" title="Laat leeg voor auto-berekening">
+                            {% set auto_month = existing_auto_monthly.get(em.id) %}
+                            <input type="number" step="0.01" name="monthly_payment_eur"
+                                   placeholder="{% if auto_month %}€ {{ '%.2f' | format(auto_month) }}{% else %}auto{% endif %}"
+                                   value="{{ em.monthly_payment_eur if em.monthly_payment_eur is not none else '' }}"
+                                   class="inline-input" style="text-align:right; width:7rem;"
+                                   title="Laat leeg voor auto-berekening op basis van saldo + rente + type">
                         </td>
                         <td class="text-center" title="Vink uit voor privé-leningen die buiten de bank-LTV vallen">
                             <input type="checkbox" name="counts_in_ltv" value="1" {% if em.counts_in_ltv %}checked{% endif %}>

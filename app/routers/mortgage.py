@@ -892,6 +892,18 @@ def scenarios_detail(
     ann_principal = fin.nieuwe_annuiteit
     ltv_fraction = fin.ltv_fraction
 
+    # Per bestaande-hypotheek de auto-berekende maandlast (niet: de user-override)
+    # zodat het invoerveld een zinvolle placeholder kan tonen i.p.v. "€ None".
+    existing_auto_monthly: dict[int, Decimal] = {}
+    for em in scenario.existing_mortgages:
+        existing_auto_monthly[em.id] = mortgage_calc.existing_mortgage_monthly(
+            balance=Decimal(str(em.balance_eur or 0)),
+            mortgage_type=em.mortgage_type or "annuity",
+            rate_pct=em.rate_pct,
+            months_remaining=em.months_remaining,
+            override=None,  # altijd auto, override tonen we apart
+        )
+
     # Bereken per variant de vergelijkingsdata.
     variants_sorted = sorted(scenario.variants, key=lambda v: v.fixed_years)
     variant_stats = [
@@ -1026,6 +1038,7 @@ def scenarios_detail(
             "scenario": scenario,
             "household": household,
             "fin": fin,  # LIN-44: alle afgeleide waardes gebundeld
+            "existing_auto_monthly": existing_auto_monthly,
             "to_finance": to_fin,
             "overwaarde": ow,
             "annuity_principal": ann_principal,
