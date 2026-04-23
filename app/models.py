@@ -524,6 +524,15 @@ class HouseholdFinance(Base):
     # Eigenwoningforfait-percentage. 2026: 0,35% tot drempel, 2,35% daarboven.
     # Alleen de lage grens is configureerbaar; drempel + hoge tarief staan vast.
     ewf_pct = Column(Numeric(6, 4), nullable=False, default=Decimal("0.0035"))
+    # Jaarlijkse groeipercentages voor scenario-projecties. Gelden voor ALLE
+    # scenarios van deze user.
+    # * inflation_pct: verhoogt de budget-categorieën (excl. hypotheek) elk jaar.
+    #   Default 2,5% — tussen het 10-jr NL-CPI gemiddelde (2,8%) en het ECB-doel
+    #   op lange termijn (2,0%).
+    # * contribution_growth_pct: verhoogt de persoons-bijdragen elk jaar.
+    #   Default 3,0% — typische loon-indexering in NL.
+    inflation_pct = Column(Numeric(5, 4), nullable=False, default=Decimal("0.0250"))
+    contribution_growth_pct = Column(Numeric(5, 4), nullable=False, default=Decimal("0.0300"))
 
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)

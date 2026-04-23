@@ -148,6 +148,29 @@
     </section>
 
     <section>
+        <h2 style="margin:0 0 0.25rem 0;">Inflatie & bijdrage-groei</h2>
+        <p class="muted" style="margin:0 0 0.75rem 0;">
+            Jaarlijkse groei die in scenario-projecties (grafiek) op alle
+            varianten wordt toegepast. Defaults: 2,5% inflatie (tussen NL-CPI
+            10-jr gemiddelde en ECB-doel), 3,0% bijdrage-groei (typische
+            NL-loonindexering). Inflatie verhoogt alleen de budget-
+            categorieën (excl. hypotheek zelf).
+        </p>
+        <div class="table-wrap">
+            <table>
+                <tbody>
+                    <tr>
+                        <td>Inflatie budget (%)</td>
+                        <td>{{ pct_input("inflation_pct", household.inflation_pct, "2,50") }}</td>
+                        <td>Groei bijdragen (%)</td>
+                        <td>{{ pct_input("contribution_growth_pct", household.contribution_growth_pct, "3,00") }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section>
         <h2 style="margin:0 0 0.25rem 0;">Kosten-percentages</h2>
         <p class="muted" style="margin:0 0 0.75rem 0;">
             Aankoopkosten (notaris, overdrachtsbelasting) en verkoopkosten (makelaar).
