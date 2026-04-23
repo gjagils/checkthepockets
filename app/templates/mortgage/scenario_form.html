@@ -8,17 +8,17 @@
 <form method="post"
       action="{% if mode == 'edit' %}/hypotheek/scenarios/{{ scenario.id }}/edit{% else %}/hypotheek/scenarios{% endif %}">
     <div class="card" style="margin-bottom:1rem;">
-        <h3 style="margin-top:0;">{% if mode == 'edit' %}Funda-link{% else %}Automatisch invullen vanaf Funda{% endif %}</h3>
+        <h3 style="margin-top:0;">{% if mode == 'edit' %}Listing-link{% else %}Automatisch invullen vanaf Funda of Move.nl{% endif %}</h3>
         {% if mode != 'edit' %}
         <p class="muted" style="margin-top:0.25rem;">
-            Plak een Funda-URL en klik op <em>Ophalen</em>. Taxatie wordt gelijk aan de vraagprijs, Bod wordt automatisch 15% hoger.
+            Plak een Funda- of Move.nl-URL en klik op <em>Ophalen</em>. Taxatie wordt gelijk aan de vraagprijs, Bod wordt automatisch 15% hoger.
         </p>
         {% endif %}
         <div class="form-group">
-            <label for="f-funda-url">Funda-URL</label>
+            <label for="f-funda-url">Funda- of Move.nl-URL</label>
             <input type="url" id="f-funda-url" name="funda_url"
                    value="{{ scenario.funda_url or '' if scenario else '' }}"
-                   placeholder="https://www.funda.nl/koop/..."
+                   placeholder="https://www.funda.nl/koop/... of https://move.nl/..."
                    autocomplete="off">
         </div>
         {% if mode != 'edit' %}
