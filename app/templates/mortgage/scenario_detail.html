@@ -121,6 +121,8 @@
                     <th class="text-right">Mnd-last</th>
                     <th class="text-center" title="Telt mee in de LTV-berekening voor de bank">LTV</th>
                     <th title="Einddatum hypotheekrenteaftrek (Wet IB 2001: 30 jaar vanaf start)">HRA-einde</th>
+                    <th class="text-right" title="Nieuwe rente na rentevast-einde">Rente 2 %</th>
+                    <th title="Datum waarop rente 2 ingaat">Rente 2 vanaf</th>
                     <th></th>
                 </tr>
             </thead>
@@ -155,6 +157,18 @@
                                    class="inline-input" style="width:8rem;"
                                    title="Leeg = altijd aftrekbaar. Voor oude aflossingsvrij: typisch 30 jaar na fiscale startdatum.">
                         </td>
+                        <td class="text-right">
+                            <input type="number" step="0.001" name="rate_pct_after"
+                                   value="{{ em.rate_pct_after if em.rate_pct_after is not none else '' }}"
+                                   class="inline-input" style="text-align:right; width:5rem;"
+                                   title="Leeg = rente blijft gelijk. Zet als rentevast-periode afloopt en een nieuwe rente gaat gelden.">
+                        </td>
+                        <td>
+                            <input type="date" name="rate_change_date"
+                                   value="{{ em.rate_change_date.isoformat() if em.rate_change_date else '' }}"
+                                   class="inline-input" style="width:8rem;"
+                                   title="Datum waarop rente 2 ingaat.">
+                        </td>
                         <td style="display:flex; gap:0.25rem; flex-wrap:wrap;">
                             <button type="submit" class="btn btn-sm btn-primary">Opslaan</button>
                     </form>
@@ -187,6 +201,8 @@
             <div><label class="muted" style="font-size:0.8rem;">Mnd-last € (optioneel)</label><br><input type="number" step="0.01" name="monthly_payment_eur" placeholder="auto"></div>
             <div style="align-self:center;"><label class="muted" style="font-size:0.8rem; display:flex; align-items:center; gap:0.35rem; cursor:pointer;"><input type="checkbox" name="counts_in_ltv" value="1" checked> Telt mee in LTV</label></div>
             <div><label class="muted" style="font-size:0.8rem;">HRA-einde</label><br><input type="date" name="hra_end_date" title="30 jaar na fiscale startdatum"></div>
+            <div><label class="muted" style="font-size:0.8rem;">Rente 2 %</label><br><input type="number" step="0.001" name="rate_pct_after" placeholder="bv. 4.45" style="width:6rem;"></div>
+            <div><label class="muted" style="font-size:0.8rem;">Rente 2 vanaf</label><br><input type="date" name="rate_change_date"></div>
             <button type="submit" class="btn btn-primary">+ Hypotheek toevoegen</button>
         </div>
     </form>

@@ -175,6 +175,20 @@ def existing_mortgage_monthly(
     return _calc_annuity_monthly_from_months(Decimal(str(balance)), annual, months)
 
 
+def effective_rate_pct_today(em) -> Decimal | None:
+    """Kies de rente (als percentage, dus 4.45 niet 0.0445) die vandaag geldt
+    voor een bestaand leningdeel. Respecteert een eventuele rentesprong via
+    ``rate_change_date`` + ``rate_pct_after``.
+    """
+    import datetime as _dt
+    rate_after = getattr(em, "rate_pct_after", None)
+    change_date = getattr(em, "rate_change_date", None)
+    if rate_after is not None and change_date is not None:
+        if _dt.date.today() >= change_date:
+            return Decimal(str(rate_after))
+    return em.rate_pct if em.rate_pct is not None else None
+
+
 @dataclass
 class ScenarioFinancials:
     """Alle afgeleide bedragen voor de derived-waardes-kaart."""
@@ -223,7 +237,7 @@ def compute_scenario_financials(scenario) -> ScenarioFinancials:
         monthly = existing_mortgage_monthly(
             balance=bal,
             mortgage_type=m.mortgage_type or "annuity",
-            rate_pct=m.rate_pct,
+            rate_pct=effective_rate_pct_today(m),
             months_remaining=m.months_remaining,
             override=(Decimal(str(m.monthly_payment_eur))
                      if m.monthly_payment_eur is not None and m.monthly_payment_eur > 0
