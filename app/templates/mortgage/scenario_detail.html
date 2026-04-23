@@ -380,8 +380,8 @@
     </div>
 
     {% if chart_series %}
-    <div style="margin-top:1rem; max-height:360px;">
-        <canvas id="netMonthlyChart" height="220" aria-label="Netto maandlast over 30 jaar"></canvas>
+    <div style="margin-top:1rem; max-height:480px;">
+        <canvas id="netMonthlyChart" height="300" aria-label="Netto maandlast over 30 jaar"></canvas>
     </div>
     {% endif %}
 </div>
@@ -715,36 +715,26 @@ document.addEventListener('DOMContentLoaded', function () {
     // borderColor/backgroundColor/borderDash/fill in per serie). We nemen de
     // objecten as-is over en voegen alleen een paar display-defaults toe
     // mochten ze ontbreken (backward compat voor oude cached pageviews).
-    // Dual Y-axis: hypotheek-last en overschot zijn heel verschillend in
-    // grootte (3-5k vs -1k tot +500). Door ze op aparte assen te plotten is
-    // de grafiek veel compacter.
     var datasets = {{ chart_series | tojson }}.map(function (s) {
-        var isOverschot = s.label && s.label.indexOf('overschot') !== -1;
         return Object.assign({
             pointRadius: 2,
             pointHoverRadius: 4,
-            yAxisID: isOverschot ? 'ySurplus' : 'yMortgage',
         }, s);
     });
-    function tightBounds(values, padPct, step) {
-        if (!values.length) return { min: 0, max: 0 };
-        var lo = Math.min.apply(null, values);
-        var hi = Math.max.apply(null, values);
-        var span = Math.max(hi - lo, 1);
-        var pad = Math.max(span * padPct, step);
-        return {
-            min: Math.floor((lo - pad) / step) * step,
-            max: Math.ceil((hi + pad) / step) * step,
-        };
+    // Enkele Y-as met strakke grenzen rond alle waarden. Afgerond op €100
+    // met 5% padding boven/onder.
+    var allValues = datasets.reduce(function (acc, ds) {
+        return acc.concat(ds.data || []);
+    }, []).filter(function (v) { return typeof v === 'number' && isFinite(v); });
+    var suggestedMin = 0;
+    var suggestedMax = 0;
+    if (allValues.length) {
+        var lo = Math.min.apply(null, allValues);
+        var hi = Math.max.apply(null, allValues);
+        var pad = Math.max((hi - lo) * 0.05, 100);
+        suggestedMin = Math.floor((lo - pad) / 100) * 100;
+        suggestedMax = Math.ceil((hi + pad) / 100) * 100;
     }
-    var mortgageVals = datasets.filter(function (d) { return d.yAxisID === 'yMortgage'; })
-        .reduce(function (a, d) { return a.concat(d.data || []); }, [])
-        .filter(function (v) { return typeof v === 'number' && isFinite(v); });
-    var surplusVals = datasets.filter(function (d) { return d.yAxisID === 'ySurplus'; })
-        .reduce(function (a, d) { return a.concat(d.data || []); }, [])
-        .filter(function (v) { return typeof v === 'number' && isFinite(v); });
-    var mBounds = tightBounds(mortgageVals, 0.05, 100);
-    var sBounds = tightBounds(surplusVals, 0.1, 100);
 
     new Chart(ctx, {
         type: 'line',
@@ -766,29 +756,16 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             },
             scales: {
-                yMortgage: {
+                y: {
                     type: 'linear',
                     position: 'left',
                     beginAtZero: false,
-                    suggestedMin: mBounds.min,
-                    suggestedMax: mBounds.max,
-                    title: { display: true, text: 'Hypotheek-last (€/mnd)' },
+                    suggestedMin: suggestedMin,
+                    suggestedMax: suggestedMax,
+                    title: { display: true, text: '€ / maand' },
                     ticks: {
                         callback: function (v) { return '€ ' + v.toLocaleString('nl-NL'); }
                     },
-                    grid: { drawOnChartArea: true },
-                },
-                ySurplus: {
-                    type: 'linear',
-                    position: 'right',
-                    beginAtZero: false,
-                    suggestedMin: sBounds.min,
-                    suggestedMax: sBounds.max,
-                    title: { display: true, text: 'Overschot (€/mnd)' },
-                    ticks: {
-                        callback: function (v) { return '€ ' + v.toLocaleString('nl-NL'); }
-                    },
-                    grid: { drawOnChartArea: false },
                 },
                 x: { title: { display: true, text: 'Jaar' } }
             },
