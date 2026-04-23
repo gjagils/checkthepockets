@@ -720,26 +720,74 @@ def scenarios_create(
     return RedirectResponse(f"/hypotheek/scenarios/{s.id}?flash=created", status_code=302)
 
 
+def _em_rate_for_date(
+    em: ScenarioExistingMortgage, dt: datetime.date,
+) -> Decimal | None:
+    """Kies de geldende rente op ``dt`` — post-change of originele rate.
+
+    Returnt None als er helemaal geen rente is gezet op het leningdeel.
+    """
+    if (
+        em.rate_change_date is not None
+        and em.rate_pct_after is not None
+        and dt >= em.rate_change_date
+    ):
+        return Decimal(str(em.rate_pct_after)) / Decimal(100)
+    if em.rate_pct is None:
+        return None
+    return Decimal(str(em.rate_pct)) / Decimal(100)
+
+
 def _existing_mortgage_yearly_interest(
     em: ScenarioExistingMortgage, year_offset: int,
 ) -> Decimal:
     """Rente die dit leningdeel in ``year_offset`` (0 = huidig jaar) maakt.
 
-    * Aflossingsvrij: ``balance × rate_pct/100`` — constant over de looptijd.
-    * Annuïtair: gebruikt een amortization-schedule gebaseerd op
-      ``months_remaining`` om het rentedeel per jaar te bepalen.
+    * Aflossingsvrij: ``balance × rate_pct/100`` — constant over de looptijd,
+      met een stap als ``rate_change_date`` binnen het jaar valt (dan wordt
+      pro-rata verdeeld over pre/post change-datum).
+    * Annuïtair: gebruikt een amortization-schedule met de rate die begin van
+      het jaar geldt. Rente-sprong mid-year wordt (bewust) genegeerd voor
+      annuïtair — in praktijk herbereken je dan de hele resterende schedule.
 
     Returnt 0 als rate of balance ontbreekt.
     """
     bal = Decimal(str(em.balance_eur or 0))
-    rate_pct = em.rate_pct
-    if bal <= 0 or rate_pct is None:
+    if bal <= 0:
         return Decimal("0")
-    rate = Decimal(str(rate_pct)) / Decimal(100)  # stored in %
 
-    if (em.mortgage_type or "annuity") == "interest_only":
+    today = datetime.date.today()
+    year_start = datetime.date(today.year + year_offset, 1, 1)
+    year_end = datetime.date(today.year + year_offset, 12, 31)
+
+    mtype = em.mortgage_type or "annuity"
+
+    if mtype == "interest_only":
+        # Pro-rata per maand rond de rate_change_date.
+        if (
+            em.rate_change_date is not None
+            and em.rate_pct_after is not None
+            and year_start <= em.rate_change_date <= year_end
+        ):
+            pre_rate = _em_rate_for_date(em, year_start)
+            post_rate = _em_rate_for_date(em, em.rate_change_date)
+            if pre_rate is None or post_rate is None:
+                return Decimal("0")
+            months_pre = (em.rate_change_date.month - 1)
+            months_post = 12 - months_pre
+            return (
+                bal * pre_rate * Decimal(months_pre) / Decimal(12)
+                + bal * post_rate * Decimal(months_post) / Decimal(12)
+            ).quantize(Decimal("0.01"))
+        rate = _em_rate_for_date(em, year_start)
+        if rate is None:
+            return Decimal("0")
         return (bal * rate).quantize(Decimal("0.01"))
 
+    # Annuïtair: rate die op 1 januari van het doeljaar geldt.
+    rate = _em_rate_for_date(em, year_start)
+    if rate is None:
+        return Decimal("0")
     months = int(em.months_remaining) if em.months_remaining else 360
     years = max(months // 12, 1)
     schedule = list(mortgage_calc.amortization_schedule(bal, rate, years))
@@ -991,7 +1039,7 @@ def scenarios_detail(
         existing_auto_monthly[em.id] = mortgage_calc.existing_mortgage_monthly(
             balance=Decimal(str(em.balance_eur or 0)),
             mortgage_type=em.mortgage_type or "annuity",
-            rate_pct=em.rate_pct,
+            rate_pct=mortgage_calc.effective_rate_pct_today(em),
             months_remaining=em.months_remaining,
             override=None,  # altijd auto, override tonen we apart
         )
@@ -1484,6 +1532,8 @@ def existing_mortgage_create(
     monthly_payment_eur: str = Form(""),
     counts_in_ltv: str = Form("1"),
     hra_end_date: str = Form(""),
+    rate_pct_after: str = Form(""),
+    rate_change_date: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = _require_admin(request, db)
@@ -1508,6 +1558,10 @@ def existing_mortgage_create(
         ),
         counts_in_ltv=1 if counts_in_ltv.strip() in ("1", "on", "true", "yes") else 0,
         hra_end_date=_parse_iso_date(hra_end_date),
+        rate_pct_after=(
+            _parse_decimal(rate_pct_after) if rate_pct_after.strip() else None
+        ),
+        rate_change_date=_parse_iso_date(rate_change_date),
         sort_order=next_order,
     )
     db.add(em)
@@ -1531,6 +1585,8 @@ def existing_mortgage_edit(
     monthly_payment_eur: str = Form(""),
     counts_in_ltv: str = Form(""),
     hra_end_date: str = Form(""),
+    rate_pct_after: str = Form(""),
+    rate_change_date: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = _require_admin(request, db)
@@ -1550,6 +1606,10 @@ def existing_mortgage_edit(
     # "1" staat.
     em.counts_in_ltv = 1 if counts_in_ltv.strip() in ("1", "on", "true", "yes") else 0
     em.hra_end_date = _parse_iso_date(hra_end_date)
+    em.rate_pct_after = (
+        _parse_decimal(rate_pct_after) if rate_pct_after.strip() else None
+    )
+    em.rate_change_date = _parse_iso_date(rate_change_date)
     db.commit()
     return RedirectResponse(
         f"/hypotheek/scenarios/{scenario_id}#existing-mortgages",

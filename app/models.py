@@ -622,6 +622,11 @@ class ScenarioExistingMortgage(Base):
     # oude aflossingsvrije hypotheken (Wet IB 2001, 30-jr-regel): typisch
     # 30 jaar na fiscale startdatum.
     hra_end_date = Column(Date, nullable=True)
+    # Rentesprong: veel bestaande leningen hebben een rentevast-periode die op
+    # een specifieke datum afloopt, waarna een nieuwe rente geldt. Beide velden
+    # samen beschrijven die stap. Leeg = rente blijft constant op rate_pct.
+    rate_pct_after = Column(Numeric(6, 3), nullable=True)
+    rate_change_date = Column(Date, nullable=True)
 
     scenario = relationship("MortgageScenario", back_populates="existing_mortgages")
 
