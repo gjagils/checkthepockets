@@ -182,6 +182,30 @@ def encrypt_data(request: Request, db: Session = Depends(get_db)):
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Demo-user seed (GJA-46) — idempotent aanmaken/resetten van een vaste
+# demo-account zodat live demo's geen lege schermen tonen.
+# ──────────────────────────────────────────────────────────────────────────────
+
+@router.post("/demo/seed")
+def seed_demo(request: Request, db: Session = Depends(get_db)):
+    admin = _require_admin(request, db)
+    # Lokale import houdt de seed-module volledig optioneel bij CLI-start.
+    from scripts.seed_demo_user import seed_demo_user
+
+    result = seed_demo_user(db=db)
+    users = db.query(User).order_by(User.created_at).all()
+    return templates.TemplateResponse(
+        "admin/users.html",
+        {
+            "request": request, "user": admin, "users": users,
+            "user_stats": _user_stats(db, users),
+            "demo_seed_result": result,
+            "encryption_enabled": encryption_enabled(),
+        },
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Import batches — groepeer transacties per import-moment zodat een verkeerde
 # import in één klik ongedaan gemaakt kan worden.
 # ──────────────────────────────────────────────────────────────────────────────

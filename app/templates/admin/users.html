@@ -34,6 +34,18 @@
 </div>
 {% endif %}
 
+{% if demo_seed_result is defined %}
+<div class="alert alert-success">
+    Demo-user <code>{{ demo_seed_result.username }}</code> opnieuw aangemaakt:
+    {{ demo_seed_result.person_count }} personen,
+    {{ demo_seed_result.account_count }} rekeningen,
+    {{ demo_seed_result.category_count }} categorieën,
+    {{ demo_seed_result.tx_count }} transacties,
+    {{ demo_seed_result.budget_count }} budgetten.
+    Wachtwoord: <code>demodemo</code>.
+</div>
+{% endif %}
+
 <!-- Encryptie status -->
 <div class="card" style="margin-bottom:1.5rem;">
     <div class="card-header">
@@ -48,6 +60,24 @@
         {% else %}
         <p style="color:var(--muted);">Veldencryptie staat uit. Stel <code>FIELD_ENCRYPTION_KEY</code> in om te activeren.</p>
         {% endif %}
+    </div>
+</div>
+
+<!-- Demo-user seed (GJA-46) -->
+<div class="card" style="margin-bottom:1.5rem;">
+    <div class="card-header">
+        <h3>Demo-user</h3>
+    </div>
+    <div style="padding:1rem;">
+        <p style="margin-top:0;">
+            Maakt (of reset) de vaste demo-account <code>demo</code> / <code>demodemo</code>
+            met 2 personen, 3 rekeningen, 12 maanden transacties, inbox-items en budgetten.
+            Bestaande data onder deze username wordt gewist.
+        </p>
+        <form method="post" action="/admin/demo/seed"
+              onsubmit="return confirm('Demo-user opnieuw seeden? Bestaande demo-data wordt verwijderd.')">
+            <button type="submit" class="btn btn-secondary">Demo-user aanmaken / resetten</button>
+        </form>
     </div>
 </div>
 
