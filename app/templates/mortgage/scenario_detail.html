@@ -315,12 +315,14 @@
 
                 <tr><td colspan="{{ colspan }}" style="padding-top:0.75rem;"><strong>Inkomsten per maand</strong></td></tr>
                 {% for c in contribution_rows %}
+                {% if c.amount and c.amount > 0 %}
                 <tr>
                     <td class="muted">Bijdrage {{ c.person.name }}</td>
                     {% for vs in active_variants %}
                     <td class="text-right">€ {{ c.amount | euro }}</td>
                     {% endfor %}
                 </tr>
+                {% endif %}
                 {% endfor %}
                 <tr>
                     <td class="muted">Teruggaaf per maand</td>
