@@ -380,10 +380,135 @@
     </div>
 
     {% if chart_series %}
-    <div style="margin-top:1rem;">
-        <canvas id="netMonthlyChart" height="300" aria-label="Netto maandlast over 30 jaar"></canvas>
+    <div style="margin-top:1rem; max-height:360px;">
+        <canvas id="netMonthlyChart" height="220" aria-label="Netto maandlast over 30 jaar"></canvas>
     </div>
     {% endif %}
+</div>
+{% endif %}
+
+{# ─── Jaarlijks spaarsaldo per variant ───────────────────────────────────── #}
+{% set _active_for_savings = [] %}
+{% for _vs in variant_stats %}{% if not _vs.rate_missing %}{% set _ = _active_for_savings.append(_vs) %}{% endif %}{% endfor %}
+{% if _active_for_savings %}
+<div class="card" style="margin-bottom:1.5rem;">
+    <h2 style="margin:0 0 0.75rem 0; font-size:1.1rem;">Jaarlijks spaarsaldo per variant</h2>
+    <p class="muted" style="margin:0 0 0.75rem 0; font-size:0.9rem;">
+        Inkomsten en uitgaven die op de spaarrekening landen, bovenop het
+        maandelijkse overschot. Posten worden ingesteld op
+        <a href="/hypotheek/huishouden">huishoud-instellingen</a>. De
+        <em>rest-teruggaaf</em> is het deel van de HRA-teruggaaf dat níet in je
+        maandlast zit (zie "Teruggaaf naar maandlast"). Onderin: gemiddelde
+        aflossing op de nieuwe annuïteit in de eerste 5 jaar — een indicatie
+        hoeveel schuld je echt aflost.
+    </p>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th></th>
+                    {% for vs in _active_for_savings %}
+                    <th class="text-right">{{ vs.fixed_years }}j</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td colspan="{{ _active_for_savings|length + 1 }}"><strong>Inkomsten / jaar</strong></td></tr>
+                <tr>
+                    <td class="muted">Maand-overschot × 12</td>
+                    {% for vs in _active_for_savings %}
+                    <td class="text-right">€ {{ vs.savings_monthly_surplus | euro }}</td>
+                    {% endfor %}
+                </tr>
+                {% if household.annual_child_benefit and household.annual_child_benefit > 0 %}
+                <tr>
+                    <td class="muted">Kinderbijslag</td>
+                    {% for vs in _active_for_savings %}
+                    <td class="text-right">€ {{ household.annual_child_benefit | euro }}</td>
+                    {% endfor %}
+                </tr>
+                {% endif %}
+                {% if household.annual_private_loan_refund and household.annual_private_loan_refund > 0 %}
+                <tr>
+                    <td class="muted">Rente-restitutie privélening</td>
+                    {% for vs in _active_for_savings %}
+                    <td class="text-right">€ {{ household.annual_private_loan_refund | euro }}</td>
+                    {% endfor %}
+                </tr>
+                {% endif %}
+                {% if household.annual_extra_primary and household.annual_extra_primary > 0 %}
+                <tr>
+                    <td class="muted">Extra stortingen {{ household.salary_primary_name or "persoon 1" }}</td>
+                    {% for vs in _active_for_savings %}
+                    <td class="text-right">€ {{ household.annual_extra_primary | euro }}</td>
+                    {% endfor %}
+                </tr>
+                {% endif %}
+                {% if household.annual_extra_secondary and household.annual_extra_secondary > 0 %}
+                <tr>
+                    <td class="muted">Extra stortingen {{ household.salary_secondary_name or "persoon 2" }}</td>
+                    {% for vs in _active_for_savings %}
+                    <td class="text-right">€ {{ household.annual_extra_secondary | euro }}</td>
+                    {% endfor %}
+                </tr>
+                {% endif %}
+                <tr>
+                    <td class="muted">Rest HRA-teruggaaf / jaar</td>
+                    {% for vs in _active_for_savings %}
+                    <td class="text-right">€ {{ vs.annual_savings | euro }}</td>
+                    {% endfor %}
+                </tr>
+                <tr style="border-top:1px solid #999;">
+                    <td><strong>Totaal inkomsten</strong></td>
+                    {% for vs in _active_for_savings %}
+                    <td class="text-right"><strong>€ {{ vs.savings_income_yr | euro }}</strong></td>
+                    {% endfor %}
+                </tr>
+
+                <tr><td colspan="{{ _active_for_savings|length + 1 }}" style="padding-top:0.75rem;"><strong>Uitgaven / jaar</strong></td></tr>
+                {% if household.annual_vacation_budget and household.annual_vacation_budget > 0 %}
+                <tr>
+                    <td class="muted">Vakantie</td>
+                    {% for vs in _active_for_savings %}
+                    <td class="text-right">€ {{ household.annual_vacation_budget | euro }}</td>
+                    {% endfor %}
+                </tr>
+                {% endif %}
+                {% if household.annual_house_budget and household.annual_house_budget > 0 %}
+                <tr>
+                    <td class="muted">Huis onderhoud</td>
+                    {% for vs in _active_for_savings %}
+                    <td class="text-right">€ {{ household.annual_house_budget | euro }}</td>
+                    {% endfor %}
+                </tr>
+                {% endif %}
+                <tr style="border-top:1px solid #999;">
+                    <td><strong>Totaal uitgaven</strong></td>
+                    {% for vs in _active_for_savings %}
+                    <td class="text-right"><strong>€ {{ vs.savings_expense_yr | euro }}</strong></td>
+                    {% endfor %}
+                </tr>
+
+                <tr style="border-top:2px solid #333;">
+                    <td><strong>Netto spaarsaldo / jaar</strong></td>
+                    {% for vs in _active_for_savings %}
+                    <td class="text-right" style="{% if vs.net_annual_savings < 0 %}color:#b31919;{% else %}color:#1f7a1f;{% endif %}">
+                        <strong>€ {{ vs.net_annual_savings | euro }}</strong>
+                    </td>
+                    {% endfor %}
+                </tr>
+
+                <tr style="border-top:1px dashed #aaa;">
+                    <td class="muted" title="Gemiddeld principal-deel in de eerste 60 maanden van de nieuwe annuïteit">
+                        Aflossing nieuwe hypotheek (gem. 5j / jaar)
+                    </td>
+                    {% for vs in _active_for_savings %}
+                    <td class="text-right" style="color:#1f7a1f;">€ {{ vs.avg_annual_amortization_5y | euro }}</td>
+                    {% endfor %}
+                </tr>
+            </tbody>
+        </table>
+    </div>
 </div>
 {% endif %}
 
@@ -590,25 +715,43 @@ document.addEventListener('DOMContentLoaded', function () {
     // borderColor/backgroundColor/borderDash/fill in per serie). We nemen de
     // objecten as-is over en voegen alleen een paar display-defaults toe
     // mochten ze ontbreken (backward compat voor oude cached pageviews).
+    // Dual Y-axis: hypotheek-last en overschot zijn heel verschillend in
+    // grootte (3-5k vs -1k tot +500). Door ze op aparte assen te plotten is
+    // de grafiek veel compacter.
     var datasets = {{ chart_series | tojson }}.map(function (s) {
+        var isOverschot = s.label && s.label.indexOf('overschot') !== -1;
         return Object.assign({
             pointRadius: 2,
             pointHoverRadius: 4,
+            yAxisID: isOverschot ? 'ySurplus' : 'yMortgage',
         }, s);
     });
-    // Y-as suggestedMin: kleinste waarde in alle series - €200 marge; niet
-    // onder 0 duwen want dat maakt negatief overschot zichtbaar.
-    var allValues = datasets.reduce(function (acc, ds) {
-        return acc.concat(ds.data || []);
-    }, []).filter(function (v) { return typeof v === 'number' && isFinite(v); });
-    var minVal = allValues.length ? Math.min.apply(null, allValues) : 0;
-    var suggestedMin = Math.floor((minVal - 200) / 100) * 100;
+    function tightBounds(values, padPct, step) {
+        if (!values.length) return { min: 0, max: 0 };
+        var lo = Math.min.apply(null, values);
+        var hi = Math.max.apply(null, values);
+        var span = Math.max(hi - lo, 1);
+        var pad = Math.max(span * padPct, step);
+        return {
+            min: Math.floor((lo - pad) / step) * step,
+            max: Math.ceil((hi + pad) / step) * step,
+        };
+    }
+    var mortgageVals = datasets.filter(function (d) { return d.yAxisID === 'yMortgage'; })
+        .reduce(function (a, d) { return a.concat(d.data || []); }, [])
+        .filter(function (v) { return typeof v === 'number' && isFinite(v); });
+    var surplusVals = datasets.filter(function (d) { return d.yAxisID === 'ySurplus'; })
+        .reduce(function (a, d) { return a.concat(d.data || []); }, [])
+        .filter(function (v) { return typeof v === 'number' && isFinite(v); });
+    var mBounds = tightBounds(mortgageVals, 0.05, 100);
+    var sBounds = tightBounds(surplusVals, 0.1, 100);
 
     new Chart(ctx, {
         type: 'line',
         data: { labels: {{ chart_labels | tojson }}, datasets: datasets },
         options: {
             responsive: true,
+            maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false },
             plugins: {
                 title: { display: true, text: 'Netto hypotheek-last + overschot per jaar (€)' },
@@ -623,13 +766,29 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             },
             scales: {
-                y: {
+                yMortgage: {
+                    type: 'linear',
+                    position: 'left',
                     beginAtZero: false,
-                    suggestedMin: suggestedMin,
-                    title: { display: true, text: '€ / maand' },
+                    suggestedMin: mBounds.min,
+                    suggestedMax: mBounds.max,
+                    title: { display: true, text: 'Hypotheek-last (€/mnd)' },
                     ticks: {
                         callback: function (v) { return '€ ' + v.toLocaleString('nl-NL'); }
-                    }
+                    },
+                    grid: { drawOnChartArea: true },
+                },
+                ySurplus: {
+                    type: 'linear',
+                    position: 'right',
+                    beginAtZero: false,
+                    suggestedMin: sBounds.min,
+                    suggestedMax: sBounds.max,
+                    title: { display: true, text: 'Overschot (€/mnd)' },
+                    ticks: {
+                        callback: function (v) { return '€ ' + v.toLocaleString('nl-NL'); }
+                    },
+                    grid: { drawOnChartArea: false },
                 },
                 x: { title: { display: true, text: 'Jaar' } }
             },

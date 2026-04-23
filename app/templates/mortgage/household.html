@@ -171,6 +171,50 @@
     </section>
 
     <section>
+        <h2 style="margin:0 0 0.25rem 0;">Jaarlijks spaarsaldo (posten)</h2>
+        <p class="muted" style="margin:0 0 0.75rem 0;">
+            Jaar-inkomsten (links) en jaar-uitgaven (rechts) die bovenop de
+            maandelijkse gezamenlijke rekening op de spaarrekening landen.
+            Gebruikt in het spaarsaldo-overzicht op elke scenario-detail.
+            Alles per jaar, leeg = € 0.
+        </p>
+        <div class="table-wrap">
+            <table>
+                <tbody>
+                    <tr>
+                        <td>Kinderbijslag / jaar</td>
+                        <td>{{ euro_input("annual_child_benefit", household.annual_child_benefit) }}</td>
+                        <td>Vakantiebudget / jaar</td>
+                        <td>{{ euro_input("annual_vacation_budget", household.annual_vacation_budget) }}</td>
+                    </tr>
+                    <tr>
+                        <td>Rente-restitutie privélening / jaar</td>
+                        <td>{{ euro_input("annual_private_loan_refund", household.annual_private_loan_refund) }}</td>
+                        <td>Huis-onderhoud / jaar</td>
+                        <td>{{ euro_input("annual_house_budget", household.annual_house_budget) }}</td>
+                    </tr>
+                    <tr>
+                        <td>Extra stortingen {{ household.salary_primary_name or "persoon 1" }} / jaar
+                            <span class="muted" style="font-size:0.75rem;">(vakantiegeld + 13e mnd)</span>
+                        </td>
+                        <td>{{ euro_input("annual_extra_primary", household.annual_extra_primary) }}</td>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td>Extra stortingen {{ household.salary_secondary_name or "persoon 2" }} / jaar
+                            <span class="muted" style="font-size:0.75rem;">(vakantiegeld + 13e mnd)</span>
+                        </td>
+                        <td>{{ euro_input("annual_extra_secondary", household.annual_extra_secondary) }}</td>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section>
         <h2 style="margin:0 0 0.25rem 0;">Kosten-percentages</h2>
         <p class="muted" style="margin:0 0 0.75rem 0;">
             Aankoopkosten (notaris, overdrachtsbelasting) en verkoopkosten (makelaar).

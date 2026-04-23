@@ -534,6 +534,16 @@ class HouseholdFinance(Base):
     inflation_pct = Column(Numeric(5, 4), nullable=False, default=Decimal("0.0250"))
     contribution_growth_pct = Column(Numeric(5, 4), nullable=False, default=Decimal("0.0300"))
 
+    # Jaarlijkse inkomsten/uitgaven die op de spaarrekening landen. Worden
+    # gebruikt in het "Jaarlijks spaarsaldo"-overzicht op de scenario-detail
+    # pagina. Allemaal bedragen per jaar, default 0.
+    annual_child_benefit = Column(Numeric(10, 2), nullable=False, default=Decimal("0"))
+    annual_private_loan_refund = Column(Numeric(10, 2), nullable=False, default=Decimal("0"))
+    annual_extra_primary = Column(Numeric(10, 2), nullable=False, default=Decimal("0"))
+    annual_extra_secondary = Column(Numeric(10, 2), nullable=False, default=Decimal("0"))
+    annual_vacation_budget = Column(Numeric(10, 2), nullable=False, default=Decimal("0"))
+    annual_house_budget = Column(Numeric(10, 2), nullable=False, default=Decimal("0"))
+
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
