@@ -204,8 +204,14 @@ def test_comparison_table_renders_for_all_variants(db_session):
     assert "Vergelijking" in body
     for label in ("5j", "10j", "20j"):
         assert label in body
-    assert "Annuiteit / maand" in body
-    assert "Netto maandlast hypotheek" in body
+    # Kosten / Inkomsten / Resultaat structuur
+    assert "Nieuwe hypotheek" in body
+    assert "Bestaande hypotheeklasten die meegaan" in body
+    assert "Totaal kosten" in body
+    assert "Teruggaaf per maand" in body
+    assert "Totaal inkomsten" in body
+    assert "Resultaat" in body
+    assert "Restant voor spaarrekening" in body
 
 
 def test_refund_usage_splits_into_savings(db_session):

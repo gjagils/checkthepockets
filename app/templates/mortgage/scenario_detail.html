@@ -270,75 +270,80 @@
                     {% endfor %}
                 </tr>
             </thead>
+            {% set active_variants = variant_stats | rejectattr("rate_missing") | list %}
+            {% set colspan = active_variants | length + 1 %}
             <tbody>
                 <tr>
                     <td class="muted">Rente</td>
-                    {% for vs in variant_stats %}
-                    {% if not vs.rate_missing %}<td class="text-right">{{ "%.2f" | format(vs.rate * 100) }}%</td>{% endif %}
+                    {% for vs in active_variants %}
+                    <td class="text-right">{{ "%.2f" | format(vs.rate * 100) }}%</td>
+                    {% endfor %}
+                </tr>
+
+                <tr><td colspan="{{ colspan }}" style="padding-top:0.75rem;"><strong>Kosten</strong></td></tr>
+                <tr>
+                    <td class="muted">Nieuwe hypotheek</td>
+                    {% for vs in active_variants %}
+                    <td class="text-right">€ {{ vs.annuity_monthly | euro }}</td>
                     {% endfor %}
                 </tr>
                 <tr>
-                    <td class="muted">Annuiteit / maand</td>
-                    {% for vs in variant_stats %}
-                    {% if not vs.rate_missing %}<td class="text-right">€ {{ vs.annuity_monthly | euro }}</td>{% endif %}
-                    {% endfor %}
-                </tr>
-                <tr>
-                    <td class="muted">Bestaande PIM / maand</td>
-                    {% for vs in variant_stats %}
-                    {% if not vs.rate_missing %}<td class="text-right">€ {{ vs.pim_monthly | euro }}</td>{% endif %}
-                    {% endfor %}
-                </tr>
-                <tr>
-                    <td class="muted">Aflossingsvrij / maand</td>
-                    {% for vs in variant_stats %}
-                    {% if not vs.rate_missing %}<td class="text-right">€ {{ vs.interest_only_monthly | euro }}</td>{% endif %}
-                    {% endfor %}
-                </tr>
-                <tr>
-                    <td class="muted">Belastingteruggaaf / maand</td>
-                    {% for vs in variant_stats %}
-                    {% if not vs.rate_missing %}<td class="text-right">€ {{ vs.monthly_refund | euro }}</td>{% endif %}
-                    {% endfor %}
-                </tr>
-                {% if scenario.monthly_refund_usage is not none %}
-                <tr>
-                    <td class="muted">Teruggaaf naar maandlast</td>
-                    {% for vs in variant_stats %}
-                    {% if not vs.rate_missing %}<td class="text-right">€ {{ vs.used_monthly_refund | euro }}</td>{% endif %}
-                    {% endfor %}
-                </tr>
-                {% endif %}
-                <tr style="border-top:2px solid #999;">
-                    <td><strong>Netto maandlast hypotheek</strong></td>
-                    {% for vs in variant_stats %}
-                    {% if not vs.rate_missing %}<td class="text-right"><strong>€ {{ vs.net_monthly | euro }}</strong></td>{% endif %}
-                    {% endfor %}
-                </tr>
-                <tr>
-                    <td class="muted">Belastingteruggaaf / jaar</td>
-                    {% for vs in variant_stats %}
-                    {% if not vs.rate_missing %}<td class="text-right">€ {{ vs.annual_refund | euro }}</td>{% endif %}
-                    {% endfor %}
-                </tr>
-                <tr>
-                    <td class="muted">Spaarbedrag / jaar (rest teruggaaf)</td>
-                    {% for vs in variant_stats %}
-                    {% if not vs.rate_missing %}<td class="text-right" style="color:#1f7a1f;">€ {{ vs.annual_savings | euro }}</td>{% endif %}
+                    <td class="muted">Bestaande hypotheeklasten die meegaan</td>
+                    {% for vs in active_variants %}
+                    <td class="text-right">€ {{ vs.existing_monthly_total | euro }}</td>
                     {% endfor %}
                 </tr>
                 {% if budget_rows %}
                 <tr>
-                    <td class="muted">Overschot van salaris</td>
-                    {% for pair in variant_leftover_pairs %}
-                    {% if not pair[0].rate_missing %}
-                    <td class="text-right" style="{% if pair[1] is not none and pair[1] < 0 %}color:#b31919;{% endif %}">
-                        {% if pair[1] is none %}<span class="muted">—</span>{% else %}€ {{ pair[1] | euro }}{% endif %}
-                    </td>
-                    {% endif %}
+                    <td class="muted">Kosten per maand (budget-categorieën)</td>
+                    {% for vs in active_variants %}
+                    <td class="text-right">€ {{ vs.other_budget_total | euro }}</td>
                     {% endfor %}
                 </tr>
                 {% endif %}
+                <tr style="border-top:1px solid #bbb;">
+                    <td><strong>Totaal kosten</strong></td>
+                    {% for vs in active_variants %}
+                    <td class="text-right"><strong>€ {{ vs.total_costs | euro }}</strong></td>
+                    {% endfor %}
+                </tr>
+
+                <tr><td colspan="{{ colspan }}" style="padding-top:0.75rem;"><strong>Inkomsten per maand</strong></td></tr>
+                {% for c in contribution_rows %}
+                <tr>
+                    <td class="muted">Bijdrage {{ c.person.name }}</td>
+                    {% for vs in active_variants %}
+                    <td class="text-right">€ {{ c.amount | euro }}</td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+                <tr>
+                    <td class="muted">Teruggaaf per maand</td>
+                    {% for vs in active_variants %}
+                    <td class="text-right">€ {{ vs.used_monthly_refund | euro }}</td>
+                    {% endfor %}
+                </tr>
+                <tr style="border-top:1px solid #bbb;">
+                    <td><strong>Totaal inkomsten</strong></td>
+                    {% for vs in active_variants %}
+                    <td class="text-right"><strong>€ {{ vs.total_income | euro }}</strong></td>
+                    {% endfor %}
+                </tr>
+
+                <tr style="border-top:2px solid #333;">
+                    <td><strong>Resultaat</strong></td>
+                    {% for vs in active_variants %}
+                    <td class="text-right" style="{% if vs.resultaat < 0 %}color:#b31919;{% endif %}">
+                        <strong>€ {{ vs.resultaat | euro }}</strong>
+                    </td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td class="muted">Restant voor spaarrekening (/mnd)</td>
+                    {% for vs in active_variants %}
+                    <td class="text-right" style="color:#1f7a1f;">€ {{ vs.savings_remainder_monthly | euro }}</td>
+                    {% endfor %}
+                </tr>
             </tbody>
         </table>
     </div>
