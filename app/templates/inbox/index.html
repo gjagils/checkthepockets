@@ -90,6 +90,21 @@
                                 <a href="/transactions/{{ tx.id }}/split" class="tx-panel-footer-btn">✂ Splitsen</a>
                                 <span class="tx-panel-footer-sep">·</span>
                                 <button type="button" class="tx-panel-footer-btn"
+                                        onclick="document.getElementById('inboxmv-{{ tx.id }}').style.display='inline-flex'"
+                                        title="Verplaats naar andere rekening (bv. bij verkeerd geïmporteerde transactie)">↪ Verplaats rekening</button>
+                                <span id="inboxmv-{{ tx.id }}" style="display:none; gap:0.3rem; align-items:center; margin-left:0.3rem;">
+                                    <form method="post" action="/transactions/{{ tx.id }}/move-account" style="display:inline-flex; gap:0.3rem; align-items:center;">
+                                        <input type="hidden" name="redirect_to" value="{{ redirect_back }}">
+                                        <select name="target_account_id" style="padding:0.2rem 0.4rem; font-size:0.8rem; max-width:180px;">
+                                            {% for acc in accounts if acc.id != tx.account_id %}
+                                            <option value="{{ acc.id }}">{{ acc.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        <button type="submit" class="btn btn-sm btn-accent">OK</button>
+                                    </form>
+                                </span>
+                                <span class="tx-panel-footer-sep">·</span>
+                                <button type="button" class="tx-panel-footer-btn"
                                         onclick="document.getElementById('inboxrc-{{ tx.id }}').style.display='inline-flex'">🔄 Koppel terugkerend</button>
                                 <span id="inboxrc-{{ tx.id }}" style="display:none; gap:0.3rem; align-items:center; margin-left:0.3rem;">
                                     <form method="post" action="/transactions/{{ tx.id }}/link-recurring" style="display:inline-flex; gap:0.3rem; align-items:center;">
