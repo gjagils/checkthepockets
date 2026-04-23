@@ -265,6 +265,7 @@
                     <th class="text-right">Uitgegeven</th>
                     <th class="text-right">Verwacht</th>
                     <th class="text-right">Vorige mnd</th>
+                    <th class="text-right" title="Gemiddelde uitgave over de 3 volle maanden vóór deze maand">Gem. 3 mnd</th>
                     <th class="text-right">Resterend</th>
                     <th>Voortgang</th>
                 </tr>
@@ -289,6 +290,11 @@
                         {% else %}<span class="muted">-</span>{% endif %}
                     </td>
                     <td class="text-right nowrap muted">-</td>
+                    <td class="text-right nowrap muted" style="font-size:0.85rem;">
+                        {% if group.group_avg_3m and group.group_avg_3m > 0 %}
+                        &euro;&nbsp;{{ group.group_avg_3m|euro }}
+                        {% else %}-{% endif %}
+                    </td>
                     <td class="text-right nowrap">
                         <strong class="{% if group.group_effective_remaining >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
                             &euro;&nbsp;{{ group.group_effective_remaining|euro }}
@@ -318,7 +324,7 @@
                                onblur="saveBudget(this)"
                                onkeydown="if(event.key==='Enter')this.blur()">
                     </td>
-                    <td colspan="7"></td>
+                    <td colspan="8"></td>
                 </tr>
                 {% endif %}
 
@@ -354,6 +360,11 @@
                     <td class="text-right nowrap muted" style="font-size:0.85rem;">
                         {% if child.prev_spent > 0 %}
                         &euro;&nbsp;{{ child.prev_spent|euro }}
+                        {% else %}-{% endif %}
+                    </td>
+                    <td class="text-right nowrap muted" style="font-size:0.85rem;">
+                        {% if child.avg_3m_spent and child.avg_3m_spent > 0 %}
+                        &euro;&nbsp;{{ child.avg_3m_spent|euro }}
                         {% else %}-{% endif %}
                     </td>
                     <td class="text-right nowrap">

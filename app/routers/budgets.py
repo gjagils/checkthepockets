@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case
 
+from app.budget_stats import category_spending_average
 from app.database import get_db
 from app.models import Account, Budget, BudgetPreset, BudgetPresetLine, Category, RecurringTransaction, Transaction
 from app.auth import require_login
@@ -110,6 +111,17 @@ def budget_overview(
     prev_spending = prev_spending_query.group_by(Category.id).all()
     prev_spending_map = {row.id: abs(row.total) for row in prev_spending}
 
+    # Gemiddelde uitgaven over de laatste 3 volle maanden (exclusief huidige).
+    # Read-only kolom die helpt om budget-realisme te beoordelen.
+    avg_3m_map = category_spending_average(
+        db,
+        user_id=user.id,
+        ref_year=current_year,
+        ref_month=current_month,
+        months=3,
+        account_id=account_id or None,
+    )
+
     # Rollover per category: prev_budget - prev_spent (positive = surplus, negative = overspent)
     rollover_map = {}
     for cat_id, prev_bud in prev_budget_map.items():
@@ -183,11 +195,13 @@ def budget_overview(
             group_spent = Decimal("0")
             group_rollover = Decimal("0")
             group_projected = Decimal("0")
+            group_avg_3m = Decimal("0")
         else:
             group_budget = parent_budget
             group_spent = parent_spent
             group_rollover = parent_rollover
             group_projected = projected_map.get(parent.id, Decimal("0"))
+            group_avg_3m = avg_3m_map.get(parent.id, Decimal("0"))
 
         for child in children:
             cb = budget_map.get(child.id, Decimal("0"))
@@ -195,10 +209,12 @@ def budget_overview(
             cr = rollover_map.get(child.id, Decimal("0"))
             cprev = prev_spending_map.get(child.id, Decimal("0"))
             cp = projected_map.get(child.id, Decimal("0"))
+            cavg = avg_3m_map.get(child.id, Decimal("0"))
             group_budget += cb
             group_spent += cs
             group_rollover += cr
             group_projected += cp
+            group_avg_3m += cavg
             child_rows.append({
                 "id": child.id,
                 "name": child.name,
@@ -210,6 +226,7 @@ def budget_overview(
                 "effective_budget": cb + cr,
                 "effective_remaining": cb + cr - cs,
                 "prev_spent": cprev,
+                "avg_3m_spent": cavg,
                 "projected": cp,
             })
 
@@ -226,6 +243,7 @@ def budget_overview(
             "group_rollover": group_rollover,
             "group_effective": group_budget + group_rollover,
             "group_effective_remaining": group_budget + group_rollover - group_spent,
+            "group_avg_3m": group_avg_3m,
             "group_projected": group_projected,
             "parent_budget": parent_budget,
             "parent_spent": parent_spent,

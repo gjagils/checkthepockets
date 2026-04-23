@@ -378,6 +378,7 @@
                 <tr>
                     <th>Categorie</th>
                     <th class="text-right">Budget huidig</th>
+                    <th class="text-right" title="Gemiddelde werkelijke uitgave over de 3 volle maanden vóór {{ budget_year }}-{{ '%02d' | format(budget_month) }}">Gem. 3 mnd</th>
                     <th class="text-right">Scenario-override</th>
                     <th></th>
                 </tr>
@@ -394,6 +395,11 @@
                         {% endif %}
                     </td>
                     <td class="text-right">€ {{ row.current_amount | euro }}</td>
+                    <td class="text-right muted" style="font-size:0.85rem;"
+                        title="Gemiddelde werkelijke uitgave over de 3 volle maanden vóór {{ budget_year }}-{{ '%02d' | format(budget_month) }}">
+                        {% set _avg3 = avg_3m_by_cat.get(row.category_id) %}
+                        {% if _avg3 and _avg3 > 0 %}€ {{ _avg3 | euro }}{% else %}—{% endif %}
+                    </td>
                     <td class="text-right">
                         <form method="post" action="/hypotheek/scenarios/{{ scenario.id }}/budgets"
                               style="display:flex; gap:0.35rem; justify-content:flex-end; align-items:center;">
@@ -419,9 +425,17 @@
                 {% set _current_sum = namespace(value=0) %}
                 {% for row in budget_rows %}{% set _current_sum.value = _current_sum.value + row.current_amount %}{% endfor %}
                 {% set _delta = budget_total - _current_sum.value %}
+                {% set _avg3_sum = namespace(value=0) %}
+                {% for row in budget_rows %}
+                    {% set _a = avg_3m_by_cat.get(row.category_id) %}
+                    {% if _a %}{% set _avg3_sum.value = _avg3_sum.value + _a %}{% endif %}
+                {% endfor %}
                 <tr class="scenario-budget-total">
                     <td>Totaal</td>
                     <td class="text-right">€ {{ _current_sum.value | euro }}</td>
+                    <td class="text-right muted" style="font-size:0.85rem;">
+                        {% if _avg3_sum.value > 0 %}€ {{ _avg3_sum.value | euro }}{% else %}—{% endif %}
+                    </td>
                     <td class="text-right">€ {{ budget_total | euro }}</td>
                     <td class="scenario-budget-delta {% if _delta > 0 %}neg{% elif _delta < 0 %}pos{% endif %}"
                         style="text-align:right; padding-right:0.6rem;"
@@ -432,7 +446,7 @@
                 <tr>
                     <td class="muted">Totaal salaris / maand</td>
                     <td class="text-right">€ {{ salary_sum | euro }}</td>
-                    <td></td><td></td>
+                    <td></td><td></td><td></td>
                 </tr>
             </tbody>
         </table>
