@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app import mortgage_calc
 from app.auth import require_login
+from app.budget_stats import category_spending_average
 from app.database import get_db
 from app.funda_parser import FundaParseError, fetch_funda, is_funda_url
 from app.move_parser import MoveParseError, fetch_move, is_move_url
@@ -1097,6 +1098,17 @@ def scenarios_detail(
         existing_monthly_total=fin.existing_monthly_total,
         new_annuity_monthly=new_annuity_monthly,
     )
+    # Gemiddelde uitgaven over de 3 volle maanden vóór budget_year/budget_month.
+    # Read-only kolom die de user helpt het scenario-budget realistisch te maken.
+    avg_3m_by_cat: dict[int, Decimal] = {}
+    if budget_year and budget_month:
+        avg_3m_by_cat = category_spending_average(
+            db,
+            user_id=user.id,
+            ref_year=budget_year,
+            ref_month=budget_month,
+            months=3,
+        )
 
     # LIN-45: person contributions + coverage.
     persons = (
@@ -1242,6 +1254,7 @@ def scenarios_detail(
             "scenario_monthly_total": scenario_monthly_total,
             "budget_rows": budget_rows,
             "budget_total": budget_total,
+            "avg_3m_by_cat": avg_3m_by_cat,
             "budget_year": budget_year,
             "budget_month": budget_month,
             "salary_sum": salary_sum,
