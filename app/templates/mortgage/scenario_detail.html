@@ -436,12 +436,6 @@
                     </td>
                     {% endfor %}
                 </tr>
-                <tr>
-                    <td class="muted">Restant voor spaarrekening (/mnd)</td>
-                    {% for vs in active_variants %}
-                    <td class="text-right" style="color:#1f7a1f;">€ {{ vs.savings_remainder_monthly | euro }}</td>
-                    {% endfor %}
-                </tr>
             </tbody>
         </table>
     </div>
