@@ -208,6 +208,73 @@
     </form>
 </div>
 
+{# ─── Overbruggingshypotheek ──────────────────────────────────────────────── #}
+<div class="card" style="margin-bottom:1.5rem;">
+    <h2 style="margin:0 0 0.25rem 0; font-size:1.1rem;">Overbrugging</h2>
+    {% if fin.bridge_months > 0 and fin.bridge_amount > 0 %}
+    <p class="muted" style="margin:0 0 0.75rem 0;">
+        Tussen overdracht nieuwe huis ({{ scenario.transfer_date_new.strftime("%d-%m-%Y") }}) en verkoop oude huis ({{ scenario.sale_date_old.strftime("%d-%m-%Y") }}) loopt een overbruggingshypotheek van {{ fin.bridge_months }} maand{% if fin.bridge_months != 1 %}en{% endif %} tegen {{ "%.2f" | format(household.bridge_rate_pct * 100) }}% (aflossingsvrij).
+    </p>
+    <div class="scenario-grid">
+        <div class="scenario-kpi">
+            <span class="kpi-label">Overbruggingsbedrag</span>
+            <span class="kpi-value">€ {{ fin.bridge_amount | euro0 }}</span>
+            <span class="kpi-hint">
+                {% if scenario.bridge_amount_override is not none and scenario.bridge_amount_override > 0 %}
+                override
+                {% else %}
+                = berekende overwaarde
+                {% endif %}
+            </span>
+        </div>
+        <div class="scenario-kpi">
+            <span class="kpi-label">Periode</span>
+            <span class="kpi-value">{{ fin.bridge_months }} mnd</span>
+            <span class="kpi-hint">overdracht → verkoop</span>
+        </div>
+        <div class="scenario-kpi">
+            <span class="kpi-label">Maandlast overbrugging</span>
+            <span class="kpi-value">€ {{ fin.bridge_monthly_interest | euro0 }}</span>
+            <span class="kpi-hint">= bedrag × rente / 12 (rente-only)</span>
+        </div>
+        <div class="scenario-kpi">
+            <span class="kpi-label">Dubbele maandlast tijdens periode</span>
+            <span class="kpi-value">
+                {% if variant_stats %}
+                € {{ (variant_stats[0].annuity_monthly + fin.existing_monthly_total + fin.bridge_monthly_interest) | euro0 }}
+                {% else %}
+                —
+                {% endif %}
+            </span>
+            <span class="kpi-hint">nieuwe annuïteit + bestaande + overbrugging</span>
+        </div>
+        <div class="scenario-kpi">
+            <span class="kpi-label">Totale rente-kost</span>
+            <span class="kpi-value">€ {{ bridge_gross_interest | euro0 }}</span>
+            <span class="kpi-hint">= maandlast × {{ fin.bridge_months }}</span>
+        </div>
+        <div class="scenario-kpi">
+            <span class="kpi-label">HRA-teruggaaf op rente</span>
+            <span class="kpi-value">− € {{ bridge_hra_refund | euro0 }}</span>
+            <span class="kpi-hint">{{ "%.2f" | format(household.tax_rate * 100) }}% × correctie {{ "%.4f" | format(household.hra_correction_factor) }}</span>
+        </div>
+        <div class="scenario-kpi">
+            <span class="kpi-label">Netto eenmalige kost</span>
+            <span class="kpi-value"><strong>€ {{ bridge_net_cost | euro0 }}</strong></span>
+            <span class="kpi-hint">komt van spaarsaldo jaar 1 af</span>
+        </div>
+    </div>
+    {% elif scenario.transfer_date_new and scenario.sale_date_old and scenario.sale_date_old < scenario.transfer_date_new %}
+    <p class="muted" style="margin:0;">
+        Verkoop oude huis ({{ scenario.sale_date_old.strftime("%d-%m-%Y") }}) ligt vóór overdracht nieuwe huis ({{ scenario.transfer_date_new.strftime("%d-%m-%Y") }}) — geen overbrugging nodig. Deze situatie (tijdelijk cash-surplus) is nog niet uitgewerkt.
+    </p>
+    {% else %}
+    <p class="muted" style="margin:0;">
+        Vul <em>overdrachtsdatum nieuwe huis</em> en <em>verkoopdatum oude huis</em> in bij <a href="/hypotheek/scenarios/{{ scenario.id }}/edit">scenario-bewerken</a> om een overbrugging door te rekenen. Laat leeg als je direct wilt doorschakelen (geen overbrugging).
+    </p>
+    {% endif %}
+</div>
+
 {# ─── Varianten ───────────────────────────────────────────────────────────── #}
 <div class="card" style="margin-bottom:1.5rem;">
     <h2 style="margin:0 0 0.75rem 0; font-size:1.1rem;">Varianten</h2>
@@ -488,6 +555,17 @@
                     <td class="text-right"><strong>€ {{ vs.savings_expense_yr | euro }}</strong></td>
                     {% endfor %}
                 </tr>
+
+                {% if bridge_net_cost and bridge_net_cost > 0 %}
+                <tr>
+                    <td class="muted" title="Netto overbruggingskost (rente − HRA-teruggaaf) — alleen in jaar 1">
+                        Overbrugging (jaar 1, eenmalig)
+                    </td>
+                    {% for vs in _active_for_savings %}
+                    <td class="text-right">− € {{ bridge_net_cost | euro }}</td>
+                    {% endfor %}
+                </tr>
+                {% endif %}
 
                 <tr style="border-top:2px solid #333;">
                     <td><strong>Netto spaarsaldo / jaar</strong></td>
