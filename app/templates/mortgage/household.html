@@ -234,6 +234,27 @@
         </div>
     </section>
 
+    <section>
+        <h2 style="margin:0 0 0.25rem 0;">Overbruggingshypotheek</h2>
+        <p class="muted" style="margin:0 0 0.75rem 0;">
+            Rente voor een tijdelijke overbrugging tussen overdracht nieuwe huis en
+            verkoop oude huis. Default 4,20% (ABN variabel, stand 24-04-2026). Geldt
+            voor alle scenarios — datums zet je per scenario.
+        </p>
+        <div class="table-wrap">
+            <table>
+                <tbody>
+                    <tr>
+                        <td>Overbruggingsrente (%)</td>
+                        <td>{{ pct_input("bridge_rate_pct", household.bridge_rate_pct, "4,20") }}</td>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
     <div style="display:flex; justify-content:flex-end;">
         <button type="submit" class="btn btn-primary">Opslaan</button>
     </div>

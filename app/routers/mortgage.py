@@ -198,6 +198,7 @@ def household_save(
     annual_extra_secondary: str = Form(""),
     annual_vacation_budget: str = Form(""),
     annual_house_budget: str = Form(""),
+    bridge_rate_pct: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = _require_admin(request, db)
@@ -244,6 +245,9 @@ def household_save(
     hf.annual_extra_secondary = _parse_decimal(annual_extra_secondary)
     hf.annual_vacation_budget = _parse_decimal(annual_vacation_budget)
     hf.annual_house_budget = _parse_decimal(annual_house_budget)
+    # Overbruggingsrente: user tikt 4.20 (=%) → opslaan als 0.0420.
+    if bridge_rate_pct.strip():
+        hf.bridge_rate_pct = _parse_percent(bridge_rate_pct, Decimal("0.0420"))
 
     db.commit()
     return RedirectResponse("/hypotheek/huishouden?saved=1", status_code=302)
@@ -563,6 +567,9 @@ def _apply_scenario_form(
     insurance_cost_factor: str = "",
     monthly_refund_usage: str = "",
     woz_value: str = "",
+    transfer_date_new: str = "",
+    sale_date_old: str = "",
+    bridge_amount_override: str = "",
 ) -> None:
     s.name = name.strip() or s.name or "Naamloos scenario"
     s.valuation = _parse_decimal(valuation)
@@ -609,6 +616,15 @@ def _apply_scenario_form(
         s.woz_value = _parse_decimal(woz_value, default=Decimal("0"))
     else:
         s.woz_value = None
+    # Overbrugging: datums + optioneel override-bedrag. Leeg → NULL.
+    s.transfer_date_new = _parse_iso_date(transfer_date_new) if transfer_date_new else None
+    s.sale_date_old = _parse_iso_date(sale_date_old) if sale_date_old else None
+    if bridge_amount_override.strip():
+        s.bridge_amount_override = _parse_decimal(
+            bridge_amount_override, default=Decimal("0")
+        )
+    else:
+        s.bridge_amount_override = None
 
 
 @router.get("/scenarios")
@@ -714,6 +730,9 @@ def scenarios_create(
     insurance_cost_factor: str = Form(""),
     monthly_refund_usage: str = Form(""),
     woz_value: str = Form(""),
+    transfer_date_new: str = Form(""),
+    sale_date_old: str = Form(""),
+    bridge_amount_override: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = _require_admin(request, db)
@@ -736,6 +755,9 @@ def scenarios_create(
         insurance_cost_factor=insurance_cost_factor,
         monthly_refund_usage=monthly_refund_usage,
         woz_value=woz_value,
+        transfer_date_new=transfer_date_new,
+        sale_date_old=sale_date_old,
+        bridge_amount_override=bridge_amount_override,
     )
     db.add(s)
     db.commit()
@@ -1128,11 +1150,29 @@ def scenarios_detail(
 
     # LIN-44: één helper berekent alle afgeleide bedragen uit het scenario zelf
     # (incl. bestaande hypotheken en per-scenario aan/verkoopkosten).
-    fin = mortgage_calc.compute_scenario_financials(scenario)
+    fin = mortgage_calc.compute_scenario_financials(scenario, household)
     to_fin = fin.te_financieren
     ow = fin.overwaarde
     ann_principal = fin.nieuwe_annuiteit
     ltv_fraction = fin.ltv_fraction
+
+    # Overbruggingshypotheek — eenmalige netto kost (bruto rente − HRA-teruggaaf)
+    # die van het spaarsaldo in jaar 1 afgaat. De dubbele maandlast (rente-only
+    # overbrugging tijdens de looptijd) wordt apart getoond in de overbrugging-
+    # kaart, bewust niét in de grafiek.
+    bridge_tax_rate = Decimal(str(household.tax_rate or 0))
+    bridge_hra_correction = Decimal(str(
+        getattr(household, "hra_correction_factor", "1.0") or "1.0"
+    ))
+    bridge_gross_interest = fin.bridge_gross_interest_total
+    # Overbruggingsrente is HRA-aftrekbaar (fiscaal box 1, max 2 jaar). Simpele
+    # benadering: tarief × bruto rente × correctiefactor. EWF trekken we hier
+    # niet opnieuw af — dat is al verrekend bij de reguliere HRA van de
+    # nieuwe annuïteit.
+    bridge_hra_refund = (
+        bridge_gross_interest * bridge_tax_rate * bridge_hra_correction
+    ).quantize(Decimal("0.01"))
+    bridge_net_cost = (bridge_gross_interest - bridge_hra_refund).quantize(Decimal("0.01"))
 
     # Per bestaande-hypotheek de auto-berekende maandlast (niet: de user-override)
     # zodat het invoerveld een zinvolle placeholder kan tonen i.p.v. "€ None".
@@ -1357,8 +1397,11 @@ def scenarios_detail(
         ).quantize(Decimal("0.01"))
         vs["savings_income_yr"] = savings_income_yr
         vs["savings_expense_yr"] = savings_expense_yr
+        # Eenmalige overbruggingskost komt in jaar 1 van het spaarsaldo af.
+        # Zelfde bedrag voor elke variant (overbrugging is scenario-niveau).
+        vs["bridge_net_cost"] = bridge_net_cost
         vs["net_annual_savings"] = (
-            savings_income_yr - savings_expense_yr
+            savings_income_yr - savings_expense_yr - bridge_net_cost
         ).quantize(Decimal("0.01"))
 
         # Gemiddelde aflossing op de nieuwe annuïteit over de eerste 5 jaar.
@@ -1466,6 +1509,9 @@ def scenarios_detail(
             "variant_leftover_pairs": variant_leftover_pairs,
             "chart_labels": chart_labels,
             "chart_series": chart_series,
+            "bridge_gross_interest": bridge_gross_interest,
+            "bridge_hra_refund": bridge_hra_refund,
+            "bridge_net_cost": bridge_net_cost,
             "flash": request.query_params.get("flash"),
         },
     )
@@ -1654,6 +1700,9 @@ def scenarios_edit(
     insurance_cost_factor: str = Form(""),
     monthly_refund_usage: str = Form(""),
     woz_value: str = Form(""),
+    transfer_date_new: str = Form(""),
+    sale_date_old: str = Form(""),
+    bridge_amount_override: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = _require_admin(request, db)
@@ -1676,6 +1725,9 @@ def scenarios_edit(
         insurance_cost_factor=insurance_cost_factor,
         monthly_refund_usage=monthly_refund_usage,
         woz_value=woz_value,
+        transfer_date_new=transfer_date_new,
+        sale_date_old=sale_date_old,
+        bridge_amount_override=bridge_amount_override,
     )
     db.commit()
     return RedirectResponse(

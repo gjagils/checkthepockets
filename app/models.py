@@ -544,6 +544,11 @@ class HouseholdFinance(Base):
     annual_vacation_budget = Column(Numeric(10, 2), nullable=False, default=Decimal("0"))
     annual_house_budget = Column(Numeric(10, 2), nullable=False, default=Decimal("0"))
 
+    # Rente voor een overbruggingshypotheek. Default 4,20% (ABN variabele
+    # overbruggingslening-rente op 2026-04-24). De 1-jaar-vast variant staat
+    # op 4,65%. Geldt voor alle scenarios — aanpasbaar op de huishouden-pagina.
+    bridge_rate_pct = Column(Numeric(6, 4), nullable=False, default=Decimal("0.0420"))
+
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
@@ -590,6 +595,13 @@ class MortgageScenario(Base):
     # WOZ-waarde voor eigenwoningforfait. NULL → fallback = valuation (taxatie).
     # Zet dit als je een WOZ-beschikking hebt die afwijkt van de taxatie.
     woz_value = Column(Numeric(12, 2), nullable=True)
+    # Overbruggings-timing. Als overdracht nieuwe huis vóór verkoop oude huis
+    # plaatsvindt, heb je een overbruggingshypotheek nodig voor de overwaarde.
+    # Periode = sale_date_old − transfer_date_new (in maanden).
+    transfer_date_new = Column(Date, nullable=True)
+    sale_date_old = Column(Date, nullable=True)
+    # Hoeveel je overbrugt. NULL → fallback = berekende overwaarde oude woning.
+    bridge_amount_override = Column(Numeric(12, 2), nullable=True)
     # Hoeveel van de maandelijkse hypotheek-rente-teruggaaf (HRA) daadwerkelijk
     # wordt gebruikt om de maandlasten te verlagen. De rest valt vrij als
     # jaarlijks spaarbedrag. NULL = oude gedrag (volledige teruggaaf → maandlast).

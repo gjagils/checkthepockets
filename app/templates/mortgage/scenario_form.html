@@ -136,6 +136,34 @@
         </div>
     </div>
 
+    <div class="card" style="margin-bottom:1rem;">
+        <h3 style="margin-top:0;">Overbrugging</h3>
+        <p class="muted" style="margin-top:0.25rem;">
+            Wanneer de overdracht van het nieuwe huis vóór de verkoop van het oude plaatsvindt, financier je de overwaarde tijdelijk met een overbruggingshypotheek. Laat de datums leeg als er geen overbrugging nodig is.
+        </p>
+        <div class="form-grid-2">
+            <div class="form-group">
+                <label for="f-transfer-date">Overdrachtsdatum nieuwe huis</label>
+                <input type="date" id="f-transfer-date" name="transfer_date_new"
+                       value="{{ scenario.transfer_date_new.isoformat() if scenario and scenario.transfer_date_new else '' }}">
+            </div>
+
+            <div class="form-group">
+                <label for="f-sale-date">Verkoopdatum oude huis</label>
+                <input type="date" id="f-sale-date" name="sale_date_old"
+                       value="{{ scenario.sale_date_old.isoformat() if scenario and scenario.sale_date_old else '' }}">
+            </div>
+
+            <div class="form-group" style="grid-column: 1 / -1;">
+                <label for="f-bridge-amount">Overbruggingsbedrag override (€)</label>
+                <input type="number" step="0.01" id="f-bridge-amount" name="bridge_amount_override"
+                       value="{{ '%.2f' | format(scenario.bridge_amount_override) if scenario and scenario.bridge_amount_override is not none else '' }}"
+                       placeholder="leeg = berekende overwaarde oude woning">
+                <small style="color:#6b7280; font-size:0.75rem;">Standaard = berekende netto overwaarde. Vul een bedrag in als je minder (of meer) wilt overbruggen.</small>
+            </div>
+        </div>
+    </div>
+
     <div style="display:flex; gap:0.5rem;">
         <button type="submit" class="btn btn-primary">
             {% if mode == 'edit' %}Opslaan{% else %}Aanmaken{% endif %}
