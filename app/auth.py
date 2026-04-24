@@ -65,25 +65,31 @@ def set_session_cookie(response: RedirectResponse, user_id: int) -> RedirectResp
 
 
 # Whitelist van toegestane startpagina-routes. Label voor de UI-dropdown.
-# `admin_only` weert opties uit het menu van niet-admins.
+# `admin_only` weert opties uit het menu van niet-admins; `mortgage_only`
+# weert opties uit het menu van users zonder can_access_mortgage=1 (GJA-47).
 START_PAGE_OPTIONS = [
-    {"path": "/dashboard", "label": "Dashboard", "admin_only": False},
-    {"path": "/transactions", "label": "Transacties", "admin_only": False},
-    {"path": "/budgets", "label": "Budgetten", "admin_only": False},
-    {"path": "/savings", "label": "Sparen", "admin_only": False},
-    {"path": "/portfolio", "label": "Portfolio", "admin_only": False},
-    {"path": "/analytics", "label": "Analyse", "admin_only": False},
-    {"path": "/accounts", "label": "Rekeningen", "admin_only": False},
-    {"path": "/hypotheek", "label": "Hypotheek", "admin_only": True},
+    {"path": "/dashboard", "label": "Dashboard", "admin_only": False, "mortgage_only": False},
+    {"path": "/transactions", "label": "Transacties", "admin_only": False, "mortgage_only": False},
+    {"path": "/budgets", "label": "Budgetten", "admin_only": False, "mortgage_only": False},
+    {"path": "/savings", "label": "Sparen", "admin_only": False, "mortgage_only": False},
+    {"path": "/portfolio", "label": "Portfolio", "admin_only": False, "mortgage_only": False},
+    {"path": "/analytics", "label": "Analyse", "admin_only": False, "mortgage_only": False},
+    {"path": "/accounts", "label": "Rekeningen", "admin_only": False, "mortgage_only": False},
+    {"path": "/hypotheek", "label": "Hypotheek", "admin_only": False, "mortgage_only": True},
 ]
 
 
 def allowed_start_pages(user: User) -> list[dict]:
-    """Opties die deze user mag kiezen (admins zien ook admin-only pagina's)."""
-    return [
-        opt for opt in START_PAGE_OPTIONS
-        if not opt["admin_only"] or user.is_admin
-    ]
+    """Opties die deze user mag kiezen. Admin-only is zichtbaar voor admins;
+    mortgage-only alleen voor users met can_access_mortgage=1."""
+    result = []
+    for opt in START_PAGE_OPTIONS:
+        if opt.get("admin_only") and not user.is_admin:
+            continue
+        if opt.get("mortgage_only") and not user.can_access_mortgage:
+            continue
+        result.append(opt)
+    return result
 
 
 def user_start_page(user: User | None) -> str:

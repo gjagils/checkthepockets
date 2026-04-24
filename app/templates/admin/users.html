@@ -110,6 +110,7 @@
                     <th>Gebruikersnaam</th>
                     <th>E-mail</th>
                     <th>Admin</th>
+                    <th>Hypotheek</th>
                     <th>Actief</th>
                     <th>Geverifieerd</th>
                     <th class="text-right">Rekeningen</th>
@@ -143,6 +144,13 @@
                     {% endif %}
                 </td>
                 <td>
+                    {% if u.can_access_mortgage %}
+                    <span class="pill pill-sky">Ja</span>
+                    {% else %}
+                    <span style="color:var(--muted);">—</span>
+                    {% endif %}
+                </td>
+                <td>
                     {% if u.is_active %}
                     <span class="pill pill-green">Actief</span>
                     {% else %}
@@ -171,6 +179,11 @@
                         <form method="post" action="/admin/users/{{ u.id }}/toggle-admin" style="display:inline;">
                             <button type="submit" class="btn btn-sm btn-secondary">
                                 {{ 'Admin af' if u.is_admin else 'Maak admin' }}
+                            </button>
+                        </form>
+                        <form method="post" action="/admin/users/{{ u.id }}/toggle-mortgage-access" style="display:inline;">
+                            <button type="submit" class="btn btn-sm btn-secondary" title="Toegang tot hypotheek-module">
+                                {{ 'Hypotheek uit' if u.can_access_mortgage else 'Hypotheek aan' }}
                             </button>
                         </form>
                         <form method="post" action="/admin/users/{{ u.id }}/delete" style="display:inline;"

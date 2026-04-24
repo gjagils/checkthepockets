@@ -88,6 +88,19 @@ def toggle_admin(user_id: int, request: Request, db: Session = Depends(get_db)):
     return RedirectResponse("/admin/users", status_code=302)
 
 
+@router.post("/users/{user_id}/toggle-mortgage-access")
+def toggle_mortgage_access(user_id: int, request: Request, db: Session = Depends(get_db)):
+    """Zet can_access_mortgage aan/uit (GJA-47). Ook de admin mag zichzelf
+    toggelen — hypotheek is losgekoppeld van admin en het kan voorkomen dat
+    je je eigen toegang wil intrekken."""
+    _require_admin(request, db)
+    target = db.query(User).filter(User.id == user_id).first()
+    if target:
+        target.can_access_mortgage = 0 if target.can_access_mortgage else 1
+        db.commit()
+    return RedirectResponse("/admin/users", status_code=302)
+
+
 @router.post("/users/{user_id}/email")
 def admin_update_user_email(
     user_id: int,

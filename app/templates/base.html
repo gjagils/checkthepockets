@@ -53,7 +53,7 @@
                 <a href="/transactions" class="{{ 'active' if main_active == 'financien' }}">Financiën</a>
                 <a href="/budgets" class="{{ 'active' if main_active == 'budgetten' }}">Budgetten</a>
                 <a href="/portfolio" class="{{ 'active' if main_active == 'portfolio' }}">Portfolio</a>
-                {% if user.is_admin %}
+                {% if user.can_access_mortgage %}
                 <a href="/hypotheek" class="{{ 'active' if main_active == 'hypotheek' }}">Hypotheek</a>
                 {% endif %}
                 <a href="/accounts" class="{{ 'active' if main_active == 'rekeningen' }}">Rekeningen</a>
@@ -136,7 +136,7 @@
                     </div>
                 </div>
 
-                {% if user.is_admin %}
+                {% if user.can_access_mortgage %}
                 <div class="m-nav-group {{ 'open' if main_active == 'hypotheek' }}">
                     <a href="/hypotheek" class="m-nav-main {{ 'active' if main_active == 'hypotheek' }}">Hypotheek</a>
                     <div class="m-nav-children">

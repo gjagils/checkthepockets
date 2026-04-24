@@ -90,10 +90,11 @@ RATE_SEED_DEFAULTS = [
 ]
 
 
-def _require_admin(request: Request, db: Session):
-    """Admin-gated: non-admins krijgen 404 (bestaan van feature niet onthullen)."""
+def _require_mortgage_access(request: Request, db: Session):
+    """Feature-flag gated (GJA-47): user.can_access_mortgage == 1. Andere
+    users krijgen 404 (bestaan van feature niet onthullen)."""
     user = require_login(request, db)
-    if not user.is_admin:
+    if not user.can_access_mortgage:
         raise HTTPException(status_code=404, detail="Niet gevonden")
     return user
 
@@ -147,7 +148,7 @@ def _parse_iso_date(value: str) -> datetime.date | None:
 
 @router.get("")
 def mortgage_index(request: Request, db: Session = Depends(get_db)):
-    user = _require_admin(request, db)
+    user = _require_mortgage_access(request, db)
     scenarios = (
         db.query(MortgageScenario)
         .filter(MortgageScenario.user_id == user.id, MortgageScenario.is_archived == 0)
@@ -162,7 +163,7 @@ def mortgage_index(request: Request, db: Session = Depends(get_db)):
 
 @router.get("/huishouden")
 def household_form(request: Request, db: Session = Depends(get_db)):
-    user = _require_admin(request, db)
+    user = _require_mortgage_access(request, db)
     household = _get_or_create_household(db, user.id)
     saved = request.query_params.get("saved") == "1"
     return templates.TemplateResponse(
@@ -200,7 +201,7 @@ def household_save(
     annual_house_budget: str = Form(""),
     db: Session = Depends(get_db),
 ):
-    user = _require_admin(request, db)
+    user = _require_mortgage_access(request, db)
     hf = _get_or_create_household(db, user.id)
 
     hf.salary_primary = _parse_decimal(salary_primary)
@@ -265,7 +266,7 @@ def _rates_for_user(db: Session, user_id: int) -> list[MortgageRateTable]:
 
 @router.get("/rentes")
 def rates_index(request: Request, db: Session = Depends(get_db)):
-    user = _require_admin(request, db)
+    user = _require_mortgage_access(request, db)
     rates = _rates_for_user(db, user.id)
     flash = request.query_params.get("flash")
     error = request.query_params.get("error")
@@ -293,7 +294,7 @@ def rates_create(
     interest_rate: str = Form(...),
     db: Session = Depends(get_db),
 ):
-    user = _require_admin(request, db)
+    user = _require_mortgage_access(request, db)
     try:
         years = int(fixed_years)
     except (TypeError, ValueError):
@@ -335,7 +336,7 @@ def rates_update(
     interest_rate: str = Form(...),
     db: Session = Depends(get_db),
 ):
-    user = _require_admin(request, db)
+    user = _require_mortgage_access(request, db)
     row = (
         db.query(MortgageRateTable)
         .filter(MortgageRateTable.id == rate_id, MortgageRateTable.user_id == user.id)
@@ -353,7 +354,7 @@ def rates_update(
 
 @router.post("/rentes/{rate_id}/delete")
 def rates_delete(rate_id: int, request: Request, db: Session = Depends(get_db)):
-    user = _require_admin(request, db)
+    user = _require_mortgage_access(request, db)
     row = (
         db.query(MortgageRateTable)
         .filter(MortgageRateTable.id == rate_id, MortgageRateTable.user_id == user.id)
@@ -368,7 +369,7 @@ def rates_delete(rate_id: int, request: Request, db: Session = Depends(get_db)):
 @router.post("/rentes/seed")
 def rates_seed(request: Request, db: Session = Depends(get_db)):
     """Vul de rente-tabel met zinvolle ABN-defaults — alleen als leeg."""
-    user = _require_admin(request, db)
+    user = _require_mortgage_access(request, db)
     existing = (
         db.query(MortgageRateTable).filter(MortgageRateTable.user_id == user.id).count()
     )
@@ -390,7 +391,7 @@ def rates_bulk_preview(
     db: Session = Depends(get_db),
 ):
     """Parse paste-input en render een voorvertoning — importeert nog niets."""
-    user = _require_admin(request, db)
+    user = _require_mortgage_access(request, db)
     parse_result = parse_bulk_rates(raw_text)
     existing = _rates_for_user(db, user.id)
     new_rows, update_rows = compare_with_existing(parse_result.rows, existing)
@@ -420,7 +421,7 @@ async def rates_bulk_screenshot(
     """Accepteer een screenshot, haal er tab-tekst uit via Claude vision en
     render dezelfde preview als de paste-flow. De gebruiker kan de tekst
     zien/corrigeren in de textarea vóór definitieve import."""
-    user = _require_admin(request, db)
+    user = _require_mortgage_access(request, db)
 
     existing = _rates_for_user(db, user.id)
 
@@ -473,7 +474,7 @@ def rates_bulk_import(
     db: Session = Depends(get_db),
 ):
     """Schrijf de parsed rijen weg — upsert op (fixed_years, ltv_max_pct)."""
-    user = _require_admin(request, db)
+    user = _require_mortgage_access(request, db)
     parse_result = parse_bulk_rates(raw_text)
     if parse_result.has_errors or not parse_result.rows:
         existing = _rates_for_user(db, user.id)
@@ -617,7 +618,7 @@ def scenarios_list(
     show_archived: int = 0,
     db: Session = Depends(get_db),
 ):
-    user = _require_admin(request, db)
+    user = _require_mortgage_access(request, db)
     q = db.query(MortgageScenario).filter(MortgageScenario.user_id == user.id)
     if not show_archived:
         q = q.filter(MortgageScenario.is_archived == 0)
@@ -642,7 +643,7 @@ def scenarios_list(
 
 @router.get("/scenarios/nieuw")
 def scenarios_new(request: Request, db: Session = Depends(get_db)):
-    user = _require_admin(request, db)
+    user = _require_mortgage_access(request, db)
     return templates.TemplateResponse(
         "mortgage/scenario_form.html",
         {"request": request, "user": user, "scenario": None, "mode": "new"},
@@ -661,7 +662,7 @@ def scenarios_funda_lookup(
     bepaald op basis van de host (funda.nl → Funda-parser, move.nl → Move-parser).
     Bij fouten retourneren we een 4xx met een NL-leesbare boodschap.
     """
-    _require_admin(request, db)
+    _require_mortgage_access(request, db)
     url = (url or "").strip()
     try:
         if is_move_url(url):
@@ -716,7 +717,7 @@ def scenarios_create(
     woz_value: str = Form(""),
     db: Session = Depends(get_db),
 ):
-    user = _require_admin(request, db)
+    user = _require_mortgage_access(request, db)
     s = MortgageScenario(user_id=user.id)
     _apply_scenario_form(
         s,
@@ -1119,7 +1120,7 @@ def _budget_rows_for_scenario(
 def scenarios_detail(
     scenario_id: int, request: Request, db: Session = Depends(get_db),
 ):
-    user = _require_admin(request, db)
+    user = _require_mortgage_access(request, db)
     scenario = _get_scenario(db, user.id, scenario_id)
     if not scenario.variants:
         _auto_create_variants(db, user.id, scenario)
@@ -1484,7 +1485,7 @@ def variants_add(
     interest_rate_override: str = Form(""),
     db: Session = Depends(get_db),
 ):
-    user = _require_admin(request, db)
+    user = _require_mortgage_access(request, db)
     scenario = _get_scenario(db, user.id, scenario_id)
     try:
         years = int(fixed_years)
@@ -1531,7 +1532,7 @@ def variants_delete(
     scenario_id: int, variant_id: int,
     request: Request, db: Session = Depends(get_db),
 ):
-    user = _require_admin(request, db)
+    user = _require_mortgage_access(request, db)
     scenario = _get_scenario(db, user.id, scenario_id)
     variant = db.query(MortgageVariant).filter(
         MortgageVariant.id == variant_id,
@@ -1558,7 +1559,7 @@ def scenario_budget_upsert(
     amount: str = Form(""),
     db: Session = Depends(get_db),
 ):
-    user = _require_admin(request, db)
+    user = _require_mortgage_access(request, db)
     scenario = _get_scenario(db, user.id, scenario_id)
     try:
         cat_id = int(category_id)
@@ -1601,7 +1602,7 @@ def scenario_budget_reset(
     db: Session = Depends(get_db),
 ):
     """Verwijder één override → categorie valt terug op user's standaard-budget."""
-    user = _require_admin(request, db)
+    user = _require_mortgage_access(request, db)
     scenario = _get_scenario(db, user.id, scenario_id)
     try:
         cat_id = int(category_id)
@@ -1626,7 +1627,7 @@ def scenario_budget_reset(
 def scenarios_edit_form(
     scenario_id: int, request: Request, db: Session = Depends(get_db),
 ):
-    user = _require_admin(request, db)
+    user = _require_mortgage_access(request, db)
     scenario = _get_scenario(db, user.id, scenario_id)
     return templates.TemplateResponse(
         "mortgage/scenario_form.html",
@@ -1656,7 +1657,7 @@ def scenarios_edit(
     woz_value: str = Form(""),
     db: Session = Depends(get_db),
 ):
-    user = _require_admin(request, db)
+    user = _require_mortgage_access(request, db)
     scenario = _get_scenario(db, user.id, scenario_id)
     _apply_scenario_form(
         scenario,
@@ -1687,7 +1688,7 @@ def scenarios_edit(
 def scenarios_archive(
     scenario_id: int, request: Request, db: Session = Depends(get_db),
 ):
-    user = _require_admin(request, db)
+    user = _require_mortgage_access(request, db)
     scenario = _get_scenario(db, user.id, scenario_id)
     scenario.is_archived = 1
     db.commit()
@@ -1698,7 +1699,7 @@ def scenarios_archive(
 def scenarios_unarchive(
     scenario_id: int, request: Request, db: Session = Depends(get_db),
 ):
-    user = _require_admin(request, db)
+    user = _require_mortgage_access(request, db)
     scenario = _get_scenario(db, user.id, scenario_id)
     scenario.is_archived = 0
     db.commit()
@@ -1753,7 +1754,7 @@ def existing_mortgage_create(
     rate_change_date: str = Form(""),
     db: Session = Depends(get_db),
 ):
-    user = _require_admin(request, db)
+    user = _require_mortgage_access(request, db)
     scenario = _get_scenario(db, user.id, scenario_id)
     last = (
         db.query(ScenarioExistingMortgage)
@@ -1806,7 +1807,7 @@ def existing_mortgage_edit(
     rate_change_date: str = Form(""),
     db: Session = Depends(get_db),
 ):
-    user = _require_admin(request, db)
+    user = _require_mortgage_access(request, db)
     em = _existing_mortgage_for(db, user.id, scenario_id, em_id)
 
     em.name = (name.strip() or em.name)[:100]
@@ -1841,7 +1842,7 @@ def existing_mortgage_delete(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    user = _require_admin(request, db)
+    user = _require_mortgage_access(request, db)
     em = _existing_mortgage_for(db, user.id, scenario_id, em_id)
     db.delete(em)
     db.commit()
@@ -1863,7 +1864,7 @@ def scenario_contribution_upsert(
     amount: str = Form("0"),
     db: Session = Depends(get_db),
 ):
-    user = _require_admin(request, db)
+    user = _require_mortgage_access(request, db)
     scenario = _get_scenario(db, user.id, scenario_id)
     try:
         pid = int(person_id)
