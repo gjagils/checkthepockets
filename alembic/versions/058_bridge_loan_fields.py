@@ -1,7 +1,7 @@
 """Overbruggingshypotheek: rente op HouseholdFinance + timing/bedrag per scenario.
 
-Revision ID: 057
-Revises: 056
+Revision ID: 058
+Revises: 057
 Create Date: 2026-04-24
 
 Nieuwe velden:
@@ -10,13 +10,18 @@ Nieuwe velden:
 * mortgage_scenarios.sale_date_old — verkoopdatum oude huis
 * mortgage_scenarios.bridge_amount_override — optioneel override-bedrag
   (NULL → valt terug op berekende overwaarde)
+
+Let op: deze migratie had oorspronkelijk revision 057 maar is hernummerd naar
+058 nadat een andere PR (GJA-47, user_can_access_mortgage) tegelijk 057
+mergede. Beide migraties zijn idempotent (checken of de kolom al bestaat)
+dus de volgorde tussen 057 en 058 maakt voor de data niet uit.
 """
 from alembic import op
 import sqlalchemy as sa
 
 
-revision = "057"
-down_revision = "056"
+revision = "058"
+down_revision = "057"
 branch_labels = None
 depends_on = None
 
