@@ -35,12 +35,16 @@ def db_session():
         db.close()
 
 
-def _make_user(db, username="user", is_admin=0, start_page=None):
+def _make_user(db, username="user", is_admin=0, start_page=None, can_access_mortgage=None):
+    # `can_access_mortgage` defaulteert op dezelfde waarde als is_admin zodat
+    # bestaande "admin mag /hypotheek"-tests blijven werken na GJA-47.
+    flag = can_access_mortgage if can_access_mortgage is not None else is_admin
     u = User(
         username=username,
         email=f"{username}@x.nl",
         password_hash=hash_password("password123"),
         is_admin=is_admin,
+        can_access_mortgage=flag,
         start_page=start_page,
     )
     db.add(u)

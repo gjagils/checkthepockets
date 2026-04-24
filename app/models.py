@@ -39,6 +39,9 @@ class User(Base):
     is_verified = Column(Integer, default=1)   # 1 = verified, 0 = pending email verification
     is_admin = Column(Integer, default=0)       # 1 = admin
     is_active = Column(Integer, default=1)      # 0 = deactivated by admin
+    # Hypotheek-module feature-flag (GJA-47). Losgekoppeld van is_admin zodat
+    # hypotheek-toegang een persoonlijke-finance keuze is, niet systeembeheer.
+    can_access_mortgage = Column(Integer, nullable=False, default=0)
     last_login_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 

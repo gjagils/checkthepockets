@@ -42,6 +42,7 @@ def _make_user(db, username="admin", is_admin=1):
     u = User(
         username=username, email=f"{username}@x.nl",
         password_hash=hash_password("pw"), is_admin=is_admin,
+        can_access_mortgage=is_admin,
     )
     db.add(u); db.commit(); db.refresh(u)
     return u
