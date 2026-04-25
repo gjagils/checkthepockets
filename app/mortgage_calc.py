@@ -204,55 +204,47 @@ class ScenarioFinancials:
     # Overbruggingshypotheek (alle NULL/0 als geen timing is gezet of verkoop
     # vóór overdracht plaatsvindt — we ondersteunen die omgekeerde situatie nog
     # niet, dan is er geen overbrugging nodig).
-    bridge_months: int = 0
+    bridge_days: int = 0
     bridge_amount: Decimal = Decimal("0.00")
     bridge_monthly_interest: Decimal = Decimal("0.00")
     bridge_gross_interest_total: Decimal = Decimal("0.00")
 
 
-def bridge_months_between(
+def bridge_days_between(
     transfer_date_new, sale_date_old,
 ) -> int:
-    """Aantal hele maanden tussen overdracht nieuw en verkoop oud.
+    """Aantal dagen tussen overdracht nieuw en verkoop oud.
 
     Beide datums moeten gezet zijn én sale_date_old moet op of na
     transfer_date_new liggen; anders retourneert 0 (geen overbrugging nodig).
-
-    Gebruikt kalendermaanden (maand × 12 + maand-verschil, plus 1 dag-correctie
-    wanneer sale-dag op of na transfer-dag). Dat matcht hoe banken de periode
-    factureren (volle maand renten vanaf passeer-datum).
+    Banken factureren overbrugging op dagbasis, dus we tellen werkelijke
+    kalenderdagen tussen passeer- en verkoopdatum.
     """
     if not transfer_date_new or not sale_date_old:
         return 0
     if sale_date_old < transfer_date_new:
         return 0
-    months = (sale_date_old.year - transfer_date_new.year) * 12 + (
-        sale_date_old.month - transfer_date_new.month
-    )
-    # Als de dag-van-de-maand vóór de start-dag ligt, is die laatste maand niet
-    # vol (bv. 5 juli → 1 augustus = 27 dagen, geen volle maand).
-    if sale_date_old.day < transfer_date_new.day:
-        months -= 1
-    return max(months, 0)
+    return (sale_date_old - transfer_date_new).days
 
 
 def bridge_loan_metrics(
     bridge_amount: Decimal,
     bridge_rate_pct: Decimal,  # als fractie, bv. 0.0420
-    bridge_months: int,
+    bridge_days: int,
 ) -> tuple[Decimal, Decimal]:
-    """Maandlast (rente-only, aflossingsvrij) + totale bruto rente-kost.
+    """Maand-referentielast + totale bruto rente-kost over de werkelijke periode.
 
-    Aflossingsvrij dus: maand-rente = amount × rate / 12. Totale rente over de
-    looptijd = maand-rente × aantal maanden.
+    Aflossingsvrij. Totale rente = amount × rate / 365 × dagen (banken
+    factureren op dagbasis). De maand-referentielast (amount × rate / 12) wordt
+    los teruggegeven omdat de UI 'm gebruikt voor de "dubbele maandlast"-KPI.
     """
     amount = Decimal(str(bridge_amount or 0))
     rate = Decimal(str(bridge_rate_pct or 0))
-    months = int(bridge_months or 0)
-    if amount <= 0 or rate <= 0 or months <= 0:
+    days = int(bridge_days or 0)
+    if amount <= 0 or rate <= 0 or days <= 0:
         return Decimal("0.00"), Decimal("0.00")
     monthly_interest = _round_cent(amount * rate / Decimal(12))
-    total_gross = _round_cent(monthly_interest * Decimal(months))
+    total_gross = _round_cent(amount * rate / Decimal(365) * Decimal(days))
     return monthly_interest, total_gross
 
 
@@ -327,7 +319,7 @@ def compute_scenario_financials(scenario, household=None) -> ScenarioFinancials:
         if valuation > 0 else Decimal(0)
     )
 
-    bridge_months = bridge_months_between(
+    bridge_days = bridge_days_between(
         getattr(scenario, "transfer_date_new", None),
         getattr(scenario, "sale_date_old", None),
     )
@@ -338,9 +330,9 @@ def compute_scenario_financials(scenario, household=None) -> ScenarioFinancials:
         else _round_cent(overwaarde_amount)
     )
     bridge_rate = Decimal(str(getattr(household, "bridge_rate_pct", 0) or 0))
-    if bridge_months > 0 and bridge_amount > 0 and bridge_rate > 0:
+    if bridge_days > 0 and bridge_amount > 0 and bridge_rate > 0:
         bridge_monthly, bridge_total_interest = bridge_loan_metrics(
-            bridge_amount, bridge_rate, bridge_months,
+            bridge_amount, bridge_rate, bridge_days,
         )
     else:
         bridge_amount = Decimal("0.00")
@@ -357,7 +349,7 @@ def compute_scenario_financials(scenario, household=None) -> ScenarioFinancials:
         ltv_fraction=ltv_fraction,
         existing_monthly_total=_round_cent(existing_monthly_total),
         existing_lines=existing_lines,
-        bridge_months=bridge_months,
+        bridge_days=bridge_days,
         bridge_amount=_round_cent(bridge_amount),
         bridge_monthly_interest=_round_cent(bridge_monthly),
         bridge_gross_interest_total=_round_cent(bridge_total_interest),
