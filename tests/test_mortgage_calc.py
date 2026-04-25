@@ -8,8 +8,8 @@ import pytest
 from app.mortgage_calc import (
     amortization_schedule,
     annuity_principal,
+    bridge_days_between,
     bridge_loan_metrics,
-    bridge_months_between,
     compute_scenario_financials,
     ltv,
     net_monthly,
@@ -145,62 +145,62 @@ def test_net_monthly_no_refund_when_below_notional():
 # ── Overbruggingshypotheek ──────────────────────────────────────────────────
 
 
-def test_bridge_months_between_same_day_counts_as_one_month():
-    # 1 juli → 1 augustus = één hele maand overbrugging.
-    result = bridge_months_between(
+def test_bridge_days_between_one_month_gap():
+    # 1 juli → 1 augustus = 31 kalenderdagen.
+    result = bridge_days_between(
         datetime.date(2026, 7, 1), datetime.date(2026, 8, 1),
     )
-    assert result == 1
+    assert result == 31
 
 
-def test_bridge_months_between_typical_four_month_gap():
-    # Overdracht 1 juli, verkoop 1 november = 4 maanden.
-    result = bridge_months_between(
+def test_bridge_days_between_typical_four_month_gap():
+    # 1 juli → 1 november = 123 kalenderdagen.
+    result = bridge_days_between(
         datetime.date(2026, 7, 1), datetime.date(2026, 11, 1),
     )
-    assert result == 4
+    assert result == 123
 
 
-def test_bridge_months_between_partial_month_rounds_down():
-    # 1 juli → 20 juli = geen volle maand → 0.
-    result = bridge_months_between(
+def test_bridge_days_between_partial_month():
+    # 1 juli → 20 juli = 19 dagen — telt nu wel mee.
+    result = bridge_days_between(
         datetime.date(2026, 7, 1), datetime.date(2026, 7, 20),
     )
-    assert result == 0
+    assert result == 19
 
 
-def test_bridge_months_between_none_returns_zero():
-    assert bridge_months_between(None, datetime.date(2026, 8, 1)) == 0
-    assert bridge_months_between(datetime.date(2026, 7, 1), None) == 0
-    assert bridge_months_between(None, None) == 0
+def test_bridge_days_between_none_returns_zero():
+    assert bridge_days_between(None, datetime.date(2026, 8, 1)) == 0
+    assert bridge_days_between(datetime.date(2026, 7, 1), None) == 0
+    assert bridge_days_between(None, None) == 0
 
 
-def test_bridge_months_between_reverse_order_returns_zero():
+def test_bridge_days_between_reverse_order_returns_zero():
     # Verkoop vóór overdracht: geen overbrugging nodig — 0 teruggeven zodat
     # het restje van de pipeline dat signaal correct interpreteert.
-    result = bridge_months_between(
+    result = bridge_days_between(
         datetime.date(2026, 11, 1), datetime.date(2026, 7, 1),
     )
     assert result == 0
 
 
 def test_bridge_loan_metrics_standard_case():
-    # €370.000 @ 4,20% over 4 maanden:
-    # maandlast = 370000 × 0.042 / 12 = 1295,00
-    # totaal = 1295 × 4 = 5180,00
-    monthly, total = bridge_loan_metrics(Decimal("370000"), Decimal("0.0420"), 4)
+    # €370.000 @ 4,20% over 100 dagen:
+    # maandlast (referentie) = 370000 × 0.042 / 12 = 1295,00
+    # totaal = 370000 × 0.042 / 365 × 100 = 4257,53
+    monthly, total = bridge_loan_metrics(Decimal("370000"), Decimal("0.0420"), 100)
     assert monthly == Decimal("1295.00")
-    assert total == Decimal("5180.00")
+    assert total == Decimal("4257.53")
 
 
-def test_bridge_loan_metrics_zero_months_returns_zero():
+def test_bridge_loan_metrics_zero_days_returns_zero():
     monthly, total = bridge_loan_metrics(Decimal("370000"), Decimal("0.0420"), 0)
     assert monthly == Decimal("0.00")
     assert total == Decimal("0.00")
 
 
 def test_bridge_loan_metrics_zero_amount_returns_zero():
-    monthly, total = bridge_loan_metrics(Decimal("0"), Decimal("0.0420"), 4)
+    monthly, total = bridge_loan_metrics(Decimal("0"), Decimal("0.0420"), 100)
     assert monthly == Decimal("0.00")
     assert total == Decimal("0.00")
 
@@ -226,7 +226,7 @@ def _scenario_stub(**kwargs):
 
 def test_compute_scenario_financials_without_bridge_dates_has_zero_bridge():
     fin = compute_scenario_financials(_scenario_stub())
-    assert fin.bridge_months == 0
+    assert fin.bridge_days == 0
     assert fin.bridge_amount == Decimal("0.00")
     assert fin.bridge_monthly_interest == Decimal("0.00")
     assert fin.bridge_gross_interest_total == Decimal("0.00")
@@ -239,13 +239,15 @@ def test_compute_scenario_financials_with_bridge_computes_metrics():
     )
     household = SimpleNamespace(bridge_rate_pct=Decimal("0.0420"))
     fin = compute_scenario_financials(scenario, household)
-    assert fin.bridge_months == 4
+    assert fin.bridge_days == 123
     # Bedrag = overwaarde = 450000 × (1 − 0.015) − 0 (geen bestaande) = 443250,
     # dan wel het netto overwaarde-getal uit de formule. Belangrijker: > 0 en
     # de metrics zijn consistent.
     assert fin.bridge_amount > Decimal("0.00")
     assert fin.bridge_monthly_interest > Decimal("0.00")
-    expected_total = fin.bridge_monthly_interest * 4
+    expected_total = (
+        fin.bridge_amount * Decimal("0.0420") / Decimal(365) * Decimal(123)
+    ).quantize(Decimal("0.01"))
     assert fin.bridge_gross_interest_total == expected_total
 
 

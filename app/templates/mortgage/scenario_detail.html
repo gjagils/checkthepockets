@@ -211,9 +211,9 @@
 {# ─── Overbruggingshypotheek ──────────────────────────────────────────────── #}
 <div class="card" style="margin-bottom:1.5rem;">
     <h2 style="margin:0 0 0.25rem 0; font-size:1.1rem;">Overbrugging</h2>
-    {% if fin.bridge_months > 0 and fin.bridge_amount > 0 %}
+    {% if fin.bridge_days > 0 and fin.bridge_amount > 0 %}
     <p class="muted" style="margin:0 0 0.75rem 0;">
-        Tussen overdracht nieuwe huis ({{ scenario.transfer_date_new.strftime("%d-%m-%Y") }}) en verkoop oude huis ({{ scenario.sale_date_old.strftime("%d-%m-%Y") }}) loopt een overbruggingshypotheek van {{ fin.bridge_months }} maand{% if fin.bridge_months != 1 %}en{% endif %} tegen {{ "%.2f" | format(household.bridge_rate_pct * 100) }}% (aflossingsvrij).
+        Tussen overdracht nieuwe huis ({{ scenario.transfer_date_new.strftime("%d-%m-%Y") }}) en verkoop oude huis ({{ scenario.sale_date_old.strftime("%d-%m-%Y") }}) loopt een overbruggingshypotheek van {{ fin.bridge_days }} dag{% if fin.bridge_days != 1 %}en{% endif %} tegen {{ "%.2f" | format(household.bridge_rate_pct * 100) }}% (aflossingsvrij).
     </p>
     <div class="scenario-grid">
         <div class="scenario-kpi">
@@ -229,7 +229,7 @@
         </div>
         <div class="scenario-kpi">
             <span class="kpi-label">Periode</span>
-            <span class="kpi-value">{{ fin.bridge_months }} mnd</span>
+            <span class="kpi-value">{{ fin.bridge_days }} dagen</span>
             <span class="kpi-hint">overdracht → verkoop</span>
         </div>
         <div class="scenario-kpi">
@@ -251,7 +251,7 @@
         <div class="scenario-kpi">
             <span class="kpi-label">Totale rente-kost</span>
             <span class="kpi-value">€ {{ bridge_gross_interest | euro0 }}</span>
-            <span class="kpi-hint">= maandlast × {{ fin.bridge_months }}</span>
+            <span class="kpi-hint">= bedrag × rente / 365 × {{ fin.bridge_days }} dagen</span>
         </div>
         <div class="scenario-kpi">
             <span class="kpi-label">HRA-teruggaaf op rente</span>
