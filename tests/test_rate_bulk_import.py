@@ -97,6 +97,36 @@ def test_parser_abn_table():
     assert match[0].interest_rate == Decimal("0.0375")
 
 
+def test_parser_abn_table_without_leading_label_cell():
+    """OCR laat soms de lege eerste header-cel weg en geeft direct
+    ``NHG\\t≤65%\\t≤85%\\t…``. De parser moet dan alle header-cellen als
+    bucket-cellen behandelen i.p.v. NHG ten onrechte als rentevast-label te
+    interpreteren."""
+    text = (
+        "NHG\t≤65%\t≤85%\t≤90%\t>90%\n"
+        "5 jaar vast\t3,71%\t3,75%\t3,80%\t3,81%\t3,83%\n"
+        "15 jaar vast\t4,10%\t4,26%\t4,37%\t4,51%\t4,58%"
+    )
+    result = parse_bulk_rates(text)
+    assert not result.has_errors, result.errors
+    # 2 rentevast × 4 LTV-buckets = 8 rijen
+    assert len(result.rows) == 8
+
+    # 5j @ ≤65% moet ABN's 65%-rente zijn (3,75%), niet de NHG-rente (3,71%)
+    five_at_65 = next(
+        r for r in result.rows
+        if r.fixed_years == 5 and r.ltv_max_pct == Decimal("0.6500")
+    )
+    assert five_at_65.interest_rate == Decimal("0.0375")
+
+    # 15j @ ≤85% = 4,37% (niet 4,26% wat de ≤65%-rente was)
+    fifteen_at_85 = next(
+        r for r in result.rows
+        if r.fixed_years == 15 and r.ltv_max_pct == Decimal("0.8500")
+    )
+    assert fifteen_at_85.interest_rate == Decimal("0.0437")
+
+
 def test_parser_abn_table_skips_variabel_row():
     text = """\t≤65%\t≤85%
 5 jaar vast\t3,39%\t3,44%
