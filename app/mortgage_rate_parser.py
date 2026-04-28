@@ -214,15 +214,31 @@ def _parse_simple(lines: list[str]) -> ParseResult:
 
 
 def _parse_abn_table(lines: list[str]) -> ParseResult:
-    """Parse ABN-achtige tabel: kolom 0 = rentevast-label, kolom 1..N = LTV-buckets."""
+    """Parse ABN-achtige tabel: kolom 0 = rentevast-label, kolom 1..N = LTV-buckets.
+
+    De header heeft idealiter een lege eerste cel (zodat hij uitlijnt met de
+    rentevast-labels in de data-rijen): ``\\tNHG\\t≤65%\\t…``. Sommige OCR-runs
+    laten die lege cel weg en geven ``NHG\\t≤65%\\t…``. We detecteren dat door
+    naar de eerste header-cel te kijken — als die zelf al een bucket-token is
+    (LTV-percentage of NHG), behandelen we ALLE header-cellen als bucket-cellen
+    en schuift de mapping één positie naar rechts.
+    """
     result = ParseResult()
     header_cells = _split_line_cells(lines[0])
     if len(header_cells) < 2:
         return ParseResult(errors=["ABN-tabel heeft te weinig kolommen."])
 
+    # Detecteer: is de eerste header-cel zelf al een bucket-header? Dan is er
+    # geen lege/label-cel vooraan en moeten we alle cellen meetellen.
+    first_ltv, first_skip = _ltv_from_header(header_cells[0])
+    if first_ltv is not None or first_skip:
+        bucket_cells = header_cells
+    else:
+        bucket_cells = header_cells[1:]
+
     # Map kolom-index → LTV-fractie (None = overslaan).
-    col_ltv: list[Decimal | None] = [None]  # kolom 0 is rentevast-label
-    for c in header_cells[1:]:
+    col_ltv: list[Decimal | None] = [None]  # data-kolom 0 = rentevast-label
+    for c in bucket_cells:
         ltv, is_skip = _ltv_from_header(c)
         if is_skip:
             col_ltv.append(None)
