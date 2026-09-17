@@ -3,7 +3,7 @@
 import json
 import logging
 import uuid
-from datetime import date as date_type, datetime, timedelta
+from datetime import date as date_type, datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Depends, Request
@@ -45,8 +45,46 @@ def _normalize_iban(value: str | None) -> str | None:
 # ── Bank selection page ─────────────────────────────────────────────────────
 
 
+CONNECT_COUNTRIES = ["NL", "BE", "DE"]
+
+
+def _render_connect(request: Request, user, db: Session, country: str = "NL", error: str | None = None):
+    """Koppelpagina met bestaande koppelingen + banklijst voor het gekozen land.
+
+    De banklijst komt live van Enable Banking zodat de naam in het formulier
+    altijd exact overeenkomt met wat /auth verwacht. Als de API niet
+    bereikbaar is, blijft de pagina werken (met een lege lijst + melding)."""
+    connections = db.query(BankConnection).filter(
+        BankConnection.user_id == user.id,
+        BankConnection.status.in_(["active", "pending"]),
+    ).all()
+
+    banks: list[dict] = []
+    if _is_configured():
+        from app import enable_banking
+        try:
+            banks = enable_banking.list_banks(country, psu_type="personal")
+        except Exception as e:
+            logger.error("Banklijst ophalen mislukt (%s): %s", country, e)
+            error = error or f"Kan banklijst niet ophalen: {e}"
+    else:
+        error = error or "Enable Banking is niet geconfigureerd."
+
+    return templates.TemplateResponse(
+        "banking/connect.html",
+        {
+            "request": request, "user": user,
+            "connections": connections,
+            "banks": sorted(banks, key=lambda b: b.get("name", "").lower()),
+            "country": country,
+            "countries": CONNECT_COUNTRIES,
+            "error": error,
+        },
+    )
+
+
 @router.get("/connect")
-def connect_page(request: Request, db: Session = Depends(get_db)):
+def connect_page(request: Request, country: str = "NL", db: Session = Depends(get_db)):
     """Show available banks to connect."""
     user = require_login(request, db)
 
@@ -56,22 +94,8 @@ def connect_page(request: Request, db: Session = Depends(get_db)):
             {"request": request, "user": user, "banks": [], "connections": [], "restricted": True},
         )
 
-    if not _is_configured():
-        return templates.TemplateResponse(
-            "banking/connect.html",
-            {"request": request, "user": user, "connections": [], "error": "Enable Banking is niet geconfigureerd."},
-        )
-
-    # Get existing connections for this user
-    connections = db.query(BankConnection).filter(
-        BankConnection.user_id == user.id,
-        BankConnection.status.in_(["active", "pending"]),
-    ).all()
-
-    return templates.TemplateResponse(
-        "banking/connect.html",
-        {"request": request, "user": user, "connections": connections},
-    )
+    country = country.upper() if country.upper() in CONNECT_COUNTRIES else "NL"
+    return _render_connect(request, user, db, country=country)
 
 
 # ── Start authorization ─────────────────────────────────────────────────────
@@ -90,6 +114,22 @@ async def start_connect(request: Request, db: Session = Depends(get_db)):
     if not bank_name:
         return RedirectResponse("/banking/connect", status_code=302)
 
+    from app import enable_banking
+
+    # Enable Banking eist de exacte ASPSP-naam ("bunq", niet "Bunq") en geeft
+    # anders 422 WRONG_ASPSP_PROVIDED. Zoek daarom case-insensitief op en
+    # gebruik de canonieke naam uit de API.
+    try:
+        bank = enable_banking.find_bank(bank_name, bank_country)
+    except Exception as e:
+        return _render_connect(request, user, db, country=bank_country,
+                               error=f"Kan banklijst niet ophalen: {e}")
+    if not bank:
+        return _render_connect(request, user, db, country=bank_country,
+                               error=f"Bank '{bank_name}' niet gevonden voor {bank_country}. Kies een bank uit de lijst.")
+    bank_name = bank["name"]
+    valid_days = enable_banking.consent_days_for(bank)
+
     state = str(uuid.uuid4())
     redirect_url = f"{APP_URL}/banking/callback"
 
@@ -97,24 +137,20 @@ async def start_connect(request: Request, db: Session = Depends(get_db)):
     request.session["eb_state"] = state
     request.session["eb_bank_name"] = bank_name
     request.session["eb_bank_country"] = bank_country
+    request.session["eb_valid_days"] = valid_days
 
-    from app import enable_banking
     try:
         result = enable_banking.start_authorization(
             bank_name=bank_name,
             bank_country=bank_country,
             redirect_url=redirect_url,
             state=state,
+            valid_days=valid_days,
         )
     except Exception as e:
-        return templates.TemplateResponse(
-            "banking/connect.html",
-            {
-                "request": request, "user": user, "banks": [],
-                "connections": [],
-                "error": f"Kan autorisatie niet starten: {e}",
-            },
-        )
+        logger.error("Enable Banking /auth mislukt voor %s/%s: %s", bank_name, bank_country, e)
+        return _render_connect(request, user, db, country=bank_country,
+                               error=f"Kan autorisatie niet starten: {e}")
 
     # Create pending connection
     conn = BankConnection(
@@ -128,6 +164,22 @@ async def start_connect(request: Request, db: Session = Depends(get_db)):
     request.session["eb_connection_id"] = conn.id
 
     return RedirectResponse(result["url"], status_code=302)
+
+
+def _consent_valid_until(session_data: dict, fallback_days: int) -> datetime:
+    """Werkelijke consent-vervaldatum uit de sessie-response (access.valid_until,
+    ISO-8601 met tijdzone) als naïeve UTC — de kolom is timezone-loos en de
+    rest van de app gebruikt utcnow(). Valt terug op nu + fallback_days."""
+    raw = (session_data.get("access") or {}).get("valid_until")
+    if raw:
+        try:
+            parsed = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+            if parsed.tzinfo is not None:
+                parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
+            return parsed
+        except ValueError:
+            logger.warning("Onbegrijpelijke valid_until van Enable Banking: %r", raw)
+    return datetime.utcnow() + timedelta(days=fallback_days)
 
 
 # ── OAuth callback ──────────────────────────────────────────────────────────
@@ -207,11 +259,13 @@ def callback(request: Request, code: str = "", state: str = "", db: Session = De
         conn.session_id = session_id
         conn.accounts_json = json.dumps(enriched_accounts)
         conn.status = "active"
-        conn.valid_until = datetime.utcnow() + timedelta(days=90)
+        conn.valid_until = _consent_valid_until(
+            session_data, request.session.get("eb_valid_days") or enable_banking.DEFAULT_CONSENT_DAYS
+        )
         db.commit()
 
     # Clean up session
-    for key in ["eb_state", "eb_bank_name", "eb_bank_country", "eb_connection_id"]:
+    for key in ["eb_state", "eb_bank_name", "eb_bank_country", "eb_connection_id", "eb_valid_days"]:
         request.session.pop(key, None)
 
     return templates.TemplateResponse(

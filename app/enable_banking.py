@@ -37,14 +37,79 @@ def _headers() -> dict:
     return {"Authorization": f"Bearer {_make_jwt()}"}
 
 
+class EnableBankingError(requests.HTTPError):
+    """HTTP-fout van de Enable Banking API, inclusief de foutcode en
+    -melding uit de JSON-body (bv. WRONG_ASPSP_PROVIDED). De standaard
+    HTTPError toont alleen de status + reason ("422 Client Error: unknown"),
+    wat niets zegt over de werkelijke oorzaak."""
+
+    def __init__(self, response: requests.Response):
+        self.code = None
+        detail = ""
+        try:
+            body = response.json()
+            self.code = body.get("error")
+            parts = [p for p in (body.get("error"), body.get("message")) if p]
+            detail = " — ".join(parts)
+        except ValueError:
+            detail = (response.text or "")[:200]
+        msg = f"{response.status_code} {detail or 'onbekende fout'} (url: {response.url})"
+        super().__init__(msg, response=response)
+
+
+def _check(r: requests.Response) -> requests.Response:
+    """raise_for_status(), maar met de API-foutmelding in de exception."""
+    if not r.ok:
+        raise EnableBankingError(r)
+    return r
+
+
 # ── Public API helpers ──────────────────────────────────────────────────────
 
 
-def list_banks(country: str = "NL") -> list[dict]:
-    """Return list of available ASPSPs (banks) for a country."""
+DEFAULT_CONSENT_DAYS = 180
+
+
+def list_banks(country: str = "NL", psu_type: str | None = None) -> list[dict]:
+    """Return list of available ASPSPs (banks) for a country.
+
+    Met psu_type (bv. "personal") worden alleen banken teruggegeven die dat
+    type klant ondersteunen — een business-only bank geeft anders een 422
+    bij /auth."""
     r = requests.get(f"{API_BASE}/aspsps", params={"country": country}, headers=_headers())
-    r.raise_for_status()
-    return r.json().get("aspsps", [])
+    _check(r)
+    banks = r.json().get("aspsps", [])
+    if psu_type:
+        banks = [b for b in banks if psu_type in (b.get("psu_types") or [])]
+    return banks
+
+
+def _norm_name(name: str) -> str:
+    return " ".join(name.split()).casefold()
+
+
+def find_bank(name: str, country: str = "NL", banks: list[dict] | None = None) -> dict | None:
+    """Zoek een ASPSP op naam, ongevoelig voor hoofdletters en spaties.
+
+    Enable Banking eist bij /auth de exacte naam ("bunq", niet "Bunq") en
+    antwoordt anders met 422 WRONG_ASPSP_PROVIDED. Geeft het ASPSP-record
+    terug (met de canonieke naam) of None."""
+    wanted = _norm_name(name)
+    if not wanted:
+        return None
+    if banks is None:
+        banks = list_banks(country)
+    return next((b for b in banks if _norm_name(b.get("name", "")) == wanted), None)
+
+
+def consent_days_for(bank: dict | None, requested_days: int = DEFAULT_CONSENT_DAYS) -> int:
+    """Aantal dagen consent om aan te vragen, begrensd op het maximum van de
+    bank (maximum_consent_validity, in seconden). Een te lange geldigheid
+    wordt door de API geweigerd."""
+    max_seconds = (bank or {}).get("maximum_consent_validity")
+    if not max_seconds:
+        return requested_days
+    return max(1, min(requested_days, int(max_seconds) // 86400))
 
 
 def start_authorization(
@@ -52,10 +117,12 @@ def start_authorization(
     bank_country: str,
     redirect_url: str,
     state: str,
-    valid_days: int = 90,
+    valid_days: int = DEFAULT_CONSENT_DAYS,
     psu_type: str = "personal",
 ) -> dict:
-    """Start PSD2 authorization flow. Returns {url, authorization_id}."""
+    """Start PSD2 authorization flow. Returns {url, authorization_id}.
+
+    bank_name moet de exacte ASPSP-naam zijn — gebruik find_bank()."""
     body = {
         "access": {
             "valid_until": (datetime.now(timezone.utc) + timedelta(days=valid_days)).isoformat(),
@@ -69,41 +136,41 @@ def start_authorization(
         "psu_type": psu_type,
     }
     r = requests.post(f"{API_BASE}/auth", json=body, headers=_headers())
-    r.raise_for_status()
+    _check(r)
     return r.json()
 
 
 def create_session(code: str) -> dict:
     """Exchange authorization code for a session. Returns {session_id, accounts: [...]}."""
     r = requests.post(f"{API_BASE}/sessions", json={"code": code}, headers=_headers())
-    r.raise_for_status()
+    _check(r)
     return r.json()
 
 
 def get_session(session_id: str) -> dict:
     """Get session status and accounts."""
     r = requests.get(f"{API_BASE}/sessions/{session_id}", headers=_headers())
-    r.raise_for_status()
+    _check(r)
     return r.json()
 
 
 def delete_session(session_id: str) -> None:
     """Revoke consent and delete session."""
     r = requests.delete(f"{API_BASE}/sessions/{session_id}", headers=_headers())
-    r.raise_for_status()
+    _check(r)
 
 
 def get_account_details(account_uid: str) -> dict:
     """Get account holder info and IBAN."""
     r = requests.get(f"{API_BASE}/accounts/{account_uid}/details", headers=_headers())
-    r.raise_for_status()
+    _check(r)
     return r.json()
 
 
 def get_balances(account_uid: str) -> dict:
     """Get current balances for an account."""
     r = requests.get(f"{API_BASE}/accounts/{account_uid}/balances", headers=_headers())
-    r.raise_for_status()
+    _check(r)
     return r.json()
 
 
@@ -126,7 +193,7 @@ def get_transactions(
             params=params,
             headers=_headers(),
         )
-        r.raise_for_status()
+        _check(r)
         data = r.json()
         all_transactions.extend(data.get("transactions", []))
         continuation_key = data.get("continuation_key")

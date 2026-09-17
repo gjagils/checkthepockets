@@ -87,26 +87,37 @@
 <div class="card">
     <h2>Nieuwe bank koppelen</h2>
     <p style="margin-bottom:1rem; color:var(--muted);">
-        Voer de naam van je bank in om de koppeling te starten.
+        Kies je bank om de koppeling te starten.
         Je wordt doorgestuurd naar je bank om in te loggen en toestemming te geven.
     </p>
     <form method="post" action="/banking/connect" style="display:flex; gap:0.75rem; align-items:flex-end; flex-wrap:wrap;">
-        <div class="form-group" style="margin-bottom:0; flex:1; min-width:200px;">
-            <label for="bank_name">Banknaam</label>
-            <input type="text" id="bank_name" name="bank_name" placeholder="bijv. ABN AMRO, Bunq, ING..." required>
-        </div>
         <div class="form-group" style="margin-bottom:0; width:100px;">
             <label for="bank_country">Land</label>
-            <select id="bank_country" name="bank_country">
-                <option value="NL" selected>NL</option>
-                <option value="BE">BE</option>
-                <option value="DE">DE</option>
+            {# Land wisselen herlaadt de pagina met de banklijst van dat land #}
+            <select id="bank_country" name="bank_country" onchange="location.href='/banking/connect?country=' + encodeURIComponent(this.value)">
+                {% for c in countries %}
+                <option value="{{ c }}" {% if c == country %}selected{% endif %}>{{ c }}</option>
+                {% endfor %}
             </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0; flex:1; min-width:200px;">
+            <label for="bank_name">Bank</label>
+            {% if banks %}
+            <select id="bank_name" name="bank_name" required>
+                <option value="" disabled selected>Kies een bank…</option>
+                {% for bank in banks %}
+                <option value="{{ bank.name }}">{{ bank.name }}{% if bank.beta %} (beta){% endif %}</option>
+                {% endfor %}
+            </select>
+            {% else %}
+            {# Banklijst niet beschikbaar (API-fout) — vrije invoer als fallback, server matcht case-insensitief #}
+            <input type="text" id="bank_name" name="bank_name" placeholder="bijv. ABN AMRO, bunq, ING" required>
+            {% endif %}
         </div>
         <button type="submit" class="btn btn-primary" style="margin-bottom:0;">Koppelen</button>
     </form>
     <p style="margin-top:0.75rem; font-size:0.8rem; color:var(--muted);">
-        Let op: de bank moet eerst geautoriseerd zijn in het Enable Banking Control Panel.
+        De banklijst komt rechtstreeks van Enable Banking. Toegang blijft tot 180 dagen geldig (afhankelijk van de bank); daarna koppel je opnieuw.
     </p>
 </div>
 

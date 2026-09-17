@@ -231,3 +231,137 @@ def test_import_hash_unique():
     result = _map_eb_transactions(raw)
     assert len(result) == 2
     assert result[0].import_hash != result[1].import_hash
+
+
+# ── Bank lookup, consent-duur en foutmeldingen ─────────────────────────────
+
+
+_NL_BANKS = [
+    {"name": "bunq", "country": "NL", "psu_types": ["personal", "business"], "maximum_consent_validity": 15552000},
+    {"name": "ABN AMRO", "country": "NL", "psu_types": ["business", "personal"], "maximum_consent_validity": 15552000},
+    {"name": "Trade Republic", "country": "NL", "psu_types": ["personal"], "maximum_consent_validity": 7776000},
+    {"name": "BNG Bank", "country": "NL", "psu_types": ["business"], "maximum_consent_validity": 15552000},
+]
+
+
+def test_find_bank_is_case_insensitive():
+    """'Bunq' (zoals de oude placeholder suggereerde) moet 'bunq' opleveren —
+    de API weigert anders met 422 WRONG_ASPSP_PROVIDED."""
+    from app.enable_banking import find_bank
+
+    assert find_bank("Bunq", banks=_NL_BANKS)["name"] == "bunq"
+    assert find_bank("BUNQ", banks=_NL_BANKS)["name"] == "bunq"
+    assert find_bank("abn amro", banks=_NL_BANKS)["name"] == "ABN AMRO"
+
+
+def test_find_bank_normalizes_whitespace():
+    from app.enable_banking import find_bank
+
+    assert find_bank("  ABN   AMRO ", banks=_NL_BANKS)["name"] == "ABN AMRO"
+
+
+def test_find_bank_unknown_returns_none():
+    from app.enable_banking import find_bank
+
+    assert find_bank("Rabo", banks=_NL_BANKS) is None
+    assert find_bank("", banks=_NL_BANKS) is None
+    assert find_bank("   ", banks=_NL_BANKS) is None
+
+
+def test_list_banks_filters_on_psu_type():
+    from app.enable_banking import list_banks
+
+    class FakeResp:
+        ok = True
+        def json(self):
+            return {"aspsps": _NL_BANKS}
+
+    with patch("app.enable_banking.requests.get", return_value=FakeResp()), \
+         patch("app.enable_banking._headers", return_value={}):
+        names = [b["name"] for b in list_banks("NL", psu_type="personal")]
+
+    assert "bunq" in names and "ABN AMRO" in names
+    assert "BNG Bank" not in names  # business-only
+
+
+def test_consent_days_clamped_to_bank_maximum():
+    from app.enable_banking import consent_days_for, DEFAULT_CONSENT_DAYS
+
+    assert DEFAULT_CONSENT_DAYS == 180
+    assert consent_days_for(_NL_BANKS[0]) == 180          # 15552000s = 180d
+    assert consent_days_for(_NL_BANKS[2]) == 90           # Trade Republic: 7776000s = 90d
+    assert consent_days_for(None) == 180                  # onbekend → default
+    assert consent_days_for({"maximum_consent_validity": 0}) == 180
+    assert consent_days_for(_NL_BANKS[0], requested_days=30) == 30
+
+
+def test_enable_banking_error_includes_api_message():
+    """De exception moet de foutcode + melding uit de JSON-body bevatten, niet
+    alleen '422 Client Error: unknown'."""
+    from app.enable_banking import EnableBankingError, _check
+
+    class FakeResp:
+        ok = False
+        status_code = 422
+        url = "https://api.enablebanking.com/auth"
+        text = '{"code": 422, "message": "Wrong ASPSP name provided", "error": "WRONG_ASPSP_PROVIDED"}'
+        def json(self):
+            return {"code": 422, "message": "Wrong ASPSP name provided", "error": "WRONG_ASPSP_PROVIDED", "detail": None}
+
+    with pytest.raises(EnableBankingError) as exc:
+        _check(FakeResp())
+
+    assert exc.value.code == "WRONG_ASPSP_PROVIDED"
+    assert "Wrong ASPSP name provided" in str(exc.value)
+    assert "WRONG_ASPSP_PROVIDED" in str(exc.value)
+    assert "422" in str(exc.value)
+
+
+def test_enable_banking_error_non_json_body():
+    from app.enable_banking import EnableBankingError, _check
+
+    class FakeResp:
+        ok = False
+        status_code = 502
+        url = "https://api.enablebanking.com/sessions"
+        text = "<html>Bad Gateway</html>"
+        def json(self):
+            raise ValueError("not json")
+
+    with pytest.raises(EnableBankingError) as exc:
+        _check(FakeResp())
+
+    assert exc.value.code is None
+    assert "502" in str(exc.value)
+    assert "Bad Gateway" in str(exc.value)
+
+
+def test_check_returns_response_when_ok():
+    from app.enable_banking import _check
+
+    class FakeResp:
+        ok = True
+
+    r = FakeResp()
+    assert _check(r) is r
+
+
+def test_consent_valid_until_from_session_response():
+    """Gebruik de echte vervaldatum uit access.valid_until (met tijdzone) als
+    naïeve UTC; val terug op nu + fallback als het veld ontbreekt."""
+    from datetime import datetime, timedelta
+    from app.routers.banking import _consent_valid_until
+
+    dt = _consent_valid_until({"access": {"valid_until": "2026-12-01T10:30:00+02:00"}}, fallback_days=180)
+    assert dt == datetime(2026, 12, 1, 8, 30, 0)
+    assert dt.tzinfo is None
+
+    dt = _consent_valid_until({"access": {"valid_until": "2026-12-01T10:30:00Z"}}, fallback_days=180)
+    assert dt == datetime(2026, 12, 1, 10, 30, 0)
+
+    before = datetime.utcnow()
+    dt = _consent_valid_until({}, fallback_days=90)
+    assert timedelta(days=89, hours=23) < dt - before < timedelta(days=90, minutes=1)
+
+    dt = _consent_valid_until({"access": {"valid_until": "garbage"}}, fallback_days=10)
+    assert timedelta(days=9, hours=23) < dt - datetime.utcnow() < timedelta(days=10, minutes=1)
