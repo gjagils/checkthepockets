@@ -199,6 +199,7 @@
                 btn.setAttribute('aria-expanded', open ? 'true' : 'false');
                 drawer.setAttribute('aria-hidden', open ? 'false' : 'true');
                 document.body.classList.toggle('nav-drawer-open', open);
+                if (!open) btn.focus();
             }
             btn.addEventListener('click', function() { setOpen(!drawer.classList.contains('open')); });
             drawer.querySelectorAll('[data-drawer-close]').forEach(function(el) {
