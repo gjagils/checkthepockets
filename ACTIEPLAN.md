@@ -60,7 +60,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-22a | P3 | Afgerond | ACT-02 | [Pure plannings- en spaarregels in eigen modules](#act-22) |
 | ACT-22b | P3 | Afgerond | ACT-22a | [Projecties en koppelingen naar een service](#act-22) |
 | ACT-23 | P3 | Bezig | ACT-02 | [Hypotheeklogica opsplitsen](#act-23) |
-| ACT-23a | P3 | Review | ACT-02 | [Leningdeel- en variantberekening naar mortgage_calc](#act-23) |
+| ACT-23a | P3 | Afgerond | ACT-02 | [Leningdeel- en variantberekening naar mortgage_calc](#act-23) |
 | ACT-23b | P3 | Gereed | ACT-23a | [Scenariovergelijking uit de detailroute](#act-23) |
 | ACT-24 | P2 | Afgerond | ACT-02 | [Gerichte foutafhandeling en logging](#act-24) |
 | ACT-24a | P2 | Afgerond | ACT-02 | [Twee stille fouten loggen (PR #174)](#act-24) |
@@ -309,14 +309,14 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 | Veld | Waarde |
 |---|---|
 | Actie | ACT-23a — leningdeel- en variantberekening naar mortgage_calc |
-| Status | Review |
+| Status | Afgerond |
 | Uitvoerder / datum | Claude Code / 2026-09-23 |
-| Branch / PR | `codex/act-23a-mortgage-calc`; PR volgt |
+| Branch / PR | `codex/act-23a-mortgage-calc`; [PR #186](https://github.com/gjagils/checkthepockets/pull/186) gemerged (`d16d38c`) |
 | Budget bij start | Claude Code usage-weergave (get_usage), 2026-09-23 13:45: 5-uurslimiet 25% gebruikt, week 42% gebruikt; extra usage uit. ACT-23 gesplitst in 23a/23b vóór de start. |
 | Uitgevoerd | `em_rate_for_date`, `existing_mortgage_yearly_gross`, `existing_mortgage_yearly_interest` en `variant_stats` staan nu in app/mortgage_calc.py (letterlijk, publieke namen, modelannotaties alleen voor typecontrole). De route roept ze aan via `mortgage_calc`. |
 | Validatie | Golden master: dezelfde 4 leningdelen × 4 jaren en 4 varianten met vaste datum 2026-09-23 geven byte-identieke uitvoer op main en branch (5269 bytes, incl. 30-jaarsreeksen). `python -m pytest tests/ --tb=short`: 469 passed, 2 skipped (live Enable Banking), 2820 warnings. Nieuw: tests/test_mortgage_variant_stats.py. |
 | Openstaand | ACT-23b. ACT-08, ACT-15 en ACT-25 vragen handelingen van de gebruiker. |
-| Volgende stap | Na groene CI mergen, ACT-23a op Afgerond; daarna ACT-23b na budgetcontrole. |
+| Volgende stap | ACT-23b na budgetcontrole. |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,
@@ -355,3 +355,4 @@ Voeg per afgeronde actie of overdracht een regel toe. Git bevat de volledige his
 | 2026-09-23 | ACT-24 | Operationele fouten gelogd zonder bank-ID's; inventarisatie in docs/ERROR-HANDLING.md | [PR #174](https://github.com/gjagils/checkthepockets/pull/174) en [PR #180](https://github.com/gjagils/checkthepockets/pull/180), beide checks groen; merge `6acc298`; productievalidatie loginhoud open |
 | 2026-09-23 | ACT-22a | Plannings- en spaarregels in app/recurring_schedule.py en app/savings_calc.py | [PR #182](https://github.com/gjagils/checkthepockets/pull/182), beide checks groen; merge `dc39afa` |
 | 2026-09-23 | ACT-22 | Planningsregels, spaarberekeningen, projecties en koppelingen buiten de routers | [PR #182](https://github.com/gjagils/checkthepockets/pull/182) en [PR #184](https://github.com/gjagils/checkthepockets/pull/184), beide checks groen; merge `90e6b88` |
+| 2026-09-23 | ACT-23a | Leningdeel- en variantberekening in app/mortgage_calc.py, uitkomsten identiek | [PR #186](https://github.com/gjagils/checkthepockets/pull/186), beide checks groen; merge `d16d38c` |
