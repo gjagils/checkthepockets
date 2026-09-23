@@ -8,14 +8,13 @@ Bijwerken gebeurt in Git; een externe tracker of chatgeschiedenis is niet nodig.
 
 - De repository-inrichting is gemerged via PR #134 (a65a899).
 - De gebruiker heeft alle verbeteracties vrijgegeven op 2026-09-23, onder de budgetvoorwaarde uit docs/WORKFLOW.md.
-- ACT-01 wordt uitgevoerd; overige acties wachten op afhankelijkheden en budgetcontrole.
+- ACT-01 t/m ACT-07, ACT-09 t/m ACT-14, ACT-16 t/m ACT-24 en ACT-26 zijn afgerond.
+- Open en afhankelijk van de gebruiker: ACT-08 (rotatie van blootgestelde geheimen),
+  ACT-15 (restoreproef op een geïsoleerde NAS-omgeving) en ACT-25 (bunq-rekeningen
+  controleren met een geautoriseerde Enable Banking-koppeling).
 - Bestaande Linear-issues zijn niet geïmporteerd of gecontroleerd op overlap.
-- Analyse betrof code, templates, CI/CD en lokale tests; geen live productieaudit
-  of volledige visuele gebruikerstest.
-- Lokale nulmeting: 286 geslaagd, 121 gefaald, 2330 waarschuwingen. Omgeving:
-  Python 3.14, FastAPI 0.135.3, Starlette 1.0.0, afwijkend van CI/requirements.
-  Twee geïsoleerd onderzochte fouten traden op bij templaterendering. De overige
-  fouten zijn nog niet allemaal verklaard; dit is geen productieoordeel.
+- Testsuite in de vastgelegde Python 3.12-omgeving: 476 geslaagd, 2 bewust
+  overgeslagen live-tests. Productievalidatie na uitrol is per actie vermeld.
 
 ## Status en prioriteit
 
@@ -59,9 +58,9 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-22 | P3 | Afgerond | ACT-02 | [Spaar- en terugkerende logica opsplitsen](#act-22) |
 | ACT-22a | P3 | Afgerond | ACT-02 | [Pure plannings- en spaarregels in eigen modules](#act-22) |
 | ACT-22b | P3 | Afgerond | ACT-22a | [Projecties en koppelingen naar een service](#act-22) |
-| ACT-23 | P3 | Review | ACT-02 | [Hypotheeklogica opsplitsen](#act-23) |
+| ACT-23 | P3 | Afgerond | ACT-02 | [Hypotheeklogica opsplitsen](#act-23) |
 | ACT-23a | P3 | Afgerond | ACT-02 | [Leningdeel- en variantberekening naar mortgage_calc](#act-23) |
-| ACT-23b | P3 | Review | ACT-23a | [Scenariovergelijking uit de detailroute](#act-23) |
+| ACT-23b | P3 | Afgerond | ACT-23a | [Scenariovergelijking uit de detailroute](#act-23) |
 | ACT-24 | P2 | Afgerond | ACT-02 | [Gerichte foutafhandeling en logging](#act-24) |
 | ACT-24a | P2 | Afgerond | ACT-02 | [Twee stille fouten loggen (PR #174)](#act-24) |
 | ACT-24b | P2 | Afgerond | ACT-24a | [Inventarisatie, overige excepts en foutinjectie](#act-24) |
@@ -309,14 +308,14 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 | Veld | Waarde |
 |---|---|
 | Actie | ACT-23b — scenariovergelijking uit de detailroute |
-| Status | Review |
+| Status | Afgerond |
 | Uitvoerder / datum | Claude Code / 2026-09-23 |
-| Branch / PR | `codex/act-23b-scenario-comparison`; PR volgt |
+| Branch / PR | `codex/act-23b-scenario-comparison`; [PR #188](https://github.com/gjagils/checkthepockets/pull/188) gemerged (`d149d9a`) |
 | Budget bij start | Claude Code usage-weergave (get_usage), 2026-09-23 13:47: 5-uurslimiet 29% gebruikt, week 43% gebruikt; extra usage uit. |
 | Uitgevoerd | Nieuwe functies in app/mortgage_calc.py: `bridge_cost_summary`, `default_variant_summary`, `mortgage_budget_sum`, `scenario_monthly_total`, `variant_leftovers`, `add_variant_comparison`, `variant_chart_series`. `scenarios_detail` haalt alleen nog gegevens op, roept deze functies aan en rendert (rekenblok 316 → 104 regels). Een dode tussentoewijzing van `first_5y_refund` is vervallen. |
 | Validatie | Golden master van de volledige templatecontext (96 KB: 4 varianten waarvan één zonder rente, overbrugging, bestaande leningdelen, budget met hypotheekcategorie, bijdragen) en van het terugvalpad zonder rentetabel: byte-identiek op main en branch. `python -m pytest tests/ --tb=short`: 476 passed, 2 skipped (live Enable Banking), 2820 warnings. Nieuw: tests/test_mortgage_scenario_comparison.py. |
 | Openstaand | ACT-08 (rotatie van geheimen), ACT-15 (restoreproef op NAS) en ACT-25 (bunq-accountlijst met geautoriseerde koppeling) vragen handelingen of toegang van de gebruiker. |
-| Volgende stap | Na groene CI mergen en ACT-23 op Afgerond zetten. |
+| Volgende stap | Gebruiker: ACT-08-rotatie, ACT-15-restoreproef of ACT-25-accountlijst aanleveren; daarna kan de uitvoering verder. |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,
@@ -356,3 +355,4 @@ Voeg per afgeronde actie of overdracht een regel toe. Git bevat de volledige his
 | 2026-09-23 | ACT-22a | Plannings- en spaarregels in app/recurring_schedule.py en app/savings_calc.py | [PR #182](https://github.com/gjagils/checkthepockets/pull/182), beide checks groen; merge `dc39afa` |
 | 2026-09-23 | ACT-22 | Planningsregels, spaarberekeningen, projecties en koppelingen buiten de routers | [PR #182](https://github.com/gjagils/checkthepockets/pull/182) en [PR #184](https://github.com/gjagils/checkthepockets/pull/184), beide checks groen; merge `90e6b88` |
 | 2026-09-23 | ACT-23a | Leningdeel- en variantberekening in app/mortgage_calc.py, uitkomsten identiek | [PR #186](https://github.com/gjagils/checkthepockets/pull/186), beide checks groen; merge `d16d38c` |
+| 2026-09-23 | ACT-23 | Leningdeel-, variant- en scenariovergelijking in app/mortgage_calc.py; routes renderen alleen | [PR #186](https://github.com/gjagils/checkthepockets/pull/186) en [PR #188](https://github.com/gjagils/checkthepockets/pull/188), beide checks groen; merge `d149d9a` |
