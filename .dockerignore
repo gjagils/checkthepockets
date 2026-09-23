@@ -9,3 +9,9 @@ __pycache__
 .pytest_cache
 tests
 .venv
+*.pem
+keys/
+stack.env
+.agents/
+.codex/
+.claude/

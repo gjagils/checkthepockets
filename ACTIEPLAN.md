@@ -42,7 +42,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-05 | P1 | Afgerond | ACT-01 | [Veilige configuratie en cookies](#act-05) |
 | ACT-06 | P1 | Afgerond | ACT-01 | [CSRF-bescherming controleren en aanvullen](#act-06) |
 | ACT-07 | P1 | Afgerond | ACT-01, ACT-03 | [Encryptie zonder stille terugval](#act-07) |
-| ACT-08 | P1 | Gepland | — | [Geheimen en Docker-buildcontext opschonen](#act-08) |
+| ACT-08 | P1 | Bezig | — | [Geheimen en Docker-buildcontext opschonen](#act-08) |
 | ACT-09 | P1 | Gepland | ACT-02, ACT-03 | [Rekeninggebonden importherkenning](#act-09) |
 | ACT-10 | P2 | Gepland | ACT-09 | [Importbatches en resultaatrapport](#act-10) |
 | ACT-11 | P2 | Gepland | ACT-10 | [Import veilig terugdraaien](#act-11) |
@@ -284,15 +284,15 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 
 | Veld | Waarde |
 |---|---|
-| Actie | ACT-07 — encryptie zonder stille terugval |
-| Status | Afgerond |
+| Actie | ACT-08 — geheimen en Docker-buildcontext opschonen |
+| Status | Bezig |
 | Uitvoerder / datum | Codex / 2026-09-23 |
-| Branch / PR | `codex/act-07-encryptie`; [PR #146](https://github.com/gjagils/checkthepockets/pull/146), gemerged in `a2bc34c` |
-| Budget bij start | 73% resterend in vijf uur; 96% per week; 0 resetcredits. Afgebakend op encryptiefouten, geldige productiesleutel en regressietests. |
-| Uitgevoerd | Encryptie weigert platte fallback bij configuratie-/encryptiefouten; corrupte ciphertext wordt niet als legacytekst geaccepteerd; productie valideert Fernet-sleutel; tests toegevoegd. |
-| Validatie | Gerichte tests 5 geslaagd; lokale volledige suite 414 passed, 2 skipped, 2705 warnings in 45.86s; normale CI groen in 1m43s en PostgreSQL-check groen in 58s. |
-| Openstaand | Geen ACT-07-werk. |
-| Volgende stap | Voor ACT-08 limieten opnieuw controleren; daarna geheimen en Docker-buildcontext opschonen. |
+| Branch / PR | `codex/act-08-secrets-buildcontext`; PR volgt |
+| Budget bij start | 72% resterend in vijf uur; 96% per week; 0 resetcredits. Afgebakend op tracking en buildcontext; secret-rotatie blijft beheeractie. |
+| Uitgevoerd | `.dockerignore` sluit PEM-sleutels, keys en agentmappen uit; `stack.env` wordt uit Git-index verwijderd zonder lokaal bestand te wissen. Historie en rotatie worden geredigeerd gerapporteerd. |
+| Validatie | Tracking/buildcontext-controle en `git diff --check` volgen; geen geheimwaarden in logs of documentatie. |
+| Openstaand | PR/CI en status bepalen; eventuele secret-rotatie moet buiten deze codewijziging door beheer worden uitgevoerd. |
+| Volgende stap | Committen/pushen en controleren dat stack.env niet meer tracked is en PEM-bestanden niet in context vallen. |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,
