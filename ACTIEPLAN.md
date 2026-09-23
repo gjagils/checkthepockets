@@ -55,7 +55,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-18 | P2 | Afgerond | ACT-16 | [Herkomst en actualiteit van bedragen](#act-18) |
 | ACT-19 | P2 | Afgerond | ACT-16 | [Navigatie, foutmeldingen en lege schermen](#act-19) |
 | ACT-20 | P2 | Afgerond | ACT-17, ACT-18, ACT-19 | [Toegankelijkheid en mobiele eindcontrole](#act-20) |
-| ACT-21 | P3 | Review | ACT-02 | [Importlogica afzonderlijk testbaar maken](#act-21) |
+| ACT-21 | P3 | Afgerond | ACT-02 | [Importlogica afzonderlijk testbaar maken](#act-21) |
 | ACT-22 | P3 | Gepland | ACT-02 | [Spaar- en terugkerende logica opsplitsen](#act-22) |
 | ACT-23 | P3 | Gepland | ACT-02 | [Hypotheeklogica opsplitsen](#act-23) |
 | ACT-24 | P2 | Gepland | ACT-02 | [Gerichte foutafhandeling en logging](#act-24) |
@@ -286,14 +286,14 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 | Veld | Waarde |
 |---|---|
 | Actie | ACT-21b — CSV-bevestiging via gedeelde importservice |
-| Status | Review |
+| Status | Afgerond |
 | Uitvoerder / datum | Claude Code / 2026-09-23 |
-| Branch / PR | `codex/act-21b-csv-import-service`; PR volgt |
+| Branch / PR | `codex/act-21b-csv-import-service`; [PR #175](https://github.com/gjagils/checkthepockets/pull/175) gemerged (`df98838`) |
 | Budget bij start | Claude Code usage-weergave (get_usage), 2026-09-23 12:56: 5-uurslimiet 2% gebruikt, week 39% gebruikt; extra usage uit. Afgebakend op CSV-opslag, tests, CI en merge. |
 | Uitgevoerd | `store_confirmed_csv_rows` in app/import_service.py deelt duplicaatcontrole per rekening en transactieopbouw met bankimport/scheduler; `/import/confirm` doet alleen HTTP, rekening, batch en nabewerking. CSV-gedrag ongewijzigd: duplicaat vóór validatie, afkeuren bij ongeldige datum/bedrag, CSV-categorie gaat vóór regels. `ImportResult` telt nu ook `rejected`. |
 | Validatie | Python 3.12.11, `pip check` en `scripts/check_environment.py` schoon; `python -m pytest tests/ --tb=short`: 420 passed, 2 skipped (live Enable Banking), 2741 warnings. Nieuw: tests/test_import_service.py (bank/scheduler-opslag, CSV-rijen, route en herhaalde bevestiging). |
 | Openstaand | Bevinding buiten scope: CSV-voorbeeld (`/import`, `/import/map`) markeert duplicaten op basis van `import_hash` van álle gebruikers; de opslag zelf is correct per rekening. ACT-24 heeft PR #174 gemerged maar staat nog op Gepland. ACT-15 vereist nog een echte geïsoleerde NAS-restoreproef. |
-| Volgende stap | Na groene CI squash-mergen, daarna ACT-21 op Afgerond zetten in een statuscommit. |
+| Volgende stap | Productievalidatie van de CSV-import na uitrol staat nog open. Volgende kandidaat: ACT-24-status bijwerken of ACT-22/ACT-23 oppakken na budgetcontrole. |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,
@@ -325,3 +325,4 @@ Voeg per afgeronde actie of overdracht een regel toe. Git bevat de volledige his
 | 2026-09-23 | ACT-06 | Cross-origin mutaties geblokkeerd in productie | [PR #144](https://github.com/gjagils/checkthepockets/pull/144), beide checks groen; merge `d2292f0` |
 | 2026-09-23 | ACT-07 | Encryptie faalt gesloten bij sleutel-, encryptie- en decryptiefouten | [PR #146](https://github.com/gjagils/checkthepockets/pull/146), beide checks groen; merge `a2bc34c` |
 | 2026-09-23 | ACT-08 | stack.env uit tracking en gevoelige bestanden uit Dockercontext | [PR #148](https://github.com/gjagils/checkthepockets/pull/148), beide checks groen; merge `5d0b678`; secret-rotatie open |
+| 2026-09-23 | ACT-21 | CSV-bevestiging, bank-sync en scheduler gebruiken één importservice | [PR #171](https://github.com/gjagils/checkthepockets/pull/171) en [PR #175](https://github.com/gjagils/checkthepockets/pull/175), beide checks groen; merge `df98838`; productievalidatie open |
