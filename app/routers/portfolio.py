@@ -9,6 +9,7 @@ from app.database import get_db
 from app.models import PortfolioAsset, Person, PortfolioHolding, PortfolioPriceSnapshot
 from app.auth import require_login
 from app.capital_dashboard import build_capital_dashboard
+from app.wealth_plan_service import capture_wealth_plan, WealthPlanConfirmationRequired
 from app.portfolio_prices import (
     fetch_price,
     fetch_historical_prices,
@@ -243,6 +244,25 @@ def capital_dashboard(
             "selected": selected,
         },
     )
+
+
+@router.post("/wealth-plan/{year}/capture")
+def capture_yearly_wealth_plan(
+    year: int,
+    request: Request,
+    confirmed: bool = Form(False),
+    db: Session = Depends(get_db),
+):
+    """Capture a yearly baseline; overwriting needs an explicit confirmation."""
+    user = require_login(request, db)
+    try:
+        capture_wealth_plan(db, user.id, year, replace=confirmed)
+        db.commit()
+    except WealthPlanConfirmationRequired:
+        return JSONResponse(
+            {"ok": False, "confirmation_required": True}, status_code=409,
+        )
+    return JSONResponse({"ok": True, "year": year})
 
 
 @router.post("/persons")

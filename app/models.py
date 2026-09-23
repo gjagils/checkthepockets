@@ -64,6 +64,7 @@ class User(Base):
     portfolio_assets = relationship("PortfolioAsset", back_populates="user", cascade="all, delete-orphan")
     persons = relationship("Person", back_populates="user", cascade="all, delete-orphan")
     portfolio_holdings = relationship("PortfolioHolding", back_populates="user", cascade="all, delete-orphan")
+    wealth_plans = relationship("WealthPlan", back_populates="user", cascade="all, delete-orphan")
     networth_accounts = relationship("NetWorthAccount", back_populates="user", cascade="all, delete-orphan")
     networth_snapshots = relationship("NetWorthSnapshot", back_populates="user", cascade="all, delete-orphan")
     budget_presets = relationship("BudgetPreset", back_populates="user", cascade="all, delete-orphan")
@@ -772,6 +773,42 @@ class PortfolioPriceSnapshot(Base):
     __table_args__ = (
         UniqueConstraint("asset_id", "year", "month", name="uq_price_snapshot_asset_year_month"),
     )
+
+
+class WealthPlan(Base):
+    """Frozen January baseline for a user's yearly wealth forecast."""
+
+    __tablename__ = "wealth_plans"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    year = Column(Integer, nullable=False)
+    captured_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    captured_automatically = Column(Integer, default=0, nullable=False)
+
+    user = relationship("User", back_populates="wealth_plans")
+    entries = relationship("WealthPlanEntry", back_populates="plan", cascade="all, delete-orphan")
+
+    __table_args__ = (UniqueConstraint("user_id", "year", name="uq_wealth_plan_user_year"),)
+
+
+class WealthPlanEntry(Base):
+    """A person's frozen opening-of-month portfolio and savings values."""
+
+    __tablename__ = "wealth_plan_entries"
+
+    id = Column(Integer, primary_key=True)
+    plan_id = Column(Integer, ForeignKey("wealth_plans.id", ondelete="CASCADE"), nullable=False, index=True)
+    person_id = Column(Integer, ForeignKey("persons.id", ondelete="CASCADE"), nullable=False, index=True)
+    month = Column(Integer, nullable=False)
+    portfolio_amount = Column(Numeric(14, 2), nullable=False, default=0)
+    savings_amount = Column(Numeric(14, 2), nullable=False, default=0)
+    total_amount = Column(Numeric(14, 2), nullable=False, default=0)
+
+    plan = relationship("WealthPlan", back_populates="entries")
+    person = relationship("Person")
+
+    __table_args__ = (UniqueConstraint("plan_id", "person_id", "month", name="uq_wealth_plan_entry_month"),)
 
 
 class SchedulerRunLog(Base):
