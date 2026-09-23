@@ -47,4 +47,6 @@ worden. ACT-13 en ACT-14 automatiseren dit verder.
 Bij herstel eerst beoordelen of het databaseschema compatibel is met de vorige
 image. Een oude image terugzetten is niet vanzelf een veilige migratierollback.
 De huidige [backupinstructie](../app/docs/admin/backup-restore.nl.md) is een
-uitgangspunt; ACT-15 vereist een daadwerkelijk uitgevoerde hersteltest.
+uitgangspunt. De [restoreproef](BACKUP-RESTORE-DRILL.md) beschrijft de vaste
+controlepunten en het beheerlog; een proef moet door een bevoegde beheerder
+worden uitgevoerd en geregistreerd.
