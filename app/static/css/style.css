@@ -901,6 +901,10 @@ tfoot td { background: var(--surface-2); border-top: 1px solid var(--border); fo
 .savings-cell:hover { background: var(--orange-bg) !important; }
 .savings-cell.cell-nolink { cursor: default; }
 .savings-cell.cell-nolink:hover { background: transparent !important; }
+.savings-cell.cell-editable { cursor: text; }
+.savings-cell.cell-editable:hover .cell-display { text-decoration: underline dotted; text-underline-offset: 3px; }
+.savings-cell.cell-editable:focus { outline: 2px solid var(--sky); outline-offset: -2px; }
+.savings-cell.cell-saving { opacity: 0.6; }
 
 /* Spaarcel-statussen — actual vs verwacht. Iets verzadigder zodat de kleuren
    van een afstand goed leesbaar zijn maar geen print-ink zijn. */

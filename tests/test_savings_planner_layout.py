@@ -79,3 +79,69 @@ def test_each_line_renders_on_one_row_with_hover_actions(planner):
     assert "line-head-row" not in html
     cell = re.search(r'<div class="line-cell[^"]*">(.*?)</div>\s*</div>', html, re.S).group(1)
     assert "Maandelijks sparen" in cell and 'title="Bewerken"' in cell
+
+
+def _entry_id(plan_id, line_name, month):
+    db = SessionLocal()
+    try:
+        return (
+            db.query(SavingsEntry.id)
+            .join(SavingsLine)
+            .filter(SavingsLine.plan_id == plan_id, SavingsLine.name == line_name, SavingsEntry.month == month)
+            .scalar()
+        )
+    finally:
+        db.close()
+
+
+def test_future_cell_update_recalculates_and_makes_line_irregular(planner):
+    client, plan_id = planner
+    entry_id = _entry_id(plan_id, "Vakantie", 3)
+
+    response = client.post("/savings/entries/update", data={"entry_id": entry_id, "amount": "1.250,50"})
+
+    data = response.json()
+    assert response.status_code == 200 and data["ok"]
+    assert data["amount"] == 1250.5
+    assert data["frequency"] == "custom"
+    assert data["running_balances"]["3"] == 1000 + 3 * 200 - 1250.5
+    assert data["movements"]["3"] == 200 - 1250.5
+    assert data["movements"]["7"] == 200 - 1500
+    assert data["line_total"] == 1500 + 1250.5
+
+    cleared = client.post("/savings/entries/update", data={"entry_id": entry_id, "amount": ""}).json()
+    assert cleared["amount"] is None and cleared["line_total"] == 1500
+
+    html = client.get(f"/savings/{plan_id}").text
+    assert html.count(' cell-editable"') == 24  # every month is in the future for plan year 2030
+
+
+def test_cell_update_rejects_invalid_amount_and_other_users(planner):
+    client, plan_id = planner
+    entry_id = _entry_id(plan_id, "Vakantie", 3)
+
+    assert client.post("/savings/entries/update", data={"entry_id": entry_id, "amount": "abc"}).status_code == 400
+
+    db = SessionLocal()
+    other = User(username="planner-other", password_hash="x")
+    db.add(other)
+    db.commit()
+    other_client = TestClient(app, follow_redirects=False)
+    other_client.cookies.set("session", create_session_cookie(other.id))
+    db.close()
+    assert other_client.post("/savings/entries/update", data={"entry_id": entry_id, "amount": "1"}).status_code == 404
+
+
+def test_past_months_are_not_editable(planner):
+    client, plan_id = planner
+    db = SessionLocal()
+    plan = db.get(SavingsPlan, plan_id)
+    plan.year = 2020
+    db.commit()
+    db.close()
+    entry_id = _entry_id(plan_id, "Vakantie", 7)
+
+    response = client.post("/savings/entries/update", data={"entry_id": entry_id, "amount": "10"})
+
+    assert response.status_code == 409
+    assert ' cell-editable"' not in client.get(f"/savings/{plan_id}").text

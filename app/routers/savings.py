@@ -705,6 +705,36 @@ def add_line(
     return RedirectResponse(f"/savings/{plan_id}", status_code=302)
 
 
+def _parse_cell_amount(raw: str) -> Decimal | None:
+    """Bedrag uit een cel: leeg of '-' = niet ingepland; '1.234,56' en '12,50' mogen."""
+    value = (raw or "").strip().replace("\u20ac", "").replace(" ", "")
+    if value in ("", "-"):
+        return None
+    if "," in value:
+        value = value.replace(".", "").replace(",", ".")
+    return Decimal(value)
+
+
+def _plan_balances(db: Session, plan: SavingsPlan) -> tuple[Decimal, dict[int, Decimal]]:
+    """Effectief startsaldo en lopend saldo per maand, zoals de detailpagina ze toont."""
+    start = plan.starting_balance or Decimal("0")
+    if plan.source_plan_id:
+        source = db.query(SavingsPlan).filter(
+            SavingsPlan.id == plan.source_plan_id, SavingsPlan.user_id == plan.user_id,
+        ).first()
+        if source:
+            start = _compute_december_balance(db, source)
+    balance = start
+    balances = {}
+    for m in range(1, 13):
+        for line in plan.lines:
+            entry = next((e for e in line.entries if e.month == m), None)
+            if entry and entry.amount is not None:
+                balance += abs(entry.amount) if line.is_income else -abs(entry.amount)
+        balances[m] = balance
+    return start, balances
+
+
 @router.post("/entries/update")
 def update_entry(
     request: Request,
@@ -712,23 +742,13 @@ def update_entry(
     amount: str = Form(""),
     db: Session = Depends(get_db),
 ):
-    """Legacy AJAX endpoint — handmatig bewerken is uitgeschakeld.
-    Bedragen komen nu altijd uit de gekoppelde transacties."""
-    return JSONResponse(
-        {"error": "Bedragen worden automatisch uit transacties berekend en zijn niet handmatig bewerkbaar."},
-        status_code=410,
-    )
+    """Bedrag van een toekomstige maand direct in de cel aanpassen (ACT-27b).
 
-
-def _unused_update_entry(
-    request: Request,
-    entry_id: int = Form(...),
-    amount: str = Form(""),
-    db: Session = Depends(get_db),
-):
-    """Oorspronkelijke implementatie, uitgeschakeld. Bewaard voor referentie."""
+    Verleden en lopende maand volgen de werkelijke transacties en zijn niet
+    bewerkbaar. Een aangepaste maand maakt de regel 'onregelmatig' zodat het
+    vaste schema de overige maanden niet meer bepaalt.
+    """
     user = require_login(request, db)
-
     entry = (
         db.query(SavingsEntry)
         .join(SavingsLine)
@@ -739,101 +759,46 @@ def _unused_update_entry(
     if not entry:
         return JSONResponse({"error": "Niet gevonden"}, status_code=404)
 
-    plan = entry.line.plan
-
-    today = datetime.date.today()
-    amount_str = amount.strip().replace(",", ".")
-    new_amount: Decimal | None
-    if amount_str == "" or amount_str == "-":
-        new_amount = None
-    else:
-        try:
-            new_amount = Decimal(amount_str)
-        except (InvalidOperation, ValueError):
-            return JSONResponse({"error": "Ongeldig bedrag"}, status_code=400)
-
-    entry.amount = new_amount
-
-    # Propagate to future forecast cells in the same line:
-    # only cells that still match the previous default (i.e. weren't manually set)
-    # AND are still 'forecast' get updated. Cells with actuals are left alone.
-    for sibling in entry.line.entries:
-        if sibling.id == entry.id:
-            continue
-        if sibling.month <= entry.month:
-            continue
-        if sibling.status != "forecast":
-            continue
-        if sibling.amount is None:
-            continue
-        sibling.amount = new_amount
-
-    # Refresh statuses for ALL entries in this line met de nieuwe color-logic.
     line = entry.line
-    is_inc = bool(line.is_income)
-    if line.category_id:
-        tx_totals = _get_transaction_totals_by_month(
-            db, plan.account_id, plan.year, line.category_id
+    plan = line.plan
+    today = datetime.date.today()
+    if (plan.year, entry.month) <= (today.year, today.month):
+        return JSONResponse(
+            {"error": "Alleen toekomstige maanden zijn aan te passen; eerdere maanden volgen de transacties."},
+            status_code=409,
         )
-    else:
-        tx_totals = {}
+    try:
+        new_amount = _parse_cell_amount(amount)
+    except (InvalidOperation, ValueError):
+        return JSONResponse({"error": "Ongeldig bedrag"}, status_code=400)
+    if new_amount is not None:
+        new_amount = abs(new_amount)
 
-    for e in line.entries:
-        actual = tx_totals.get(e.month) if line.category_id else e.amount
-        expected = line.default_amount if line.category_id else e.amount
-        e.status = determine_color_status(
-            actual, expected, is_inc, e.month, plan.year, today,
-        )
-
+    if entry.amount != new_amount:
+        entry.amount = new_amount
+        if line.frequency != "custom":
+            line.frequency = "custom"
+    entry.status = determine_color_status(
+        new_amount, new_amount, bool(line.is_income), entry.month, plan.year, today,
+    )
     db.commit()
 
-    # Recalculate line total (always positive display)
-    line_total = sum(
-        (abs(e.amount) for e in entry.line.entries if e.amount is not None),
-        Decimal("0"),
-    )
-
-    # Build per-entry update info so the frontend can refresh other cells too
-    entries_payload = [
-        {
-            "id": e.id,
-            "month": e.month,
-            "amount": float(e.amount) if e.amount is not None else None,
-            "status": e.status,
-        }
-        for e in entry.line.entries
-    ]
-
-    # Recalculate full running balance
-    all_lines = (
-        db.query(SavingsLine)
-        .options(joinedload(SavingsLine.entries))
-        .filter(SavingsLine.plan_id == plan.id)
-        .all()
-    )
-    balance = plan.starting_balance or Decimal("0")
-    running_balances = {}
+    start, balances = _plan_balances(db, plan)
+    previous = start
+    movements = {}
     for m in range(1, 13):
-        month_total = Decimal("0")
-        for ln in all_lines:
-            e = next((x for x in ln.entries if x.month == m), None)
-            if e and e.amount is not None:
-                if ln.is_income:
-                    month_total += abs(e.amount)
-                else:
-                    month_total -= abs(e.amount)
-        balance += month_total
-        running_balances[m] = float(balance)
-
+        movements[m] = float(balances[m] - previous)
+        previous = balances[m]
+    line_total = sum((abs(e.amount) for e in line.entries if e.amount is not None), Decimal("0"))
     return JSONResponse({
         "ok": True,
         "entry_id": entry.id,
-        "amount": float(entry.amount) if entry.amount is not None else None,
-        "status": entry.status,
+        "amount": float(new_amount) if new_amount is not None else None,
+        "line_id": line.id,
         "line_total": float(line_total),
-        "line_id": entry.line_id,
-        "entries": entries_payload,
-        "running_balances": running_balances,
+        "frequency": line.frequency,
+        "running_balances": {m: float(v) for m, v in balances.items()},
+        "movements": movements,
     })
 
 
