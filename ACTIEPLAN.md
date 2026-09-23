@@ -55,7 +55,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-18 | P2 | Afgerond | ACT-16 | [Herkomst en actualiteit van bedragen](#act-18) |
 | ACT-19 | P2 | Afgerond | ACT-16 | [Navigatie, foutmeldingen en lege schermen](#act-19) |
 | ACT-20 | P2 | Afgerond | ACT-17, ACT-18, ACT-19 | [Toegankelijkheid en mobiele eindcontrole](#act-20) |
-| ACT-21 | P3 | Bezig | ACT-02 | [Importlogica afzonderlijk testbaar maken](#act-21) |
+| ACT-21 | P3 | Review | ACT-02 | [Importlogica afzonderlijk testbaar maken](#act-21) |
 | ACT-22 | P3 | Gepland | ACT-02 | [Spaar- en terugkerende logica opsplitsen](#act-22) |
 | ACT-23 | P3 | Gepland | ACT-02 | [Hypotheeklogica opsplitsen](#act-23) |
 | ACT-24 | P2 | Gepland | ACT-02 | [Gerichte foutafhandeling en logging](#act-24) |
@@ -286,14 +286,14 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 | Veld | Waarde |
 |---|---|
 | Actie | ACT-21 — importlogica afzonderlijk testbaar maken |
-| Status | Bezig |
+| Status | Review |
 | Uitvoerder / datum | Codex / 2026-09-23 |
 | Branch / PR | `codex/act-21a-shared-bank-import`; PR #171 gemerged |
 | Budget bij start | 72% resterend in vijf uur; 95% per week; 0 resetcredits. Afgebakend op constraint, migratie, opslagcontroles en regressietests. |
 | Uitgevoerd | ACT-16 navigatieontwerp via PR #166; ACT-17 actieoverzicht via #167; ACT-18 broninformatie via #168; ACT-19 lege schermen via #169; ACT-20 focus/mobiel via #170. ACT-21a centraliseert opslag voor Enable Banking en scheduler via #171. |
 | Validatie | PR #167 t/m #171: test en postgres-migrations geslaagd. |
-| Openstaand | ACT-21b verplaatst CSV-confirmatie naar dezelfde importservice; ACT-15 vereist nog een echte geïsoleerde NAS-restoreproef. |
-| Volgende stap | ACT-21b afbakenen en de CSV-opslag verplaatsen naar de gedeelde service. |
+| Openstaand | ACT-21b verplaatst CSV-confirmatie naar dezelfde importservice en voegt regressietests toe; ACT-15 vereist nog een echte geïsoleerde NAS-restoreproef. |
+| Volgende stap | Pak ACT-21b op met voldoende budget voor code, tests, CI en merge. |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,
