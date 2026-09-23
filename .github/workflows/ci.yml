@@ -15,14 +15,17 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: "3.12"
+          python-version-file: ".python-version"
           cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest
+          python -m pip install -r requirements-dev.txt
+          python -m pip check
+          python scripts/check_environment.py
 
       - name: Run tests
-        run: pytest tests/ --tb=short
+        run: python -m pytest tests/ --tb=short

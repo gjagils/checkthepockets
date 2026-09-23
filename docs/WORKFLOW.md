@@ -32,6 +32,29 @@ uit te voeren. Een expliciete gebruikersopdracht bepaalt de vrijgegeven scope.
 6. Gebruik voor nieuwe branches standaard `codex/<actie-id>-<slug>` conform de
    repositoryconventie; de naam beperkt gebruik door Claude Code niet.
 
+## Budgetcontrole vóór iedere actie
+
+De gebruiker heeft op 2026-09-23 uitvoering vrijgegeven onder deze voorwaarden:
+
+- Controleer vóór iedere nieuwe actie het actuele resterende gebruikstegoed via
+  de beschikbare account-/usage-weergave van de gebruikte agent. Dit kan via UI
+  of een beschikbare tool; geen specifieke connector is vereist.
+- Noteer bron, datum en resterende limieten in de overdracht. Percentages zijn
+  geen exacte tokenbudgetten en kunnen door andere sessies veranderen.
+- Schat uitvoering, tests, mogelijke herstelronde, CI, merge en statusregistratie
+  samen in. Reserveer minstens een derde van de beschikbare ruimte voor
+  verificatie en afronding; dit is een werkafspraak, geen garantie op verbruik.
+- Start alleen één afgebakende actie die naar redelijke inschatting past. Splits
+  een te grote actie vóór de start in zelfstandig afrondbare subacties, met eigen
+  acceptatiecriteria. Het bovenliggende werk blijft open tot alle criteria gelden.
+- Bij onvoldoende of onbekend tegoed: start geen nieuwe implementatie. Laat de
+  actie Gereed en leg vast waarom er gewacht wordt. Verbruik geen resetcredit
+  en koop geen tegoed zonder expliciete toestemming.
+- Controleer opnieuw vóór een volgende actie. Rond eerst de lopende actie af,
+  inclusief geverifieerde merge en registratie als Afgerond. Bij een onverwachte
+  blokkade leg je de werkelijkheid vast; nooit tests overslaan of werk ten
+  onrechte afronden om binnen een limiet te blijven.
+
 ## Uitvoering en toetsing
 
 - Houd één samenhangende actie per PR aan; splits omvangrijk werk in subacties

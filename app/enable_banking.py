@@ -1,6 +1,7 @@
 """Enable Banking API client — PSD2 bank connection via enablebanking.com."""
 
 import time
+import os
 from datetime import datetime, timezone, timedelta
 
 import jwt as pyjwt
@@ -12,7 +13,11 @@ API_BASE = "https://api.enablebanking.com"
 
 
 def _load_private_key() -> bytes:
-    with open(ENABLE_BANKING_PRIVATE_KEY_PATH, "rb") as f:
+    # Read the path at call time as well as at import time. This keeps tests and
+    # long-running processes correct when configuration is loaded before an
+    # integration test sets its environment variables.
+    path = os.getenv("ENABLE_BANKING_PRIVATE_KEY_PATH") or ENABLE_BANKING_PRIVATE_KEY_PATH
+    with open(path, "rb") as f:
         return f.read()
 
 
@@ -29,7 +34,7 @@ def _make_jwt() -> str:
         payload,
         _load_private_key(),
         algorithm="RS256",
-        headers={"kid": ENABLE_BANKING_APP_ID},
+        headers={"kid": os.getenv("ENABLE_BANKING_APP_ID") or ENABLE_BANKING_APP_ID},
     )
 
 
