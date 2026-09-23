@@ -33,6 +33,22 @@
     </div>
 </div>
 
+{% if not current_month %}
+<section class="card" aria-labelledby="actions-title" style="margin-bottom:1rem;">
+    <div style="display:flex; align-items:baseline; justify-content:space-between; gap:1rem;">
+        <h2 id="actions-title" style="margin:0; font-size:1.1rem;">Nu te doen</h2>
+        {% if not open_actions %}<span class="muted" style="font-size:0.85rem;">Geen open acties</span>{% endif %}
+    </div>
+    {% if open_actions %}
+    <ul style="list-style:none; padding:0; margin:0.75rem 0 0; display:grid; gap:0.5rem;">
+        {% for action in open_actions %}
+        <li><a href="{{ action.href }}" class="btn" style="width:100%; text-align:left;">{{ action.label }} <span aria-hidden="true">→</span></a></li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+</section>
+{% endif %}
+
 <!-- TABLE VIEW -->
 <div id="view-tabel" class="card" style="display:none;">
     <div class="table-wrap">
