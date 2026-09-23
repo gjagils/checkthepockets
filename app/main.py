@@ -23,10 +23,12 @@ from app.database import get_db
 from app.routers import auth, transactions, accounts, categories, rules, budgets, recurring, dashboard, savings, analytics, portfolio, networth, settings, admin, banking, inbox, persons, mortgage, info
 from app.scheduler import start_scheduler
 
-from app.config import SECRET_KEY
+from app.config import COOKIE_SECURE, SECRET_KEY, validate_production_config
+
+validate_production_config()
 
 app = FastAPI(title="Check Your Pockets", docs_url=None, redoc_url=None)
-app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY, session_cookie="oauth_state")
+app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY, session_cookie="oauth_state", https_only=COOKIE_SECURE)
 _landing_templates = Jinja2Templates(directory="app/templates")
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")

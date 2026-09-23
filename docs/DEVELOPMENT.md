@@ -41,6 +41,7 @@ lokale, door Git genegeerde `.env` de volgende waarden in (vervang placeholders)
 DATABASE_URL=postgresql://<lokale-user>:<lokaal-wachtwoord>@localhost:5432/checkthepockets_dev
 SECRET_KEY=<een-lokaal-gegenereerde-willekeurige-sleutel>
 APP_URL=http://localhost:8000
+ENVIRONMENT=development
 REGISTRATION_OPEN=true
 ```
 
@@ -98,3 +99,9 @@ docker build -t checkthepockets:local .
 Neem lokale sleutels niet mee in een buildcontext. ACT-08 behandelt de bestaande
 buildcontext-uitsluitingen. Een CI-build op een schone Git-checkout bevat geen lokale
 niet-gevolgde sleutels. Productievalidatie en herstel staan in OPERATIONS.md.
+
+Voor productie moet `ENVIRONMENT=production`, `APP_URL` een HTTPS-URL en
+`COOKIE_SECURE=true` zijn. `SECRET_KEY` moet minstens 32 tekens zijn en mag geen
+voorbeeldwaarde zijn. De applicatie stopt bij opstarten wanneer deze voorwaarden
+niet gelden. In lokale ontwikkeling blijft HTTP toegestaan en worden Secure-cookies
+uitgeschakeld zodat localhost-login werkt.
