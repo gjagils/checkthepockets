@@ -285,14 +285,14 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 | Veld | Waarde |
 |---|---|
 | Actie | ACT-11 — import veilig terugdraaien |
-| Status | Gepland |
+| Status | Bezig |
 | Uitvoerder / datum | Codex / 2026-09-23 |
-| Branch / PR | `codex/act-10-importbatches`; PR #152 gemerged |
+| Branch / PR | `codex/act-11-import-rollback`; PR volgt |
 | Budget bij start | 72% resterend in vijf uur; 95% per week; 0 resetcredits. Afgebakend op constraint, migratie, opslagcontroles en regressietests. |
-| Uitgevoerd | ImportBatch-model en migratie 061 toegevoegd; CSV- en Enable Banking-imports registreren bron, rekening, totalen, geïmporteerd, overgeslagen en afgekeurd; eigenaargebonden batchresultaat-endpoint en resultaatpagina’s toegevoegd. |
-| Validatie | CI-run 35842390267: 414 tests geslaagd, 3 overgeslagen; postgres-migrations geslaagd. Nieuwe regressietest voor eigenaar en tellingen toegevoegd. |
-| Openstaand | Geen codeblokkade. Lokale venv is niet representatief (Python 3.14 zonder projectdeps); CI is leidend gevalideerd. |
-| Volgende stap | ACT-11 ontwerpen: batchgewijs terugdraaien met conflictcontrole en veilige herhaalde actie. |
+| Uitgevoerd | Bestaande transactierelaties geïnventariseerd: splitsingen via parent_id/children, koppelingen via recurring_id en transfers via transfer_id; batchrecords bevatten nu alleen tellingen en nog geen transactieverwijzingen. |
+| Validatie | Analyse afgerond; codewijziging volgt pas na ontwerp van conflictregels. |
+| Openstaand | Ontwerp van batch-transactiekoppeling, detectie van latere wijzigingen, gedeelde/split-transacties en idempotente rollback. |
+| Volgende stap | Ontwerp vastleggen en daarna migratie, rollback-endpoint en regressietests implementeren. |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,
