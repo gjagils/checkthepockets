@@ -70,7 +70,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-25b | P2 | Review | ACT-25a | [Beschikbaarheid bunq-rekeningen vaststellen en vervolg kiezen](#act-25) |
 | ACT-26 | P1 | Afgerond | ACT-21 | [Importvoorbeeld zonder gegevens van andere gebruikers](#act-26) |
 | ACT-27 | P2 | Bezig | — | [Compacte spaarplanner](#act-27) |
-| ACT-27a | P2 | Review | — | [Eén regel per spaarregel, regel Beweging, compacte kop](#act-27) |
+| ACT-27a | P2 | Afgerond | — | [Eén regel per spaarregel, regel Beweging, compacte kop](#act-27) |
 | ACT-27b | P2 | Gereed | ACT-27a | [Toekomstige maanden direct bewerkbaar](#act-27) |
 
 ## Beschrijving en acceptatiecriteria
@@ -328,14 +328,14 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 | Veld | Waarde |
 |---|---|
 | Actie | ACT-27a — compacte spaarplanner |
-| Status | Review |
+| Status | Afgerond |
 | Uitvoerder / datum | Claude Code / 2026-09-23 |
-| Branch / PR | `codex/act-27a-compact-planner`; PR volgt |
+| Branch / PR | `codex/act-27a-compact-planner`; [PR #194](https://github.com/gjagils/checkthepockets/pull/194) gemerged (`34066d5`), deployment geslaagd |
 | Budget bij start | Claude Code usage-weergave (get_usage), 2026-09-23 15:21: 5-uurslimiet 65% gebruikt (reset 17:50), week 47%; extra usage uit. Daarom alleen 27a; 27b na de reset. |
 | Uitgevoerd | Sticky regelcel als één flexregel met ellipsis; acties via hover/focus (altijd bij `hover: none`). Celafstand 0,2rem/0,45rem, maandkolom 74px, tekst 0,8rem, compacte kop met kleine knoppen, scrollbox tot 100vh−170px. Nieuwe rij 'Beweging' berekend in de template uit het lopende saldo; geen routewijziging. |
 | Validatie | Screenshot 1920×1080 met 15 regels zoals de Excel: alles incl. Beweging en Saldo zichtbaar (voorheen 11 regels en scrollen). `python -m pytest tests/ --tb=short`: 485 passed, 2 skipped, 2846 warnings. Nieuw: tests/test_savings_planner_layout.py (beweging per maand, één regel per spaarregel). |
 | Openstaand | ACT-27b (celbewerking toekomst) na budgetreset. ACT-25: bunq geeft de tweede spaarrekening niet door; wacht op test met alleen die rekening en eventueel Enable Banking support. ACT-15 later. |
-| Volgende stap | Na groene CI mergen; ACT-27b starten na budgetcontrole. |
+| Volgende stap | ACT-27b starten na budgetcontrole (na reset 17:50). |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,
@@ -378,3 +378,4 @@ Voeg per afgeronde actie of overdracht een regel toe. Git bevat de volledige his
 | 2026-09-23 | ACT-23 | Leningdeel-, variant- en scenariovergelijking in app/mortgage_calc.py; routes renderen alleen | [PR #186](https://github.com/gjagils/checkthepockets/pull/186) en [PR #188](https://github.com/gjagils/checkthepockets/pull/188), beide checks groen; merge `d149d9a` |
 | 2026-09-23 | ACT-08 | Gelekte SECRET_KEY en POSTGRES_PASSWORD niet meer in gebruik (vingerafdrukken verschillen; productie op Neon) | Controle door gebruiker in Portainer; geen rotatie nodig |
 | 2026-09-23 | ACT-25a | Rekeningen zonder uid zichtbaar na koppelen; logregel per koppeling | [PR #191](https://github.com/gjagils/checkthepockets/pull/191), beide checks groen; merge `8a58ab7`; deployment geslaagd |
+| 2026-09-23 | ACT-27a | Compacte spaarplanner met regel Beweging | [PR #194](https://github.com/gjagils/checkthepockets/pull/194), beide checks groen; merge `34066d5`; deployment geslaagd |
