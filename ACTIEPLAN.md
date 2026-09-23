@@ -8,14 +8,11 @@ Bijwerken gebeurt in Git; een externe tracker of chatgeschiedenis is niet nodig.
 
 - De repository-inrichting is gemerged via PR #134 (a65a899).
 - De gebruiker heeft alle verbeteracties vrijgegeven op 2026-09-23, onder de budgetvoorwaarde uit docs/WORKFLOW.md.
-- ACT-01 t/m ACT-14, ACT-16 t/m ACT-24 en ACT-26 zijn afgerond.
-- ACT-08 is afgerond: de gelekte geheimen zijn niet meer in gebruik in productie.
-- Open en afhankelijk van de gebruiker: ACT-15 (restoreproef op een geïsoleerde
-  NAS-omgeving, later) en ACT-25 (bunq-rekeningen; eerste waarneming: bij een
-  autorisatie van twee rekeningen kwam er vermoedelijk één terug).
+- ACT-01 t/m ACT-14, ACT-16 t/m ACT-24 en ACT-26 t/m ACT-28 zijn afgerond; ACT-08 zonder rotatie (gelekte geheimen niet meer in gebruik).
+- Open: ACT-15 (restoreproef NAS, later), ACT-25b (bunq geeft de tweede spaarrekening niet door; wacht op test met alleen die rekening) en ACT-29 (verkoopfactor per bezit).
 - Bestaande Linear-issues zijn niet geïmporteerd of gecontroleerd op overlap.
-- Testsuite in de vastgelegde Python 3.12-omgeving: 476 geslaagd, 2 bewust
-  overgeslagen live-tests. Productievalidatie na uitrol is per actie vermeld.
+- Testsuite in de vastgelegde Python 3.12-omgeving: 496 geslaagd, 2 bewust
+  overgeslagen live-tests (controle 2026-09-23 na ACT-28). Productievalidatie na uitrol is per actie vermeld.
 
 ## Status en prioriteit
 
@@ -67,7 +64,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-24b | P2 | Afgerond | ACT-24a | [Inventarisatie, overige excepts en foutinjectie](#act-24) |
 | ACT-25 | P2 | Bezig | — | [Meerdere bunq- en spaarrekeningen](#act-25) |
 | ACT-25a | P2 | Afgerond | — | [Rekeningen zonder uid zichtbaar na koppelen](#act-25) |
-| ACT-25b | P2 | Review | ACT-25a | [Beschikbaarheid bunq-rekeningen vaststellen en vervolg kiezen](#act-25) |
+| ACT-25b | P2 | Geblokkeerd | ACT-25a | [Beschikbaarheid bunq-rekeningen vaststellen en vervolg kiezen](#act-25) |
 | ACT-26 | P1 | Afgerond | ACT-21 | [Importvoorbeeld zonder gegevens van andere gebruikers](#act-26) |
 | ACT-27 | P2 | Afgerond | — | [Compacte spaarplanner](#act-27) |
 | ACT-27a | P2 | Afgerond | — | [Eén regel per spaarregel, regel Beweging, compacte kop](#act-27) |
@@ -77,6 +74,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-28b | P2 | Afgerond | ACT-28a | [Plan per 1/1 automatisch vastleggen](#act-28) |
 | ACT-28c | P2 | Afgerond | ACT-28a, ACT-28b | [Pagina Vermogensprognose](#act-28) |
 | ACT-28d | P2 | Afgerond | ACT-28c | [Losse boekingen per cel](#act-28) |
+| ACT-29 | P2 | Gepland | ACT-28 | [Verkoopfactor per bezit in de vermogensprognose](#act-29) |
 
 ## Beschrijving en acceptatiecriteria
 
@@ -324,6 +322,17 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 - **ACT-28c:** Pagina met weergaven Prognose / Plan 1/1 / Verschil, filter en inklappen per persoon, kleuren t.o.v. plan, tegels "nu vs plan" en "prognose eind jaar"; compact zoals ACT-27a, bruikbaar op mobiel. Klaar met route- en eigenaartests en een schermcontrole.
 - **ACT-28d:** Losse bij-/afboekingen per persoon, bezit en maand direct in de cel (vervangt `+1000`/`−7500` in formules). Klaar met tests op herberekening en eigenaarschap.
 
+- **Uitkomst en aannames (review 2026-09-23, Claude Code):** Gebouwd in app/wealth_forecast.py, app/wealth_plan_service.py, migraties 064/065 en /portfolio/wealth-forecast (menu Portfolio → Vermogensprognose); plan wordt op 1 januari 00:05 automatisch vastgelegd en vervangen alleen na bevestiging. Aannames in de code: (1) verkoopfactor 0,982 geldt voor alle portfoliobezit, ook beleggen, en negeert spread/verkoopkosten per bezit (afwijking van de sheet → ACT-29); (2) een rekening met meerdere eigenaren wordt gelijk over die eigenaren verdeeld — voor de groep "Samen" moet een persoon "Samen" eigenaar zijn; (3) ontbreekt een koers-momentopname voor een verstreken maand, dan telt de huidige koers. Codex valideerde lokaal op Python 3.14; herhaald in Python 3.12: 496 passed, 2 skipped. Deployments van #199, #201, #202 en #203 geslaagd. Een schermcontrole (desktop en mobiel) van ACT-28c is niet vastgelegd en staat open, net als controle met eigen gegevens.
+
+<a id="act-29"></a>
+
+### ACT-29 — Verkoopfactor per bezit in de vermogensprognose
+
+- **Aanleiding:** Review van ACT-28: `SELL_FACTOR = 0,982` wordt op alle portfoliobezit toegepast. In de sheet geldt de factor alleen voor goud en zilver; beleggen telt volledig mee. De Portfolio kent al `spread_pct` en verkoopkosten per bezit.
+- **Acties:** Gebruik per bezit de verkoopwaarde uit de eigen spread/verkoopkosten (goud/zilver 1,8% ≙ 0,982), beleggen zonder aftrek tenzij ingesteld; leg de keuze vast in de docstring.
+- **Klaar wanneer:** Beleggen volgt `(vorige + inleg) × groei` zonder factor, goud/zilver houden 0,982 via hun instelling, en een bevroren plan wijzigt niet mee.
+- **Validatie:** Regressietests per bezitsoort en een test dat bestaande plannen ongewijzigd blijven.
+
 ## Onderbouwing van de eerste analyse
 
 - Importidentiteit: [parser](app/parsers/base.py), [globale constraint](app/models.py)
@@ -399,4 +408,5 @@ Voeg per afgeronde actie of overdracht een regel toe. Git bevat de volledige his
 | 2026-09-23 | ACT-27a | Compacte spaarplanner met regel Beweging | [PR #194](https://github.com/gjagils/checkthepockets/pull/194), beide checks groen; merge `34066d5`; deployment geslaagd |
 | 2026-09-23 | ACT-27 | Compacte spaarplanner; toekomstige maanden direct bewerkbaar | [PR #194](https://github.com/gjagils/checkthepockets/pull/194) en [PR #197](https://github.com/gjagils/checkthepockets/pull/197), beide checks groen; merge `ccc26a2`; browsercontrole celbewerking open |
 | 2026-09-23 | ACT-28a | Jaarrekenkern per persoon met koersmomentopnames, groei, inleg, verkoopfactor en gedeelde spaarrekeningen | [PR #199](https://github.com/gjagils/checkthepockets/pull/199), beide checks groen; merge `85caa2c` |
-| 2026-09-23 | ACT-28 | Vermogensprognose, bevroren plan per 1/1, verschilweergave en losse maandboekingen per persoon/bezit | [PR #199](https://github.com/gjagils/checkthepockets/pull/199), [#201](https://github.com/gjagils/checkthepockets/pull/201), [#202](https://github.com/gjagils/checkthepockets/pull/202), [#203](https://github.com/gjagils/checkthepockets/pull/203); alle checks groen |
+| 2026-09-23 | ACT-28 | Vermogensprognose, bevroren plan per 1/1, verschilweergave en losse maandboekingen per persoon/bezit | [PR #199](https://github.com/gjagils/checkthepockets/pull/199), [#201](https://github.com/gjagils/checkthepockets/pull/201), [#202](https://github.com/gjagils/checkthepockets/pull/202), [#203](https://github.com/gjagils/checkthepockets/pull/203); alle checks groen; merge `fde6ebb`; deployments geslaagd; schermcontrole open |
+| 2026-09-23 | Review ACT-28 | Documentatie aangevuld (aannames, validatie op 3.12, open schermcontrole); ACT-29 toegevoegd; ACT-25b op Geblokkeerd | Claude Code; 496 passed, 2 skipped in Python 3.12 |
