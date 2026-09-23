@@ -856,7 +856,7 @@ tfoot td { background: var(--surface-2); border-top: 1px solid var(--border); fo
    richtingen; sticky is daardoor stabiel binnen één container. */
 .savings-table-wrap {
     overflow: auto;
-    max-height: calc(100vh - 220px);
+    max-height: calc(100vh - 170px);
 }
 @media (max-width: 768px) {
     .savings-table-wrap { max-height: calc(100vh - 160px); }
@@ -875,13 +875,18 @@ tfoot td { background: var(--surface-2); border-top: 1px solid var(--border); fo
     left: 0;
     background: var(--surface);
     z-index: 2;
-    min-width: 180px;
-    max-width: 240px;
+    min-width: 170px;
+    max-width: 230px;
     border-right: 1px solid var(--border);
 }
 /* Regel-kolom in de sticky header: bovenhoek-cell blijft op beide assen zichtbaar */
 .savings-grid th.sticky-col { background: var(--surface-2); z-index: 6; }
-.savings-grid th.month-col { min-width: 90px; white-space: nowrap; }
+.savings-grid th.month-col { min-width: 74px; white-space: nowrap; }
+/* Compact als een spreadsheet: één regel per spaarregel. */
+.savings-grid th, .savings-grid td { padding: 0.2rem 0.45rem; font-size: 0.8rem; }
+.savings-header { margin-bottom: 0.75rem; align-items: center; }
+.savings-header h1 { font-size: 1.5rem; margin-bottom: 0; }
+.savings-header p { margin: 0; font-size: 0.82rem; }
 
 /* Saldo-rij: plakt onderin de scrollbox */
 .savings-grid tr.balance-row td {
@@ -892,7 +897,7 @@ tfoot td { background: var(--surface-2); border-top: 1px solid var(--border); fo
 }
 .savings-grid tr.balance-row td.sticky-col { z-index: 6; }
 
-.savings-cell { cursor: pointer; padding: 0.4rem 0.6rem !important; transition: background 0.1s; position: relative; }
+.savings-cell { cursor: pointer; padding: 0.2rem 0.45rem !important; transition: background 0.1s; position: relative; }
 .savings-cell:hover { background: var(--orange-bg) !important; }
 .savings-cell.cell-nolink { cursor: default; }
 .savings-cell.cell-nolink:hover { background: transparent !important; }
@@ -959,27 +964,39 @@ a.cell-display:hover { text-decoration: none; color: inherit; }
     .custom-amounts-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
-/* Compact spaar-rij: freq-badge linksboven, actie-iconen rechtsboven, titel onder. */
-.line-head-row {
+/* Spaarregel op één regel: badge, naam, acties (acties verschijnen bij hover). */
+.line-cell {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 4px;
-    margin-bottom: 4px;
+    gap: 6px;
+    min-height: 24px;
+}
+.line-cell .line-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.line-cell.line-has-category .line-name {
+    text-decoration: underline;
+    text-decoration-color: var(--sky);
+    text-decoration-thickness: 2px;
+    text-underline-offset: 3px;
 }
 .line-actions-right {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 2px;
+    opacity: 0;
+    transition: opacity 0.1s;
 }
 .line-actions-right form { margin: 0; line-height: 0; }
-.line-title-row {
-    display: flex;
-    align-items: center;
-    padding-bottom: 3px;
-    border-bottom: 2px solid transparent;
+.savings-row:hover .line-actions-right,
+.savings-row:focus-within .line-actions-right { opacity: 1; }
+@media (hover: none) {
+    .line-actions-right { opacity: 1; }
 }
-.line-title-row.line-has-category { border-bottom-color: var(--sky); }
 .line-freq-badge {
     display: inline-flex;
     align-items: center;
@@ -1000,11 +1017,12 @@ a.cell-display:hover { text-decoration: none; color: inherit; }
 /* Neutraal grijs in rust, subtiele rode hover — zodat een destructieve icoon-knop visueel
    in de icoon-stack past (niet afwijkt met een rood randje zoals .btn-danger doet). */
 .btn-icon-danger:hover { background: rgba(248, 113, 113, 0.12); color: var(--red); border-color: var(--red); }
-.line-name { font-weight: 700; font-size: 0.875rem; line-height: 1.15; }
+.line-name { font-weight: 700; font-size: 0.82rem; line-height: 1.15; }
+.savings-grid .btn-icon { padding: 0.1rem 0.3rem; font-size: 0.72rem; min-width: 20px; }
 
 .section-header td {
     background: var(--surface-2);
-    padding: 0.45rem 0.75rem;
+    padding: 0.2rem 0.6rem;
     font-size: 0.68rem;
     color: var(--muted);
     border-bottom: 1px solid var(--border);
@@ -1017,6 +1035,7 @@ a.cell-display:hover { text-decoration: none; color: inherit; }
 
 .balance-row td { border-top: 1px solid var(--orange); border-bottom: 1px solid var(--orange); background: var(--orange-bg); font-weight: 700; }
 .balance-row td.sticky-col { background: var(--orange-bg); }
+.movement-row td { border-top: 2px solid var(--border); background: var(--surface-2); }
 .line-total { border-left: 1px solid var(--border); background: rgba(255, 152, 0, 0.04); }
 
 .savings-legend { display: flex; gap: 1.5rem; flex-wrap: wrap; font-size: 0.78rem; color: var(--muted); }

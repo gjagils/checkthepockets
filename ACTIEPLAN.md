@@ -69,6 +69,9 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-25a | P2 | Afgerond | — | [Rekeningen zonder uid zichtbaar na koppelen](#act-25) |
 | ACT-25b | P2 | Review | ACT-25a | [Beschikbaarheid bunq-rekeningen vaststellen en vervolg kiezen](#act-25) |
 | ACT-26 | P1 | Afgerond | ACT-21 | [Importvoorbeeld zonder gegevens van andere gebruikers](#act-26) |
+| ACT-27 | P2 | Bezig | — | [Compacte spaarplanner](#act-27) |
+| ACT-27a | P2 | Review | — | [Eén regel per spaarregel, regel Beweging, compacte kop](#act-27) |
+| ACT-27b | P2 | Gereed | ACT-27a | [Toekomstige maanden direct bewerkbaar](#act-27) |
 
 ## Beschrijving en acceptatiecriteria
 
@@ -295,6 +298,15 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 - **Klaar wanneer:** Het voorbeeld toont alleen duplicaten van de eigen doelrekening; transacties van andere gebruikers of andere eigen rekeningen tellen niet mee; het getoonde aantal nieuw/dubbel komt overeen met het resultaat van bevestigen.
 - **Validatie:** Routetests voor bekende bank en aangepaste CSV met: dezelfde hash bij een andere gebruiker, op een andere eigen rekening, op de doelrekening en een nog niet bestaande rekening. Controleer dat de aantallen in voorbeeld en bevestiging gelijk zijn.
 
+<a id="act-27"></a>
+
+### ACT-27 — Compacte spaarplanner
+
+- **Aanleiding:** De gebruiker wil het overzicht van de eigen Excel-spaarsheet (alles op één scherm, makkelijk aanpassen) met de functionaliteit van de planner. Elke regel besloeg twee regelhoogtes en bewerken ging alleen via een uitklapformulier.
+- **Besluiten gebruiker (2026-09-23):** actieknoppen per regel verschijnen bij hover (op aanraakschermen altijd); toekomstige maanden worden direct in de cel bewerkbaar, verleden maanden blijven de werkelijke transactiebedragen.
+- **ACT-27a:** Eén regel per spaarregel (badge, naam, acties), kleinere celafstand en maandkolommen, compacte kop, regel "Beweging" (saldo min vorige maand) boven "Saldo". Klaar wanneer ±20 regels plus beweging en saldo op 1920×1080 zonder scrollen passen.
+- **ACT-27b:** Klik op een toekomstige cel → bedrag typen, Enter/Tab slaat op en gaat naar de volgende cel; saldo en beweging werken direct bij. Een afwijkend maandbedrag maakt de regel 'onregelmatig' met behoud van de overige maanden. Alleen eigen plannen; verleden en lopende maand niet bewerkbaar. Klaar wanneer dit met route- en eigenaartests is afgedekt.
+
 ## Onderbouwing van de eerste analyse
 
 - Importidentiteit: [parser](app/parsers/base.py), [globale constraint](app/models.py)
@@ -315,15 +327,15 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 
 | Veld | Waarde |
 |---|---|
-| Actie | ACT-25b — rekeningen aanvullen uit GET /sessions en diagnose |
+| Actie | ACT-27a — compacte spaarplanner |
 | Status | Review |
 | Uitvoerder / datum | Claude Code / 2026-09-23 |
-| Branch / PR | `codex/act-25b-session-accounts`; PR volgt |
-| Budget bij start | Voortzetting van ACT-25a binnen dezelfde budgetcontrole (5-uurslimiet 55% gebruikt, week 46%). |
-| Uitgevoerd | Na POST /sessions vraagt de callback GET /sessions/{id} op; uid's die daar wel en in het POST-antwoord niet staan, worden toegevoegd en via de details verrijkt (IBAN, soort). Mislukt het opvragen, dan blijft het POST-resultaat staan. Log: veldnamen van het POST-antwoord en per rekening (geen waarden), en aantallen in accounts/accounts_data/extra. |
-| Validatie | Python 3.12.11: `python -m pytest tests/ --tb=short`: 483 passed, 2 skipped (live Enable Banking), 2838 warnings. tests/test_bank_session_accounts.py uitgebreid (aanvullen, mislukte opvraag, veldnamen in log). |
-| Openstaand | Na uitrol koppelt de gebruiker bunq twee keer: met beide spaarrekeningen en met alleen de ontbrekende. De logregels 'Enable Banking sessie' bepalen het vervolg (fix in app of melding bij Enable Banking + CSV-fallback). |
-| Volgende stap | Na groene CI mergen en uitrol afwachten; daarna de twee logregels van de gebruiker analyseren. |
+| Branch / PR | `codex/act-27a-compact-planner`; PR volgt |
+| Budget bij start | Claude Code usage-weergave (get_usage), 2026-09-23 15:21: 5-uurslimiet 65% gebruikt (reset 17:50), week 47%; extra usage uit. Daarom alleen 27a; 27b na de reset. |
+| Uitgevoerd | Sticky regelcel als één flexregel met ellipsis; acties via hover/focus (altijd bij `hover: none`). Celafstand 0,2rem/0,45rem, maandkolom 74px, tekst 0,8rem, compacte kop met kleine knoppen, scrollbox tot 100vh−170px. Nieuwe rij 'Beweging' berekend in de template uit het lopende saldo; geen routewijziging. |
+| Validatie | Screenshot 1920×1080 met 15 regels zoals de Excel: alles incl. Beweging en Saldo zichtbaar (voorheen 11 regels en scrollen). `python -m pytest tests/ --tb=short`: 485 passed, 2 skipped, 2846 warnings. Nieuw: tests/test_savings_planner_layout.py (beweging per maand, één regel per spaarregel). |
+| Openstaand | ACT-27b (celbewerking toekomst) na budgetreset. ACT-25: bunq geeft de tweede spaarrekening niet door; wacht op test met alleen die rekening en eventueel Enable Banking support. ACT-15 later. |
+| Volgende stap | Na groene CI mergen; ACT-27b starten na budgetcontrole. |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,

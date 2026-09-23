@@ -7,23 +7,21 @@
 {% set freq_label = frequency_labels.get(line.frequency, line.frequency) %}
 <tr class="savings-row" data-line-id="{{ line.id }}">
     <td class="sticky-col">
-        <div class="line-head-row">
+        <div class="line-cell{% if line.category_id %} line-has-category{% endif %}">
             <span class="line-freq-badge" title="{{ freq_label }}">{{ freq_letter }}</span>
+            <span class="line-name" title="{{ line.name }}{% if line.category %} — gekoppeld aan {{ line.category.name }}{% endif %}">{{ line.name }}</span>
             <div class="line-actions-right">
                 <button type="button" class="btn btn-sm btn-icon" onclick="toggleEditRow({{ line.id }})" title="Bewerken">&#9998;</button>
                 {% if line.category_id %}
-                <form method="post" action="/savings/lines/{{ line.id }}/fill-from-transactions" style="margin:0; line-height:0;">
+                <form method="post" action="/savings/lines/{{ line.id }}/fill-from-transactions">
                     <button type="submit" class="btn btn-sm btn-icon" title="Vul vanuit transacties{% if line.category %}: {{ line.category.name }}{% endif %}">&#8635;</button>
                 </form>
                 {% endif %}
-                <form method="post" action="/savings/lines/{{ line.id }}/delete" style="margin:0; line-height:0;"
+                <form method="post" action="/savings/lines/{{ line.id }}/delete"
                       onsubmit="return confirm('Regel verwijderen?')">
                     <button type="submit" class="btn btn-sm btn-icon btn-icon-danger" title="Verwijderen">&times;</button>
                 </form>
             </div>
-        </div>
-        <div class="line-title-row {% if line.category_id %}line-has-category{% endif %}">
-            <span class="line-name"{% if line.category %} title="Gekoppeld aan: {{ line.category.name }}"{% endif %}>{{ line.name }}</span>
         </div>
     </td>
     {% for m in range(1, 13) %}
@@ -143,7 +141,7 @@
 {% endmacro %}
 
 {% block content %}
-<div class="page-header">
+<div class="page-header savings-header">
     <div>
         <h1>{{ plan.account.name }} - {{ plan.year }}</h1>
         <p class="muted">
@@ -176,9 +174,9 @@
         </p>
     </div>
     <div style="display:flex; gap:0.5rem;">
-        <button type="button" class="btn btn-primary" onclick="openQuickAdd()">+ Snel toevoegen</button>
+        <button type="button" class="btn btn-sm btn-primary" onclick="openQuickAdd()">+ Snel toevoegen</button>
         <form method="post" action="/savings/{{ plan.id }}/analyze" style="margin:0;">
-            <button type="submit" class="btn btn-accent">✨ Analyseer transacties</button>
+            <button type="submit" class="btn btn-sm btn-accent">✨ Analyseer transacties</button>
         </form>
         <a href="/savings?year={{ plan.year }}" class="btn btn-sm">Terug naar overzicht</a>
     </div>
@@ -271,6 +269,21 @@
                     {{ render_line(line) }}
                 {% endfor %}
                 {% endif %}
+
+                <!-- Beweging: netto per maand (saldo min vorige maand) -->
+                {% set prev = namespace(balance=effective_starting_balance) %}
+                <tr class="movement-row">
+                    <td class="sticky-col"><strong>Beweging</strong></td>
+                    {% for m in range(1, 13) %}
+                    {% set bal = running_balance.get(m, 0) %}
+                    {% set movement = bal - prev.balance %}
+                    <td class="text-right nowrap movement-cell" data-month="{{ m }}">
+                        <span class="{% if movement >= 0 %}amount-positive{% else %}amount-negative{% endif %}">&euro;&nbsp;{{ movement|euro }}</span>
+                    </td>
+                    {% set prev.balance = bal %}
+                    {% endfor %}
+                    <td></td>
+                </tr>
 
                 <!-- Saldo rij (onderaan) -->
                 <tr class="balance-row" style="border-top:2px solid var(--border);">
