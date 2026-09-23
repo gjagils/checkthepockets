@@ -40,7 +40,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-03 | P1 | Afgerond | ACT-01 | [PostgreSQL en migraties toetsen](#act-03) |
 | ACT-04 | P1 | Afgerond | ACT-01 | [Accountstatus en sessie-intrekking](#act-04) |
 | ACT-05 | P1 | Afgerond | ACT-01 | [Veilige configuratie en cookies](#act-05) |
-| ACT-06 | P1 | Gepland | ACT-01 | [CSRF-bescherming controleren en aanvullen](#act-06) |
+| ACT-06 | P1 | Bezig | ACT-01 | [CSRF-bescherming controleren en aanvullen](#act-06) |
 | ACT-07 | P1 | Gepland | ACT-01, ACT-03 | [Encryptie zonder stille terugval](#act-07) |
 | ACT-08 | P1 | Gepland | — | [Geheimen en Docker-buildcontext opschonen](#act-08) |
 | ACT-09 | P1 | Gepland | ACT-02, ACT-03 | [Rekeninggebonden importherkenning](#act-09) |
@@ -284,15 +284,15 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 
 | Veld | Waarde |
 |---|---|
-| Actie | ACT-05 — veilige configuratie en cookies |
-| Status | Afgerond |
+| Actie | ACT-06 — CSRF-bescherming controleren en aanvullen |
+| Status | Bezig |
 | Uitvoerder / datum | Codex / 2026-09-23 |
-| Branch / PR | `codex/act-05-veilige-configuratie`; [PR #142](https://github.com/gjagils/checkthepockets/pull/142), gemerged in `8ef7401` |
-| Budget bij start | 77% resterend in vijf uur; 96% per week; 0 resetcredits. Afgebakend op productievalidatie, cookie-instellingen en regressietests. |
-| Uitgevoerd | Productievalidatie toegevoegd; `ENVIRONMENT`, `COOKIE_SECURE` en HTTPS-APP_URL gedocumenteerd; SessionMiddleware, sessiecookie en taalcookie gebruiken Secure in HTTPS; configuratietests toegevoegd. |
-| Validatie | Gerichte tests 4 geslaagd; lokale volledige suite 409 passed, 2 skipped, 2705 warnings in 46.00s; normale CI groen in 1m42s en PostgreSQL-check groen in 31s. |
-| Openstaand | Geen ACT-05-werk. |
-| Volgende stap | Voor ACT-06 limieten opnieuw controleren; daarna CSRF-bescherming inventariseren en aanvullen. |
+| Branch / PR | `codex/act-06-csrf`; PR volgt |
+| Budget bij start | 75% resterend in vijf uur; 96% per week; 0 resetcredits. Afgebakend op centrale origincontrole en regressietests. |
+| Uitgevoerd | Productie-CSRFcontrole toegevoegd voor POST/PUT/PATCH/DELETE; same-origin via Origin/Referer toegestaan; cross-origin cookie-mutaties krijgen 403; tests toegevoegd. |
+| Validatie | Gerichte tests 4 geslaagd; lokale volledige suite 411 passed, 2 skipped, 2705 warnings in 45.60s; CI volgt. |
+| Openstaand | CI-run, PR-merge en status naar Afgerond bij groene checks. |
+| Volgende stap | Committen/pushen en CI afwachten. |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,

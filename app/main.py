@@ -2,9 +2,10 @@ import hashlib
 import logging
 import os
 import time
+from urllib.parse import urlsplit
 
 from fastapi import FastAPI, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
@@ -23,12 +24,28 @@ from app.database import get_db
 from app.routers import auth, transactions, accounts, categories, rules, budgets, recurring, dashboard, savings, analytics, portfolio, networth, settings, admin, banking, inbox, persons, mortgage, info
 from app.scheduler import start_scheduler
 
-from app.config import COOKIE_SECURE, SECRET_KEY, validate_production_config
+from app.config import APP_URL, COOKIE_SECURE, CSRF_ENFORCE, SECRET_KEY, validate_production_config
 
 validate_production_config()
 
 app = FastAPI(title="Check Your Pockets", docs_url=None, redoc_url=None)
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY, session_cookie="oauth_state", https_only=COOKIE_SECURE)
+
+
+@app.middleware("http")
+async def csrf_origin_check(request: Request, call_next):
+    """Reject cross-origin state-changing cookie requests in production."""
+    if CSRF_ENFORCE and request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+        origin = request.headers.get("origin")
+        referer = request.headers.get("referer")
+        expected = APP_URL.rstrip("/")
+        supplied = origin or (f"{urlsplit(referer).scheme}://{urlsplit(referer).netloc}" if referer else None)
+        # Login/register clients may not have a cookie yet; authenticated
+        # browser mutations must carry same-origin metadata.
+        has_session = bool(request.cookies.get("session"))
+        if has_session and supplied != expected:
+            return PlainTextResponse("CSRF origin check failed", status_code=403)
+    return await call_next(request)
 _landing_templates = Jinja2Templates(directory="app/templates")
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
