@@ -17,6 +17,26 @@ class ImportResult:
     auto_categorized: int = 0
 
 
+def find_import_account(db: Session, user_id: int, bank: str, iban: str | None) -> Account | None:
+    """Return the user's account an import for this bank and IBAN is stored on."""
+    return db.query(Account).filter(
+        Account.user_id == user_id,
+        Account.bank == bank,
+        Account.iban == iban,
+    ).first()
+
+
+def existing_import_hashes(db: Session, account: Account | None, import_hashes) -> set[str]:
+    """Hashes already imported on this account; other accounts and users never count."""
+    import_hashes = list(import_hashes)
+    if account is None or not import_hashes:
+        return set()
+    return {row[0] for row in db.query(Transaction.import_hash).filter(
+        Transaction.account_id == account.id,
+        Transaction.import_hash.in_(import_hashes),
+    )}
+
+
 def _already_imported(db: Session, account: Account, import_hash: str) -> bool:
     return db.query(Transaction.id).filter(
         Transaction.account_id == account.id,

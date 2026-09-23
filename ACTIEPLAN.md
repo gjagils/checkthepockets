@@ -56,13 +56,13 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-19 | P2 | Afgerond | ACT-16 | [Navigatie, foutmeldingen en lege schermen](#act-19) |
 | ACT-20 | P2 | Afgerond | ACT-17, ACT-18, ACT-19 | [Toegankelijkheid en mobiele eindcontrole](#act-20) |
 | ACT-21 | P3 | Afgerond | ACT-02 | [Importlogica afzonderlijk testbaar maken](#act-21) |
-| ACT-22 | P3 | Gepland | ACT-02 | [Spaar- en terugkerende logica opsplitsen](#act-22) |
-| ACT-23 | P3 | Gepland | ACT-02 | [Hypotheeklogica opsplitsen](#act-23) |
+| ACT-22 | P3 | Gereed | ACT-02 | [Spaar- en terugkerende logica opsplitsen](#act-22) |
+| ACT-23 | P3 | Gereed | ACT-02 | [Hypotheeklogica opsplitsen](#act-23) |
 | ACT-24 | P2 | Gereed | ACT-02 | [Gerichte foutafhandeling en logging](#act-24) |
 | ACT-24a | P2 | Afgerond | ACT-02 | [Twee stille fouten loggen (PR #174)](#act-24) |
 | ACT-24b | P2 | Gereed | ACT-24a | [Inventarisatie, overige excepts en foutinjectie](#act-24) |
 | ACT-25 | P2 | Gepland | — | [Meerdere bunq- en spaarrekeningen](#act-25) |
-| ACT-26 | P1 | Gereed | ACT-21 | [Importvoorbeeld zonder gegevens van andere gebruikers](#act-26) |
+| ACT-26 | P1 | Review | ACT-21 | [Importvoorbeeld zonder gegevens van andere gebruikers](#act-26) |
 
 ## Beschrijving en acceptatiecriteria
 
@@ -299,15 +299,15 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 
 | Veld | Waarde |
 |---|---|
-| Actie | ACT-21b — CSV-bevestiging via gedeelde importservice |
-| Status | Afgerond |
+| Actie | ACT-26 — importvoorbeeld zonder gegevens van andere gebruikers |
+| Status | Review |
 | Uitvoerder / datum | Claude Code / 2026-09-23 |
-| Branch / PR | `codex/act-21b-csv-import-service`; [PR #175](https://github.com/gjagils/checkthepockets/pull/175) gemerged (`df98838`) |
-| Budget bij start | Claude Code usage-weergave (get_usage), 2026-09-23 12:56: 5-uurslimiet 2% gebruikt, week 39% gebruikt; extra usage uit. Afgebakend op CSV-opslag, tests, CI en merge. |
-| Uitgevoerd | `store_confirmed_csv_rows` in app/import_service.py deelt duplicaatcontrole per rekening en transactieopbouw met bankimport/scheduler; `/import/confirm` doet alleen HTTP, rekening, batch en nabewerking. CSV-gedrag ongewijzigd: duplicaat vóór validatie, afkeuren bij ongeldige datum/bedrag, CSV-categorie gaat vóór regels. `ImportResult` telt nu ook `rejected`. |
-| Validatie | Python 3.12.11, `pip check` en `scripts/check_environment.py` schoon; `python -m pytest tests/ --tb=short`: 420 passed, 2 skipped (live Enable Banking), 2741 warnings. Nieuw: tests/test_import_service.py (bank/scheduler-opslag, CSV-rijen, route en herhaalde bevestiging). |
-| Openstaand | Bevinding uit het CSV-voorbeeld is vastgelegd als ACT-26 (P1, Gereed). ACT-24 is gesplitst: ACT-24a (#174) is afgerond, ACT-24b is Gereed. ACT-15 vereist nog een echte geïsoleerde NAS-restoreproef. |
-| Volgende stap | Pak ACT-26 op na budgetcontrole. Productievalidatie van de CSV-import na uitrol staat nog open. |
+| Branch / PR | `codex/act-26-import-preview-isolation`; PR volgt |
+| Budget bij start | Claude Code usage-weergave (get_usage), 2026-09-23 13:16: 5-uurslimiet 9% gebruikt, week 40% gebruikt; extra usage uit. |
+| Uitgevoerd | `find_import_account` en `existing_import_hashes` in app/import_service.py. `/import` en `/import/map` zoeken duplicaten alleen op de doelrekening (zelfde bank + IBAN als bij bevestigen); `/import/confirm` gebruikt dezelfde rekeningbepaling. Het voorbeeld markeert ook herhalingen binnen het bestand, omdat bevestigen die overslaat. |
+| Validatie | Python 3.12.11: `python -m pytest tests/ --tb=short`: 423 passed, 2 skipped (live Enable Banking), 2771 warnings. Nieuw: tests/test_import_preview.py (andere gebruiker, andere eigen rekening, doelrekening, nieuwe rekening, herhaling in bestand, aangepaste CSV, voorbeeld = bevestigresultaat); faalt op de oude code. |
+| Openstaand | Productievalidatie na uitrol. ACT-24b, ACT-22 en ACT-23 volgen. ACT-08-rotatie, ACT-15-restoreproef en ACT-25 vragen toegang of handelingen van de gebruiker. |
+| Volgende stap | Na groene CI mergen en ACT-26 op Afgerond zetten; daarna ACT-24b na budgetcontrole. |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,
@@ -321,6 +321,7 @@ belemmeringen en één eerstvolgende stap. Bewaar de afgeronde samenvatting hier
 | 2026-09-23 | Beide agentingangen verwijzen naar één workflow | Voorkomt twee uiteenlopende versies van afspraken |
 | 2026-09-23 | Alle verbeteracties vrijgegeven; budgetcontrole vóór iedere start verplicht | Alleen een actie starten die inclusief tests, CI en afronding naar redelijke inschatting past; anders wachten |
 | 2026-09-23 | Oude Linear-items blijven extern totdat relevant werk bewust is overgenomen | Geen claim dat de volledige bestaande backlog al is gemigreerd |
+| 2026-09-23 | Gebruiker vraagt alle openstaande acties af te werken; ACT-22 en ACT-23 naar Gereed | Uitvoering blijft één actie tegelijk met budgetcontrole; ACT-08-rotatie, ACT-15-restoreproef en ACT-25-accountonderzoek vragen toegang of handelingen van de gebruiker |
 
 ## Uitvoeringslog
 
