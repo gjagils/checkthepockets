@@ -840,23 +840,7 @@ def scenarios_detail(
     ann_principal = fin.nieuwe_annuiteit
     ltv_fraction = fin.ltv_fraction
 
-    # Overbruggingshypotheek — eenmalige netto kost (bruto rente − HRA-teruggaaf)
-    # die van het spaarsaldo in jaar 1 afgaat. De dubbele maandlast (rente-only
-    # overbrugging tijdens de looptijd) wordt apart getoond in de overbrugging-
-    # kaart, bewust niét in de grafiek.
-    bridge_tax_rate = Decimal(str(household.tax_rate or 0))
-    bridge_hra_correction = Decimal(str(
-        getattr(household, "hra_correction_factor", "1.0") or "1.0"
-    ))
-    bridge_gross_interest = fin.bridge_gross_interest_total
-    # Overbruggingsrente is HRA-aftrekbaar (fiscaal box 1, max 2 jaar). Simpele
-    # benadering: tarief × bruto rente × correctiefactor. EWF trekken we hier
-    # niet opnieuw af — dat is al verrekend bij de reguliere HRA van de
-    # nieuwe annuïteit.
-    bridge_hra_refund = (
-        bridge_gross_interest * bridge_tax_rate * bridge_hra_correction
-    ).quantize(Decimal("0.01"))
-    bridge_net_cost = (bridge_gross_interest - bridge_hra_refund).quantize(Decimal("0.01"))
+    bridge_gross_interest, bridge_hra_refund, bridge_net_cost = mortgage_calc.bridge_cost_summary(fin, household)
 
     # Per bestaande-hypotheek de auto-berekende maandlast (niet: de user-override)
     # zodat het invoerveld een zinvolle placeholder kan tonen i.p.v. "€ None".
@@ -876,48 +860,14 @@ def scenarios_detail(
         mortgage_calc.variant_stats(v, ann_principal, ltv_fraction, rates, household, scenario)
         for v in variants_sorted
     ]
-
-    # Default weergave: laagste-rentevast variant voor aflossingstabel (zoals
-    # GJA-28). Als geen variants, fallback naar rate-tabel direct.
-    default_stats = variant_stats[0] if variant_stats else None
-    if default_stats and default_stats["rate"] is not None:
-        fixed_years = default_stats["fixed_years"]
-        rate = default_stats["rate"]
-        rate_missing = False
-        schedule = list(
-            mortgage_calc.amortization_schedule(ann_principal, rate, 30)
-        )
-        monthly_payment = schedule[0].payment if schedule else Decimal("0")
-        net_month = default_stats["net_monthly"]
-        first_5y_interest = sum(
-            (row.interest for row in schedule[:60]), Decimal(0),
-        )
-        first_5y_refund = default_stats["first_5y_total_cost"]  # niet direct refund, maar placeholder
-        # eigenlijke refund som:
-        first_5y_refund = Decimal(0)
-        tax_rate_dec = Decimal(str(household.tax_rate))
-        yearly_notional = Decimal(str(household.notional_rent_value))
-        for year_offset in range(5):
-            year_rows = schedule[year_offset * 12:(year_offset + 1) * 12]
-            year_interest = sum((row.interest for row in year_rows), Decimal(0))
-            deductible = max(year_interest - yearly_notional, Decimal(0))
-            first_5y_refund += deductible * tax_rate_dec
-    else:
-        # Fallback: geen variant of geen rate gevonden.
-        fixed_years = default_stats["fixed_years"] if default_stats else min(
-            (r.fixed_years for r in rates), default=10,
-        )
-        rate = None
-        rate_missing = True
-        schedule = []
-        monthly_payment = Decimal("0")
-        net_month = Decimal("0")
-        first_5y_interest = Decimal("0")
-        first_5y_refund = Decimal("0")
+    default = mortgage_calc.default_variant_summary(
+        variant_stats[0] if variant_stats else None, ann_principal, household, rates,
+    )
+    rate = default["rate"]
 
     # Budget-impact. LIN-45: factor-engine + hypotheek-som gebruikt de monthly-
     # last van de default variant (laagste rentevast). Fallback op 0 bij geen rate.
-    new_annuity_monthly = monthly_payment if not rate_missing else Decimal("0")
+    new_annuity_monthly = default["monthly_payment"] if not default["rate_missing"] else Decimal("0")
     budget_rows, budget_total, budget_year, budget_month = _budget_rows_for_scenario(
         db, user.id, scenario,
         existing_monthly_total=fin.existing_monthly_total,
@@ -948,7 +898,6 @@ def scenarios_detail(
         .all()
     }
     contribution_rows = []
-    total_contrib = Decimal("0")
     for p in persons:
         c = contributions_by_person_id.get(p.id)
         amount = Decimal(str(c.monthly_contribution_eur)) if c else Decimal("0")
@@ -956,205 +905,44 @@ def scenarios_detail(
             "person": p,
             "amount": amount,
         })
-        total_contrib += amount
-    # Totaal maandlast = nieuwe net-monthly + bestaande hypotheken + rest-budget
-    scenario_monthly_total = (
-        net_month + fin.existing_monthly_total + (budget_total - (
-            # Mortgage-categorieën staan al in budget_total; voorkom dubbeltelling
-            sum(
-                (r.effective_amount for r in budget_rows
-                 if r.cost_scale_type == "mortgage"),
-                Decimal("0"),
-            )
-        ))
-    ).quantize(Decimal("0.01"))
+    scenario_monthly_total = mortgage_calc.scenario_monthly_total(
+        default["net_monthly"], fin.existing_monthly_total, budget_total, budget_rows,
+    )
     coverage = mortgage_calc.compute_scenario_coverage(
         scenario_monthly_total, [r["amount"] for r in contribution_rows],
     )
     salary_sum = (
         Decimal(str(household.salary_primary)) + Decimal(str(household.salary_secondary))
     )
-    variant_leftover = []
-    variant_leftover_pairs = []  # tuples (stats, leftover) voor gemakkelijke iteratie
-    for vs in variant_stats:
-        if vs["rate_missing"]:
-            variant_leftover.append(None)
-            variant_leftover_pairs.append((vs, None))
-        else:
-            total_load = vs["net_monthly"] + vs["pim_monthly"] + vs["interest_only_monthly"]
-            leftover = (salary_sum - budget_total - total_load).quantize(Decimal("0.01"))
-            variant_leftover.append(leftover)
-            variant_leftover_pairs.append((vs, leftover))
+    variant_leftover, variant_leftover_pairs = mortgage_calc.variant_leftovers(
+        variant_stats, salary_sum, budget_total,
+    )
 
     # Kosten / Inkomsten / Resultaat per variant — gestructureerde vergelijking.
-    # Mortgage-categorieën in het budget worden vervangen door de echte nieuwe
-    # annuïteit + bestaande lasten dus subtract-en om dubbeltelling te voorkomen.
-    mortgage_budget_sum = sum(
-        (r.effective_amount for r in budget_rows if r.cost_scale_type == "mortgage"),
-        Decimal("0"),
-    )
-    other_budget_total = (budget_total - mortgage_budget_sum).quantize(Decimal("0.01"))
+    other_budget_total = (
+        budget_total - mortgage_calc.mortgage_budget_sum(budget_rows)
+    ).quantize(Decimal("0.01"))
     contributions_monthly_total = sum(
         (c["amount"] for c in contribution_rows), Decimal("0"),
     ).quantize(Decimal("0.01"))
-
-    for vs in variant_stats:
-        if vs["rate_missing"]:
-            vs["existing_monthly_total"] = Decimal("0.00")
-            vs["other_budget_total"] = other_budget_total
-            vs["total_costs"] = Decimal("0.00")
-            vs["contributions_total"] = contributions_monthly_total
-            vs["total_income"] = Decimal("0.00")
-            vs["resultaat"] = Decimal("0.00")
-            vs["savings_remainder_monthly"] = Decimal("0.00")
-            continue
-        existing_monthly = (
-            Decimal(str(fin.existing_monthly_total))
-            + vs["pim_monthly"]
-            + vs["interest_only_monthly"]
-        ).quantize(Decimal("0.01"))
-        total_costs = (
-            vs["annuity_monthly"] + existing_monthly + other_budget_total
-        ).quantize(Decimal("0.01"))
-        total_income = (
-            contributions_monthly_total + vs["used_monthly_refund"]
-        ).quantize(Decimal("0.01"))
-        vs["existing_monthly_total"] = existing_monthly
-        vs["other_budget_total"] = other_budget_total
-        vs["total_costs"] = total_costs
-        vs["contributions_total"] = contributions_monthly_total
-        vs["total_income"] = total_income
-        vs["resultaat"] = (total_income - total_costs).quantize(Decimal("0.01"))
-        vs["savings_remainder_monthly"] = (
-            vs["annual_savings"] / Decimal(12)
-        ).quantize(Decimal("0.01"))
-
-        # Per-jaar surplus (wat blijft er over op de gezamenlijke rekening).
-        # Formule: inkomsten_yr − kosten_yr waar kosten_yr = nieuwe annuïteit +
-        # werkelijke bestaande-maandlast dat jaar + rest-budget, en inkomsten_yr
-        # = bijdragen + werkelijk gebruikte teruggaaf dat jaar.
-        #
-        # Inflatie (alleen op other_budget_total) en bijdrage-groei worden
-        # samengesteld toegepast (compounded) per jaar.
-        inflation = Decimal(str(
-            getattr(household, "inflation_pct", "0.025") or "0.025"
-        ))
-        contrib_growth = Decimal(str(
-            getattr(household, "contribution_growth_pct", "0.030") or "0.030"
-        ))
-        one = Decimal("1")
-        surplus_by_year: list[Decimal] = []
-        for i in range(len(vs["mortgage_net_by_year"])):
-            yr_existing = vs["existing_monthly_by_year"][i]
-            yr_used = vs["used_refund_monthly_by_year"][i]
-            infl_factor = (one + inflation) ** i
-            contrib_factor = (one + contrib_growth) ** i
-            yr_other_budget = (other_budget_total * infl_factor).quantize(Decimal("0.01"))
-            yr_contrib = (contributions_monthly_total * contrib_factor).quantize(Decimal("0.01"))
-            yr_costs = vs["annuity_monthly"] + yr_existing + yr_other_budget
-            yr_income = yr_contrib + yr_used
-            surplus_by_year.append((yr_income - yr_costs).quantize(Decimal("0.01")))
-        vs["surplus_by_year"] = surplus_by_year
-
-        # Jaarlijks spaarsaldo-overzicht per variant. Baseert zich op het
-        # eerste jaar (geen inflatie-compounding) — dit is een indicatie van
-        # "hoeveel spaar ik per jaar bij dit scenario?". Aflossing op de
-        # nieuwe annuïteit wordt ernaast getoond: gemiddelde principal-deel
-        # over de eerste 5 jaar (jaar 1 is laagste aflossing, vandaar avg).
-        monthly_surplus_yr1 = (
-            surplus_by_year[0] if surplus_by_year else Decimal("0")
-        )
-        savings_income_yr = (
-            monthly_surplus_yr1 * Decimal(12)
-            + Decimal(str(household.annual_child_benefit or 0))
-            + Decimal(str(household.annual_private_loan_refund or 0))
-            + Decimal(str(household.annual_extra_primary or 0))
-            + Decimal(str(household.annual_extra_secondary or 0))
-            + vs["annual_savings"]  # rest teruggaaf (onbenut deel HRA)
-        ).quantize(Decimal("0.01"))
-        savings_expense_yr = (
-            Decimal(str(household.annual_vacation_budget or 0))
-            + Decimal(str(household.annual_house_budget or 0))
-        ).quantize(Decimal("0.01"))
-        vs["savings_monthly_surplus"] = (
-            monthly_surplus_yr1 * Decimal(12)
-        ).quantize(Decimal("0.01"))
-        vs["savings_income_yr"] = savings_income_yr
-        vs["savings_expense_yr"] = savings_expense_yr
-        # Eenmalige overbruggingskost komt in jaar 1 van het spaarsaldo af.
-        # Zelfde bedrag voor elke variant (overbrugging is scenario-niveau).
-        vs["bridge_net_cost"] = bridge_net_cost
-        vs["net_annual_savings"] = (
-            savings_income_yr - savings_expense_yr - bridge_net_cost
-        ).quantize(Decimal("0.01"))
-
-        # Gemiddelde aflossing op de nieuwe annuïteit over de eerste 5 jaar.
-        if ann_principal > 0 and rate is not None:
-            sched = list(
-                mortgage_calc.amortization_schedule(ann_principal, rate, 30)
-            )[:60]
-            total_principal_5y = sum(
-                (r.principal for r in sched), Decimal("0"),
-            )
-            vs["avg_annual_amortization_5y"] = (
-                total_principal_5y / Decimal(5)
-            ).quantize(Decimal("0.01"))
-        else:
-            vs["avg_annual_amortization_5y"] = Decimal("0.00")
+    mortgage_calc.add_variant_comparison(
+        variant_stats,
+        existing_monthly_total=fin.existing_monthly_total,
+        household=household,
+        other_budget_total=other_budget_total,
+        contributions_monthly_total=contributions_monthly_total,
+        ann_principal=ann_principal,
+        rate=rate,
+        bridge_net_cost=bridge_net_cost,
+    )
 
     available_fixed_years = sorted({r.fixed_years for r in rates}) or [5, 10, 15, 20, 30]
     missing_fixed_years = [
         fy for fy in available_fixed_years
         if fy not in {v.fixed_years for v in variants_sorted}
     ]
-
-    # Chart.js data: twee reeksen per variant — totale netto hypotheek-last
-    # (solid) en netto overschot op de gezamenlijke rekening (dashed + area).
-    # Kleuren per rentevast-periode (blauw/oranje/groen), consistent met de
-    # vergelijkingstabel-headers.
     chart_labels = list(range(1, 31))
-    chart_series: list[dict] = []
-    variant_colors = {
-        5: "rgba(54,162,235,1)",    # blauw
-        10: "rgba(255,159,64,1)",   # oranje
-        20: "rgba(75,192,75,1)",    # groen
-    }
-    default_color = "rgba(128,128,128,1)"
-
-    def _pad(series: list[Decimal]) -> list[float]:
-        out = [float(v) for v in series]
-        while len(out) < 30:
-            out.append(out[-1] if out else 0)
-        return out[:30]
-
-    def _soften(rgba: str, alpha: float) -> str:
-        # "rgba(54,162,235,1)" → "rgba(54,162,235,0.15)"
-        return rgba.rsplit(",", 1)[0] + f",{alpha})"
-
-    for vs in variant_stats:
-        if vs["rate_missing"]:
-            continue
-        color = variant_colors.get(vs["fixed_years"], default_color)
-        label_prefix = f"{vs['fixed_years']}j"
-        chart_series.append({
-            "label": f"{label_prefix} netto hypotheek-last",
-            "data": _pad(vs["mortgage_net_by_year"]),
-            "borderColor": color,
-            "backgroundColor": "transparent",
-            "borderWidth": 2,
-            "fill": False,
-            "tension": 0.1,
-        })
-        chart_series.append({
-            "label": f"{label_prefix} overschot",
-            "data": _pad(vs.get("surplus_by_year", [])),
-            "borderColor": color,
-            "backgroundColor": _soften(color, 0.15),
-            "borderWidth": 1.5,
-            "borderDash": [6, 3],
-            "fill": "origin",
-            "tension": 0.1,
-        })
+    chart_series = mortgage_calc.variant_chart_series(variant_stats)
 
     return templates.TemplateResponse(
         "mortgage/scenario_detail.html",
@@ -1169,14 +957,14 @@ def scenarios_detail(
             "overwaarde": ow,
             "annuity_principal": ann_principal,
             "ltv_fraction": ltv_fraction,
-            "fixed_years": fixed_years,
+            "fixed_years": default["fixed_years"],
             "rate": rate,
-            "rate_missing": rate_missing,
-            "monthly_payment": monthly_payment,
-            "net_monthly": net_month,
-            "schedule": schedule,
-            "first_5y_interest": first_5y_interest,
-            "first_5y_refund": first_5y_refund,
+            "rate_missing": default["rate_missing"],
+            "monthly_payment": default["monthly_payment"],
+            "net_monthly": default["net_monthly"],
+            "schedule": default["schedule"],
+            "first_5y_interest": default["first_5y_interest"],
+            "first_5y_refund": default["first_5y_refund"],
             "variant_stats": variant_stats,
             "missing_fixed_years": missing_fixed_years,
             "available_fixed_years": available_fixed_years,
