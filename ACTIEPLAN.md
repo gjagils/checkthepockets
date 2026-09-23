@@ -57,7 +57,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-20 | P2 | Afgerond | ACT-17, ACT-18, ACT-19 | [Toegankelijkheid en mobiele eindcontrole](#act-20) |
 | ACT-21 | P3 | Afgerond | ACT-02 | [Importlogica afzonderlijk testbaar maken](#act-21) |
 | ACT-22 | P3 | Bezig | ACT-02 | [Spaar- en terugkerende logica opsplitsen](#act-22) |
-| ACT-22a | P3 | Review | ACT-02 | [Pure plannings- en spaarregels in eigen modules](#act-22) |
+| ACT-22a | P3 | Afgerond | ACT-02 | [Pure plannings- en spaarregels in eigen modules](#act-22) |
 | ACT-22b | P3 | Gereed | ACT-22a | [Projecties en koppelingen naar een service](#act-22) |
 | ACT-23 | P3 | Gereed | ACT-02 | [Hypotheeklogica opsplitsen](#act-23) |
 | ACT-24 | P2 | Afgerond | ACT-02 | [Gerichte foutafhandeling en logging](#act-24) |
@@ -304,14 +304,14 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 | Veld | Waarde |
 |---|---|
 | Actie | ACT-22a — pure plannings- en spaarregels in eigen modules |
-| Status | Review |
+| Status | Afgerond |
 | Uitvoerder / datum | Claude Code / 2026-09-23 |
-| Branch / PR | `codex/act-22a-schedule-rules`; PR volgt |
+| Branch / PR | `codex/act-22a-schedule-rules`; [PR #182](https://github.com/gjagils/checkthepockets/pull/182) gemerged (`dc39afa`) |
 | Budget bij start | Claude Code usage-weergave (get_usage), 2026-09-23 13:33: 5-uurslimiet 17% gebruikt, week 41% gebruikt; extra usage uit. ACT-22 gesplitst in 22a/22b vóór de start. |
 | Uitgevoerd | 11 functies uit routers/recurring.py naar app/recurring_schedule.py en 3 functies plus `FREQUENCY_LABELS` uit routers/savings.py naar app/savings_calc.py, met publieke namen. AST-vergelijking met main: alle verplaatste functies inhoudelijk identiek. Ongebruikte constante `FREQUENCY_MONTHS` verwijderd. transactions.py en budgets.py halen planningsregels uit de module in plaats van de router. |
 | Validatie | Python 3.12.11: `python -m pytest tests/ --tb=short`: 460 passed, 2 skipped (live Enable Banking), 2785 warnings. Nieuw: tests/test_schedule_rules.py (30 gevallen: perioden incl. schrikkeljaar en jaargrens, actieve/overgeslagen maanden, frequenties, maandbedragen, kleurstatus). |
 | Openstaand | ACT-22b (projecties en koppelingen naar service), daarna ACT-23. ACT-08, ACT-15 en ACT-25 vragen handelingen van de gebruiker. |
-| Volgende stap | Na groene CI mergen; ACT-22a op Afgerond en ACT-22b oppakken na budgetcontrole. |
+| Volgende stap | ACT-22b na budgetcontrole. |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,
@@ -348,3 +348,4 @@ Voeg per afgeronde actie of overdracht een regel toe. Git bevat de volledige his
 | 2026-09-23 | ACT-24a | Twee stille fouten worden gelogd; ACT-24 gesplitst, ACT-24b open | [PR #174](https://github.com/gjagils/checkthepockets/pull/174), merge `f5639e1`; geen tests, sessie-ID kan in de logmelding staan |
 | 2026-09-23 | ACT-26 | Importvoorbeeld telt alleen duplicaten op de eigen doelrekening | [PR #178](https://github.com/gjagils/checkthepockets/pull/178), beide checks groen; merge `f104c13`; productievalidatie open |
 | 2026-09-23 | ACT-24 | Operationele fouten gelogd zonder bank-ID's; inventarisatie in docs/ERROR-HANDLING.md | [PR #174](https://github.com/gjagils/checkthepockets/pull/174) en [PR #180](https://github.com/gjagils/checkthepockets/pull/180), beide checks groen; merge `6acc298`; productievalidatie loginhoud open |
+| 2026-09-23 | ACT-22a | Plannings- en spaarregels in app/recurring_schedule.py en app/savings_calc.py | [PR #182](https://github.com/gjagils/checkthepockets/pull/182), beide checks groen; merge `dc39afa` |
