@@ -244,6 +244,7 @@ def _sync_all_bank_connections():
                 imported = 0
                 for p in parsed:
                     exists = db.query(Transaction).filter(
+                        Transaction.account_id == account.id,
                         Transaction.import_hash == p.import_hash
                     ).first()
                     if exists:

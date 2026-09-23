@@ -254,7 +254,7 @@ class Transaction(Base):
     balance_after = Column(Numeric(12, 2), nullable=True)
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
     parent_id = Column(Integer, ForeignKey("transactions.id", ondelete="CASCADE"), nullable=True)
-    import_hash = Column(String(64), unique=True, nullable=False)
+    import_hash = Column(String(64), nullable=False)
     is_excluded = Column(Integer, default=0)
     is_reviewed = Column(Integer, default=0)
     is_projected = Column(Integer, default=0)
@@ -262,6 +262,10 @@ class Transaction(Base):
     transfer_id = Column(Integer, ForeignKey("transactions.id", ondelete="SET NULL"), nullable=True)
     assigned_by_rule_id = Column(Integer, ForeignKey("rules.id", ondelete="SET NULL"), nullable=True, index=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("account_id", "import_hash", name="uq_transaction_account_import_hash"),
+    )
 
     account = relationship("Account", back_populates="transactions")
     category = relationship("Category", back_populates="transactions")

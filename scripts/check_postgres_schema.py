@@ -28,10 +28,10 @@ def main() -> int:
     unique_constraints = inspector.get_unique_constraints("transactions")
     indexes = inspector.get_indexes("transactions")
     has_import_identity = any(
-        set(item.get("column_names") or ()) == {"import_hash"}
+        set(item.get("column_names") or ()) == {"account_id", "import_hash"}
         for item in unique_constraints
     ) or any(
-        set(item.get("column_names") or ()) == {"import_hash"}
+        set(item.get("column_names") or ()) == {"account_id", "import_hash"}
         for item in indexes
         if item.get("unique") is True
     )
