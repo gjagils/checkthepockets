@@ -33,6 +33,14 @@
     </div>
 </div>
 
+{% if not current_month and source_summary %}
+<p class="muted" style="margin:-0.2rem 0 1rem; font-size:0.85rem;">
+    Werkelijk komt uit <a href="/transactions">{{ source_summary.account_count }} rekening(en)</a>
+    {% if source_summary.as_of %}t/m {{ source_summary.as_of.strftime('%d-%m-%Y') }}{% else %}zonder geregistreerde transacties{% endif %};
+    gestreept in de grafiek is verwacht uit terugkerende posten.
+</p>
+{% endif %}
+
 {% if not current_month %}
 <section class="card" aria-labelledby="actions-title" style="margin-bottom:1rem;">
     <div style="display:flex; align-items:baseline; justify-content:space-between; gap:1rem;">
