@@ -37,7 +37,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 |---|---|---|---|---|
 | ACT-01 | P1 | Afgerond | — | [Reproduceerbare ontwikkel- en testomgeving](#act-01) |
 | ACT-02 | P1 | Afgerond | ACT-01 | [Testfouten onderzoeken en herstellen](#act-02) |
-| ACT-03 | P1 | Bezig | ACT-01 | [PostgreSQL en migraties toetsen](#act-03) |
+| ACT-03 | P1 | Afgerond | ACT-01 | [PostgreSQL en migraties toetsen](#act-03) |
 | ACT-04 | P1 | Gepland | ACT-01 | [Accountstatus en sessie-intrekking](#act-04) |
 | ACT-05 | P1 | Gepland | ACT-01 | [Veilige configuratie en cookies](#act-05) |
 | ACT-06 | P1 | Gepland | ACT-01 | [CSRF-bescherming controleren en aanvullen](#act-06) |
@@ -285,14 +285,14 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 | Veld | Waarde |
 |---|---|
 | Actie | ACT-03 — PostgreSQL en migraties toetsen |
-| Status | Bezig |
+| Status | Afgerond |
 | Uitvoerder / datum | Codex / 2026-09-23 |
-| Branch / PR | `codex/act-03-postgres-ci`; PR volgt |
+| Branch / PR | `codex/act-03-postgres-ci`; [PR #138](https://github.com/gjagils/checkthepockets/pull/138), gemerged in `bb2fa44` |
 | Budget bij start | 79% resterend in vijf uur; 97% per week; 0 resetcredits. Afgebakend op lege-schema-migratie en schema-inspectie. |
-| Uitgevoerd | PostgreSQL 16-service en schema-smokecheck toegevoegd aan CI; lokale Docker ontbreekt, dus CI is vereist. |
-| Validatie | Lokale statische controle en git diff-check; GitHub CI volgt. |
-| Openstaand | CI-run, eventuele migratiefout oplossen, PR mergen en daarna status Afgerond of een concrete subactie voor bestaande-databaseproef registreren. |
-| Volgende stap | Committen/pushen en PostgreSQL CI afwachten. |
+| Uitgevoerd | PostgreSQL 16-service en schema-smokecheck toegevoegd aan CI; lege database gemigreerd; kern-tabellen, transactievelden en import-identiteitsconstraint gecontroleerd. |
+| Validatie | PostgreSQL-check groen (31s); normale testjob groen (1m36s); lokale Docker was niet beschikbaar. Een bestaande-databaseproef is niet nodig om de lege migratiecheck te laten slagen en blijft expliciet vervolgwerk indien gewenst. |
+| Openstaand | Geen ACT-03-werk. Een representatieve bestaande-databaseproef kan later als afzonderlijke subactie worden toegevoegd. |
+| Volgende stap | Voor ACT-04 limieten opnieuw controleren; daarna accountstatus en sessie-intrekking implementeren. |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,
@@ -318,3 +318,4 @@ Voeg per afgeronde actie of overdracht een regel toe. Git bevat de volledige his
 | 2026-09-23 | Inrichting afgerond | PR #134 gemerged (a65a899) | Groene GitHub CI |
 | 2026-09-23 | ACT-01 | Python 3.12-omgeving, locks en deterministische offline tests ingevoerd | [PR #135](https://github.com/gjagils/checkthepockets/pull/135), CI groen; merge `0032f6d` |
 | 2026-09-23 | ACT-02 | Testresultaten gereproduceerd en eerdere fouten geclassificeerd | Deze PR; 405 passed, 2 skipped, 2703 warnings |
+| 2026-09-23 | ACT-03 | PostgreSQL 16-migratie en schema gecontroleerd in CI | [PR #138](https://github.com/gjagils/checkthepockets/pull/138), beide checks groen; merge `bb2fa44` |
