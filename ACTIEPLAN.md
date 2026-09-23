@@ -48,7 +48,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-11 | P2 | Afgerond | ACT-10 | [Import veilig terugdraaien](#act-11) |
 | ACT-12 | P2 | Afgerond | ACT-01 | [Bankstatus en synchronisatiefouten zichtbaar](#act-12) |
 | ACT-13 | P1 | Afgerond | ACT-01 | [Deploymentfouten en healthchecks](#act-13) |
-| ACT-14 | P2 | Gepland | ACT-13, ACT-03 | [Vaste releaseversies en herstelprocedure](#act-14) |
+| ACT-14 | P2 | Afgerond | ACT-13, ACT-03 | [Vaste releaseversies en herstelprocedure](#act-14) |
 | ACT-15 | P1 | Gepland | — | [Backups en herstel aantoonbaar maken](#act-15) |
 | ACT-16 | P2 | Gepland | ACT-02 | [Gebruikersroutes en navigatie ontwerpen](#act-16) |
 | ACT-17 | P2 | Gepland | ACT-12, ACT-16 | [Centraal actieoverzicht](#act-17) |
@@ -284,15 +284,15 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 
 | Veld | Waarde |
 |---|---|
-| Actie | ACT-14 — vaste releaseversies en herstelprocedure |
+| Actie | ACT-15 — backups en herstel aantoonbaar maken |
 | Status | Gepland |
 | Uitvoerder / datum | Codex / 2026-09-23 |
-| Branch / PR | `codex/act-13-healthchecks`; PR #159 gemerged |
+| Branch / PR | `codex/act-14-release`; PR #162 gemerged |
 | Budget bij start | 72% resterend in vijf uur; 95% per week; 0 resetcredits. Afgebakend op constraint, migratie, opslagcontroles en regressietests. |
-| Uitgevoerd | `/healthz` en `/readyz` toegevoegd; deployworkflow gebruikt fail-fast HTTP-calls; regressietest toegevoegd. |
-| Validatie | CI voor PR #159: test en postgres-migrations geslaagd. |
+| Uitgevoerd | Images krijgen naast `latest` een commit-SHA-tag; Portainer krijgt `IMAGE_TAG` mee; compose gebruikt de vaste tag met `latest` als fallback. |
+| Validatie | CI voor PR #162: test en postgres-migrations geslaagd. |
 | Openstaand | Geen codeblokkade. |
-| Volgende stap | ACT-14: vaste imageversies en herstelprocedure uitwerken. |
+| Volgende stap | ACT-15: backups, retentie en hersteltest aantoonbaar maken. |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,
