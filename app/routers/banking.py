@@ -613,7 +613,7 @@ def disconnect(connection_id: int, request: Request, db: Session = Depends(get_d
         try:
             enable_banking.delete_session(conn.session_id)
         except Exception:
-            pass
+            logger.warning("Unable to revoke remote banking session for connection id=%s", conn.id, exc_info=True)
 
     conn.status = "revoked"
     conn.session_id = None
