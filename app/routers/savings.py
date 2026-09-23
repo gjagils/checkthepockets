@@ -18,6 +18,7 @@ from app.models import (
 from app.auth import require_login
 from app.template_config import templates
 from app.rules_engine import apply_single_rule
+from app.savings_calc import FREQUENCY_LABELS, months_for_frequency, parse_custom_amounts, determine_color_status
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/savings")
@@ -26,64 +27,6 @@ MONTH_NAMES_NL = [
     "", "Jan", "Feb", "Mrt", "Apr", "Mei", "Jun",
     "Jul", "Aug", "Sep", "Okt", "Nov", "Dec",
 ]
-
-FREQUENCY_LABELS = {
-    "monthly": "Maandelijks",
-    "quarterly": "Per kwartaal",
-    "biannual": "Halfjaarlijks",
-    "yearly": "Jaarlijks",
-    "one-off": "Eenmalig",
-    "custom": "Onregelmatig",
-}
-
-FREQUENCY_MONTHS = {
-    "monthly": list(range(1, 13)),
-    "quarterly": [3, 6, 9, 12],
-    "biannual": [6, 12],
-    "yearly": [12],
-    "one-off": [],
-    "custom": [],
-}
-
-
-def _months_for_frequency(frequency: str, target_month: int | None = None) -> list[int]:
-    """Return the months (1..12) where this frequency 'fires', given an optional start month.
-    Voor 'custom' is er geen vast schema — de maanden volgen uit per-maand ingevoerde bedragen."""
-    if frequency == "monthly":
-        return list(range(1, 13))
-    if frequency == "quarterly":
-        start = target_month or 3
-        return sorted({((start - 1 + 3 * i) % 12) + 1 for i in range(4)})
-    if frequency == "biannual":
-        start = target_month or 6
-        return sorted({((start - 1 + 6 * i) % 12) + 1 for i in range(2)})
-    if frequency == "yearly":
-        return [target_month or 12]
-    if frequency == "one-off":
-        return [target_month] if target_month else []
-    if frequency == "custom":
-        return []
-    return list(range(1, 13))
-
-
-def _parse_custom_amounts(
-    a1: str, a2: str, a3: str, a4: str, a5: str, a6: str,
-    a7: str, a8: str, a9: str, a10: str, a11: str, a12: str,
-) -> dict[int, Decimal | None]:
-    """Parse 12 maandvelden naar een {1..12: Decimal|None} dict.
-    Lege waarden → None (maand niet ingepland). Ongeldige waarden → None."""
-    raw = [a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12]
-    result: dict[int, Decimal | None] = {}
-    for i, v in enumerate(raw, start=1):
-        s = (v or "").strip().replace(",", ".")
-        if s == "":
-            result[i] = None
-            continue
-        try:
-            result[i] = Decimal(s)
-        except (InvalidOperation, ValueError):
-            result[i] = None
-    return result
 
 
 def _compute_december_balance(db: Session, plan: SavingsPlan) -> Decimal:
@@ -154,7 +97,7 @@ def _smart_fill_entries(
         amounts_map = custom_amounts or {}
     else:
         amount = line.default_amount or Decimal("0")
-        months = _months_for_frequency(line.frequency, target_month)
+        months = months_for_frequency(line.frequency, target_month)
         amounts_map = {m: (amount if m in months else None) for m in range(1, 13)}
 
     entries = []
@@ -247,7 +190,7 @@ def _determine_entry_status(
     db: Session, account_id: int, year: int, month: int, today: datetime.date
 ) -> str:
     """Legacy status helper — kept as fallback for non-category lines.
-    See `_determine_color_status` for the new actual-vs-expected coloring."""
+    See `determine_color_status` for the new actual-vs-expected coloring."""
     has_tx = _has_transactions_in_month(db, account_id, year, month)
 
     if not has_tx:
@@ -269,48 +212,6 @@ def _determine_entry_status(
             return "match"
 
     return "current"
-
-
-def _determine_color_status(
-    actual: Decimal | None,
-    expected: Decimal | None,
-    is_income: bool,
-    month: int,
-    year: int,
-    today: datetime.date,
-    month_fully_categorized: bool = False,
-) -> str:
-    """Bepaal de kleurstatus voor een spaarcel.
-
-    - 'forecast' (transparant): toekomstige maand of geen actual
-    - 'current' (grijs): lopende maand
-    - 'above' (groen): beter dan verwacht
-    - 'match' (blauw): gelijk aan verwacht
-    - 'below' (rood): slechter dan verwacht (incl. niet-gerealiseerd in een
-      maand waarin alle transacties gecategoriseerd zijn)
-    """
-    # Toekomst
-    if (year, month) > (today.year, today.month):
-        return "forecast"
-    # Lopende maand — altijd grijs ongeacht waarde
-    if (year, month) == (today.year, today.month):
-        return "current"
-    # Verleden maand zonder actual: als de maand volledig gecategoriseerd is
-    # weten we zeker dat 0 ontvangen/uitgegeven is voor deze categorie.
-    if actual is None:
-        if month_fully_categorized:
-            actual = Decimal("0")
-        else:
-            return "forecast"
-
-    actual_abs = abs(actual)
-    expected_abs = abs(expected) if expected is not None else Decimal("0")
-
-    if actual_abs == expected_abs:
-        return "match"
-    if is_income:
-        return "above" if actual_abs > expected_abs else "below"
-    return "above" if actual_abs < expected_abs else "below"
 
 
 def _build_category_suggestions(
@@ -562,7 +463,7 @@ def plan_detail(
                 # verleden): laat forecast staan zodat de gebruiker nog steeds ziet
                 # wat gepland was.
                 expected_for_cell = line.default_amount if was_scheduled else Decimal("0")
-                entry.status = _determine_color_status(
+                entry.status = determine_color_status(
                     actual, expected_for_cell, is_inc,
                     entry.month, plan.year, today,
                     month_fully_categorized=(entry.month in fully_cat_months),
@@ -571,7 +472,7 @@ def plan_detail(
             for entry in line.entries:
                 # Voor regels zonder categorie: amount is wat de gebruiker zelf zette,
                 # dus dat geldt zowel als actual als als expected (= altijd 'match' in 't verleden).
-                entry.status = _determine_color_status(
+                entry.status = determine_color_status(
                     entry.amount, entry.amount, is_inc,
                     entry.month, plan.year, today,
                 )
@@ -755,7 +656,7 @@ def add_line(
     # default_amount wordt dan op 0 gezet en annual_budget = som van de maanden.
     custom_amounts: dict[int, Decimal | None] | None = None
     if frequency == "custom":
-        custom_amounts = _parse_custom_amounts(
+        custom_amounts = parse_custom_amounts(
             amount_1, amount_2, amount_3, amount_4, amount_5, amount_6,
             amount_7, amount_8, amount_9, amount_10, amount_11, amount_12,
         )
@@ -765,7 +666,7 @@ def add_line(
             Decimal("0"),
         )
     else:
-        months_for_line = _months_for_frequency(frequency, tm)
+        months_for_line = months_for_frequency(frequency, tm)
         annual_budget = amount * len(months_for_line)
 
     line = SavingsLine(
@@ -880,7 +781,7 @@ def _unused_update_entry(
     for e in line.entries:
         actual = tx_totals.get(e.month) if line.category_id else e.amount
         expected = line.default_amount if line.category_id else e.amount
-        e.status = _determine_color_status(
+        e.status = determine_color_status(
             actual, expected, is_inc, e.month, plan.year, today,
         )
 
@@ -992,7 +893,7 @@ def edit_line(
     # Voor 'onregelmatig' komt het schema uit de 12 per-maand-velden.
     custom_amounts: dict[int, Decimal | None] | None = None
     if frequency == "custom":
-        custom_amounts = _parse_custom_amounts(
+        custom_amounts = parse_custom_amounts(
             amount_1, amount_2, amount_3, amount_4, amount_5, amount_6,
             amount_7, amount_8, amount_9, amount_10, amount_11, amount_12,
         )
@@ -1003,7 +904,7 @@ def edit_line(
             Decimal("0"),
         )
     else:
-        months_for_line = _months_for_frequency(frequency, tm)
+        months_for_line = months_for_frequency(frequency, tm)
         months_set = set(months_for_line)
         annual_budget = amount * len(months_for_line)
 
@@ -1322,7 +1223,7 @@ def quick_add_line(
     # Voor 'onregelmatig' (custom) komt het schema uit de 12 per-maand-velden.
     custom_amounts: dict[int, Decimal | None] | None = None
     if frequency == "custom":
-        custom_amounts = _parse_custom_amounts(
+        custom_amounts = parse_custom_amounts(
             amount_1, amount_2, amount_3, amount_4, amount_5, amount_6,
             amount_7, amount_8, amount_9, amount_10, amount_11, amount_12,
         )
@@ -1332,7 +1233,7 @@ def quick_add_line(
             Decimal("0"),
         )
     else:
-        months_for_line = _months_for_frequency(frequency, tm)
+        months_for_line = months_for_frequency(frequency, tm)
         annual_budget = amount * len(months_for_line)
 
     max_order = (

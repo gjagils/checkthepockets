@@ -56,7 +56,9 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-19 | P2 | Afgerond | ACT-16 | [Navigatie, foutmeldingen en lege schermen](#act-19) |
 | ACT-20 | P2 | Afgerond | ACT-17, ACT-18, ACT-19 | [Toegankelijkheid en mobiele eindcontrole](#act-20) |
 | ACT-21 | P3 | Afgerond | ACT-02 | [Importlogica afzonderlijk testbaar maken](#act-21) |
-| ACT-22 | P3 | Gereed | ACT-02 | [Spaar- en terugkerende logica opsplitsen](#act-22) |
+| ACT-22 | P3 | Bezig | ACT-02 | [Spaar- en terugkerende logica opsplitsen](#act-22) |
+| ACT-22a | P3 | Review | ACT-02 | [Pure plannings- en spaarregels in eigen modules](#act-22) |
+| ACT-22b | P3 | Gereed | ACT-22a | [Projecties en koppelingen naar een service](#act-22) |
 | ACT-23 | P3 | Gereed | ACT-02 | [Hypotheeklogica opsplitsen](#act-23) |
 | ACT-24 | P2 | Afgerond | ACT-02 | [Gerichte foutafhandeling en logging](#act-24) |
 | ACT-24a | P2 | Afgerond | ACT-02 | [Twee stille fouten loggen (PR #174)](#act-24) |
@@ -242,6 +244,8 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 - **Acties:** Scheid berekeningen, gegevensmutaties en rendering; centraliseer gedeelde regels voor projecties en koppelingen.
 - **Klaar wanneer:** Berekeningen zijn zelfstandig testbaar; routegedrag en bestaande bedragen blijven gelijk.
 - **Validatie:** Regressietests voor spaarplannen, overnames, koppelingen en projecties.
+- **ACT-22a:** Pure regels zonder database verhuizen letterlijk naar app/recurring_schedule.py (perioden, actieve/overgeslagen maanden, projectiehash) en app/savings_calc.py (frequentiemaanden, eigen maandbedragen, kleurstatus). transactions.py en budgets.py importeren die niet meer uit de recurring-router. Klaar wanneer de functies inhoudelijk identiek zijn en unit-tests de bestaande uitkomsten vastleggen.
+- **ACT-22b:** Verplaats de databasegebonden logica voor projecties en koppelingen (`sync_projected_transactions`, `cleanup_matched_projected`, `find_candidates_for_projected`, `link_transaction_to_recurring`, `_find_matching_transaction`, `auto_link_recurring_after_import`) naar een service, zodat banking, scheduler, budgets, dashboard en transactions niet meer uit routers importeren. Klaar wanneer bestaande routes gelijk werken en er regressietests voor projectie en koppeling zijn.
 
 <a id="act-23"></a>
 
@@ -299,15 +303,15 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 
 | Veld | Waarde |
 |---|---|
-| Actie | ACT-24b — inventarisatie, overige excepts en foutinjectie |
-| Status | Afgerond |
+| Actie | ACT-22a — pure plannings- en spaarregels in eigen modules |
+| Status | Review |
 | Uitvoerder / datum | Claude Code / 2026-09-23 |
-| Branch / PR | `codex/act-24b-error-handling`; [PR #180](https://github.com/gjagils/checkthepockets/pull/180) gemerged (`6acc298`) |
-| Budget bij start | Claude Code usage-weergave (get_usage), 2026-09-23 13:24: 5-uurslimiet 12% gebruikt, week 40% gebruikt; extra usage uit. |
-| Uitgevoerd | Inventarisatie en regels in docs/ERROR-HANDLING.md (40 brede excepts over, 4 versmald). `safe_error_message` en ID-redactie in `EnableBankingError`: geen sessie-/rekening-ID's of querystrings in logs, UI of `last_sync_error`; ook netwerkfouten van requests. Operationele fouten die stil verdwenen worden gelogd: Google OAuth-configuratie en callback, sessieopzoeking op landingspagina, rekeningdetails en sessie aanmaken bij Enable Banking, beschadigde rekeninglijst, onleesbare transacties in spaaranalyse, schedulerjobs in admin, info-artikelen. Gebruikersinvoer (spaarsuggesties, datums in instellingenimport) vangt alleen `ValueError`/`TypeError`. |
-| Validatie | Python 3.12.11: `python -m pytest tests/ --tb=short`: 430 passed, 2 skipped (live Enable Banking), 2785 warnings. Nieuw: tests/test_error_handling.py met foutinjectie voor API- en netwerkfout, ontkoppelen, handmatige sync, scheduler-sync, inbox-middleware en landingspagina; controleert loginhoud en foutrespons. |
-| Openstaand | Productievalidatie na uitrol (loginhoud in Portainer controleren). E-mailadres in email_service-log is bewust behouden (zie docs/ERROR-HANDLING.md). ACT-22 en ACT-23 volgen; ACT-08, ACT-15 en ACT-25 vragen handelingen van de gebruiker. |
-| Volgende stap | ACT-22 na budgetcontrole. |
+| Branch / PR | `codex/act-22a-schedule-rules`; PR volgt |
+| Budget bij start | Claude Code usage-weergave (get_usage), 2026-09-23 13:33: 5-uurslimiet 17% gebruikt, week 41% gebruikt; extra usage uit. ACT-22 gesplitst in 22a/22b vóór de start. |
+| Uitgevoerd | 11 functies uit routers/recurring.py naar app/recurring_schedule.py en 3 functies plus `FREQUENCY_LABELS` uit routers/savings.py naar app/savings_calc.py, met publieke namen. AST-vergelijking met main: alle verplaatste functies inhoudelijk identiek. Ongebruikte constante `FREQUENCY_MONTHS` verwijderd. transactions.py en budgets.py halen planningsregels uit de module in plaats van de router. |
+| Validatie | Python 3.12.11: `python -m pytest tests/ --tb=short`: 460 passed, 2 skipped (live Enable Banking), 2785 warnings. Nieuw: tests/test_schedule_rules.py (30 gevallen: perioden incl. schrikkeljaar en jaargrens, actieve/overgeslagen maanden, frequenties, maandbedragen, kleurstatus). |
+| Openstaand | ACT-22b (projecties en koppelingen naar service), daarna ACT-23. ACT-08, ACT-15 en ACT-25 vragen handelingen van de gebruiker. |
+| Volgende stap | Na groene CI mergen; ACT-22a op Afgerond en ACT-22b oppakken na budgetcontrole. |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,
