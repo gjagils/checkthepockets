@@ -72,8 +72,8 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-27 | P2 | Afgerond | — | [Compacte spaarplanner](#act-27) |
 | ACT-27a | P2 | Afgerond | — | [Eén regel per spaarregel, regel Beweging, compacte kop](#act-27) |
 | ACT-27b | P2 | Afgerond | ACT-27a | [Toekomstige maanden direct bewerkbaar](#act-27) |
-| ACT-28 | P2 | Gereed | — | [Vermogensprognose per persoon](#act-28) |
-| ACT-28a | P2 | Gereed | — | [Rekenkern vermogen per persoon per maand](#act-28) |
+| ACT-28 | P2 | Bezig | — | [Vermogensprognose per persoon](#act-28) |
+| ACT-28a | P2 | Review | — | [Rekenkern vermogen per persoon per maand](#act-28) |
 | ACT-28b | P2 | Gepland | ACT-28a | [Plan per 1/1 automatisch vastleggen](#act-28) |
 | ACT-28c | P2 | Gepland | ACT-28a, ACT-28b | [Pagina Vermogensprognose](#act-28) |
 | ACT-28d | P2 | Gepland | ACT-28c | [Losse boekingen per cel](#act-28) |
@@ -344,15 +344,15 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 
 | Veld | Waarde |
 |---|---|
-| Actie | ACT-27b — toekomstige maanden direct bewerkbaar |
-| Status | Afgerond |
-| Uitvoerder / datum | Claude Code / 2026-09-23 |
-| Branch / PR | `codex/act-27b-inline-edit`; [PR #197](https://github.com/gjagils/checkthepockets/pull/197) gemerged (`ccc26a2`), deployment geslaagd |
-| Budget bij start | Claude Code usage-weergave (get_usage), 2026-09-23 15:39: 5-uurslimiet 76% gebruikt, week 49%; gebruiker vroeg door te gaan tot het budget op is. |
-| Uitgevoerd | `POST /savings/entries/update` (was uitgeschakeld, 410) accepteert weer bedragen, maar alleen voor toekomstige maanden van eigen plannen (409 voor verleden/lopende maand, 404 voor anderen, 400 bij ongeldig bedrag; '1.234,56', '12,50' en leeg toegestaan). Een aangepaste maand maakt de regel 'onregelmatig'. Antwoord bevat lopend saldo (met gekoppeld startsaldo) en beweging per maand. Cellen: klikken of Enter om te bewerken, Enter/Tab/Shift+Tab slaan op en gaan verder, Escape annuleert; saldo, beweging, regeltotaal en badge worden direct bijgewerkt. Oude uitgeschakelde implementatie verwijderd. |
-| Validatie | Python 3.12.11: `python -m pytest tests/ --tb=short`: 488 passed, 2 skipped, 2858 warnings. tests/test_savings_planner_layout.py uitgebreid (herberekening, leegmaken, ongeldig bedrag, andere gebruiker, verleden maand, bewerkbare cellen). Het JavaScript is niet end-to-end in een browser getest; route en rendering wel. |
-| Openstaand | ACT-28a–d: gebruiker laat deze door Codex uitvoeren, in volgorde 28a → 28b → 28c → 28d, vanaf main na merge van ACT-27b. ACT-25: test met alleen de ontbrekende bunq-rekening. ACT-15 later. |
-| Volgende stap | Codex start ACT-28a vanaf main. Gebruiker controleert celbewerking in productie. |
+| Actie | ACT-28a — rekenkern vermogen per persoon per maand |
+| Status | Review |
+| Uitvoerder / datum | Codex / 2026-09-23 |
+| Branch / PR | `codex/act-28a-wealth-engine`; PR volgt |
+| Budget bij start | Codex usage-weergave, 2026-09-23 13:41: 100% resterend in vijf uur, 86% per week; afgebakend op rekenkern, acceptatietests, CI en merge. |
+| Uitgevoerd | `app/wealth_forecast.py` berekent de netto verkoopwaarde (factor 0,982) voor januari t/m december per persoon. Historische portefeuillemaanden gebruiken koersmomentopnames; toekomstige maanden gebruiken de vorige waarde plus inleg en maandgroei. Spaarrekeningen volgen eigenaren, gebruiken geïmporteerde historische saldi wanneer beschikbaar en anders de spaarplanstand aan het begin van de maand. |
+| Validatie | Nieuwe acceptatietests verifiëren momentopnames, groei, inleg, verkoopfactor, gedeelde spaarrekening, historisch saldo en gebruikersscheiding. Lokaal: 2 passed met de bestaande Python 3.14-omgeving. De volledige suite draait verplicht in Python 3.12-CI. |
+| Openstaand | Groene PR-CI en squash-merge; ACT-28b bouwt daarna de bevroren planopslag op deze rekenkern. |
+| Volgende stap | PR aanmaken en CI afwachten; bij groen ACT-28a afronden. |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,
