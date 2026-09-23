@@ -6,9 +6,9 @@ Bijwerken gebeurt in Git; een externe tracker of chatgeschiedenis is niet nodig.
 
 ## Huidige stand — 2026-09-23
 
-- De repository-inrichting voor overdraagbaar werken is opgesteld.
-- De verbeteracties hieronder zijn **Gepland**, nog niet vrijgegeven of uitgevoerd.
-- Er is geen actieve implementatieactie. Eerste voorgestelde actie: **ACT-01**.
+- De repository-inrichting is gemerged via PR #134 (a65a899).
+- De gebruiker heeft alle verbeteracties vrijgegeven op 2026-09-23, onder de budgetvoorwaarde uit docs/WORKFLOW.md.
+- ACT-01 wordt uitgevoerd; overige acties wachten op afhankelijkheden en budgetcontrole.
 - Bestaande Linear-issues zijn niet geïmporteerd of gecontroleerd op overlap.
 - Analyse betrof code, templates, CI/CD en lokale tests; geen live productieaudit
   of volledige visuele gebruikerstest.
@@ -35,7 +35,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 
 | ID | Prioriteit | Status | Afhankelijk van | Actie |
 |---|---|---|---|---|
-| ACT-01 | P1 | Gepland | — | [Reproduceerbare ontwikkel- en testomgeving](#act-01) |
+| ACT-01 | P1 | Bezig | — | [Reproduceerbare ontwikkel- en testomgeving](#act-01) |
 | ACT-02 | P1 | Gepland | ACT-01 | [Testfouten onderzoeken en herstellen](#act-02) |
 | ACT-03 | P1 | Gepland | ACT-01 | [PostgreSQL en migraties toetsen](#act-03) |
 | ACT-04 | P1 | Gepland | ACT-01 | [Accountstatus en sessie-intrekking](#act-04) |
@@ -59,7 +59,6 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-22 | P3 | Gepland | ACT-02 | [Spaar- en terugkerende logica opsplitsen](#act-22) |
 | ACT-23 | P3 | Gepland | ACT-02 | [Hypotheeklogica opsplitsen](#act-23) |
 | ACT-24 | P2 | Gepland | ACT-02 | [Gerichte foutafhandeling en logging](#act-24) |
-
 | ACT-25 | P2 | Gepland | — | [Meerdere bunq- en spaarrekeningen](#act-25) |
 
 ## Beschrijving en acceptatiecriteria
@@ -285,14 +284,15 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 
 | Veld | Waarde |
 |---|---|
-| Actie | Repository-inrichting; geen verbeteractie gestart |
-| Status | Review — documentatie gepubliceerd in PR #134 |
+| Actie | ACT-01 — reproduceerbare ontwikkel- en testomgeving |
+| Status | Bezig |
 | Uitvoerder / datum | Codex / 2026-09-23 |
-| Branch / PR | `codex/repository-actieplan`; [PR #134](https://github.com/gjagils/checkthepockets/pull/134) |
-| Uitgevoerd | Centraal actieplan, gedeelde workflow, technische context en beide agentingangen opgesteld; oude Claude-snelkoppeling verwijst naar gedeelde workflow |
-| Validatie | Lokale Markdown-links en actie-ID’s gecontroleerd; `git diff --check` geslaagd. Alleen documentatie gewijzigd; runtime-tests niet herhaald. |
-| Openstaand | PR-CI en merge; implementatieacties nog niet vrijgegeven |
-| Volgende stap | Controleer PR #134 en merge na groene CI; bij vrijgave ACT-01 starten |
+| Branch / PR | `codex/act-01-reproduceerbare-omgeving`; PR volgt |
+| Budget bij start | 22% resterend in 5 uur; 88% resterend in week; geen gekocht tegoed. Geschat: één afgebakende omgevingsactie met reserve voor CI/afronding. |
+| Uitgevoerd | PR #134 met groene CI gemerged; geïsoleerde Python 3.12.11 beschikbaar |
+| Validatie | Schone Python 3.12.11-omgeving: `pip check`, `scripts/check_environment.py` en volledige suite geslaagd: 405 passed, 2 skipped, 2703 warnings in 47.48s. De twee skips zijn live Enable Banking-tests; deze zijn alleen opt-in. |
+| Openstaand | CI uitvoeren, PR-review/merge en ACT-01 daarna als Afgerond registreren. |
+| Volgende stap | Committen, pushen en PR openen; daarna groene CI afwachten. |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,
@@ -304,7 +304,7 @@ belemmeringen en één eerstvolgende stap. Bewaar de afgeronde samenvatting hier
 |---|---|---|
 | 2026-09-23 | Git en Markdown zijn de centrale bron; Codex en Claude Code volgen dezelfde workflow | Wisselen zonder afhankelijkheid van Linear, MCP of agentspecifiek geheugen |
 | 2026-09-23 | Beide agentingangen verwijzen naar één workflow | Voorkomt twee uiteenlopende versies van afspraken |
-| 2026-09-23 | Verbeteracties starten als Gepland | Deze opdracht richt de werkwijze in; implementatie wordt apart vrijgegeven |
+| 2026-09-23 | Alle verbeteracties vrijgegeven; budgetcontrole vóór iedere start verplicht | Alleen een actie starten die inclusief tests, CI en afronding naar redelijke inschatting past; anders wachten |
 | 2026-09-23 | Oude Linear-items blijven extern totdat relevant werk bewust is overgenomen | Geen claim dat de volledige bestaande backlog al is gemigreerd |
 
 ## Uitvoeringslog
@@ -314,3 +314,5 @@ Voeg per afgeronde actie of overdracht een regel toe. Git bevat de volledige his
 | Datum | Actie | Resultaat | Validatie / PR |
 |---|---|---|---|
 | 2026-09-23 | Inrichting | Actieplan en gedeelde repositorywerkwijze opgesteld | Zie actieve overdracht |
+
+| 2026-09-23 | Inrichting afgerond | PR #134 gemerged (a65a899) | Groene GitHub CI |

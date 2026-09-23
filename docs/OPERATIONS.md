@@ -7,8 +7,8 @@ GitHub → GitHub Actions → GHCR → Tailscale → Portainer → Docker op Syn
 
 - [Dependencies](../requirements.txt), [Dockerfile](../Dockerfile),
   [app-stack](../docker-compose.yml), [nginx-stack](../docker-compose.nginx.yml).
-- [PR-CI](../.github/workflows/ci.yml): Python 3.12, installatie van requirements
-  en pytest, `pytest tests/ --tb=short`.
+- [PR-CI](../.github/workflows/ci.yml): Python volgens `.python-version` (3.12), installatie van
+  `requirements-dev.txt`, omgevingscontrole en `python -m pytest tests/ --tb=short`.
 - [Deployment](../.github/workflows/deploy.yml): push naar main bouwt images en
   werkt Portainer bij. Markdown-wijzigingen zijn uitgesloten van de deploytrigger.
 - Containerstart voert `alembic upgrade head` uit vóór Uvicorn.
@@ -36,9 +36,9 @@ verwijdering uit tracking. Kopieer geen bestaande waarden naar voorbeelden.
 ## Verificatie en herstel
 
 Gebruik een geïsoleerde testdatabase, nooit de productiedatabase, voor tests en
-migratieproeven. ACT-01 t/m ACT-03 leveren een reproduceerbare ontwikkelomgeving en
-PostgreSQL-/migratiecontroles op. Tot die tijd zijn de bestaande CI en requirements
-het uitgangspunt, met expliciete vermelding van afwijkingen.
+migratieproeven. De [ontwikkelhandleiding](DEVELOPMENT.md) beschrijft de reproduceerbare
+Python-omgeving en locks. PostgreSQL-/migratiecontroles volgen in ACT-03.
+Vermeld bij testresultaten altijd afwijkingen van de vastgelegde omgeving.
 
 Controleer bij een release PR-CI, build/deploy-run, containerstatus, applicatielogs
 en de relevante gebruikersroute. Meld welke controles niet uitgevoerd konden

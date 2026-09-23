@@ -13,6 +13,8 @@ from unittest.mock import patch
 
 import pytest
 
+LIVE_TESTS = os.getenv("ENABLE_BANKING_LIVE_TESTS", "false").lower() == "true"
+
 # Set env vars before importing app modules
 os.environ.setdefault(
     "ENABLE_BANKING_APP_ID", "05336855-b073-4033-96be-5455f7196a5a"
@@ -57,6 +59,8 @@ def test_jwt_generation():
 
 def test_list_banks_sandbox():
     """Verify we can connect to the sandbox and list Dutch banks."""
+    if not LIVE_TESTS:
+        pytest.skip("Live Enable Banking tests disabled; set ENABLE_BANKING_LIVE_TESTS=true")
     pem_path = os.environ["ENABLE_BANKING_PRIVATE_KEY_PATH"]
     if not os.path.exists(pem_path):
         pytest.skip("Private key file not found")
@@ -76,6 +80,8 @@ def test_list_banks_sandbox():
 
 def test_list_banks_finland_sandbox():
     """Verify sandbox also works for Finnish banks (common in EB docs)."""
+    if not LIVE_TESTS:
+        pytest.skip("Live Enable Banking tests disabled; set ENABLE_BANKING_LIVE_TESTS=true")
     pem_path = os.environ["ENABLE_BANKING_PRIVATE_KEY_PATH"]
     if not os.path.exists(pem_path):
         pytest.skip("Private key file not found")
