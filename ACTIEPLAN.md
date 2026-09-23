@@ -62,7 +62,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-24a | P2 | Afgerond | ACT-02 | [Twee stille fouten loggen (PR #174)](#act-24) |
 | ACT-24b | P2 | Gereed | ACT-24a | [Inventarisatie, overige excepts en foutinjectie](#act-24) |
 | ACT-25 | P2 | Gepland | — | [Meerdere bunq- en spaarrekeningen](#act-25) |
-| ACT-26 | P1 | Review | ACT-21 | [Importvoorbeeld zonder gegevens van andere gebruikers](#act-26) |
+| ACT-26 | P1 | Afgerond | ACT-21 | [Importvoorbeeld zonder gegevens van andere gebruikers](#act-26) |
 
 ## Beschrijving en acceptatiecriteria
 
@@ -300,14 +300,14 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 | Veld | Waarde |
 |---|---|
 | Actie | ACT-26 — importvoorbeeld zonder gegevens van andere gebruikers |
-| Status | Review |
+| Status | Afgerond |
 | Uitvoerder / datum | Claude Code / 2026-09-23 |
-| Branch / PR | `codex/act-26-import-preview-isolation`; PR volgt |
+| Branch / PR | `codex/act-26-import-preview-isolation`; [PR #178](https://github.com/gjagils/checkthepockets/pull/178) gemerged (`f104c13`) |
 | Budget bij start | Claude Code usage-weergave (get_usage), 2026-09-23 13:16: 5-uurslimiet 9% gebruikt, week 40% gebruikt; extra usage uit. |
 | Uitgevoerd | `find_import_account` en `existing_import_hashes` in app/import_service.py. `/import` en `/import/map` zoeken duplicaten alleen op de doelrekening (zelfde bank + IBAN als bij bevestigen); `/import/confirm` gebruikt dezelfde rekeningbepaling. Het voorbeeld markeert ook herhalingen binnen het bestand, omdat bevestigen die overslaat. |
 | Validatie | Python 3.12.11: `python -m pytest tests/ --tb=short`: 423 passed, 2 skipped (live Enable Banking), 2771 warnings. Nieuw: tests/test_import_preview.py (andere gebruiker, andere eigen rekening, doelrekening, nieuwe rekening, herhaling in bestand, aangepaste CSV, voorbeeld = bevestigresultaat); faalt op de oude code. |
 | Openstaand | Productievalidatie na uitrol. ACT-24b, ACT-22 en ACT-23 volgen. ACT-08-rotatie, ACT-15-restoreproef en ACT-25 vragen toegang of handelingen van de gebruiker. |
-| Volgende stap | Na groene CI mergen en ACT-26 op Afgerond zetten; daarna ACT-24b na budgetcontrole. |
+| Volgende stap | ACT-24b na budgetcontrole. |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,
@@ -342,3 +342,4 @@ Voeg per afgeronde actie of overdracht een regel toe. Git bevat de volledige his
 | 2026-09-23 | ACT-08 | stack.env uit tracking en gevoelige bestanden uit Dockercontext | [PR #148](https://github.com/gjagils/checkthepockets/pull/148), beide checks groen; merge `5d0b678`; secret-rotatie open |
 | 2026-09-23 | ACT-21 | CSV-bevestiging, bank-sync en scheduler gebruiken één importservice | [PR #171](https://github.com/gjagils/checkthepockets/pull/171) en [PR #175](https://github.com/gjagils/checkthepockets/pull/175), beide checks groen; merge `df98838`; productievalidatie open |
 | 2026-09-23 | ACT-24a | Twee stille fouten worden gelogd; ACT-24 gesplitst, ACT-24b open | [PR #174](https://github.com/gjagils/checkthepockets/pull/174), merge `f5639e1`; geen tests, sessie-ID kan in de logmelding staan |
+| 2026-09-23 | ACT-26 | Importvoorbeeld telt alleen duplicaten op de eigen doelrekening | [PR #178](https://github.com/gjagils/checkthepockets/pull/178), beide checks groen; merge `f104c13`; productievalidatie open |
