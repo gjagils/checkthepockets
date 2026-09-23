@@ -4,7 +4,7 @@ from starlette.requests import Request
 from starlette.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
-from app.config import SECRET_KEY, SESSION_MAX_AGE
+from app.config import COOKIE_SECURE, SECRET_KEY, SESSION_MAX_AGE
 from app.models import User
 
 _signer = URLSafeTimedSerializer(SECRET_KEY)
@@ -70,6 +70,7 @@ def set_session_cookie(response: RedirectResponse, user_id: int, session_version
         max_age=SESSION_MAX_AGE,
         httponly=True,
         samesite="lax",
+        secure=COOKIE_SECURE,
     )
     return response
 

@@ -16,6 +16,7 @@ from app.info_loader import (
     normalize_lang,
 )
 from app.template_config import templates
+from app.config import COOKIE_SECURE
 
 router = APIRouter()
 
@@ -45,6 +46,7 @@ def _maybe_set_lang_cookie(response: Response, lang: str, was_explicit: bool) ->
             max_age=LANG_COOKIE_MAX_AGE,
             httponly=False,  # JS-switcher kan 'm lezen
             samesite="lax",
+            secure=COOKIE_SECURE,
         )
 
 

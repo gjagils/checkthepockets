@@ -11,6 +11,8 @@ services:
       # Auth & sessies
       - SECRET_KEY=${SECRET_KEY:-verander-dit-in-een-lang-willekeurig-wachtwoord}
       - APP_URL=${APP_URL:-http://localhost:8000}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - COOKIE_SECURE=${COOKIE_SECURE:-}
       - REGISTRATION_OPEN=${REGISTRATION_OPEN:-true}
       - REQUIRE_EMAIL_VERIFICATION=${REQUIRE_EMAIL_VERIFICATION:-false}
       # E-mail (Resend)
