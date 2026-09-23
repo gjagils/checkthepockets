@@ -8,10 +8,11 @@ Bijwerken gebeurt in Git; een externe tracker of chatgeschiedenis is niet nodig.
 
 - De repository-inrichting is gemerged via PR #134 (a65a899).
 - De gebruiker heeft alle verbeteracties vrijgegeven op 2026-09-23, onder de budgetvoorwaarde uit docs/WORKFLOW.md.
-- ACT-01 t/m ACT-07, ACT-09 t/m ACT-14, ACT-16 t/m ACT-24 en ACT-26 zijn afgerond.
-- Open en afhankelijk van de gebruiker: ACT-08 (rotatie van blootgestelde geheimen),
-  ACT-15 (restoreproef op een geïsoleerde NAS-omgeving) en ACT-25 (bunq-rekeningen
-  controleren met een geautoriseerde Enable Banking-koppeling).
+- ACT-01 t/m ACT-14, ACT-16 t/m ACT-24 en ACT-26 zijn afgerond.
+- ACT-08 is afgerond: de gelekte geheimen zijn niet meer in gebruik in productie.
+- Open en afhankelijk van de gebruiker: ACT-15 (restoreproef op een geïsoleerde
+  NAS-omgeving, later) en ACT-25 (bunq-rekeningen; eerste waarneming: bij een
+  autorisatie van twee rekeningen kwam er vermoedelijk één terug).
 - Bestaande Linear-issues zijn niet geïmporteerd of gecontroleerd op overlap.
 - Testsuite in de vastgelegde Python 3.12-omgeving: 476 geslaagd, 2 bewust
   overgeslagen live-tests. Productievalidatie na uitrol is per actie vermeld.
@@ -41,7 +42,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-05 | P1 | Afgerond | ACT-01 | [Veilige configuratie en cookies](#act-05) |
 | ACT-06 | P1 | Afgerond | ACT-01 | [CSRF-bescherming controleren en aanvullen](#act-06) |
 | ACT-07 | P1 | Afgerond | ACT-01, ACT-03 | [Encryptie zonder stille terugval](#act-07) |
-| ACT-08 | P1 | Review | — | [Geheimen en Docker-buildcontext opschonen](#act-08) |
+| ACT-08 | P1 | Afgerond | — | [Geheimen en Docker-buildcontext opschonen](#act-08) |
 | ACT-09 | P1 | Afgerond | ACT-02, ACT-03 | [Rekeninggebonden importherkenning](#act-09) |
 | ACT-10 | P2 | Afgerond | ACT-09 | [Importbatches en resultaatrapport](#act-10) |
 | ACT-11 | P2 | Afgerond | ACT-10 | [Import veilig terugdraaien](#act-11) |
@@ -132,6 +133,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 - **Acties:** Onderzoek stack.env en Git-historie zonder waarden te publiceren. Verwijder tracking en maak veilige voorbeelden. Sluit private keys en lokale agentconfiguratie uit van builds. Roteer blootgestelde geheimen via bevoegd beheer.
 - **Klaar wanneer:** Geen geheimen in nieuwe commits/images; eventuele blootstelling heeft gedocumenteerde opvolging; rotatie wordt alleen voltooid genoemd na verificatie.
 - **Validatie:** Controle van tracking en buildcontext; geredigeerde bevindingen. Herschrijf gedeelde Git-historie niet zonder expliciete opdracht.
+- **Afronding 2026-09-23:** De repository is openbaar, dus de oude stack.env was leesbaar via de Git-geschiedenis. Daarin stonden als geheimen `SECRET_KEY` en `POSTGRES_PASSWORD`; `ENABLE_BANKING_APP_ID` is een ID, de private key heeft nooit in Git gestaan. De gebruiker vergeleek SHA-256-vingerafdrukken (12 tekens, lokaal, zonder waarden te delen) van de gelekte waarden met de productieconfiguratie in Portainer: beide verschillen. Productie gebruikt een Neon-database; de `POSTGRES_*`-waarden hoorden bij een eerdere eigen database. Rotatie is daarmee niet nodig. De Git-geschiedenis is niet herschreven. `GOOGLE_CLIENT_SECRET`, `ANTHROPIC_API_KEY`, `RESEND_API_KEY` en `FIELD_ENCRYPTION_KEY` hebben nooit in Git gestaan.
 
 <a id="act-09"></a>
 
@@ -356,3 +358,4 @@ Voeg per afgeronde actie of overdracht een regel toe. Git bevat de volledige his
 | 2026-09-23 | ACT-22 | Planningsregels, spaarberekeningen, projecties en koppelingen buiten de routers | [PR #182](https://github.com/gjagils/checkthepockets/pull/182) en [PR #184](https://github.com/gjagils/checkthepockets/pull/184), beide checks groen; merge `90e6b88` |
 | 2026-09-23 | ACT-23a | Leningdeel- en variantberekening in app/mortgage_calc.py, uitkomsten identiek | [PR #186](https://github.com/gjagils/checkthepockets/pull/186), beide checks groen; merge `d16d38c` |
 | 2026-09-23 | ACT-23 | Leningdeel-, variant- en scenariovergelijking in app/mortgage_calc.py; routes renderen alleen | [PR #186](https://github.com/gjagils/checkthepockets/pull/186) en [PR #188](https://github.com/gjagils/checkthepockets/pull/188), beide checks groen; merge `d149d9a` |
+| 2026-09-23 | ACT-08 | Gelekte SECRET_KEY en POSTGRES_PASSWORD niet meer in gebruik (vingerafdrukken verschillen; productie op Neon) | Controle door gebruiker in Portainer; geen rotatie nodig |
