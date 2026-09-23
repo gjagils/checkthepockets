@@ -18,6 +18,7 @@ logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO").upper(),
     format="%(asctime)s %(levelname)-8s [%(name)s] %(message)s",
 )
+logger = logging.getLogger(__name__)
 
 from app.auth import LoginRequired, get_current_user
 from app.database import get_db
@@ -78,7 +79,7 @@ async def add_inbox_count(request: Request, call_next):
                 finally:
                     db.close()
         except Exception:
-            pass
+            logger.warning("Inbox count unavailable for this request", exc_info=True)
     return await call_next(request)
 
 @app.get("/")
