@@ -59,9 +59,9 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-22 | P3 | Afgerond | ACT-02 | [Spaar- en terugkerende logica opsplitsen](#act-22) |
 | ACT-22a | P3 | Afgerond | ACT-02 | [Pure plannings- en spaarregels in eigen modules](#act-22) |
 | ACT-22b | P3 | Afgerond | ACT-22a | [Projecties en koppelingen naar een service](#act-22) |
-| ACT-23 | P3 | Bezig | ACT-02 | [Hypotheeklogica opsplitsen](#act-23) |
+| ACT-23 | P3 | Review | ACT-02 | [Hypotheeklogica opsplitsen](#act-23) |
 | ACT-23a | P3 | Afgerond | ACT-02 | [Leningdeel- en variantberekening naar mortgage_calc](#act-23) |
-| ACT-23b | P3 | Gereed | ACT-23a | [Scenariovergelijking uit de detailroute](#act-23) |
+| ACT-23b | P3 | Review | ACT-23a | [Scenariovergelijking uit de detailroute](#act-23) |
 | ACT-24 | P2 | Afgerond | ACT-02 | [Gerichte foutafhandeling en logging](#act-24) |
 | ACT-24a | P2 | Afgerond | ACT-02 | [Twee stille fouten loggen (PR #174)](#act-24) |
 | ACT-24b | P2 | Afgerond | ACT-24a | [Inventarisatie, overige excepts en foutinjectie](#act-24) |
@@ -308,15 +308,15 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 
 | Veld | Waarde |
 |---|---|
-| Actie | ACT-23a — leningdeel- en variantberekening naar mortgage_calc |
-| Status | Afgerond |
+| Actie | ACT-23b — scenariovergelijking uit de detailroute |
+| Status | Review |
 | Uitvoerder / datum | Claude Code / 2026-09-23 |
-| Branch / PR | `codex/act-23a-mortgage-calc`; [PR #186](https://github.com/gjagils/checkthepockets/pull/186) gemerged (`d16d38c`) |
-| Budget bij start | Claude Code usage-weergave (get_usage), 2026-09-23 13:45: 5-uurslimiet 25% gebruikt, week 42% gebruikt; extra usage uit. ACT-23 gesplitst in 23a/23b vóór de start. |
-| Uitgevoerd | `em_rate_for_date`, `existing_mortgage_yearly_gross`, `existing_mortgage_yearly_interest` en `variant_stats` staan nu in app/mortgage_calc.py (letterlijk, publieke namen, modelannotaties alleen voor typecontrole). De route roept ze aan via `mortgage_calc`. |
-| Validatie | Golden master: dezelfde 4 leningdelen × 4 jaren en 4 varianten met vaste datum 2026-09-23 geven byte-identieke uitvoer op main en branch (5269 bytes, incl. 30-jaarsreeksen). `python -m pytest tests/ --tb=short`: 469 passed, 2 skipped (live Enable Banking), 2820 warnings. Nieuw: tests/test_mortgage_variant_stats.py. |
-| Openstaand | ACT-23b. ACT-08, ACT-15 en ACT-25 vragen handelingen van de gebruiker. |
-| Volgende stap | ACT-23b na budgetcontrole. |
+| Branch / PR | `codex/act-23b-scenario-comparison`; PR volgt |
+| Budget bij start | Claude Code usage-weergave (get_usage), 2026-09-23 13:47: 5-uurslimiet 29% gebruikt, week 43% gebruikt; extra usage uit. |
+| Uitgevoerd | Nieuwe functies in app/mortgage_calc.py: `bridge_cost_summary`, `default_variant_summary`, `mortgage_budget_sum`, `scenario_monthly_total`, `variant_leftovers`, `add_variant_comparison`, `variant_chart_series`. `scenarios_detail` haalt alleen nog gegevens op, roept deze functies aan en rendert (rekenblok 316 → 104 regels). Een dode tussentoewijzing van `first_5y_refund` is vervallen. |
+| Validatie | Golden master van de volledige templatecontext (96 KB: 4 varianten waarvan één zonder rente, overbrugging, bestaande leningdelen, budget met hypotheekcategorie, bijdragen) en van het terugvalpad zonder rentetabel: byte-identiek op main en branch. `python -m pytest tests/ --tb=short`: 476 passed, 2 skipped (live Enable Banking), 2820 warnings. Nieuw: tests/test_mortgage_scenario_comparison.py. |
+| Openstaand | ACT-08 (rotatie van geheimen), ACT-15 (restoreproef op NAS) en ACT-25 (bunq-accountlijst met geautoriseerde koppeling) vragen handelingen of toegang van de gebruiker. |
+| Volgende stap | Na groene CI mergen en ACT-23 op Afgerond zetten. |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,
