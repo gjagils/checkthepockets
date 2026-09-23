@@ -42,7 +42,7 @@ def budget_overview(
     )
 
     # Ensure projected transactions are synced for this month
-    from app.routers.recurring import sync_projected_transactions
+    from app.recurring_service import sync_projected_transactions
     sync_projected_transactions(user.id, current_year, current_month, db)
 
     # Get all categories with hierarchy
@@ -352,9 +352,9 @@ def budget_overview(
         )
         .all()
     )
-    # Use _find_matching_transaction which handles encrypted fields correctly
+    # Use find_matching_transaction which handles encrypted fields correctly
     from app.recurring_schedule import get_period_range
-    from app.routers.recurring import _find_matching_transaction
+    from app.recurring_service import find_matching_transaction
     import calendar as cal
     expected_income = Decimal("0")
     for item in active_recurring:
@@ -365,7 +365,7 @@ def budget_overview(
         period_start, period_end = get_period_range(
             item.frequency, datetime.date(current_year, current_month, 1)
         )
-        matched = _find_matching_transaction(db, user.id, item, period_start, period_end)
+        matched = find_matching_transaction(db, user.id, item, period_start, period_end)
         if not matched:
             expected_income += item.amount_expected
 
