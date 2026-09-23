@@ -56,9 +56,9 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-19 | P2 | Afgerond | ACT-16 | [Navigatie, foutmeldingen en lege schermen](#act-19) |
 | ACT-20 | P2 | Afgerond | ACT-17, ACT-18, ACT-19 | [Toegankelijkheid en mobiele eindcontrole](#act-20) |
 | ACT-21 | P3 | Afgerond | ACT-02 | [Importlogica afzonderlijk testbaar maken](#act-21) |
-| ACT-22 | P3 | Bezig | ACT-02 | [Spaar- en terugkerende logica opsplitsen](#act-22) |
+| ACT-22 | P3 | Review | ACT-02 | [Spaar- en terugkerende logica opsplitsen](#act-22) |
 | ACT-22a | P3 | Afgerond | ACT-02 | [Pure plannings- en spaarregels in eigen modules](#act-22) |
-| ACT-22b | P3 | Gereed | ACT-22a | [Projecties en koppelingen naar een service](#act-22) |
+| ACT-22b | P3 | Review | ACT-22a | [Projecties en koppelingen naar een service](#act-22) |
 | ACT-23 | P3 | Gereed | ACT-02 | [Hypotheeklogica opsplitsen](#act-23) |
 | ACT-24 | P2 | Afgerond | ACT-02 | [Gerichte foutafhandeling en logging](#act-24) |
 | ACT-24a | P2 | Afgerond | ACT-02 | [Twee stille fouten loggen (PR #174)](#act-24) |
@@ -303,15 +303,15 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 
 | Veld | Waarde |
 |---|---|
-| Actie | ACT-22a — pure plannings- en spaarregels in eigen modules |
-| Status | Afgerond |
+| Actie | ACT-22b — projecties en koppelingen naar een service |
+| Status | Review |
 | Uitvoerder / datum | Claude Code / 2026-09-23 |
-| Branch / PR | `codex/act-22a-schedule-rules`; [PR #182](https://github.com/gjagils/checkthepockets/pull/182) gemerged (`dc39afa`) |
-| Budget bij start | Claude Code usage-weergave (get_usage), 2026-09-23 13:33: 5-uurslimiet 17% gebruikt, week 41% gebruikt; extra usage uit. ACT-22 gesplitst in 22a/22b vóór de start. |
-| Uitgevoerd | 11 functies uit routers/recurring.py naar app/recurring_schedule.py en 3 functies plus `FREQUENCY_LABELS` uit routers/savings.py naar app/savings_calc.py, met publieke namen. AST-vergelijking met main: alle verplaatste functies inhoudelijk identiek. Ongebruikte constante `FREQUENCY_MONTHS` verwijderd. transactions.py en budgets.py halen planningsregels uit de module in plaats van de router. |
-| Validatie | Python 3.12.11: `python -m pytest tests/ --tb=short`: 460 passed, 2 skipped (live Enable Banking), 2785 warnings. Nieuw: tests/test_schedule_rules.py (30 gevallen: perioden incl. schrikkeljaar en jaargrens, actieve/overgeslagen maanden, frequenties, maandbedragen, kleurstatus). |
-| Openstaand | ACT-22b (projecties en koppelingen naar service), daarna ACT-23. ACT-08, ACT-15 en ACT-25 vragen handelingen van de gebruiker. |
-| Volgende stap | ACT-22b na budgetcontrole. |
+| Branch / PR | `codex/act-22b-recurring-service`; PR volgt |
+| Budget bij start | Claude Code usage-weergave (get_usage), 2026-09-23 13:39: 5-uurslimiet 21% gebruikt, week 42% gebruikt; extra usage uit. |
+| Uitgevoerd | app/recurring_service.py bevat `sync_projected_transactions`, `cleanup_matched_projected`, `find_candidates_for_projected`, `link_transaction_to_recurring`, `find_matching_transaction`, `find_recurring_candidates` en `auto_link_recurring_after_import` (uit routers/recurring.py en routers/transactions.py). AST-vergelijking met main: inhoudelijk identiek op namen en overbodige lokale imports na. banking, scheduler, budgets, dashboard en transactions importeren niet meer uit de recurring- of transactions-router. |
+| Validatie | Python 3.12.11: `python -m pytest tests/ --tb=short`: 464 passed, 2 skipped (live Enable Banking), 2820 warnings. Nieuw: tests/test_recurring_service.py (projectie aanmaken/idempotent/opruimen, maanden vóór data en overgeslagen maanden, betaling van andere gebruiker telt niet, automatisch koppelen één per periode met categorie); slaagt ook op main, dus gedrag gelijk. |
+| Openstaand | Buiten ACT-22: scheduler.py importeert nog `inbox_count` en `_map_eb_transactions` uit routers, admin.py `_clean_email` uit de auth-router. ACT-23 volgt; ACT-08, ACT-15 en ACT-25 vragen handelingen van de gebruiker. |
+| Volgende stap | Na groene CI mergen, ACT-22 en ACT-22b op Afgerond zetten; daarna ACT-23 na budgetcontrole. |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,

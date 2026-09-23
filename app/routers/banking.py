@@ -500,8 +500,8 @@ async def sync_transactions(connection_id: int, request: Request, db: Session = 
         logger.info("Bank sync: %d extra bestaande transacties gecategoriseerd via apply_rules_to_all", extra)
 
     # Auto-link recurring and sync projections
-    from app.routers.transactions import auto_link_recurring_after_import
-    from app.routers.recurring import cleanup_matched_projected, sync_projected_transactions
+    from app.recurring_service import auto_link_recurring_after_import
+    from app.recurring_service import cleanup_matched_projected, sync_projected_transactions
     auto_link_recurring_after_import(db, user.id)
     cleanup_matched_projected(user.id, db)
     # Re-sync projected transactions for current month to reflect new imports

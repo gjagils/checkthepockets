@@ -23,6 +23,7 @@ from app.parsers import abn_amro, bunq, ics, ing, rabobank
 from app.parsers.base import ParseError, ParsedTransaction
 from app.parsers.ics_pdf import parse_ics_pdf
 from app.import_service import existing_import_hashes, find_import_account, store_confirmed_csv_rows
+from app.recurring_service import auto_link_recurring_after_import, find_recurring_candidates
 from app.rules_engine import apply_rules_to_transaction
 from app.template_config import templates
 
@@ -389,7 +390,7 @@ def transaction_list(
     projected_transactions = []
     projected_candidates = {}
     if current_month:
-        from app.routers.recurring import sync_projected_transactions
+        from app.recurring_service import sync_projected_transactions
         y, m = int(current_month[:4]), int(current_month[5:7])
         sync_projected_transactions(user.id, y, m, db)
         proj_date_from = date_type.fromisoformat(date_from) if date_from else None
@@ -419,7 +420,7 @@ def transaction_list(
 
         # For each projected tx, find candidate real transactions (match on counterparty + amount)
         if projected_transactions:
-            from app.routers.recurring import find_candidates_for_projected
+            from app.recurring_service import find_candidates_for_projected
             for ptx in projected_transactions:
                 projected_candidates[ptx.id] = find_candidates_for_projected(db, user.id, ptx)
 
@@ -687,11 +688,11 @@ def link_recurring(
             RecurringTransaction.user_id == user.id,
         ).first()
         if item:
-            from app.routers.recurring import link_transaction_to_recurring
+            from app.recurring_service import link_transaction_to_recurring
             link_transaction_to_recurring(tx, item)
             db.flush()
             # Find candidates for auto-matching (don't link yet — propose)
-            candidates = _find_recurring_candidates(db, user.id, item, tx)
+            candidates = find_recurring_candidates(db, user.id, item, tx)
             db.commit()
 
             if candidates:
@@ -742,177 +743,12 @@ def accept_recurring_proposals(
         )
         .all()
     )
-    from app.routers.recurring import link_transaction_to_recurring
+    from app.recurring_service import link_transaction_to_recurring
     for tx in txs:
         link_transaction_to_recurring(tx, item)
 
     db.commit()
     return RedirectResponse(redirect_to, status_code=302)
-
-
-def _find_recurring_candidates(
-    db: Session, user_id: int, item: RecurringTransaction, linked_tx: Transaction
-) -> list[Transaction]:
-    """After a manual link, learn from the transaction's description/counterparty
-    and find candidate transactions in other months that could be matched.
-    Returns candidates (does NOT link them — caller decides to propose or auto-link).
-    """
-    # Build search words from the linked transaction (for Python filtering)
-    desc = (linked_tx.description or "").strip()
-    cp = (linked_tx.counterparty or "").strip()
-
-    search_words = []
-    if desc:
-        item_words = item.name.lower().split()
-        desc_lower = desc.lower()
-        matching_words = [w for w in item_words if len(w) > 2 and w in desc_lower]
-        if matching_words:
-            search_words = matching_words
-        elif cp:
-            search_words = [cp.lower()]
-        else:
-            snippet = desc[:30].strip().lower()
-            if len(snippet) > 5:
-                search_words = [snippet]
-    elif cp:
-        search_words = [cp.lower()]
-
-    if not search_words:
-        return []
-
-    # Update the recurring item's description_match if empty
-    if not item.description_match and desc:
-        item_words = item.name.lower().split()
-        desc_lower = desc.lower()
-        matching = [w for w in item_words if len(w) > 2 and w in desc_lower]
-        if matching:
-            item.description_match = " ".join(matching)
-
-    # Find all unlinked transactions and filter in Python (encrypted fields)
-    all_txs = (
-        db.query(Transaction)
-        .join(Account)
-        .filter(
-            Account.user_id == user_id,
-            Transaction.is_excluded == 0,
-            Transaction.is_projected == 0,
-            Transaction.recurring_id.is_(None),
-            Transaction.id != linked_tx.id,
-        )
-        .order_by(Transaction.date)
-        .all()
-    )
-    all_candidates = []
-    for tx in all_txs:
-        tx_desc = (tx.description or "").lower()
-        tx_cp = (tx.counterparty or "").lower()
-        if all(w in tx_desc or w in tx_cp for w in search_words):
-            all_candidates.append(tx)
-
-    # Filter: one per period, same sign, no existing match
-    from app.recurring_schedule import get_period_range
-    from app.routers.recurring import _find_matching_transaction
-
-    result = []
-    seen_periods = set()
-    for candidate in all_candidates:
-        period_start, period_end = get_period_range(item.frequency, candidate.date)
-        period_key = (period_start, period_end)
-        if period_key in seen_periods:
-            continue
-
-        existing = _find_matching_transaction(db, user_id, item, period_start, period_end)
-        if existing:
-            seen_periods.add(period_key)
-            continue
-
-        if (candidate.amount > 0) != (linked_tx.amount > 0):
-            continue
-
-        result.append(candidate)
-        seen_periods.add(period_key)
-
-    return result
-
-
-def auto_link_recurring_after_import(db: Session, user_id: int):
-    """Called after CSV import — automatically link new transactions to recurring items
-    based on counterparty/description matching. No user confirmation needed.
-    Note: counterparty/description are encrypted, so we filter in Python."""
-    from app.recurring_schedule import get_period_range
-
-    recurring_items = (
-        db.query(RecurringTransaction)
-        .filter(RecurringTransaction.user_id == user_id, RecurringTransaction.is_active == 1)
-        .all()
-    )
-
-    # Load all unlinked transactions once (avoid N+1 on encrypted fields)
-    all_unlinked = (
-        db.query(Transaction)
-        .join(Account)
-        .filter(
-            Account.user_id == user_id,
-            Transaction.is_excluded == 0,
-            Transaction.is_projected == 0,
-            Transaction.recurring_id.is_(None),
-        )
-        .order_by(Transaction.date)
-        .all()
-    )
-
-    for item in recurring_items:
-        if not item.counterparty and not item.description_match:
-            continue
-
-        # Build search terms
-        cp_term = (item.counterparty or "").lower()
-        desc_words = [w.lower() for w in (item.description_match or "").split() if len(w) > 2]
-
-        if not cp_term and not desc_words:
-            continue
-
-        for candidate in all_unlinked:
-            if candidate.recurring_id:
-                continue  # Already linked by a previous item in this loop
-
-            cp = (candidate.counterparty or "").lower()
-            desc = (candidate.description or "").lower()
-
-            # Match: counterparty contains search term OR all desc words found
-            match = False
-            if cp_term and cp_term in cp:
-                match = True
-            if not match and cp_term and cp_term in desc:
-                match = True
-            if not match and desc_words and all(w in desc for w in desc_words):
-                match = True
-
-            if not match:
-                continue
-
-            period_start, period_end = get_period_range(item.frequency, candidate.date)
-
-            # Check if there's already a LINKED transaction for this recurring item
-            # in this period. Don't use _find_matching_transaction here because it
-            # auto-matches and would find the candidate itself, skipping it forever.
-            already_linked = (
-                db.query(Transaction)
-                .join(Account)
-                .filter(
-                    Account.user_id == user_id,
-                    Transaction.recurring_id == item.id,
-                    Transaction.date >= period_start,
-                    Transaction.date <= period_end,
-                    Transaction.is_projected == 0,
-                )
-                .first()
-            )
-            if already_linked:
-                continue
-
-            from app.routers.recurring import link_transaction_to_recurring
-            link_transaction_to_recurring(candidate, item)
 
 
 @router.post("/transactions/{transaction_id}/reviewed")
@@ -1506,7 +1342,7 @@ async def import_confirm(request: Request, db: Session = Depends(get_db)):
 
     # Auto-link new transactions to recurring items, then clean up projections
     auto_link_recurring_after_import(db, user.id)
-    from app.routers.recurring import cleanup_matched_projected, sync_projected_transactions
+    from app.recurring_service import cleanup_matched_projected, sync_projected_transactions
     cleanup_matched_projected(user.id, db)
     # Re-sync projected transactions for current month to reflect new imports
     import datetime as _dt

@@ -270,7 +270,7 @@ def test_projected_tx_null_account_visible_everywhere(db_session):
 def test_null_account_backfills_from_linked_transactions(db_session):
     """GJA-37: recurring zonder account_id + linked tx op bunq → projection op bunq,
     item.account_id wordt gebackfilled."""
-    from app.routers.recurring import sync_projected_transactions
+    from app.recurring_service import sync_projected_transactions
 
     alice = _make_user(db_session)
     cat = _make_category(db_session, alice)
@@ -324,7 +324,7 @@ def test_null_account_backfills_from_linked_transactions(db_session):
 def test_stale_projection_on_fallback_gets_cleaned(db_session):
     """Projection ooit gemaakt op fallback-rekening wordt verwijderd nadat
     item.account_id is gezet naar de correcte rekening."""
-    from app.routers.recurring import cleanup_matched_projected
+    from app.recurring_service import cleanup_matched_projected
 
     alice = _make_user(db_session)
     cat = _make_category(db_session, alice)

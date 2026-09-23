@@ -261,8 +261,8 @@ def _sync_all_bank_connections():
                 logger.info("Bank sync: %d extra transacties gecategoriseerd voor user %d", extra, user_id)
 
         # Auto-link recurring, then sync projections
-        from app.routers.transactions import auto_link_recurring_after_import
-        from app.routers.recurring import cleanup_matched_projected, sync_projected_transactions
+        from app.recurring_service import auto_link_recurring_after_import
+        from app.recurring_service import cleanup_matched_projected, sync_projected_transactions
         today = datetime.utcnow().date()
         for user_id in synced_user_ids:
             auto_link_recurring_after_import(db, user_id)
