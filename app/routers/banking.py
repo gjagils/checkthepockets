@@ -17,7 +17,7 @@ from app.config import APP_URL, ENABLE_BANKING_APP_ID, SUPER_ADMIN_USERNAME
 from app.database import get_db
 from app.models import Account, BankConnection, Transaction, Rule, Category, ImportBatch
 from app.parsers.base import ParsedTransaction
-from app.rules_engine import apply_rules_to_transaction
+from app.import_service import store_parsed_transactions
 from app.template_config import templates
 
 router = APIRouter(prefix="/banking")
@@ -474,41 +474,11 @@ async def sync_transactions(connection_id: int, request: Request, db: Session = 
 
     # Import transactions (skip duplicates)
     active_rules = db.query(Rule).filter(Rule.user_id == user.id, Rule.is_active == 1).all()
-    imported = skipped = auto_categorized = 0
     batch = ImportBatch(user_id=user.id, account_id=account.id, source="enable_banking", total_count=len(parsed))
     db.add(batch)
     db.flush()
-
-    for p in parsed:
-        exists = db.query(Transaction).filter(
-            Transaction.account_id == account.id,
-            Transaction.import_hash == p.import_hash,
-        ).first()
-        if exists:
-            skipped += 1
-            continue
-
-        db_tx = Transaction(
-            account_id=account.id,
-            date=p.date,
-            amount=p.amount,
-            currency=p.currency,
-            description=p.description,
-            counterparty=p.counterparty,
-            counterparty_iban=p.counterparty_iban,
-            balance_after=p.balance_after,
-            import_hash=p.import_hash,
-            import_batch_id=batch.id,
-        )
-        db.add(db_tx)
-        db.flush()
-
-        if active_rules:
-            apply_rules_to_transaction(active_rules, db_tx, db)
-            if db_tx.category_id is not None:
-                auto_categorized += 1
-
-        imported += 1
+    result = store_parsed_transactions(db, account, parsed, active_rules, batch.id)
+    imported, skipped, auto_categorized = result.imported, result.skipped, result.auto_categorized
 
     conn.last_synced_at = datetime.utcnow()
     conn.last_sync_status = "success"
