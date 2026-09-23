@@ -29,3 +29,43 @@ jobs:
 
       - name: Run tests
         run: python -m pytest tests/ --tb=short
+
+  postgres-migrations:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: checkthepockets
+          POSTGRES_PASSWORD: checkthepockets
+          POSTGRES_DB: checkthepockets_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U checkthepockets -d checkthepockets_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: ".python-version"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install runtime dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Upgrade empty PostgreSQL schema
+        env:
+          DATABASE_URL: postgresql://checkthepockets:checkthepockets@localhost:5432/checkthepockets_ci
+        run: python -m alembic upgrade head
+
+      - name: Inspect migrated schema
+        env:
+          DATABASE_URL: postgresql://checkthepockets:checkthepockets@localhost:5432/checkthepockets_ci
+        run: python scripts/check_postgres_schema.py
