@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import case, func, or_
 
 from app.database import get_db
-from app.models import Account, Transaction, Category, Budget
+from app.models import Account, Transaction, Category, Budget, BankConnection
 from app.auth import require_login
 from app.template_config import templates
 
@@ -255,6 +255,37 @@ def _level1_yearly(request, db, user, current_year, years, base_tx_filter, today
         for r in overview_rows
     ])
 
+    open_actions = []
+    current_uncategorized = uncat_by_month.get(today.month, {}).get("count", 0)
+    if current_uncategorized:
+        open_actions.append({
+            "label": f"{current_uncategorized} transacties wachten op een categorie",
+            "href": f"/transactions?month={today.year}-{today.month:02d}&uncategorized=1",
+            "kind": "categorize",
+        })
+    failed_connections = db.query(BankConnection).filter(
+        BankConnection.user_id == user.id,
+        BankConnection.last_sync_status == "error",
+    ).count()
+    if failed_connections:
+        open_actions.append({
+            "label": f"{failed_connections} bankkoppeling(en) hebben aandacht nodig",
+            "href": "/banking/connect",
+            "kind": "bank",
+        })
+    expiring_connections = db.query(BankConnection).filter(
+        BankConnection.user_id == user.id,
+        BankConnection.status == "active",
+        BankConnection.valid_until.isnot(None),
+        BankConnection.valid_until <= datetime.datetime.combine(today + datetime.timedelta(days=7), datetime.time.max),
+    ).count()
+    if expiring_connections:
+        open_actions.append({
+            "label": f"{expiring_connections} banktoestemming(en) verlopen binnenkort",
+            "href": "/banking/connect",
+            "kind": "bank",
+        })
+
     return templates.TemplateResponse(
         "dashboard/index.html",
         {
@@ -270,6 +301,7 @@ def _level1_yearly(request, db, user, current_year, years, base_tx_filter, today
             "breadcrumbs": [],
             "overview_rows": overview_rows,
             "overview_json": overview_json,
+            "open_actions": open_actions,
         },
     )
 
