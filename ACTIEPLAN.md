@@ -43,7 +43,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-06 | P1 | Afgerond | ACT-01 | [CSRF-bescherming controleren en aanvullen](#act-06) |
 | ACT-07 | P1 | Afgerond | ACT-01, ACT-03 | [Encryptie zonder stille terugval](#act-07) |
 | ACT-08 | P1 | Review | — | [Geheimen en Docker-buildcontext opschonen](#act-08) |
-| ACT-09 | P1 | Bezig | ACT-02, ACT-03 | [Rekeninggebonden importherkenning](#act-09) |
+| ACT-09 | P1 | Afgerond | ACT-02, ACT-03 | [Rekeninggebonden importherkenning](#act-09) |
 | ACT-10 | P2 | Gepland | ACT-09 | [Importbatches en resultaatrapport](#act-10) |
 | ACT-11 | P2 | Gepland | ACT-10 | [Import veilig terugdraaien](#act-11) |
 | ACT-12 | P2 | Gepland | ACT-01 | [Bankstatus en synchronisatiefouten zichtbaar](#act-12) |
@@ -284,15 +284,15 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 
 | Veld | Waarde |
 |---|---|
-| Actie | ACT-09 — rekeninggebonden importherkenning |
-| Status | Bezig |
+| Actie | ACT-10 — importbatches en resultaatrapport |
+| Status | Gepland |
 | Uitvoerder / datum | Codex / 2026-09-23 |
-| Branch / PR | `codex/act-09-import-identiteit`; PR volgt |
+| Branch / PR | `codex/act-09-import-identiteit`; PR #150 gemerged |
 | Budget bij start | 72% resterend in vijf uur; 95% per week; 0 resetcredits. Afgebakend op constraint, migratie, opslagcontroles en regressietests. |
-| Uitgevoerd | Globale unique constraint vervangen door rekeninggebonden constraint; bank- en scheduler-imports en confirm-import controleren account_id; test voor dezelfde hash op twee rekeningen toegevoegd. |
-| Validatie | Gerichte tests 15 geslaagd; lokale volledige suite 415 passed, 2 skipped, 2711 warnings in 45.03s; CI volgt. |
-| Openstaand | CI-run, migratiecontrole en PR-merge; preview-deduplicatie zonder gekozen rekening blijft bewust conservatief en moet in ACT-10 worden meegenomen. |
-| Volgende stap | Committen/pushen en CI afwachten. |
+| Uitgevoerd | Globale unique constraint vervangen door rekeninggebonden constraint; bank- en scheduler-imports en confirm-import controleren account_id; test voor dezelfde hash op twee rekeningen toegevoegd; PostgreSQL-schema-check bijgewerkt. |
+| Validatie | Gerichte tests 15 geslaagd; lokale volledige suite 415 passed, 2 skipped, 2711 warnings in 45.03s; CI-run 35841585232: test en postgres-migrations geslaagd. |
+| Openstaand | Preview-deduplicatie zonder gekozen rekening blijft bewust conservatief en wordt meegenomen in ACT-10. |
+| Volgende stap | ACT-10 uitwerken: importbatch, aantallen, overslaan/afkeuren en eigenaargebonden resultaatweergave. |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,
