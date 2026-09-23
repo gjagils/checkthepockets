@@ -37,7 +37,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 |---|---|---|---|---|
 | ACT-01 | P1 | Afgerond | — | [Reproduceerbare ontwikkel- en testomgeving](#act-01) |
 | ACT-02 | P1 | Afgerond | ACT-01 | [Testfouten onderzoeken en herstellen](#act-02) |
-| ACT-03 | P1 | Gepland | ACT-01 | [PostgreSQL en migraties toetsen](#act-03) |
+| ACT-03 | P1 | Bezig | ACT-01 | [PostgreSQL en migraties toetsen](#act-03) |
 | ACT-04 | P1 | Gepland | ACT-01 | [Accountstatus en sessie-intrekking](#act-04) |
 | ACT-05 | P1 | Gepland | ACT-01 | [Veilige configuratie en cookies](#act-05) |
 | ACT-06 | P1 | Gepland | ACT-01 | [CSRF-bescherming controleren en aanvullen](#act-06) |
@@ -83,7 +83,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 
 ### ACT-03 — PostgreSQL en migraties toetsen
 
-- **Acties:** Voeg geïsoleerde PostgreSQL-integratietests toe en test Alembic vanaf een lege en een representatieve bestaande database. Gebruik synthetische gegevens.
+- **Acties:** Voeg een geïsoleerde PostgreSQL CI-service toe, test Alembic vanaf een lege database en inspecteer de gemigreerde tabellen, transactievelden en import-identiteitsconstraint met synthetische schema-informatie. Een bestaande-databaseproef volgt als aparte subactie wanneer een representatieve synthetische dump beschikbaar is.
 - **Klaar wanneer:** Constraints en gebruikersscheiding worden op PostgreSQL getest; upgrades behouden bestaande gegevens; CI voert controles uit.
 - **Validatie:** Migratieproeven en integratietests, zonder productiegegevens.
 
@@ -284,15 +284,15 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 
 | Veld | Waarde |
 |---|---|
-| Actie | ACT-02 — testfouten onderzoeken en herstellen |
-| Status | Afgerond |
+| Actie | ACT-03 — PostgreSQL en migraties toetsen |
+| Status | Bezig |
 | Uitvoerder / datum | Codex / 2026-09-23 |
-| Branch / PR | `codex/act-02-testresultaten`; volgt |
-| Budget bij start | 80% resterend in vijf uur; 97% per week; 0 resetcredits. Afgebakend als documentatie en validatie na ACT-01. |
-| Uitgevoerd | Testresultaten in de juiste omgeving herhaald; eerdere fouten geclassificeerd; Enable Banking-tests deterministisch gemaakt. |
-| Validatie | 405 passed, 2 skipped, 2703 warnings in 47.48s; pip check en omgevingscontrole geslaagd. |
-| Openstaand | Geen ACT-02-werk; waarschuwingen zijn geregistreerd onder ACT-24. |
-| Volgende stap | ACT-03 of ACT-04; limieten opnieuw controleren vóór start. |
+| Branch / PR | `codex/act-03-postgres-ci`; PR volgt |
+| Budget bij start | 79% resterend in vijf uur; 97% per week; 0 resetcredits. Afgebakend op lege-schema-migratie en schema-inspectie. |
+| Uitgevoerd | PostgreSQL 16-service en schema-smokecheck toegevoegd aan CI; lokale Docker ontbreekt, dus CI is vereist. |
+| Validatie | Lokale statische controle en git diff-check; GitHub CI volgt. |
+| Openstaand | CI-run, eventuele migratiefout oplossen, PR mergen en daarna status Afgerond of een concrete subactie voor bestaande-databaseproef registreren. |
+| Volgende stap | Committen/pushen en PostgreSQL CI afwachten. |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,
