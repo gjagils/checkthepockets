@@ -66,8 +66,8 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-24a | P2 | Afgerond | ACT-02 | [Twee stille fouten loggen (PR #174)](#act-24) |
 | ACT-24b | P2 | Afgerond | ACT-24a | [Inventarisatie, overige excepts en foutinjectie](#act-24) |
 | ACT-25 | P2 | Bezig | — | [Meerdere bunq- en spaarrekeningen](#act-25) |
-| ACT-25a | P2 | Review | — | [Rekeningen zonder uid zichtbaar na koppelen](#act-25) |
-| ACT-25b | P2 | Gepland | ACT-25a | [Beschikbaarheid bunq-rekeningen vaststellen en vervolg kiezen](#act-25) |
+| ACT-25a | P2 | Afgerond | — | [Rekeningen zonder uid zichtbaar na koppelen](#act-25) |
+| ACT-25b | P2 | Gereed | ACT-25a | [Beschikbaarheid bunq-rekeningen vaststellen en vervolg kiezen](#act-25) |
 | ACT-26 | P1 | Afgerond | ACT-21 | [Importvoorbeeld zonder gegevens van andere gebruikers](#act-26) |
 
 ## Beschrijving en acceptatiecriteria
@@ -315,9 +315,9 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 | Veld | Waarde |
 |---|---|
 | Actie | ACT-25a — rekeningen zonder uid zichtbaar na koppelen |
-| Status | Review |
+| Status | Afgerond |
 | Uitvoerder / datum | Claude Code / 2026-09-23 |
-| Branch / PR | `codex/act-25a-unavailable-accounts`; PR volgt |
+| Branch / PR | `codex/act-25a-unavailable-accounts`; [PR #191](https://github.com/gjagils/checkthepockets/pull/191) gemerged (`8a58ab7`), deployment geslaagd |
 | Budget bij start | Claude Code usage-weergave (get_usage), 2026-09-23 14:44: 5-uurslimiet 55% gebruikt, week 46% gebruikt; extra usage uit. Afgebakend op callback, twee templates en tests. |
 | Uitgevoerd | `_describe_session_accounts` bewaart elke sessierekening met `uid`, IBAN (uit details of sessie), BIC, soort (CACC/SVGS → Betaal-/Spaarrekening) en `available`. Resultaatpagina toont alle rekeningen met status en meldt het als niets op te halen is. Synchronisatiepagina toont alleen op te halen rekeningen en noemt de rest. Log: aantal ontvangen/op te halen en per rekening volgorde, soort en uid ja/nee. |
 | Validatie | Python 3.12.11: `python -m pytest tests/ --tb=short`: 480 passed, 2 skipped (live Enable Banking), 2830 warnings. Nieuw: tests/test_bank_session_accounts.py (omzetting, terugval bij detailfout, volledige koppelstroom met en zonder op te halen rekening, loginhoud zonder IBAN/ID). |
@@ -364,3 +364,4 @@ Voeg per afgeronde actie of overdracht een regel toe. Git bevat de volledige his
 | 2026-09-23 | ACT-23a | Leningdeel- en variantberekening in app/mortgage_calc.py, uitkomsten identiek | [PR #186](https://github.com/gjagils/checkthepockets/pull/186), beide checks groen; merge `d16d38c` |
 | 2026-09-23 | ACT-23 | Leningdeel-, variant- en scenariovergelijking in app/mortgage_calc.py; routes renderen alleen | [PR #186](https://github.com/gjagils/checkthepockets/pull/186) en [PR #188](https://github.com/gjagils/checkthepockets/pull/188), beide checks groen; merge `d149d9a` |
 | 2026-09-23 | ACT-08 | Gelekte SECRET_KEY en POSTGRES_PASSWORD niet meer in gebruik (vingerafdrukken verschillen; productie op Neon) | Controle door gebruiker in Portainer; geen rotatie nodig |
+| 2026-09-23 | ACT-25a | Rekeningen zonder uid zichtbaar na koppelen; logregel per koppeling | [PR #191](https://github.com/gjagils/checkthepockets/pull/191), beide checks groen; merge `8a58ab7`; deployment geslaagd |
