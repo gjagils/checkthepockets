@@ -44,7 +44,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-07 | P1 | Afgerond | ACT-01, ACT-03 | [Encryptie zonder stille terugval](#act-07) |
 | ACT-08 | P1 | Review | — | [Geheimen en Docker-buildcontext opschonen](#act-08) |
 | ACT-09 | P1 | Afgerond | ACT-02, ACT-03 | [Rekeninggebonden importherkenning](#act-09) |
-| ACT-10 | P2 | Gepland | ACT-09 | [Importbatches en resultaatrapport](#act-10) |
+| ACT-10 | P2 | Afgerond | ACT-09 | [Importbatches en resultaatrapport](#act-10) |
 | ACT-11 | P2 | Gepland | ACT-10 | [Import veilig terugdraaien](#act-11) |
 | ACT-12 | P2 | Gepland | ACT-01 | [Bankstatus en synchronisatiefouten zichtbaar](#act-12) |
 | ACT-13 | P1 | Gepland | ACT-01 | [Deploymentfouten en healthchecks](#act-13) |
@@ -284,15 +284,15 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 
 | Veld | Waarde |
 |---|---|
-| Actie | ACT-10 — importbatches en resultaatrapport |
+| Actie | ACT-11 — import veilig terugdraaien |
 | Status | Gepland |
 | Uitvoerder / datum | Codex / 2026-09-23 |
-| Branch / PR | `codex/act-09-import-identiteit`; PR #150 gemerged |
+| Branch / PR | `codex/act-10-importbatches`; PR #152 gemerged |
 | Budget bij start | 72% resterend in vijf uur; 95% per week; 0 resetcredits. Afgebakend op constraint, migratie, opslagcontroles en regressietests. |
-| Uitgevoerd | Globale unique constraint vervangen door rekeninggebonden constraint; bank- en scheduler-imports en confirm-import controleren account_id; test voor dezelfde hash op twee rekeningen toegevoegd; PostgreSQL-schema-check bijgewerkt. |
-| Validatie | Gerichte tests 15 geslaagd; lokale volledige suite 415 passed, 2 skipped, 2711 warnings in 45.03s; CI-run 35841585232: test en postgres-migrations geslaagd. |
-| Openstaand | Preview-deduplicatie zonder gekozen rekening blijft bewust conservatief en wordt meegenomen in ACT-10. |
-| Volgende stap | ACT-10 uitwerken: importbatch, aantallen, overslaan/afkeuren en eigenaargebonden resultaatweergave. |
+| Uitgevoerd | ImportBatch-model en migratie 061 toegevoegd; CSV- en Enable Banking-imports registreren bron, rekening, totalen, geïmporteerd, overgeslagen en afgekeurd; eigenaargebonden batchresultaat-endpoint en resultaatpagina’s toegevoegd. |
+| Validatie | CI-run 35842390267: 414 tests geslaagd, 3 overgeslagen; postgres-migrations geslaagd. Nieuwe regressietest voor eigenaar en tellingen toegevoegd. |
+| Openstaand | Geen codeblokkade. Lokale venv is niet representatief (Python 3.14 zonder projectdeps); CI is leidend gevalideerd. |
+| Volgende stap | ACT-11 ontwerpen: batchgewijs terugdraaien met conflictcontrole en veilige herhaalde actie. |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,
