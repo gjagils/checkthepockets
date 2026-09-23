@@ -76,6 +76,12 @@
     --ctp-shadow-sm:  0 2px 8px rgba(0, 0, 0, 0.40);
 }
 
+/* One consistent, high-contrast keyboard focus marker across routes. */
+:focus-visible {
+    outline: 3px solid var(--nav-active-border);
+    outline-offset: 3px;
+}
+
 /* ===== Light Theme (Banani) ===== */
 [data-theme="light"] {
     /* Surfaces */
