@@ -72,6 +72,11 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-27 | P2 | Bezig | — | [Compacte spaarplanner](#act-27) |
 | ACT-27a | P2 | Afgerond | — | [Eén regel per spaarregel, regel Beweging, compacte kop](#act-27) |
 | ACT-27b | P2 | Gereed | ACT-27a | [Toekomstige maanden direct bewerkbaar](#act-27) |
+| ACT-28 | P2 | Gereed | — | [Vermogensprognose per persoon](#act-28) |
+| ACT-28a | P2 | Gereed | — | [Rekenkern vermogen per persoon per maand](#act-28) |
+| ACT-28b | P2 | Gepland | ACT-28a | [Plan per 1/1 automatisch vastleggen](#act-28) |
+| ACT-28c | P2 | Gepland | ACT-28a, ACT-28b | [Pagina Vermogensprognose](#act-28) |
+| ACT-28d | P2 | Gepland | ACT-28c | [Losse boekingen per cel](#act-28) |
 
 ## Beschrijving en acceptatiecriteria
 
@@ -307,6 +312,18 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 - **ACT-27a:** Eén regel per spaarregel (badge, naam, acties), kleinere celafstand en maandkolommen, compacte kop, regel "Beweging" (saldo min vorige maand) boven "Saldo". Klaar wanneer ±20 regels plus beweging en saldo op 1920×1080 zonder scrollen passen.
 - **ACT-27b:** Klik op een toekomstige cel → bedrag typen, Enter/Tab slaat op en gaat naar de volgende cel; saldo en beweging werken direct bij. Een afwijkend maandbedrag maakt de regel 'onregelmatig' met behoud van de overige maanden. Alleen eigen plannen; verleden en lopende maand niet bewerkbaar. Klaar wanneer dit met route- en eigenaartests is afgedekt.
 
+<a id="act-28"></a>
+
+### ACT-28 — Vermogensprognose per persoon
+
+- **Aanleiding:** De gebruiker volgt goud, zilver, beleggen en sparen per persoon in een spreadsheet (tabblad 2026, rij 46–67): per begin van de maand, bezit per persoon via aandeel × app-waarde × verkoopfactor 0,982, groei 0,8%/maand, beleggen (vorige + €150) × 1,01, spaar samen uit het spaarplan, kinderspaar + €60/maand met losse boekingen. Begin januari kopieert hij de waarden als "Plan per 1/1" om voor/achter te zien. Mockup besproken op 2026-09-23.
+- **Besluiten gebruiker (2026-09-23):** weergave per persoon (Samen, Nelleke, Hannah, Suze), niet per soort bezit; rood/groen vergelijkt met plan 1/1 (niet met vorige maand); goud/zilver staan vermoedelijk al per persoon in de Portfolio (controleren bij ACT-28a).
+- **Bestaande bouwstenen:** `PortfolioHolding` (bezit per persoon, inleg per maand), `PortfolioAsset` (koers, `monthly_growth_pct`, spread/verkoopkosten), `PortfolioPriceSnapshot` (koers per maand), `account_owners` (rekening ↔ persoon), spaarplanner (lopend saldo).
+- **ACT-28a:** Service die per persoon en bezit de stand per begin van de maand (1/1 t/m eind dec) berekent: verleden uit koers-momentopnames en saldi, toekomst met groei, inleg en verkoopkosten; spaarrekeningen via eigenaar en spaarplan. Klaar wanneer een testgeval met de rekenregels van de sheet dezelfde bedragen oplevert en gebruikersscheiding getest is.
+- **ACT-28b:** Bevroren plan per jaar (model + migratie), automatisch op 1 januari en handmatig vast te leggen; opnieuw vastleggen alleen na bevestiging. Klaar wanneer het plan niet meer meebeweegt met latere wijzigingen.
+- **ACT-28c:** Pagina met weergaven Prognose / Plan 1/1 / Verschil, filter en inklappen per persoon, kleuren t.o.v. plan, tegels "nu vs plan" en "prognose eind jaar"; compact zoals ACT-27a, bruikbaar op mobiel. Klaar met route- en eigenaartests en een schermcontrole.
+- **ACT-28d:** Losse bij-/afboekingen per persoon, bezit en maand direct in de cel (vervangt `+1000`/`−7500` in formules). Klaar met tests op herberekening en eigenaarschap.
+
 ## Onderbouwing van de eerste analyse
 
 - Importidentiteit: [parser](app/parsers/base.py), [globale constraint](app/models.py)
@@ -349,6 +366,7 @@ belemmeringen en één eerstvolgende stap. Bewaar de afgeronde samenvatting hier
 | 2026-09-23 | Beide agentingangen verwijzen naar één workflow | Voorkomt twee uiteenlopende versies van afspraken |
 | 2026-09-23 | Alle verbeteracties vrijgegeven; budgetcontrole vóór iedere start verplicht | Alleen een actie starten die inclusief tests, CI en afronding naar redelijke inschatting past; anders wachten |
 | 2026-09-23 | Oude Linear-items blijven extern totdat relevant werk bewust is overgenomen | Geen claim dat de volledige bestaande backlog al is gemigreerd |
+| 2026-09-23 | Vermogensprognose per persoon, kleuren t.o.v. plan 1/1 (ACT-28) | Vervangt de handmatige kopie in de spreadsheet; bouwt voort op Portfolio en spaarplanner |
 | 2026-09-23 | Gebruiker vraagt alle openstaande acties af te werken; ACT-22 en ACT-23 naar Gereed | Uitvoering blijft één actie tegelijk met budgetcontrole; ACT-08-rotatie, ACT-15-restoreproef en ACT-25-accountonderzoek vragen toegang of handelingen van de gebruiker |
 
 ## Uitvoeringslog
