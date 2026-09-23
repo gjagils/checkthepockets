@@ -2,9 +2,13 @@
 
 Alle bedragen zijn Decimal (centen). Rentes zijn fracties (0.0375 = 3,75%).
 """
+import datetime
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
-from typing import Iterator
+from typing import TYPE_CHECKING, Iterator
+
+if TYPE_CHECKING:
+    from app.models import HouseholdFinance, MortgageScenario, MortgageVariant, ScenarioExistingMortgage
 
 _CENT = Decimal("0.01")
 
@@ -532,3 +536,323 @@ def hra_refund(
     saldo = max(Decimal(str(deductible_interest_yr or 0)) - Decimal(str(ewf_yr or 0)), Decimal("0"))
     factor = Decimal(str(correction_factor or "1.0"))
     return _round_cent(saldo * Decimal(str(tax_rate)) * factor)
+
+
+# ── Bestaande leningdelen en varianten ────────────────────────────────────────
+
+
+def em_rate_for_date(
+    em: "ScenarioExistingMortgage", dt: datetime.date,
+) -> Decimal | None:
+    """Kies de geldende rente op ``dt`` — post-change of originele rate.
+
+    Returnt None als er helemaal geen rente is gezet op het leningdeel.
+    """
+    if (
+        em.rate_change_date is not None
+        and em.rate_pct_after is not None
+        and dt >= em.rate_change_date
+    ):
+        return Decimal(str(em.rate_pct_after)) / Decimal(100)
+    if em.rate_pct is None:
+        return None
+    return Decimal(str(em.rate_pct)) / Decimal(100)
+
+
+def existing_mortgage_yearly_gross(
+    em: "ScenarioExistingMortgage", year_offset: int,
+) -> Decimal:
+    """Totale bruto betaling (rente + aflossing) in het doeljaar.
+
+    Voor aflossingsvrij: gelijk aan rente (geen aflossing). Voor annuïtair:
+    de volledige jaartermijn. Respecteert rate_change_date zoals interest-only
+    al doet; voor annuïtair bij een rentesprong mid-year valt 'ie momenteel
+    terug op de gemiddelde rente (acceptabele vereenvoudiging, omdat Pim/ABN
+    in praktijk aflossingsvrij zijn).
+    """
+    bal = Decimal(str(em.balance_eur or 0))
+    if bal <= 0:
+        return Decimal("0")
+
+    today = datetime.date.today()
+    year_start = datetime.date(today.year + year_offset, 1, 1)
+    year_end = datetime.date(today.year + year_offset, 12, 31)
+    mtype = em.mortgage_type or "annuity"
+
+    if mtype == "interest_only":
+        if (
+            em.rate_change_date is not None
+            and em.rate_pct_after is not None
+            and year_start <= em.rate_change_date <= year_end
+        ):
+            pre_rate = em_rate_for_date(em, year_start)
+            post_rate = em_rate_for_date(em, em.rate_change_date)
+            if pre_rate is None or post_rate is None:
+                return Decimal("0")
+            months_pre = (em.rate_change_date.month - 1)
+            months_post = 12 - months_pre
+            return (
+                bal * pre_rate * Decimal(months_pre) / Decimal(12)
+                + bal * post_rate * Decimal(months_post) / Decimal(12)
+            ).quantize(Decimal("0.01"))
+        rate = em_rate_for_date(em, year_start)
+        if rate is None:
+            return Decimal("0")
+        return (bal * rate).quantize(Decimal("0.01"))
+
+    # Annuïtair: PMT per maand × 12. Gebruik een schedule met de rente die
+    # 1 januari geldt.
+    rate = em_rate_for_date(em, year_start)
+    if rate is None:
+        return Decimal("0")
+    months = int(em.months_remaining) if em.months_remaining else 360
+    years = max(months // 12, 1)
+    pmt_monthly = _calc_annuity_monthly_from_months(
+        bal, rate, min(months, years * 12),
+    )
+    return (pmt_monthly * Decimal(12)).quantize(Decimal("0.01"))
+
+
+def existing_mortgage_yearly_interest(
+    em: "ScenarioExistingMortgage", year_offset: int,
+) -> Decimal:
+    """Rente die dit leningdeel in ``year_offset`` (0 = huidig jaar) maakt.
+
+    * Aflossingsvrij: ``balance × rate_pct/100`` — constant over de looptijd,
+      met een stap als ``rate_change_date`` binnen het jaar valt (dan wordt
+      pro-rata verdeeld over pre/post change-datum).
+    * Annuïtair: gebruikt een amortization-schedule met de rate die begin van
+      het jaar geldt. Rente-sprong mid-year wordt (bewust) genegeerd voor
+      annuïtair — in praktijk herbereken je dan de hele resterende schedule.
+
+    Returnt 0 als rate of balance ontbreekt.
+    """
+    bal = Decimal(str(em.balance_eur or 0))
+    if bal <= 0:
+        return Decimal("0")
+
+    today = datetime.date.today()
+    year_start = datetime.date(today.year + year_offset, 1, 1)
+    year_end = datetime.date(today.year + year_offset, 12, 31)
+
+    mtype = em.mortgage_type or "annuity"
+
+    if mtype == "interest_only":
+        # Pro-rata per maand rond de rate_change_date.
+        if (
+            em.rate_change_date is not None
+            and em.rate_pct_after is not None
+            and year_start <= em.rate_change_date <= year_end
+        ):
+            pre_rate = em_rate_for_date(em, year_start)
+            post_rate = em_rate_for_date(em, em.rate_change_date)
+            if pre_rate is None or post_rate is None:
+                return Decimal("0")
+            months_pre = (em.rate_change_date.month - 1)
+            months_post = 12 - months_pre
+            return (
+                bal * pre_rate * Decimal(months_pre) / Decimal(12)
+                + bal * post_rate * Decimal(months_post) / Decimal(12)
+            ).quantize(Decimal("0.01"))
+        rate = em_rate_for_date(em, year_start)
+        if rate is None:
+            return Decimal("0")
+        return (bal * rate).quantize(Decimal("0.01"))
+
+    # Annuïtair: rate die op 1 januari van het doeljaar geldt.
+    rate = em_rate_for_date(em, year_start)
+    if rate is None:
+        return Decimal("0")
+    months = int(em.months_remaining) if em.months_remaining else 360
+    years = max(months // 12, 1)
+    schedule = list(amortization_schedule(bal, rate, years))
+    rows = schedule[year_offset * 12:(year_offset + 1) * 12]
+    return sum((r.interest for r in rows), Decimal("0"))
+
+
+def variant_stats(
+    variant: "MortgageVariant",
+    ann_principal: Decimal,
+    ltv_fraction: Decimal,
+    rates,
+    household: "HouseholdFinance",
+    scenario: "MortgageScenario | None" = None,
+):
+    """Bereken alle rijen voor deze variant voor de vergelijkingstabel + chart.
+
+    HRA wordt per jaar uitgerekend met:
+
+    * Werkelijke rente uit de aflossingstabel (annuïteit) + rente uit bestaande
+      leningdelen die nog HRA-geldig zijn (``hra_end_date``).
+    * EWF als percentage × WOZ-waarde (scenario.woz_value of fallback
+      scenario.valuation).
+    * ``household.hra_correction_factor`` als kalibratie op je echte aangifte.
+
+    Het veld ``annual_refund`` = gemiddelde teruggaaf over de rentevast-periode
+    (5/10/20 jaar), omdat de jaar-1-waarde een boven-schatting is.
+    """
+    tax_rate = Decimal(str(household.tax_rate))
+    correction = Decimal(
+        str(getattr(household, "hra_correction_factor", "1.0") or "1.0")
+    )
+    ewf_pct = Decimal(
+        str(getattr(household, "ewf_pct", "0.0035") or "0.0035")
+    )
+    existing_pim = Decimal(str(household.existing_mortgage_pim))
+    existing_pim_rate = Decimal(str(household.existing_mortgage_pim_rate))
+    existing_io_monthly = Decimal(str(household.existing_mortgage_interest_only_monthly))
+
+    # WOZ: scenario override, fallback = taxatie, fallback = 0.
+    woz = Decimal("0")
+    if scenario is not None:
+        woz = Decimal(str(
+            scenario.woz_value
+            if scenario.woz_value is not None
+            else scenario.valuation or 0
+        ))
+    ewf_yr = ewf_amount(woz, ewf_pct)
+
+    # Teruggaaf-gebruik per scenario: NULL = volledige teruggaaf → maandlast
+    # (oude gedrag); anders dit bedrag per maand naar maandlast, rest spaart.
+    refund_usage_setting: Decimal | None = None
+    if scenario is not None and scenario.monthly_refund_usage is not None:
+        refund_usage_setting = Decimal(str(scenario.monthly_refund_usage))
+
+    override = variant.interest_rate_override
+    if override is not None:
+        rate = Decimal(str(override))
+        rate_source = "handmatig"
+    else:
+        rate = pick_rate(rates, variant.fixed_years, ltv_fraction)
+        rate_source = "uit rente-tabel"
+
+    stats = {
+        "variant": variant,
+        "fixed_years": variant.fixed_years,
+        "rate": rate,
+        "rate_source": rate_source,
+        "rate_missing": rate is None,
+        "annuity_monthly": Decimal("0.00"),
+        "pim_monthly": Decimal("0.00"),
+        "interest_only_monthly": existing_io_monthly,
+        "monthly_refund": Decimal("0.00"),
+        "annual_refund": Decimal("0.00"),
+        "used_monthly_refund": Decimal("0.00"),
+        "annual_savings": Decimal("0.00"),
+        "net_monthly": Decimal("0.00"),
+        "first_5y_total_cost": Decimal("0.00"),
+        "net_monthly_by_year": [],
+        # Nieuw: per jaar bestaande-maandlast en gebruikte teruggaaf, zodat
+        # het scenario-chart de totale netto hypotheek-last (inclusief ABN-
+        # rentesprong + PIM-HRA-einde) kan tonen, én een overschot-lijn.
+        "existing_monthly_by_year": [],
+        "used_refund_monthly_by_year": [],
+        "mortgage_net_by_year": [],
+        "ewf_yr": ewf_yr,
+    }
+
+    if rate is None:
+        return stats
+
+    stats["annuity_monthly"] = pmt(ann_principal, rate, 30)
+    stats["pim_monthly"] = (existing_pim * existing_pim_rate / Decimal(12)).quantize(
+        Decimal("0.01")
+    )
+
+    schedule = (
+        list(amortization_schedule(ann_principal, rate, 30))
+        if ann_principal > 0 else []
+    )
+
+    today = datetime.date.today()
+    fixed_years = variant.fixed_years or 5
+    refunds_over_fixed: list[Decimal] = []
+
+    for year_offset in range(30):
+        yr_start = datetime.date(today.year + year_offset, 1, 1)
+
+        # Nieuwe annuïteit — rente altijd aftrekbaar (30-jr loopt sowieso).
+        rows = schedule[year_offset * 12:(year_offset + 1) * 12]
+        annuity_int = sum((r.interest for r in rows), Decimal(0)) if rows else Decimal(0)
+        annuity_gross = sum((r.payment for r in rows), Decimal(0)) if rows else Decimal(0)
+
+        # Bestaande leningdelen: rente aftrekbaar tot hra_end_date, plus de
+        # totale bruto maandlast voor het chart.
+        existing_int_deductible = Decimal(0)
+        existing_gross_yr = Decimal(0)
+        if scenario is not None:
+            for em in scenario.existing_mortgages:
+                yr_int = existing_mortgage_yearly_interest(em, year_offset)
+                yr_gross = existing_mortgage_yearly_gross(em, year_offset)
+                existing_gross_yr += yr_gross
+                if em.hra_end_date is None or em.hra_end_date > yr_start:
+                    existing_int_deductible += yr_int
+
+        total_deductible = annuity_int + existing_int_deductible
+        year_refund = hra_refund(
+            total_deductible, ewf_yr, tax_rate, correction,
+        )
+
+        if year_offset < fixed_years:
+            refunds_over_fixed.append(year_refund)
+
+        # Netto maandlast nieuwe annuïteit = bruto − inzet teruggaaf per maand.
+        if refund_usage_setting is None:
+            year_used = year_refund
+        else:
+            year_used = min(
+                max(refund_usage_setting, Decimal("0")) * Decimal(12), year_refund,
+            )
+        if rows:
+            year_net = (annuity_gross - year_used) / Decimal(12)
+            stats["net_monthly_by_year"].append(year_net.quantize(Decimal("0.01")))
+
+        # Per-jaar reeksen voor het chart.
+        stats["existing_monthly_by_year"].append(
+            (existing_gross_yr / Decimal(12)).quantize(Decimal("0.01"))
+        )
+        stats["used_refund_monthly_by_year"].append(
+            (year_used / Decimal(12)).quantize(Decimal("0.01"))
+        )
+        mortgage_net_monthly = (
+            (annuity_gross + existing_gross_yr - year_used) / Decimal(12)
+        )
+        stats["mortgage_net_by_year"].append(
+            mortgage_net_monthly.quantize(Decimal("0.01"))
+        )
+
+    # Vergelijkingstabel-cellen: gemiddelde over rentevast-periode (realistisch,
+    # houdt rekening met dalende rente én aflopende HRA van bestaande leningen).
+    if refunds_over_fixed:
+        avg_annual_refund = (
+            sum(refunds_over_fixed, Decimal(0)) / Decimal(len(refunds_over_fixed))
+        ).quantize(Decimal("0.01"))
+    else:
+        avg_annual_refund = Decimal("0.00")
+
+    full_monthly_refund = (avg_annual_refund / Decimal(12)).quantize(Decimal("0.01"))
+
+    if refund_usage_setting is None:
+        used_monthly = full_monthly_refund
+    else:
+        used_monthly = min(
+            max(refund_usage_setting, Decimal("0")), full_monthly_refund,
+        )
+
+    stats["monthly_refund"] = full_monthly_refund
+    stats["used_monthly_refund"] = used_monthly.quantize(Decimal("0.01"))
+    stats["annual_refund"] = avg_annual_refund
+    stats["annual_savings"] = (
+        (full_monthly_refund - used_monthly) * Decimal(12)
+    ).quantize(Decimal("0.01"))
+    stats["net_monthly"] = (
+        stats["annuity_monthly"] - used_monthly
+    ).quantize(Decimal("0.01"))
+
+    # Eerste 5 jaar totale kosten uit de net_monthly_by_year reeks.
+    if len(stats["net_monthly_by_year"]) >= 5:
+        stats["first_5y_total_cost"] = (
+            sum(stats["net_monthly_by_year"][:5], Decimal(0)) * Decimal(12)
+        ).quantize(Decimal("0.01"))
+
+    return stats

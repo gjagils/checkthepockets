@@ -59,7 +59,9 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-22 | P3 | Afgerond | ACT-02 | [Spaar- en terugkerende logica opsplitsen](#act-22) |
 | ACT-22a | P3 | Afgerond | ACT-02 | [Pure plannings- en spaarregels in eigen modules](#act-22) |
 | ACT-22b | P3 | Afgerond | ACT-22a | [Projecties en koppelingen naar een service](#act-22) |
-| ACT-23 | P3 | Gereed | ACT-02 | [Hypotheeklogica opsplitsen](#act-23) |
+| ACT-23 | P3 | Bezig | ACT-02 | [Hypotheeklogica opsplitsen](#act-23) |
+| ACT-23a | P3 | Review | ACT-02 | [Leningdeel- en variantberekening naar mortgage_calc](#act-23) |
+| ACT-23b | P3 | Gereed | ACT-23a | [Scenariovergelijking uit de detailroute](#act-23) |
 | ACT-24 | P2 | Afgerond | ACT-02 | [Gerichte foutafhandeling en logging](#act-24) |
 | ACT-24a | P2 | Afgerond | ACT-02 | [Twee stille fouten loggen (PR #174)](#act-24) |
 | ACT-24b | P2 | Afgerond | ACT-24a | [Inventarisatie, overige excepts en foutinjectie](#act-24) |
@@ -254,6 +256,9 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 - **Acties:** Scheid scenarioberekeningen, databasewerk en schermweergave. Leg aannames bij berekeningen vast zonder ongemerkt financiële regels te wijzigen.
 - **Klaar wanneer:** Scenario-uitkomsten blijven gelijk bij de refactor; gedeelde berekeningen staan op één plek en zijn zelfstandig testbaar.
 - **Validatie:** Bestaande rekentests en routechecks; afwijkingen alleen met expliciete bugfix en regressietest.
+- **ACT-23a:** Verplaats `_em_rate_for_date`, `_existing_mortgage_yearly_gross`, `_existing_mortgage_yearly_interest` en `_variant_stats` letterlijk van routers/mortgage.py naar app/mortgage_calc.py. Klaar wanneer uitkomsten identiek zijn aan de oude implementatie (golden master met vaste datum) en regressietests ze vastleggen.
+- **ACT-23b:** Haal de scenariovergelijking uit `scenarios_detail` (overbruggingskosten, eerste-5-jaarsrente/-teruggaaf, kosten/inkomsten/resultaat, overschot per jaar, spaarsaldo, grafiekreeksen) naar functies in app/mortgage_calc.py; de route haalt gegevens op en rendert. Klaar wanneer de templatecontext voor een representatief scenario identiek blijft en de rekenstappen afzonderlijk getest zijn.
+- **Aannames (vastgelegd in docstrings):** annuïtaire bestaande leningdelen gebruiken de rente van 1 januari (rentesprong midden in het jaar genegeerd); aflossingsvrij wordt pro rata per maand rond de wijzigingsdatum berekend; de getoonde teruggaaf is het gemiddelde over de rentevaste periode.
 
 <a id="act-24"></a>
 
@@ -303,15 +308,15 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 
 | Veld | Waarde |
 |---|---|
-| Actie | ACT-22b — projecties en koppelingen naar een service |
-| Status | Afgerond |
+| Actie | ACT-23a — leningdeel- en variantberekening naar mortgage_calc |
+| Status | Review |
 | Uitvoerder / datum | Claude Code / 2026-09-23 |
-| Branch / PR | `codex/act-22b-recurring-service`; [PR #184](https://github.com/gjagils/checkthepockets/pull/184) gemerged (`90e6b88`) |
-| Budget bij start | Claude Code usage-weergave (get_usage), 2026-09-23 13:39: 5-uurslimiet 21% gebruikt, week 42% gebruikt; extra usage uit. |
-| Uitgevoerd | app/recurring_service.py bevat `sync_projected_transactions`, `cleanup_matched_projected`, `find_candidates_for_projected`, `link_transaction_to_recurring`, `find_matching_transaction`, `find_recurring_candidates` en `auto_link_recurring_after_import` (uit routers/recurring.py en routers/transactions.py). AST-vergelijking met main: inhoudelijk identiek op namen en overbodige lokale imports na. banking, scheduler, budgets, dashboard en transactions importeren niet meer uit de recurring- of transactions-router. |
-| Validatie | Python 3.12.11: `python -m pytest tests/ --tb=short`: 464 passed, 2 skipped (live Enable Banking), 2820 warnings. Nieuw: tests/test_recurring_service.py (projectie aanmaken/idempotent/opruimen, maanden vóór data en overgeslagen maanden, betaling van andere gebruiker telt niet, automatisch koppelen één per periode met categorie); slaagt ook op main, dus gedrag gelijk. |
-| Openstaand | Buiten ACT-22: scheduler.py importeert nog `inbox_count` en `_map_eb_transactions` uit routers, admin.py `_clean_email` uit de auth-router. ACT-23 volgt; ACT-08, ACT-15 en ACT-25 vragen handelingen van de gebruiker. |
-| Volgende stap | ACT-23 na budgetcontrole. |
+| Branch / PR | `codex/act-23a-mortgage-calc`; PR volgt |
+| Budget bij start | Claude Code usage-weergave (get_usage), 2026-09-23 13:45: 5-uurslimiet 25% gebruikt, week 42% gebruikt; extra usage uit. ACT-23 gesplitst in 23a/23b vóór de start. |
+| Uitgevoerd | `em_rate_for_date`, `existing_mortgage_yearly_gross`, `existing_mortgage_yearly_interest` en `variant_stats` staan nu in app/mortgage_calc.py (letterlijk, publieke namen, modelannotaties alleen voor typecontrole). De route roept ze aan via `mortgage_calc`. |
+| Validatie | Golden master: dezelfde 4 leningdelen × 4 jaren en 4 varianten met vaste datum 2026-09-23 geven byte-identieke uitvoer op main en branch (5269 bytes, incl. 30-jaarsreeksen). `python -m pytest tests/ --tb=short`: 469 passed, 2 skipped (live Enable Banking), 2820 warnings. Nieuw: tests/test_mortgage_variant_stats.py. |
+| Openstaand | ACT-23b. ACT-08, ACT-15 en ACT-25 vragen handelingen van de gebruiker. |
+| Volgende stap | Na groene CI mergen, ACT-23a op Afgerond; daarna ACT-23b na budgetcontrole. |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,
