@@ -170,6 +170,20 @@ def _run_weekly_digests():
     finally:
         db.close()
 
+
+@logged_job("wealth_plan_january")
+def _capture_january_wealth_plans():
+    """Freeze missing yearly wealth baselines on the first day of January."""
+    from app.database import SessionLocal
+    from app.wealth_plan_service import capture_january_wealth_plans
+
+    db = SessionLocal()
+    try:
+        captured = capture_january_wealth_plans(db)
+        return f"{captured} vermogensplan(nen) vastgelegd"
+    finally:
+        db.close()
+
     return (
         f"{sent_count} verzonden, {failed_count} mislukt, {skipped_count} overgeslagen "
         f"({len(candidates)} kandidaten)"
@@ -299,6 +313,19 @@ def start_scheduler():
         replace_existing=True,
     )
     logger.info("Weekly digest tick ingepland elk heel uur (Europe/Amsterdam)")
+
+    scheduler.add_job(
+        _capture_january_wealth_plans,
+        "cron",
+        month=1,
+        day=1,
+        hour=0,
+        minute=5,
+        timezone=NL_TZ,
+        id="wealth_plan_january",
+        replace_existing=True,
+    )
+    logger.info("Vermogensplan vastleggen ingepland op 1 januari 00:05 Europe/Amsterdam")
 
     if scheduler.get_jobs():
         scheduler.start()

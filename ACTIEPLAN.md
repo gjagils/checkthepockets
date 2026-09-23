@@ -74,7 +74,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-27b | P2 | Afgerond | ACT-27a | [Toekomstige maanden direct bewerkbaar](#act-27) |
 | ACT-28 | P2 | Bezig | — | [Vermogensprognose per persoon](#act-28) |
 | ACT-28a | P2 | Afgerond | — | [Rekenkern vermogen per persoon per maand](#act-28) |
-| ACT-28b | P2 | Gepland | ACT-28a | [Plan per 1/1 automatisch vastleggen](#act-28) |
+| ACT-28b | P2 | Review | ACT-28a | [Plan per 1/1 automatisch vastleggen](#act-28) |
 | ACT-28c | P2 | Gepland | ACT-28a, ACT-28b | [Pagina Vermogensprognose](#act-28) |
 | ACT-28d | P2 | Gepland | ACT-28c | [Losse boekingen per cel](#act-28) |
 
@@ -344,15 +344,15 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 
 | Veld | Waarde |
 |---|---|
-| Actie | ACT-28a — rekenkern vermogen per persoon per maand |
-| Status | Afgerond |
+| Actie | ACT-28b — plan per 1/1 automatisch vastleggen |
+| Status | Review |
 | Uitvoerder / datum | Codex / 2026-09-23 |
-| Branch / PR | `codex/act-28a-engine`; [PR #199](https://github.com/gjagils/checkthepockets/pull/199) gemerged (`85caa2c`) |
-| Budget bij start | Codex usage-weergave, 2026-09-23 13:41: 100% resterend in vijf uur, 86% per week; afgebakend op rekenkern, acceptatietests, CI en merge. |
-| Uitgevoerd | `app/wealth_forecast.py` berekent de netto verkoopwaarde (factor 0,982) voor januari t/m december per persoon. Historische portefeuillemaanden gebruiken koersmomentopnames; toekomstige maanden gebruiken de vorige waarde plus inleg en maandgroei. Spaarrekeningen volgen eigenaren, gebruiken geïmporteerde historische saldi wanneer beschikbaar en anders de spaarplanstand aan het begin van de maand. |
-| Validatie | Nieuwe acceptatietests verifiëren momentopnames, groei, inleg, verkoopfactor, gedeelde spaarrekening, historisch saldo en gebruikersscheiding. Lokaal: 2 passed met de bestaande Python 3.14-omgeving. De volledige suite draait verplicht in Python 3.12-CI. |
-| Openstaand | ACT-28b bouwt de bevroren planopslag op deze rekenkern. |
-| Volgende stap | Start ACT-28b vanaf de actuele hoofdbranch. |
+| Branch / PR | `codex/act-28b-frozen-plan`; PR volgt |
+| Budget bij start | Codex usage-weergave, 2026-09-23 13:59: 85% resterend in vijf uur, 85% per week; afgebakend op model, migratie, service, scheduler, tests, CI en merge. |
+| Uitgevoerd | `WealthPlan` en maandelijkse `WealthPlanEntry` bevriezen per persoon portefeuille-, spaar- en totaalbedragen. Vastleggen op 1 januari 00:05 gebeurt automatisch en is idempotent. Handmatige vastlegging retourneert een bevestigingsvereiste wanneer een jaar al bestaat; alleen een expliciete bevestiging mag vervangen. |
+| Validatie | Nieuwe servicetests verifiëren onveranderlijkheid bij latere koerswijzigingen, vervanging alleen met bevestiging en de automatische januari-run. Lokaal: 4 passed voor ACT-28a/b. Python 3.12-CI en PostgreSQL-migraties staan nog open. |
+| Openstaand | Groene PR-CI en squash-merge; ACT-28c bouwt daarna de zichtbare prognosepagina. |
+| Volgende stap | PR aanmaken en CI afwachten; bij groen ACT-28b afronden. |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,
