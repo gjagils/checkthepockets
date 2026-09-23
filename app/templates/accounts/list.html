@@ -97,8 +97,11 @@
 </div>
 {% else %}
 <div class="card" style="text-align:center; padding:3rem;">
-    <p style="margin-bottom:1rem;">Nog geen rekeningen. Importeer een CSV om te beginnen.</p>
-    <a href="/import" class="btn btn-primary">CSV importeren</a>
+    <p style="margin-bottom:1rem;">Nog geen rekeningen. Importeer een bestand of koppel je bank om te beginnen.</p>
+    <div style="display:flex; justify-content:center; gap:0.75rem; flex-wrap:wrap;">
+        <a href="/import" class="btn btn-primary">CSV importeren</a>
+        <a href="/banking/connect" class="btn">Bank koppelen</a>
+    </div>
 </div>
 {% endif %}
 

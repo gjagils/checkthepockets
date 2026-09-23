@@ -531,8 +531,11 @@
     <p style="margin-bottom:1rem;">Geen transacties gevonden met deze filters.</p>
     <a href="/transactions" class="btn btn-primary">Filters wissen</a>
     {% else %}
-    <p style="margin-bottom:1rem;">Nog geen transacties geimporteerd.</p>
-    <a href="/import" class="btn btn-primary">Eerste CSV importeren</a>
+    <p style="margin-bottom:1rem;">Nog geen transacties. Begin met een import of voeg één betaling handmatig toe.</p>
+    <div style="display:flex; justify-content:center; gap:0.75rem; flex-wrap:wrap;">
+        <a href="/import" class="btn btn-primary">Eerste CSV importeren</a>
+        <a href="/transactions/create" class="btn">Transactie toevoegen</a>
+    </div>
     {% endif %}
 </div>
 {% endif %}
