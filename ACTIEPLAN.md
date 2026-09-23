@@ -43,7 +43,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-06 | P1 | Afgerond | ACT-01 | [CSRF-bescherming controleren en aanvullen](#act-06) |
 | ACT-07 | P1 | Afgerond | ACT-01, ACT-03 | [Encryptie zonder stille terugval](#act-07) |
 | ACT-08 | P1 | Review | — | [Geheimen en Docker-buildcontext opschonen](#act-08) |
-| ACT-09 | P1 | Gepland | ACT-02, ACT-03 | [Rekeninggebonden importherkenning](#act-09) |
+| ACT-09 | P1 | Bezig | ACT-02, ACT-03 | [Rekeninggebonden importherkenning](#act-09) |
 | ACT-10 | P2 | Gepland | ACT-09 | [Importbatches en resultaatrapport](#act-10) |
 | ACT-11 | P2 | Gepland | ACT-10 | [Import veilig terugdraaien](#act-11) |
 | ACT-12 | P2 | Gepland | ACT-01 | [Bankstatus en synchronisatiefouten zichtbaar](#act-12) |
@@ -131,7 +131,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 
 ### ACT-09 — Rekeninggebonden importherkenning
 
-- **Acties:** Herontwerp globale import_hash naar rekeninggebonden identiteit. Gebruik bank-ID’s waar beschikbaar; behoud echte identieke betalingen en behandel overlap CSV/bankkoppeling. Migreer bestaande constraints.
+- **Acties:** Maak de database-identiteit uniek per rekening via `(account_id, import_hash)`. Gebruik bestaande stabiele bank-ID/hashwaarden; beperk opslagcontroles in handmatige, scheduler- en Enable Banking-imports tot de doelrekening. Behoud echte identieke betalingen op verschillende rekeningen en migreer de globale constraint.
 - **Klaar wanneer:** Twee gebruikers/rekeningen kunnen dezelfde betaling importeren; herhaalde import dupliceert niet; twee echte identieke betalingen blijven behouden; bestaande imports blijven herkenbaar.
 - **Validatie:** Regressietests voor alle genoemde gevallen en PostgreSQL-migratieproef; leg fallbackregels expliciet vast.
 
@@ -284,15 +284,15 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 
 | Veld | Waarde |
 |---|---|
-| Actie | ACT-08 — geheimen en Docker-buildcontext opschonen |
-| Status | Review |
+| Actie | ACT-09 — rekeninggebonden importherkenning |
+| Status | Bezig |
 | Uitvoerder / datum | Codex / 2026-09-23 |
-| Branch / PR | `codex/act-08-secrets-buildcontext`; [PR #148](https://github.com/gjagils/checkthepockets/pull/148), gemerged in `5d0b678` |
-| Budget bij start | 72% resterend in vijf uur; 96% per week; 0 resetcredits. Afgebakend op tracking en buildcontext; secret-rotatie blijft beheeractie. |
-| Uitgevoerd | `.dockerignore` sluit PEM-sleutels, keys en agentmappen uit; `stack.env` wordt uit Git-index verwijderd zonder lokaal bestand te wissen. Historie en rotatie worden geredigeerd gerapporteerd. |
-| Validatie | `git check-ignore` bevestigde stack.env en PEM-uitsluiting; normale CI groen in 1m42s en PostgreSQL-check groen in 37s; geen geheimwaarden in logs of documentatie. |
-| Openstaand | Secret-rotatie en besluit over historische Git-inhoud vereisen beheeractie; code/buildcontext is afgerond. |
-| Volgende stap | Beheer roteert waarden indien nodig; voor codewerk kan ACT-09 starten na limietcontrole. |
+| Branch / PR | `codex/act-09-import-identiteit`; PR volgt |
+| Budget bij start | 72% resterend in vijf uur; 95% per week; 0 resetcredits. Afgebakend op constraint, migratie, opslagcontroles en regressietests. |
+| Uitgevoerd | Globale unique constraint vervangen door rekeninggebonden constraint; bank- en scheduler-imports en confirm-import controleren account_id; test voor dezelfde hash op twee rekeningen toegevoegd. |
+| Validatie | Gerichte tests 15 geslaagd; lokale volledige suite 415 passed, 2 skipped, 2711 warnings in 45.03s; CI volgt. |
+| Openstaand | CI-run, migratiecontrole en PR-merge; preview-deduplicatie zonder gekozen rekening blijft bewust conservatief en moet in ACT-10 worden meegenomen. |
+| Volgende stap | Committen/pushen en CI afwachten. |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,

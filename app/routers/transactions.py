@@ -1494,7 +1494,10 @@ async def import_confirm(request: Request, db: Session = Depends(get_db)):
     imported = skipped = auto_categorized = 0
 
     for item in tx_data:
-        exists = db.query(Transaction).filter(Transaction.import_hash == item["import_hash"]).first()
+        exists = db.query(Transaction).filter(
+            Transaction.account_id == account.id,
+            Transaction.import_hash == item["import_hash"],
+        ).first()
         if exists:
             skipped += 1
             continue

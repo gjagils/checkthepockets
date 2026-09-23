@@ -474,7 +474,10 @@ async def sync_transactions(connection_id: int, request: Request, db: Session = 
     imported = skipped = auto_categorized = 0
 
     for p in parsed:
-        exists = db.query(Transaction).filter(Transaction.import_hash == p.import_hash).first()
+        exists = db.query(Transaction).filter(
+            Transaction.account_id == account.id,
+            Transaction.import_hash == p.import_hash,
+        ).first()
         if exists:
             skipped += 1
             continue
