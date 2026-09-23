@@ -517,6 +517,8 @@ class BankConnection(Base):
     valid_until = Column(DateTime, nullable=True)           # consent expiry
     status = Column(String(20), nullable=False, default="pending")  # pending, active, expired, revoked
     last_synced_at = Column(DateTime, nullable=True)
+    last_sync_status = Column(String(20), nullable=False, default="never")
+    last_sync_error = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     user = relationship("User")
