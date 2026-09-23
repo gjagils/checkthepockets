@@ -73,7 +73,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-27a | P2 | Afgerond | — | [Eén regel per spaarregel, regel Beweging, compacte kop](#act-27) |
 | ACT-27b | P2 | Afgerond | ACT-27a | [Toekomstige maanden direct bewerkbaar](#act-27) |
 | ACT-28 | P2 | Bezig | — | [Vermogensprognose per persoon](#act-28) |
-| ACT-28a | P2 | Review | — | [Rekenkern vermogen per persoon per maand](#act-28) |
+| ACT-28a | P2 | Afgerond | — | [Rekenkern vermogen per persoon per maand](#act-28) |
 | ACT-28b | P2 | Gepland | ACT-28a | [Plan per 1/1 automatisch vastleggen](#act-28) |
 | ACT-28c | P2 | Gepland | ACT-28a, ACT-28b | [Pagina Vermogensprognose](#act-28) |
 | ACT-28d | P2 | Gepland | ACT-28c | [Losse boekingen per cel](#act-28) |
@@ -345,14 +345,14 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 | Veld | Waarde |
 |---|---|
 | Actie | ACT-28a — rekenkern vermogen per persoon per maand |
-| Status | Review |
+| Status | Afgerond |
 | Uitvoerder / datum | Codex / 2026-09-23 |
-| Branch / PR | `codex/act-28a-wealth-engine`; PR volgt |
+| Branch / PR | `codex/act-28a-engine`; [PR #199](https://github.com/gjagils/checkthepockets/pull/199) gemerged (`85caa2c`) |
 | Budget bij start | Codex usage-weergave, 2026-09-23 13:41: 100% resterend in vijf uur, 86% per week; afgebakend op rekenkern, acceptatietests, CI en merge. |
 | Uitgevoerd | `app/wealth_forecast.py` berekent de netto verkoopwaarde (factor 0,982) voor januari t/m december per persoon. Historische portefeuillemaanden gebruiken koersmomentopnames; toekomstige maanden gebruiken de vorige waarde plus inleg en maandgroei. Spaarrekeningen volgen eigenaren, gebruiken geïmporteerde historische saldi wanneer beschikbaar en anders de spaarplanstand aan het begin van de maand. |
 | Validatie | Nieuwe acceptatietests verifiëren momentopnames, groei, inleg, verkoopfactor, gedeelde spaarrekening, historisch saldo en gebruikersscheiding. Lokaal: 2 passed met de bestaande Python 3.14-omgeving. De volledige suite draait verplicht in Python 3.12-CI. |
-| Openstaand | Groene PR-CI en squash-merge; ACT-28b bouwt daarna de bevroren planopslag op deze rekenkern. |
-| Volgende stap | PR aanmaken en CI afwachten; bij groen ACT-28a afronden. |
+| Openstaand | ACT-28b bouwt de bevroren planopslag op deze rekenkern. |
+| Volgende stap | Start ACT-28b vanaf de actuele hoofdbranch. |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,
@@ -398,3 +398,4 @@ Voeg per afgeronde actie of overdracht een regel toe. Git bevat de volledige his
 | 2026-09-23 | ACT-25a | Rekeningen zonder uid zichtbaar na koppelen; logregel per koppeling | [PR #191](https://github.com/gjagils/checkthepockets/pull/191), beide checks groen; merge `8a58ab7`; deployment geslaagd |
 | 2026-09-23 | ACT-27a | Compacte spaarplanner met regel Beweging | [PR #194](https://github.com/gjagils/checkthepockets/pull/194), beide checks groen; merge `34066d5`; deployment geslaagd |
 | 2026-09-23 | ACT-27 | Compacte spaarplanner; toekomstige maanden direct bewerkbaar | [PR #194](https://github.com/gjagils/checkthepockets/pull/194) en [PR #197](https://github.com/gjagils/checkthepockets/pull/197), beide checks groen; merge `ccc26a2`; browsercontrole celbewerking open |
+| 2026-09-23 | ACT-28a | Jaarrekenkern per persoon met koersmomentopnames, groei, inleg, verkoopfactor en gedeelde spaarrekeningen | [PR #199](https://github.com/gjagils/checkthepockets/pull/199), beide checks groen; merge `85caa2c` |
