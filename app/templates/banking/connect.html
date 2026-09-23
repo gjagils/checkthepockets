@@ -58,7 +58,8 @@
                     {% endif %}
                 </td>
                 <td>{{ conn.valid_until.strftime('%d-%m-%Y') if conn.valid_until else '-' }}</td>
-                <td>{{ conn.last_synced_at.strftime('%d-%m-%Y %H:%M') if conn.last_synced_at else 'Nog niet' }}</td>
+                    <td>{{ conn.last_synced_at.strftime('%d-%m-%Y %H:%M') if conn.last_synced_at else 'Nog niet' }}</td>
+                    <td>{% if conn.last_sync_status == 'error' %}<span class="badge" title="{{ conn.last_sync_error }}">Fout</span>{% elif conn.last_sync_status == 'success' %}Geslaagd{% else %}Nog niet{% endif %}</td>
                 <td style="display:flex; gap:0.5rem; flex-wrap:wrap;">
                     {% if conn.status == "active" %}
                     <a href="/banking/sync/{{ conn.id }}" class="btn btn-sm btn-primary">Synchroniseren</a>

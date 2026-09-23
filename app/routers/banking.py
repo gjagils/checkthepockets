@@ -343,6 +343,9 @@ async def sync_transactions(connection_id: int, request: Request, db: Session = 
         logger.info("Bank sync: %d ruwe transacties opgehaald", len(raw_transactions))
     except Exception as e:
         logger.error("Bank sync fout: %s", e)
+        conn.last_sync_status = "error"
+        conn.last_sync_error = str(e)[:500]
+        db.commit()
         return templates.TemplateResponse(
             "banking/sync.html",
             {
@@ -508,6 +511,8 @@ async def sync_transactions(connection_id: int, request: Request, db: Session = 
         imported += 1
 
     conn.last_synced_at = datetime.utcnow()
+    conn.last_sync_status = "success"
+    conn.last_sync_error = None
     batch.imported_count = imported
     batch.skipped_count = skipped
     db.commit()
