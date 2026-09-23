@@ -23,6 +23,7 @@ from app.models import (
     SavingsLine,
     SavingsPlan,
     Transaction,
+    WealthAdjustment,
 )
 
 
@@ -115,6 +116,12 @@ def build_wealth_forecast(
     plans_by_account = {plan.account_id: plan for plan in plans}
     assets_by_id = {asset.id: asset for asset in assets}
     prices = _asset_prices_by_month(db, assets, year)
+    adjustments = {
+        (row.asset_id, row.person_id, row.month): row.amount
+        for row in db.query(WealthAdjustment).filter(
+            WealthAdjustment.user_id == user_id, WealthAdjustment.year == year,
+        ).all()
+    }
 
     per_person = {
         person.id: {month: {"portfolio": ZERO, "savings": ZERO, "total": ZERO}
@@ -144,11 +151,11 @@ def build_wealth_forecast(
                 contribution = holding.monthly_contribution_eur or ZERO
                 if historic:
                     price = snapshot_price if snapshot_price is not None else current_price
-                    value = quantity * price * SELL_FACTOR
+                    value = quantity * price * SELL_FACTOR + adjustments.get((asset.id, person_id, month), ZERO)
                 elif person_id in previous_values:
-                    value = (previous_values[person_id] + contribution) * growth
+                    value = (previous_values[person_id] + contribution + adjustments.get((asset.id, person_id, month), ZERO)) * growth
                 else:
-                    value = quantity * current_price * SELL_FACTOR
+                    value = quantity * current_price * SELL_FACTOR + adjustments.get((asset.id, person_id, month), ZERO)
                 previous_values[person_id] = value
                 asset_values[person_id][month] += value
 

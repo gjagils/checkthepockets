@@ -75,8 +75,8 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-28 | P2 | Bezig | — | [Vermogensprognose per persoon](#act-28) |
 | ACT-28a | P2 | Afgerond | — | [Rekenkern vermogen per persoon per maand](#act-28) |
 | ACT-28b | P2 | Afgerond | ACT-28a | [Plan per 1/1 automatisch vastleggen](#act-28) |
-| ACT-28c | P2 | Review | ACT-28a, ACT-28b | [Pagina Vermogensprognose](#act-28) |
-| ACT-28d | P2 | Gepland | ACT-28c | [Losse boekingen per cel](#act-28) |
+| ACT-28c | P2 | Afgerond | ACT-28a, ACT-28b | [Pagina Vermogensprognose](#act-28) |
+| ACT-28d | P2 | Review | ACT-28c | [Losse boekingen per cel](#act-28) |
 
 ## Beschrijving en acceptatiecriteria
 
@@ -344,15 +344,15 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 
 | Veld | Waarde |
 |---|---|
-| Actie | ACT-28c — pagina Vermogensprognose |
+| Actie | ACT-28d — losse boekingen per cel |
 | Status | Review |
 | Uitvoerder / datum | Codex / 2026-09-23 |
-| Branch / PR | `codex/act-28c-forecast-page`; PR volgt |
-| Budget bij start | Codex usage-weergave, 2026-09-23 14:05: 76% resterend in vijf uur, 85% per week; afgebakend op route, pagina, navigatie, routechecks, CI en merge. |
-| Uitgevoerd | Nieuwe pagina `/portfolio/wealth-forecast` toont per persoon of samen de Prognose, Plan 1/1 en Verschil voor alle maanden, met huidige/eindjaartegels en groen/rood t.o.v. plan. De pagina is via desktop- en mobiele Portfolio-navigatie bereikbaar; vastleggen van het plan vraagt bevestiging bij vervangen. |
-| Validatie | Routecheck dekt aanmelding, persoonfilter en planweergave. Lokaal faalt alleen de renderstap door de bestaande Python 3.14/Jinja-cache-incompatibiliteit; syntaxis en aanmeldcheck zijn groen. Python 3.12-CI staat nog open. |
-| Openstaand | Groene PR-CI en squash-merge; ACT-28d voegt daarna losse boekingen per persoon, bezit en maand toe. |
-| Volgende stap | PR aanmaken en CI afwachten; bij groen ACT-28c afronden. |
+| Branch / PR | `codex/act-28d-adjustments`; PR volgt |
+| Budget bij start | Codex usage-weergave, 2026-09-23 14:13: 67% resterend in vijf uur, 85% per week; afgebakend op mutatiemodel, migratie, eigenaarschap, celbewerking, tests, CI en merge. |
+| Uitgevoerd | `WealthAdjustment` bewaart een losse euroboeking per gebruiker, bezit, persoon en maand. De prognose rekent deze direct door; de pagina toont per bezit/persoon twaalf bewerkbare cellen. Een lege cel verwijdert de boeking. De route accepteert alleen een eigen bezit met eigen persoon én bestaande holding. |
+| Validatie | Lokale Python 3.14: 6 passed voor ACT-28a/b/d, inclusief bij-/afboeken, herberekening, wissen en eigenaarschap. De volledige Python 3.12-CI en PostgreSQL-migratie staan nog open. |
+| Openstaand | Groene PR-CI en squash-merge. |
+| Volgende stap | PR aanmaken en CI afwachten; bij groen ACT-28d en ACT-28 afronden. |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,

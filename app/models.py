@@ -65,6 +65,7 @@ class User(Base):
     persons = relationship("Person", back_populates="user", cascade="all, delete-orphan")
     portfolio_holdings = relationship("PortfolioHolding", back_populates="user", cascade="all, delete-orphan")
     wealth_plans = relationship("WealthPlan", back_populates="user", cascade="all, delete-orphan")
+    wealth_adjustments = relationship("WealthAdjustment", back_populates="user", cascade="all, delete-orphan")
     networth_accounts = relationship("NetWorthAccount", back_populates="user", cascade="all, delete-orphan")
     networth_snapshots = relationship("NetWorthSnapshot", back_populates="user", cascade="all, delete-orphan")
     budget_presets = relationship("BudgetPreset", back_populates="user", cascade="all, delete-orphan")
@@ -809,6 +810,26 @@ class WealthPlanEntry(Base):
     person = relationship("Person")
 
     __table_args__ = (UniqueConstraint("plan_id", "person_id", "month", name="uq_wealth_plan_entry_month"),)
+
+
+class WealthAdjustment(Base):
+    """A one-off euro booking for a person's portfolio asset in one month."""
+
+    __tablename__ = "wealth_adjustments"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    asset_id = Column(Integer, ForeignKey("portfolio_assets.id", ondelete="CASCADE"), nullable=False)
+    person_id = Column(Integer, ForeignKey("persons.id", ondelete="CASCADE"), nullable=False)
+    year = Column(Integer, nullable=False)
+    month = Column(Integer, nullable=False)
+    amount = Column(Numeric(14, 2), nullable=False)
+
+    user = relationship("User", back_populates="wealth_adjustments")
+    asset = relationship("PortfolioAsset")
+    person = relationship("Person")
+
+    __table_args__ = (UniqueConstraint("user_id", "asset_id", "person_id", "year", "month", name="uq_wealth_adjustment_month"),)
 
 
 class SchedulerRunLog(Base):

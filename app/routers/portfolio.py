@@ -6,7 +6,7 @@ from fastapi.responses import RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import PortfolioAsset, Person, PortfolioHolding, PortfolioPriceSnapshot
+from app.models import PortfolioAsset, Person, PortfolioHolding, PortfolioPriceSnapshot, WealthAdjustment
 from app.auth import require_login
 from app.capital_dashboard import build_capital_dashboard
 from app.wealth_forecast import build_wealth_forecast
@@ -296,6 +296,25 @@ def wealth_forecast_page(
 
     now_month = datetime.date.today().month if selected_year == current_year else 1
     now_row = rows[now_month - 1]
+    holdings = (
+        db.query(PortfolioHolding)
+        .filter(PortfolioHolding.user_id == user.id)
+        .all()
+    )
+    adjustments = {
+        (row.asset_id, row.person_id, row.month): row.amount
+        for row in db.query(WealthAdjustment).filter(
+            WealthAdjustment.user_id == user.id, WealthAdjustment.year == selected_year,
+        ).all()
+    }
+    adjustment_rows = [
+        {
+            "asset": next((asset for asset in db.query(PortfolioAsset).filter(PortfolioAsset.id == holding.asset_id).all()), None),
+            "person": next((item for item in persons if item.id == holding.person_id), None),
+            "amounts": {month: adjustments.get((holding.asset_id, holding.person_id, month), Decimal("0")) for month in range(1, 13)},
+        }
+        for holding in holdings
+    ]
     return templates.TemplateResponse(
         "portfolio/wealth_forecast.html",
         {
@@ -308,8 +327,52 @@ def wealth_forecast_page(
             "has_plan": bool(plan_entries),
             "now_row": now_row,
             "end_row": rows[-1],
+            "adjustment_rows": [row for row in adjustment_rows if row["asset"] and row["person"]],
         },
     )
+
+
+@router.post("/wealth-adjustments")
+def save_wealth_adjustment(
+    request: Request,
+    asset_id: int = Form(...),
+    person_id: int = Form(...),
+    year: int = Form(...),
+    month: int = Form(...),
+    amount: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """Save one person's one-off booking for a portfolio asset and month."""
+    user = require_login(request, db)
+    if month not in range(1, 13):
+        return JSONResponse({"ok": False}, status_code=400)
+    asset = db.query(PortfolioAsset).filter(PortfolioAsset.id == asset_id, PortfolioAsset.user_id == user.id).first()
+    person = db.query(Person).filter(Person.id == person_id, Person.user_id == user.id).first()
+    holding = db.query(PortfolioHolding).filter(
+        PortfolioHolding.user_id == user.id, PortfolioHolding.asset_id == asset_id, PortfolioHolding.person_id == person_id,
+    ).first()
+    if not asset or not person or not holding:
+        return JSONResponse({"ok": False}, status_code=404)
+    raw_amount = (amount or "").strip()
+    if "," in raw_amount:
+        raw_amount = raw_amount.replace(".", "").replace(",", ".")
+    try:
+        parsed = Decimal(raw_amount) if raw_amount else Decimal("0")
+    except (InvalidOperation, ValueError):
+        return JSONResponse({"ok": False}, status_code=400)
+    row = db.query(WealthAdjustment).filter(
+        WealthAdjustment.user_id == user.id, WealthAdjustment.asset_id == asset_id,
+        WealthAdjustment.person_id == person_id, WealthAdjustment.year == year, WealthAdjustment.month == month,
+    ).first()
+    if parsed == 0:
+        if row:
+            db.delete(row)
+    elif row:
+        row.amount = parsed
+    else:
+        db.add(WealthAdjustment(user_id=user.id, asset_id=asset_id, person_id=person_id, year=year, month=month, amount=parsed))
+    db.commit()
+    return JSONResponse({"ok": True, "amount": str(parsed)})
 
 
 @router.post("/wealth-plan/{year}/capture")
