@@ -16,5 +16,6 @@ def test_production_rejects_default_secret_and_http(monkeypatch):
 
 
 def test_production_accepts_strong_https_configuration(monkeypatch):
-    result = _validate({"ENVIRONMENT": "production", "SECRET_KEY": "a" * 32, "APP_URL": "https://example.test", "COOKIE_SECURE": "true"})
+    from cryptography.fernet import Fernet
+    result = _validate({"ENVIRONMENT": "production", "SECRET_KEY": "a" * 32, "APP_URL": "https://example.test", "COOKIE_SECURE": "true", "FIELD_ENCRYPTION_KEY": Fernet.generate_key().decode()})
     assert result.returncode == 0, result.stderr

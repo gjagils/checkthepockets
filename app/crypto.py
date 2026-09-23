@@ -20,6 +20,7 @@ from app.config import FIELD_ENCRYPTION_KEY
 logger = logging.getLogger(__name__)
 
 _fernet = None
+_encryption_configured = bool(FIELD_ENCRYPTION_KEY)
 
 if FIELD_ENCRYPTION_KEY:
     try:
@@ -41,22 +42,29 @@ class EncryptedText(TypeDecorator):
 
     def process_bind_param(self, value, dialect):
         """Encrypt before writing to DB."""
-        if value is None or _fernet is None:
+        if value is None:
+            return value
+        if _encryption_configured and _fernet is None:
+            raise RuntimeError("FIELD_ENCRYPTION_KEY is configured but invalid; refusing plain-text storage")
+        if _fernet is None:
             return value
         try:
             return _fernet.encrypt(value.encode()).decode()
-        except Exception:
-            return value
+        except Exception as exc:
+            raise RuntimeError("Unable to encrypt sensitive field; refusing plain-text storage") from exc
 
     def process_result_value(self, value, dialect):
         """Decrypt after reading from DB."""
         if value is None or _fernet is None:
             return value
+        # Values without Fernet's marker are legacy plaintext. Ciphertext that
+        # has the marker but fails authentication is corruption/key mismatch.
+        if not value.startswith("gAAAA"):
+            return value
         try:
             return _fernet.decrypt(value.encode()).decode()
-        except Exception:
-            # Legacy unencrypted value — return as-is
-            return value
+        except Exception as exc:
+            raise RuntimeError("Unable to decrypt sensitive field; key may be wrong or data corrupted") from exc
 
 
 def encryption_enabled() -> bool:
