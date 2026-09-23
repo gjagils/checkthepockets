@@ -40,7 +40,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-03 | P1 | Afgerond | ACT-01 | [PostgreSQL en migraties toetsen](#act-03) |
 | ACT-04 | P1 | Afgerond | ACT-01 | [Accountstatus en sessie-intrekking](#act-04) |
 | ACT-05 | P1 | Afgerond | ACT-01 | [Veilige configuratie en cookies](#act-05) |
-| ACT-06 | P1 | Bezig | ACT-01 | [CSRF-bescherming controleren en aanvullen](#act-06) |
+| ACT-06 | P1 | Afgerond | ACT-01 | [CSRF-bescherming controleren en aanvullen](#act-06) |
 | ACT-07 | P1 | Gepland | ACT-01, ACT-03 | [Encryptie zonder stille terugval](#act-07) |
 | ACT-08 | P1 | Gepland | — | [Geheimen en Docker-buildcontext opschonen](#act-08) |
 | ACT-09 | P1 | Gepland | ACT-02, ACT-03 | [Rekeninggebonden importherkenning](#act-09) |
@@ -285,14 +285,14 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 | Veld | Waarde |
 |---|---|
 | Actie | ACT-06 — CSRF-bescherming controleren en aanvullen |
-| Status | Bezig |
+| Status | Afgerond |
 | Uitvoerder / datum | Codex / 2026-09-23 |
-| Branch / PR | `codex/act-06-csrf`; PR volgt |
+| Branch / PR | `codex/act-06-csrf`; [PR #144](https://github.com/gjagils/checkthepockets/pull/144), gemerged in `d2292f0` |
 | Budget bij start | 75% resterend in vijf uur; 96% per week; 0 resetcredits. Afgebakend op centrale origincontrole en regressietests. |
 | Uitgevoerd | Productie-CSRFcontrole toegevoegd voor POST/PUT/PATCH/DELETE; same-origin via Origin/Referer toegestaan; cross-origin cookie-mutaties krijgen 403; tests toegevoegd. |
-| Validatie | Gerichte tests 4 geslaagd; lokale volledige suite 411 passed, 2 skipped, 2705 warnings in 45.60s; CI volgt. |
-| Openstaand | CI-run, PR-merge en status naar Afgerond bij groene checks. |
-| Volgende stap | Committen/pushen en CI afwachten. |
+| Validatie | Gerichte tests 4 geslaagd; lokale volledige suite 411 passed, 2 skipped, 2705 warnings in 45.60s; normale CI groen in 1m47s en PostgreSQL-check groen in 34s. |
+| Openstaand | Geen ACT-06-werk. |
+| Volgende stap | Voor ACT-07 limieten opnieuw controleren; daarna encryptie zonder stille terugval. |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,
@@ -321,3 +321,4 @@ Voeg per afgeronde actie of overdracht een regel toe. Git bevat de volledige his
 | 2026-09-23 | ACT-03 | PostgreSQL 16-migratie en schema gecontroleerd in CI | [PR #138](https://github.com/gjagils/checkthepockets/pull/138), beide checks groen; merge `bb2fa44` |
 | 2026-09-23 | ACT-04 | Accountstatus en sessie-intrekking toegevoegd | [PR #140](https://github.com/gjagils/checkthepockets/pull/140), beide checks groen; merge `f313593` |
 | 2026-09-23 | ACT-05 | Productieconfiguratie en HTTPS-cookies veilig afgedwongen | [PR #142](https://github.com/gjagils/checkthepockets/pull/142), beide checks groen; merge `8ef7401` |
+| 2026-09-23 | ACT-06 | Cross-origin mutaties geblokkeerd in productie | [PR #144](https://github.com/gjagils/checkthepockets/pull/144), beide checks groen; merge `d2292f0` |
