@@ -56,6 +56,21 @@
         </table>
     </div>
 </div>
+{% if adjustment_rows %}
+<details class="card" style="margin-top:1.25rem;">
+    <summary style="cursor:pointer; font-weight:650;">Losse boekingen per bezit</summary>
+    <p class="muted" style="margin:.6rem 0 1rem;">Vul een positieve of negatieve euroboeking in. Leegmaken verwijdert de boeking; de prognose wordt daarna opnieuw berekend.</p>
+    <div class="table-wrap">
+        <table class="wealth-adjustments">
+            <thead><tr><th>Bezit / persoon</th>{% for row in rows %}<th class="text-right">{{ row.label }}</th>{% endfor %}</tr></thead>
+            <tbody>{% for adjustment in adjustment_rows %}<tr>
+                <th>{{ adjustment.asset.name }}<br><span class="muted" style="font-weight:400;">{{ adjustment.person.name }}</span></th>
+                {% for row in rows %}<td class="text-right"><input class="budget-input wealth-adjustment" inputmode="decimal" style="width:82px" data-asset="{{ adjustment.asset.id }}" data-person="{{ adjustment.person.id }}" data-month="{{ row.month }}" value="{% if adjustment.amounts[row.month] %}{{ adjustment.amounts[row.month] }}{% endif %}" aria-label="{{ adjustment.asset.name }} {{ adjustment.person.name }} {{ row.label }}"></td>{% endfor %}
+            </tr>{% endfor %}</tbody>
+        </table>
+    </div>
+</details>
+{% endif %}
 {% endif %}
 {% endblock %}
 {% block scripts %}
@@ -71,5 +86,12 @@ async function capturePlan(confirmed) {
     }
     if (response.ok) window.location.reload();
 }
+document.querySelectorAll('.wealth-adjustment').forEach(function(input) {
+    input.addEventListener('change', async function() {
+        const body = new URLSearchParams({asset_id: input.dataset.asset, person_id: input.dataset.person, year: '{{ year }}', month: input.dataset.month, amount: input.value});
+        const response = await fetch('/portfolio/wealth-adjustments', {method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: body.toString()});
+        if (response.ok) window.location.reload();
+    });
+});
 </script>
 {% endblock %}
