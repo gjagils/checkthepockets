@@ -22,7 +22,7 @@ from app.auth import require_login
 from app.parsers import abn_amro, bunq, ics, ing, rabobank
 from app.parsers.base import ParseError, ParsedTransaction
 from app.parsers.ics_pdf import parse_ics_pdf
-from app.import_service import store_confirmed_csv_rows
+from app.import_service import existing_import_hashes, find_import_account, store_confirmed_csv_rows
 from app.rules_engine import apply_rules_to_transaction
 from app.template_config import templates
 
@@ -143,8 +143,11 @@ def _build_preview(parsed: list[ParsedTransaction], existing_hashes: set) -> tup
     """Return (preview_rows for template, base64 tx_data for hidden form field)."""
     preview_rows = []
     tx_data_list = []
+    seen = set()
     for p in parsed:
-        is_dup = p.import_hash in existing_hashes
+        # Confirming skips hashes already on the account and repeats within the file.
+        is_dup = p.import_hash in existing_hashes or p.import_hash in seen
+        seen.add(p.import_hash)
         preview_rows.append({
             "date": p.date.isoformat(),
             "amount": str(p.amount),
@@ -1361,9 +1364,8 @@ async def import_csv(
             status_code=400,
         )
 
-    existing_hashes = {row[0] for row in db.query(Transaction.import_hash).filter(
-        Transaction.import_hash.in_([p.import_hash for p in parsed])
-    ).all()}
+    account = find_import_account(db, user.id, bank, detected_iban or None)
+    existing_hashes = existing_import_hashes(db, account, (p.import_hash for p in parsed))
     preview_rows, tx_data = _build_preview(parsed, existing_hashes)
 
     return templates.TemplateResponse(
@@ -1431,9 +1433,8 @@ async def import_map(request: Request, db: Session = Depends(get_db)):
             },
         )
 
-    existing_hashes = {row[0] for row in db.query(Transaction.import_hash).filter(
-        Transaction.import_hash.in_([p.import_hash for p in parsed])
-    ).all()}
+    account = find_import_account(db, user.id, "custom", None)
+    existing_hashes = existing_import_hashes(db, account, (p.import_hash for p in parsed))
     preview_rows, tx_data = _build_preview(parsed, existing_hashes)
 
     return templates.TemplateResponse(
@@ -1469,11 +1470,7 @@ async def import_confirm(request: Request, db: Session = Depends(get_db)):
         return RedirectResponse("/import", status_code=302)
 
     # Find or create account
-    account = db.query(Account).filter(
-        Account.user_id == user.id,
-        Account.bank == bank,
-        Account.iban == account_iban,
-    ).first()
+    account = find_import_account(db, user.id, bank, account_iban)
     if not account:
         account = Account(
             user_id=user.id,
