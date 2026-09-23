@@ -11,13 +11,13 @@ from typing import List
 from urllib.parse import quote_plus
 
 from fastapi import APIRouter, Depends, Request, UploadFile, File, Form, Query
-from fastapi.responses import RedirectResponse, StreamingResponse
+from fastapi.responses import RedirectResponse, StreamingResponse, JSONResponse
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, or_, tuple_
 from sqlalchemy.exc import IntegrityError
 
 from app.database import get_db
-from app.models import Account, Transaction, Category, Rule, RecurringTransaction
+from app.models import Account, Transaction, Category, Rule, RecurringTransaction, ImportBatch
 from app.auth import require_login
 from app.parsers import abn_amro, bunq, ics, ing, rabobank
 from app.parsers.base import ParseError, ParsedTransaction
@@ -1492,6 +1492,10 @@ async def import_confirm(request: Request, db: Session = Depends(get_db)):
     active_rules = db.query(Rule).filter(Rule.user_id == user.id, Rule.is_active == 1).all()
 
     imported = skipped = auto_categorized = 0
+    rejected = 0
+    batch = ImportBatch(user_id=user.id, account_id=account.id, source=f"csv:{bank}", total_count=len(tx_data))
+    db.add(batch)
+    db.flush()
 
     for item in tx_data:
         exists = db.query(Transaction).filter(
@@ -1506,7 +1510,7 @@ async def import_confirm(request: Request, db: Session = Depends(get_db)):
             tx_date   = date_type.fromisoformat(item["date"])
             tx_amount = Decimal(item["amount"])
         except (ValueError, InvalidOperation):
-            skipped += 1
+            rejected += 1
             continue
 
         # Category from name
@@ -1538,6 +1542,10 @@ async def import_confirm(request: Request, db: Session = Depends(get_db)):
         imported += 1
 
     db.commit()
+    batch.imported_count = imported
+    batch.skipped_count = skipped
+    batch.rejected_count = rejected
+    db.commit()
 
     # Auto-link new transactions to recurring items, then clean up projections
     auto_link_recurring_after_import(db, user.id)
@@ -1554,11 +1562,34 @@ async def import_confirm(request: Request, db: Session = Depends(get_db)):
         {
             "request": request, "user": user,
             "imported": imported, "skipped": skipped,
+            "rejected": rejected, "batch": batch,
             "auto_categorized": auto_categorized,
             "total": len(tx_data),
             "account": account,
         },
     )
+
+
+@router.get("/import/batches/{batch_id}")
+def import_batch_result(batch_id: int, request: Request, db: Session = Depends(get_db)):
+    """Return an import result only to the batch owner."""
+    user = require_login(request, db)
+    batch = db.query(ImportBatch).filter(
+        ImportBatch.id == batch_id,
+        ImportBatch.user_id == user.id,
+    ).first()
+    if not batch:
+        return JSONResponse({"detail": "Importbatch niet gevonden"}, status_code=404)
+    return {
+        "id": batch.id,
+        "source": batch.source,
+        "status": batch.status,
+        "total": batch.total_count,
+        "imported": batch.imported_count,
+        "skipped": batch.skipped_count,
+        "rejected": batch.rejected_count,
+        "created_at": batch.created_at.isoformat() if batch.created_at else None,
+    }
 
 
 # ===== Split / Specificeer =====

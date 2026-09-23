@@ -30,10 +30,15 @@
         <div class="label">Bestaande ook gecategoriseerd</div>
     </div>
     {% endif %}
+    <div class="summary-card">
+        <div class="value">{{ rejected|default(0) }}</div>
+        <div class="label">Afgekeurd</div>
+    </div>
 </div>
 
 <div class="card">
     <p>Transacties zijn toegevoegd aan rekening <strong>{{ account.name }}</strong>{% if account.iban %} ({{ account.iban }}){% endif %}.</p>
+    <p>Batch #{{ batch.id }} is opgeslagen voor controle.</p>
 </div>
 
 <div style="display:flex; gap:0.75rem; margin-top:1rem;">

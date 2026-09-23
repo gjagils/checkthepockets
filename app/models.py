@@ -273,6 +273,24 @@ class Transaction(Base):
     assigned_by_rule = relationship("Rule", foreign_keys=[assigned_by_rule_id])
 
 
+class ImportBatch(Base):
+    __tablename__ = "import_batches"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    account_id = Column(Integer, ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True, index=True)
+    source = Column(String(40), nullable=False)
+    status = Column(String(20), nullable=False, default="completed")
+    total_count = Column(Integer, nullable=False, default=0)
+    imported_count = Column(Integer, nullable=False, default=0)
+    skipped_count = Column(Integer, nullable=False, default=0)
+    rejected_count = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+
+    user = relationship("User")
+    account = relationship("Account")
+
+
 class SavingsPlan(Base):
     __tablename__ = "savings_plans"
 
