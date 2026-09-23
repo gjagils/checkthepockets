@@ -255,6 +255,12 @@ def _level1_yearly(request, db, user, current_year, years, base_tx_filter, today
         for r in overview_rows
     ])
 
+    account_count = db.query(Account).filter(Account.user_id == user.id).count()
+    latest_transaction_date = db.query(func.max(Transaction.date)).join(Account).filter(
+        Account.user_id == user.id,
+        Transaction.is_projected == 0,
+    ).scalar()
+
     open_actions = []
     current_uncategorized = uncat_by_month.get(today.month, {}).get("count", 0)
     if current_uncategorized:
@@ -302,6 +308,7 @@ def _level1_yearly(request, db, user, current_year, years, base_tx_filter, today
             "overview_rows": overview_rows,
             "overview_json": overview_json,
             "open_actions": open_actions,
+            "source_summary": {"account_count": account_count, "as_of": latest_transaction_date},
         },
     )
 
