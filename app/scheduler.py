@@ -183,9 +183,9 @@ def _sync_all_bank_connections():
     Returns een korte string met aantallen voor de scheduler-log.
     """
     from app.database import SessionLocal
-    from app.models import Account, BankConnection, Transaction, Rule
+    from app.models import Account, BankConnection, Rule
     from app.parsers.base import ParsedTransaction
-    from app.rules_engine import apply_rules_to_transaction
+    from app.import_service import store_parsed_transactions
 
     total_imported = 0
 
@@ -241,33 +241,7 @@ def _sync_all_bank_connections():
                     Rule.user_id == conn.user_id, Rule.is_active == 1
                 ).all()
 
-                imported = 0
-                for p in parsed:
-                    exists = db.query(Transaction).filter(
-                        Transaction.account_id == account.id,
-                        Transaction.import_hash == p.import_hash
-                    ).first()
-                    if exists:
-                        continue
-
-                    from decimal import Decimal
-                    db_tx = Transaction(
-                        account_id=account.id,
-                        date=p.date,
-                        amount=p.amount,
-                        currency=p.currency,
-                        description=p.description,
-                        counterparty=p.counterparty,
-                        counterparty_iban=p.counterparty_iban,
-                        balance_after=p.balance_after,
-                        import_hash=p.import_hash,
-                    )
-                    db.add(db_tx)
-                    db.flush()
-
-                    if active_rules:
-                        apply_rules_to_transaction(active_rules, db_tx, db)
-                    imported += 1
+                imported = store_parsed_transactions(db, account, parsed, active_rules).imported
 
                 if imported:
                     logger.info("Bank sync: %d transacties geimporteerd voor %s (%s)",
