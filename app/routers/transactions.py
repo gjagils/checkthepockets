@@ -22,6 +22,7 @@ from app.auth import require_login
 from app.parsers import abn_amro, bunq, ics, ing, rabobank
 from app.parsers.base import ParseError, ParsedTransaction
 from app.parsers.ics_pdf import parse_ics_pdf
+from app.import_service import store_confirmed_csv_rows
 from app.rules_engine import apply_rules_to_transaction
 from app.template_config import templates
 
@@ -1491,56 +1492,13 @@ async def import_confirm(request: Request, db: Session = Depends(get_db)):
 
     active_rules = db.query(Rule).filter(Rule.user_id == user.id, Rule.is_active == 1).all()
 
-    imported = skipped = auto_categorized = 0
-    rejected = 0
     batch = ImportBatch(user_id=user.id, account_id=account.id, source=f"csv:{bank}", total_count=len(tx_data))
     db.add(batch)
     db.flush()
 
-    for item in tx_data:
-        exists = db.query(Transaction).filter(
-            Transaction.account_id == account.id,
-            Transaction.import_hash == item["import_hash"],
-        ).first()
-        if exists:
-            skipped += 1
-            continue
-
-        try:
-            tx_date   = date_type.fromisoformat(item["date"])
-            tx_amount = Decimal(item["amount"])
-        except (ValueError, InvalidOperation):
-            rejected += 1
-            continue
-
-        # Category from name
-        cat_id = None
-        cat_name = (item.get("category_name") or "").strip().lower()
-        if cat_name and cat_name in categories_by_name:
-            cat_id = categories_by_name[cat_name].id
-
-        db_tx = Transaction(
-            account_id=account.id,
-            date=tx_date,
-            amount=tx_amount,
-            currency=item.get("currency", "EUR"),
-            description=item.get("description"),
-            counterparty=item.get("counterparty"),
-            counterparty_iban=item.get("counterparty_iban"),
-            balance_after=Decimal(item["balance_after"]) if item.get("balance_after") else None,
-            import_hash=item["import_hash"],
-            category_id=cat_id,
-            import_batch_id=batch.id,
-        )
-        db.add(db_tx)
-        db.flush()
-
-        if cat_id:
-            auto_categorized += 1
-        elif active_rules and apply_rules_to_transaction(active_rules, db_tx, db):
-            auto_categorized += 1
-
-        imported += 1
+    result = store_confirmed_csv_rows(db, account, tx_data, categories_by_name, active_rules, batch.id)
+    imported, skipped = result.imported, result.skipped
+    rejected, auto_categorized = result.rejected, result.auto_categorized
 
     db.commit()
     batch.imported_count = imported

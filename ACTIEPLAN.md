@@ -285,15 +285,15 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 
 | Veld | Waarde |
 |---|---|
-| Actie | ACT-21 — importlogica afzonderlijk testbaar maken |
+| Actie | ACT-21b — CSV-bevestiging via gedeelde importservice |
 | Status | Review |
-| Uitvoerder / datum | Codex / 2026-09-23 |
-| Branch / PR | `codex/act-21a-shared-bank-import`; PR #171 gemerged |
-| Budget bij start | 72% resterend in vijf uur; 95% per week; 0 resetcredits. Afgebakend op constraint, migratie, opslagcontroles en regressietests. |
-| Uitgevoerd | ACT-16 navigatieontwerp via PR #166; ACT-17 actieoverzicht via #167; ACT-18 broninformatie via #168; ACT-19 lege schermen via #169; ACT-20 focus/mobiel via #170. ACT-21a centraliseert opslag voor Enable Banking en scheduler via #171. |
-| Validatie | PR #167 t/m #171: test en postgres-migrations geslaagd. |
-| Openstaand | ACT-21b verplaatst CSV-confirmatie naar dezelfde importservice en voegt regressietests toe; ACT-15 vereist nog een echte geïsoleerde NAS-restoreproef. |
-| Volgende stap | Pak ACT-21b op met voldoende budget voor code, tests, CI en merge. |
+| Uitvoerder / datum | Claude Code / 2026-09-23 |
+| Branch / PR | `codex/act-21b-csv-import-service`; PR volgt |
+| Budget bij start | Claude Code usage-weergave (get_usage), 2026-09-23 12:56: 5-uurslimiet 2% gebruikt, week 39% gebruikt; extra usage uit. Afgebakend op CSV-opslag, tests, CI en merge. |
+| Uitgevoerd | `store_confirmed_csv_rows` in app/import_service.py deelt duplicaatcontrole per rekening en transactieopbouw met bankimport/scheduler; `/import/confirm` doet alleen HTTP, rekening, batch en nabewerking. CSV-gedrag ongewijzigd: duplicaat vóór validatie, afkeuren bij ongeldige datum/bedrag, CSV-categorie gaat vóór regels. `ImportResult` telt nu ook `rejected`. |
+| Validatie | Python 3.12.11, `pip check` en `scripts/check_environment.py` schoon; `python -m pytest tests/ --tb=short`: 420 passed, 2 skipped (live Enable Banking), 2741 warnings. Nieuw: tests/test_import_service.py (bank/scheduler-opslag, CSV-rijen, route en herhaalde bevestiging). |
+| Openstaand | Bevinding buiten scope: CSV-voorbeeld (`/import`, `/import/map`) markeert duplicaten op basis van `import_hash` van álle gebruikers; de opslag zelf is correct per rekening. ACT-24 heeft PR #174 gemerged maar staat nog op Gepland. ACT-15 vereist nog een echte geïsoleerde NAS-restoreproef. |
+| Volgende stap | Na groene CI squash-mergen, daarna ACT-21 op Afgerond zetten in een statuscommit. |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,
