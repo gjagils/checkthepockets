@@ -12,6 +12,10 @@ from sqlalchemy import func, or_
 from app.database import get_db
 from app.models import Account, Transaction, Category, RecurringTransaction, RecurringSuggestion
 from app.auth import require_login
+from app.recurring_schedule import (
+    add_skipped_month, get_period_range, get_previous_period_range, is_active_in_month,
+    is_in_active_period, parse_active_months, projected_hash, remove_skipped_month,
+)
 from app.template_config import templates
 
 router = APIRouter()
@@ -32,42 +36,6 @@ MONTH_NAMES_NL = [
     "", "Januari", "Februari", "Maart", "April", "Mei", "Juni",
     "Juli", "Augustus", "September", "Oktober", "November", "December",
 ]
-
-
-def _get_period_range(frequency: str, ref_date: date) -> tuple[date, date]:
-    """Get the start and end date for the current period based on frequency."""
-    if frequency == "weekly":
-        start = ref_date - timedelta(days=ref_date.weekday())
-        end = start + timedelta(days=6)
-    elif frequency == "monthly":
-        start = ref_date.replace(day=1)
-        last_day = calendar.monthrange(ref_date.year, ref_date.month)[1]
-        end = ref_date.replace(day=last_day)
-    elif frequency == "quarterly":
-        q_month = ((ref_date.month - 1) // 3) * 3 + 1
-        start = date(ref_date.year, q_month, 1)
-        end_month = q_month + 2
-        end_year = ref_date.year
-        if end_month > 12:
-            end_month -= 12
-            end_year += 1
-        last_day = calendar.monthrange(end_year, end_month)[1]
-        end = date(end_year, end_month, last_day)
-    elif frequency == "yearly":
-        start = date(ref_date.year, 1, 1)
-        end = date(ref_date.year, 12, 31)
-    else:
-        start = ref_date.replace(day=1)
-        last_day = calendar.monthrange(ref_date.year, ref_date.month)[1]
-        end = ref_date.replace(day=last_day)
-    return start, end
-
-
-def _get_previous_period_range(frequency: str, ref_date: date) -> tuple[date, date]:
-    """Get the start and end date of the period BEFORE the current one."""
-    current_start, _ = _get_period_range(frequency, ref_date)
-    prev_date = current_start - timedelta(days=1)
-    return _get_period_range(frequency, prev_date)
 
 
 def link_transaction_to_recurring(tx: Transaction, item: RecurringTransaction):
@@ -227,86 +195,13 @@ def find_candidates_for_projected(
     return matches
 
 
-def _parse_active_months(values: List[str]) -> str | None:
-    """Convert list of month number strings to stored comma-separated string, or None for all."""
-    nums = sorted({int(v) for v in values if v.isdigit() and 1 <= int(v) <= 12})
-    if len(nums) == 12:
-        return None  # all months = no restriction
-    return ",".join(str(m) for m in nums) if nums else None
-
-
-def _active_months_set(item: RecurringTransaction) -> set[int]:
-    """Return the set of active month numbers for a recurring item (1-12). Empty = all."""
-    if not item.active_months:
-        return set(range(1, 13))
-    try:
-        return {int(m) for m in item.active_months.split(",") if m.strip()}
-    except ValueError:
-        return set(range(1, 13))
-
-
-def _is_in_active_period(item: RecurringTransaction, today: date) -> bool:
-    """Check if a recurring item is within its configured active period."""
-    if item.start_date and item.start_date > today:
-        return False
-    if item.end_date and item.end_date < today:
-        return False
-    months = _active_months_set(item)
-    if today.month not in months:
-        return False
-    return True
-
-
-def _is_active_in_month(item: RecurringTransaction, year: int, month: int) -> bool:
-    """Check if a recurring item should be active in the given year/month."""
-    ref = date(year, month, 1)
-    if item.start_date and item.start_date > date(year, month, calendar.monthrange(year, month)[1]):
-        return False
-    if item.end_date and item.end_date < ref:
-        return False
-    months = _active_months_set(item)
-    if month not in months:
-        return False
-    if _is_month_skipped(item, year, month):
-        return False
-    return True
-
-
-def _skipped_months_set(item: RecurringTransaction) -> set[str]:
-    raw = (item.skipped_months or "").strip()
-    if not raw:
-        return set()
-    return {p.strip() for p in raw.split(",") if p.strip()}
-
-
-def _is_month_skipped(item: RecurringTransaction, year: int, month: int) -> bool:
-    return f"{year:04d}-{month:02d}" in _skipped_months_set(item)
-
-
-def _add_skipped_month(item: RecurringTransaction, year: int, month: int) -> None:
-    existing = _skipped_months_set(item)
-    existing.add(f"{year:04d}-{month:02d}")
-    item.skipped_months = ",".join(sorted(existing))
-
-
-def _remove_skipped_month(item: RecurringTransaction, year: int, month: int) -> None:
-    existing = _skipped_months_set(item)
-    existing.discard(f"{year:04d}-{month:02d}")
-    item.skipped_months = ",".join(sorted(existing)) if existing else None
-
-
-def _projected_hash(item_id: int, year: int, month: int) -> str:
-    """Canonical hash for a projected transaction. Always use this function."""
-    return f"projected-{item_id}-{year}-{month:02d}"
-
-
 def _cleanup_legacy_projected_hashes(db: Session, item_id: int, year: int, month: int) -> bool:
     """Delete any projected transactions with the old ISO-date hash format.
     Returns True if anything was deleted."""
     ref = date(year, month, 1)
     # The old format used period_start.isoformat(), e.g. "projected-5-2026-04-01"
     legacy_hash = f"projected-{item_id}-{ref.isoformat()}"
-    canonical_hash = _projected_hash(item_id, year, month)
+    canonical_hash = projected_hash(item_id, year, month)
     if legacy_hash == canonical_hash:
         return False  # Same format, nothing to clean
     legacy = db.query(Transaction).filter(Transaction.import_hash == legacy_hash).first()
@@ -396,9 +291,9 @@ def sync_projected_transactions(user_id: int, year: int, month: int, db: Session
                     item.account_id = most_used_account_id
                     changed = True
 
-            if not _is_active_in_month(item, year, month):
+            if not is_active_in_month(item, year, month):
                 # Clean up any stale projected tx for this item+period
-                proj_hash = _projected_hash(item.id, year, month)
+                proj_hash = projected_hash(item.id, year, month)
                 stale = db.query(Transaction).filter(Transaction.import_hash == proj_hash).first()
                 if stale:
                     db.delete(stale)
@@ -406,8 +301,8 @@ def sync_projected_transactions(user_id: int, year: int, month: int, db: Session
                 continue
 
             # Determine the period for this item's frequency in the given month
-            period_start, period_end = _get_period_range(item.frequency, ref)
-            proj_hash = _projected_hash(item.id, year, month)
+            period_start, period_end = get_period_range(item.frequency, ref)
+            proj_hash = projected_hash(item.id, year, month)
 
             # Check if a real (non-projected) transaction already matches
             real_tx = _find_matching_transaction(db, user_id, item, period_start, period_end)
@@ -488,7 +383,7 @@ def cleanup_matched_projected(user_id: int, db: Session) -> None:
                 db.delete(proj)
                 changed = True
                 continue
-            period_start, period_end = _get_period_range(item.frequency, proj.date)
+            period_start, period_end = get_period_range(item.frequency, proj.date)
             real_tx = _find_matching_transaction(db, user_id, item, period_start, period_end)
             if real_tx:
                 db.delete(proj)
@@ -533,7 +428,7 @@ def skip_projected_transaction(
             .first()
         )
     if item and ptx.date:
-        _add_skipped_month(item, ptx.date.year, ptx.date.month)
+        add_skipped_month(item, ptx.date.year, ptx.date.month)
 
     db.delete(ptx)
     db.commit()
@@ -560,7 +455,7 @@ def unskip_month(
         .first()
     )
     if item:
-        _remove_skipped_month(item, year, month)
+        remove_skipped_month(item, year, month)
         db.commit()
     return RedirectResponse(redirect_to or "/recurring", status_code=302)
 
@@ -732,10 +627,10 @@ def _render_recurring_page(
     items_inactive = []
 
     for item in recurring_items:
-        in_period = _is_in_active_period(item, today)
+        in_period = is_in_active_period(item, today)
 
         if not item.is_active or not in_period:
-            cur_start, cur_end = _get_period_range(item.frequency, today)
+            cur_start, cur_end = get_period_range(item.frequency, today)
             match = _find_matching_transaction(db, user.id, item, cur_start, cur_end)
             items_inactive.append({
                 "item": item, "period_start": cur_start, "period_end": cur_end,
@@ -744,9 +639,9 @@ def _render_recurring_page(
             })
             continue
 
-        cur_start, cur_end = _get_period_range(item.frequency, today)
+        cur_start, cur_end = get_period_range(item.frequency, today)
         cur_match = _find_matching_transaction(db, user.id, item, cur_start, cur_end)
-        prev_start, prev_end = _get_previous_period_range(item.frequency, today)
+        prev_start, prev_end = get_previous_period_range(item.frequency, today)
         prev_match = _find_matching_transaction(db, user.id, item, prev_start, prev_end)
 
         # If previous period is before first transaction, treat as "not missed"
@@ -933,7 +828,7 @@ def accept_suggestion(suggestion_id: int, request: Request, db: Session = Depend
                 desc = (tx.description or "").lower()
                 if search_term not in cp and search_term not in desc:
                     continue
-                period_start, period_end = _get_period_range(item.frequency, tx.date)
+                period_start, period_end = get_period_range(item.frequency, tx.date)
                 period_key = f"{period_start}-{period_end}"
                 if period_key in seen_periods:
                     continue
@@ -1032,7 +927,7 @@ async def create_recurring(
         description_match=description_match.strip() or None,
         start_date=parsed_start,
         end_date=parsed_end,
-        active_months=_parse_active_months(active_months),
+        active_months=parse_active_months(active_months),
     )
     db.add(item)
     db.flush()
@@ -1284,7 +1179,7 @@ def edit_recurring(
     item.description_match = description_match.strip() or None
     item.start_date = parsed_start
     item.end_date = parsed_end
-    item.active_months = _parse_active_months(active_months)
+    item.active_months = parse_active_months(active_months)
 
     cat_id = int(category_id) if category_id.strip() else None
     resolved_cat = None
@@ -1354,7 +1249,7 @@ def link_transaction(
             except ValueError:
                 target_date = None
             if target_date:
-                cur_start, cur_end = _get_period_range(item.frequency, tx.date)
+                cur_start, cur_end = get_period_range(item.frequency, tx.date)
                 if not (cur_start <= target_date <= cur_end):
                     # Verschuiven: bewaar oorspronkelijke datum eenmalig
                     if tx.original_date is None:

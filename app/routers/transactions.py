@@ -810,12 +810,13 @@ def _find_recurring_candidates(
             all_candidates.append(tx)
 
     # Filter: one per period, same sign, no existing match
-    from app.routers.recurring import _get_period_range, _find_matching_transaction
+    from app.recurring_schedule import get_period_range
+    from app.routers.recurring import _find_matching_transaction
 
     result = []
     seen_periods = set()
     for candidate in all_candidates:
-        period_start, period_end = _get_period_range(item.frequency, candidate.date)
+        period_start, period_end = get_period_range(item.frequency, candidate.date)
         period_key = (period_start, period_end)
         if period_key in seen_periods:
             continue
@@ -838,7 +839,7 @@ def auto_link_recurring_after_import(db: Session, user_id: int):
     """Called after CSV import — automatically link new transactions to recurring items
     based on counterparty/description matching. No user confirmation needed.
     Note: counterparty/description are encrypted, so we filter in Python."""
-    from app.routers.recurring import _get_period_range
+    from app.recurring_schedule import get_period_range
 
     recurring_items = (
         db.query(RecurringTransaction)
@@ -890,7 +891,7 @@ def auto_link_recurring_after_import(db: Session, user_id: int):
             if not match:
                 continue
 
-            period_start, period_end = _get_period_range(item.frequency, candidate.date)
+            period_start, period_end = get_period_range(item.frequency, candidate.date)
 
             # Check if there's already a LINKED transaction for this recurring item
             # in this period. Don't use _find_matching_transaction here because it

@@ -342,7 +342,7 @@ def budget_overview(
     total_income_received = income_result.income or Decimal("0")
 
     # Expected remaining income from recurring items not yet matched this month
-    from app.routers.recurring import _is_active_in_month
+    from app.recurring_schedule import is_active_in_month
     active_recurring = (
         db.query(RecurringTransaction)
         .filter(
@@ -353,15 +353,16 @@ def budget_overview(
         .all()
     )
     # Use _find_matching_transaction which handles encrypted fields correctly
-    from app.routers.recurring import _find_matching_transaction, _get_period_range
+    from app.recurring_schedule import get_period_range
+    from app.routers.recurring import _find_matching_transaction
     import calendar as cal
     expected_income = Decimal("0")
     for item in active_recurring:
-        if not _is_active_in_month(item, current_year, current_month):
+        if not is_active_in_month(item, current_year, current_month):
             continue
         if item.frequency != "monthly":
             continue
-        period_start, period_end = _get_period_range(
+        period_start, period_end = get_period_range(
             item.frequency, datetime.date(current_year, current_month, 1)
         )
         matched = _find_matching_transaction(db, user.id, item, period_start, period_end)
