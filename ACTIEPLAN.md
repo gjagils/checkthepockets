@@ -47,7 +47,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-10 | P2 | Afgerond | ACT-09 | [Importbatches en resultaatrapport](#act-10) |
 | ACT-11 | P2 | Gepland | ACT-10 | [Import veilig terugdraaien](#act-11) |
 | ACT-12 | P2 | Gepland | ACT-01 | [Bankstatus en synchronisatiefouten zichtbaar](#act-12) |
-| ACT-13 | P1 | Gepland | ACT-01 | [Deploymentfouten en healthchecks](#act-13) |
+| ACT-13 | P1 | Afgerond | ACT-01 | [Deploymentfouten en healthchecks](#act-13) |
 | ACT-14 | P2 | Gepland | ACT-13, ACT-03 | [Vaste releaseversies en herstelprocedure](#act-14) |
 | ACT-15 | P1 | Gepland | — | [Backups en herstel aantoonbaar maken](#act-15) |
 | ACT-16 | P2 | Gepland | ACT-02 | [Gebruikersroutes en navigatie ontwerpen](#act-16) |
@@ -284,15 +284,15 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 
 | Veld | Waarde |
 |---|---|
-| Actie | ACT-11 — import veilig terugdraaien |
-| Status | Bezig |
+| Actie | ACT-14 — vaste releaseversies en herstelprocedure |
+| Status | Gepland |
 | Uitvoerder / datum | Codex / 2026-09-23 |
-| Branch / PR | `codex/act-11-import-rollback`; PR volgt |
+| Branch / PR | `codex/act-13-healthchecks`; PR #159 gemerged |
 | Budget bij start | 72% resterend in vijf uur; 95% per week; 0 resetcredits. Afgebakend op constraint, migratie, opslagcontroles en regressietests. |
-| Uitgevoerd | Bestaande transactierelaties geïnventariseerd: splitsingen via parent_id/children, koppelingen via recurring_id en transfers via transfer_id; batchrecords bevatten nu alleen tellingen en nog geen transactieverwijzingen. |
-| Validatie | Analyse afgerond; codewijziging volgt pas na ontwerp van conflictregels. |
-| Openstaand | Ontwerp van batch-transactiekoppeling, detectie van latere wijzigingen, gedeelde/split-transacties en idempotente rollback. |
-| Volgende stap | Ontwerp vastleggen en daarna migratie, rollback-endpoint en regressietests implementeren. |
+| Uitgevoerd | `/healthz` en `/readyz` toegevoegd; deployworkflow gebruikt fail-fast HTTP-calls; regressietest toegevoegd. |
+| Validatie | CI voor PR #159: test en postgres-migrations geslaagd. |
+| Openstaand | Geen codeblokkade. |
+| Volgende stap | ACT-14: vaste imageversies en herstelprocedure uitwerken. |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,
