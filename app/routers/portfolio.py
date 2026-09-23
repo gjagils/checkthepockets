@@ -9,6 +9,8 @@ from app.database import get_db
 from app.models import PortfolioAsset, Person, PortfolioHolding, PortfolioPriceSnapshot
 from app.auth import require_login
 from app.capital_dashboard import build_capital_dashboard
+from app.wealth_forecast import build_wealth_forecast
+from app.wealth_plan_service import get_wealth_plan_entries
 from app.wealth_plan_service import capture_wealth_plan, WealthPlanConfirmationRequired
 from app.portfolio_prices import (
     fetch_price,
@@ -242,6 +244,70 @@ def capital_dashboard(
             "user": user,
             "data": data,
             "selected": selected,
+        },
+    )
+
+
+@router.get("/wealth-forecast")
+def wealth_forecast_page(
+    request: Request,
+    year: int | None = Query(None),
+    person: str | None = Query(None),
+    db: Session = Depends(get_db),
+):
+    """Forecast, frozen 1/1 plan and variance in one monthly view."""
+    user = require_login(request, db)
+    current_year = datetime.date.today().year
+    selected_year = year if year and 2000 <= year <= 2200 else current_year
+    forecast = build_wealth_forecast(db, user.id, selected_year)
+    persons = forecast["persons"]
+    person_ids = {item.id for item in persons}
+    selected = int(person) if person and person.isdigit() else None
+    if selected not in person_ids:
+        selected = None
+    plan_entries = get_wealth_plan_entries(db, user.id, selected_year)
+
+    rows = []
+    for month in range(1, 13):
+        if selected is None:
+            projected = forecast["together"][month]
+            plan = {
+                "portfolio": sum((entry.portfolio_amount for (pid, m), entry in plan_entries.items() if m == month), Decimal("0")),
+                "savings": sum((entry.savings_amount for (pid, m), entry in plan_entries.items() if m == month), Decimal("0")),
+                "total": sum((entry.total_amount for (pid, m), entry in plan_entries.items() if m == month), Decimal("0")),
+            } if plan_entries else None
+        else:
+            projected = forecast["per_person"][selected][month]
+            entry = plan_entries.get((selected, month))
+            plan = {
+                "portfolio": entry.portfolio_amount,
+                "savings": entry.savings_amount,
+                "total": entry.total_amount,
+            } if entry else None
+        difference = projected["total"] - plan["total"] if plan else None
+        rows.append({
+            "month": month,
+            "label": MONTH_LABELS[month - 1],
+            "forecast": projected,
+            "plan": plan,
+            "difference": difference,
+            "status": "above" if difference and difference > 0 else "below" if difference and difference < 0 else "match",
+        })
+
+    now_month = datetime.date.today().month if selected_year == current_year else 1
+    now_row = rows[now_month - 1]
+    return templates.TemplateResponse(
+        "portfolio/wealth_forecast.html",
+        {
+            "request": request,
+            "user": user,
+            "year": selected_year,
+            "persons": persons,
+            "selected": selected,
+            "rows": rows,
+            "has_plan": bool(plan_entries),
+            "now_row": now_row,
+            "end_row": rows[-1],
         },
     )
 

@@ -83,6 +83,7 @@
                 <a href="/analytics/query" class="{{ 'active' if path == '/analytics/query' }}">Query</a>
                 <a href="/portfolio" class="{{ 'active' if path == '/portfolio' or (path.startswith('/portfolio') and not path.startswith('/portfolio/dashboard')) }}">Portfolio</a>
                 <a href="/portfolio/dashboard" class="{{ 'active' if path.startswith('/portfolio/dashboard') }}">Dashboard</a>
+                <a href="/portfolio/wealth-forecast" class="{{ 'active' if path.startswith('/portfolio/wealth-forecast') }}">Vermogensprognose</a>
             {% elif main_active == 'hypotheek' %}
                 <a href="/hypotheek" class="{{ 'active' if path == '/hypotheek' }}">Overzicht</a>
                 <a href="/hypotheek/scenarios" class="{{ 'active' if path.startswith('/hypotheek/scenarios') }}">Scenarios</a>
@@ -133,6 +134,7 @@
                         <a href="/analytics/query" class="{{ 'active' if path == '/analytics/query' }}">Query</a>
                         <a href="/portfolio" class="{{ 'active' if path == '/portfolio' or (path.startswith('/portfolio') and not path.startswith('/portfolio/dashboard')) }}">Portfolio</a>
                         <a href="/portfolio/dashboard" class="{{ 'active' if path.startswith('/portfolio/dashboard') }}">Dashboard</a>
+                        <a href="/portfolio/wealth-forecast" class="{{ 'active' if path.startswith('/portfolio/wealth-forecast') }}">Vermogensprognose</a>
                     </div>
                 </div>
 
