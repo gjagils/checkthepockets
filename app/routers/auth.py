@@ -11,6 +11,7 @@ from app.auth import (
     hash_password,
     verify_password,
     set_session_cookie,
+    revoke_sessions,
     get_current_user,
     require_login,
     user_start_page,
@@ -169,7 +170,7 @@ def login(
     db.commit()
 
     response = RedirectResponse(user_start_page(user), status_code=302)
-    return set_session_cookie(response, user.id)
+    return set_session_cookie(response, user.id, user.session_version)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -267,7 +268,7 @@ def register(
         )
 
     response = RedirectResponse(user_start_page(user), status_code=302)
-    return set_session_cookie(response, user.id)
+    return set_session_cookie(response, user.id, user.session_version)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -369,6 +370,7 @@ def reset_password(
     user = db.query(User).filter(User.id == t.user_id).first()
     if user:
         user.password_hash = hash_password(new_password)
+        revoke_sessions(user)
         db.commit()
 
     return templates.TemplateResponse(
@@ -452,6 +454,7 @@ def change_password(
         )
 
     user.password_hash = hash_password(new_password)
+    revoke_sessions(user)
     db.commit()
 
     return templates.TemplateResponse(
@@ -737,7 +740,7 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
     db.commit()
 
     response = RedirectResponse(user_start_page(user), status_code=302)
-    return set_session_cookie(response, user.id)
+    return set_session_cookie(response, user.id, user.session_version)
 
 
 @router.get("/logout")

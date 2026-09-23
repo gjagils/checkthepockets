@@ -38,7 +38,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-01 | P1 | Afgerond | — | [Reproduceerbare ontwikkel- en testomgeving](#act-01) |
 | ACT-02 | P1 | Afgerond | ACT-01 | [Testfouten onderzoeken en herstellen](#act-02) |
 | ACT-03 | P1 | Afgerond | ACT-01 | [PostgreSQL en migraties toetsen](#act-03) |
-| ACT-04 | P1 | Gepland | ACT-01 | [Accountstatus en sessie-intrekking](#act-04) |
+| ACT-04 | P1 | Bezig | ACT-01 | [Accountstatus en sessie-intrekking](#act-04) |
 | ACT-05 | P1 | Gepland | ACT-01 | [Veilige configuratie en cookies](#act-05) |
 | ACT-06 | P1 | Gepland | ACT-01 | [CSRF-bescherming controleren en aanvullen](#act-06) |
 | ACT-07 | P1 | Gepland | ACT-01, ACT-03 | [Encryptie zonder stille terugval](#act-07) |
@@ -91,7 +91,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 
 ### ACT-04 — Accountstatus en sessie-intrekking
 
-- **Acties:** Controleer is_active bij ieder beschermd verzoek. Maak sessies intrekbaar bij deactivering, wachtwoordreset/-wijziging en overal uitloggen.
+- **Acties:** Controleer `is_active` bij ieder beschermd verzoek. Voeg een versieveld toe aan gebruikerssessies en verhoog dit bij deactivering, wachtwoordreset en wachtwoordwijziging, zodat oude cookies ongeldig worden. Voeg regressietests toe.
 - **Klaar wanneer:** Oude cookies geven na intrekking geen toegang; actieve accounts kunnen opnieuw inloggen; oude sessies worden bij invoering bewust afgehandeld.
 - **Validatie:** Tests met oude cookie vóór/na iedere intrekkingsactie, inclusief OAuth-gebruiker.
 
@@ -284,15 +284,15 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 
 | Veld | Waarde |
 |---|---|
-| Actie | ACT-03 — PostgreSQL en migraties toetsen |
-| Status | Afgerond |
+| Actie | ACT-04 — accountstatus en sessie-intrekking |
+| Status | Bezig |
 | Uitvoerder / datum | Codex / 2026-09-23 |
-| Branch / PR | `codex/act-03-postgres-ci`; [PR #138](https://github.com/gjagils/checkthepockets/pull/138), gemerged in `bb2fa44` |
-| Budget bij start | 79% resterend in vijf uur; 97% per week; 0 resetcredits. Afgebakend op lege-schema-migratie en schema-inspectie. |
-| Uitgevoerd | PostgreSQL 16-service en schema-smokecheck toegevoegd aan CI; lege database gemigreerd; kern-tabellen, transactievelden en import-identiteitsconstraint gecontroleerd. |
-| Validatie | PostgreSQL-check groen (31s); normale testjob groen (1m36s); lokale Docker was niet beschikbaar. Een bestaande-databaseproef is niet nodig om de lege migratiecheck te laten slagen en blijft expliciet vervolgwerk indien gewenst. |
-| Openstaand | Geen ACT-03-werk. Een representatieve bestaande-databaseproef kan later als afzonderlijke subactie worden toegevoegd. |
-| Volgende stap | Voor ACT-04 limieten opnieuw controleren; daarna accountstatus en sessie-intrekking implementeren. |
+| Branch / PR | `codex/act-04-sessie-intrekking`; PR volgt |
+| Budget bij start | 78% resterend in vijf uur; 97% per week; 0 resetcredits. Afgebakend op accountstatus, sessieversie, migratie en regressietests. |
+| Uitgevoerd | `session_version` toegevoegd; beschermde verzoeken controleren activiteit en sessieversie; reset/wijziging/deactivatie trekken sessies in; 2 regressietests toegevoegd. |
+| Validatie | Gerichte tests 15 geslaagd; volledige suite 407 passed, 2 skipped, 2705 warnings in 46.06s. CI en migratie volgen. |
+| Openstaand | CI-run, PR-merge en status naar Afgerond bij groene checks. |
+| Volgende stap | Committen/pushen en CI afwachten. |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,
