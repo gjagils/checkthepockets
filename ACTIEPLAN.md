@@ -56,9 +56,9 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-19 | P2 | Afgerond | ACT-16 | [Navigatie, foutmeldingen en lege schermen](#act-19) |
 | ACT-20 | P2 | Afgerond | ACT-17, ACT-18, ACT-19 | [Toegankelijkheid en mobiele eindcontrole](#act-20) |
 | ACT-21 | P3 | Afgerond | ACT-02 | [Importlogica afzonderlijk testbaar maken](#act-21) |
-| ACT-22 | P3 | Review | ACT-02 | [Spaar- en terugkerende logica opsplitsen](#act-22) |
+| ACT-22 | P3 | Afgerond | ACT-02 | [Spaar- en terugkerende logica opsplitsen](#act-22) |
 | ACT-22a | P3 | Afgerond | ACT-02 | [Pure plannings- en spaarregels in eigen modules](#act-22) |
-| ACT-22b | P3 | Review | ACT-22a | [Projecties en koppelingen naar een service](#act-22) |
+| ACT-22b | P3 | Afgerond | ACT-22a | [Projecties en koppelingen naar een service](#act-22) |
 | ACT-23 | P3 | Gereed | ACT-02 | [Hypotheeklogica opsplitsen](#act-23) |
 | ACT-24 | P2 | Afgerond | ACT-02 | [Gerichte foutafhandeling en logging](#act-24) |
 | ACT-24a | P2 | Afgerond | ACT-02 | [Twee stille fouten loggen (PR #174)](#act-24) |
@@ -304,14 +304,14 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 | Veld | Waarde |
 |---|---|
 | Actie | ACT-22b — projecties en koppelingen naar een service |
-| Status | Review |
+| Status | Afgerond |
 | Uitvoerder / datum | Claude Code / 2026-09-23 |
-| Branch / PR | `codex/act-22b-recurring-service`; PR volgt |
+| Branch / PR | `codex/act-22b-recurring-service`; [PR #184](https://github.com/gjagils/checkthepockets/pull/184) gemerged (`90e6b88`) |
 | Budget bij start | Claude Code usage-weergave (get_usage), 2026-09-23 13:39: 5-uurslimiet 21% gebruikt, week 42% gebruikt; extra usage uit. |
 | Uitgevoerd | app/recurring_service.py bevat `sync_projected_transactions`, `cleanup_matched_projected`, `find_candidates_for_projected`, `link_transaction_to_recurring`, `find_matching_transaction`, `find_recurring_candidates` en `auto_link_recurring_after_import` (uit routers/recurring.py en routers/transactions.py). AST-vergelijking met main: inhoudelijk identiek op namen en overbodige lokale imports na. banking, scheduler, budgets, dashboard en transactions importeren niet meer uit de recurring- of transactions-router. |
 | Validatie | Python 3.12.11: `python -m pytest tests/ --tb=short`: 464 passed, 2 skipped (live Enable Banking), 2820 warnings. Nieuw: tests/test_recurring_service.py (projectie aanmaken/idempotent/opruimen, maanden vóór data en overgeslagen maanden, betaling van andere gebruiker telt niet, automatisch koppelen één per periode met categorie); slaagt ook op main, dus gedrag gelijk. |
 | Openstaand | Buiten ACT-22: scheduler.py importeert nog `inbox_count` en `_map_eb_transactions` uit routers, admin.py `_clean_email` uit de auth-router. ACT-23 volgt; ACT-08, ACT-15 en ACT-25 vragen handelingen van de gebruiker. |
-| Volgende stap | Na groene CI mergen, ACT-22 en ACT-22b op Afgerond zetten; daarna ACT-23 na budgetcontrole. |
+| Volgende stap | ACT-23 na budgetcontrole. |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,
@@ -349,3 +349,4 @@ Voeg per afgeronde actie of overdracht een regel toe. Git bevat de volledige his
 | 2026-09-23 | ACT-26 | Importvoorbeeld telt alleen duplicaten op de eigen doelrekening | [PR #178](https://github.com/gjagils/checkthepockets/pull/178), beide checks groen; merge `f104c13`; productievalidatie open |
 | 2026-09-23 | ACT-24 | Operationele fouten gelogd zonder bank-ID's; inventarisatie in docs/ERROR-HANDLING.md | [PR #174](https://github.com/gjagils/checkthepockets/pull/174) en [PR #180](https://github.com/gjagils/checkthepockets/pull/180), beide checks groen; merge `6acc298`; productievalidatie loginhoud open |
 | 2026-09-23 | ACT-22a | Plannings- en spaarregels in app/recurring_schedule.py en app/savings_calc.py | [PR #182](https://github.com/gjagils/checkthepockets/pull/182), beide checks groen; merge `dc39afa` |
+| 2026-09-23 | ACT-22 | Planningsregels, spaarberekeningen, projecties en koppelingen buiten de routers | [PR #182](https://github.com/gjagils/checkthepockets/pull/182) en [PR #184](https://github.com/gjagils/checkthepockets/pull/184), beide checks groen; merge `90e6b88` |
