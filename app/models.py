@@ -261,6 +261,7 @@ class Transaction(Base):
     recurring_id = Column(Integer, ForeignKey("recurring_transactions.id", ondelete="SET NULL"), nullable=True)
     transfer_id = Column(Integer, ForeignKey("transactions.id", ondelete="SET NULL"), nullable=True)
     assigned_by_rule_id = Column(Integer, ForeignKey("rules.id", ondelete="SET NULL"), nullable=True, index=True)
+    import_batch_id = Column(Integer, ForeignKey("import_batches.id", ondelete="SET NULL"), nullable=True, index=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     __table_args__ = (
@@ -289,6 +290,7 @@ class ImportBatch(Base):
 
     user = relationship("User")
     account = relationship("Account")
+    transactions = relationship("Transaction", backref="import_batch")
 
 
 class SavingsPlan(Base):

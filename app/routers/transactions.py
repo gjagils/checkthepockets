@@ -1530,6 +1530,7 @@ async def import_confirm(request: Request, db: Session = Depends(get_db)):
             balance_after=Decimal(item["balance_after"]) if item.get("balance_after") else None,
             import_hash=item["import_hash"],
             category_id=cat_id,
+            import_batch_id=batch.id,
         )
         db.add(db_tx)
         db.flush()
@@ -1590,6 +1591,23 @@ def import_batch_result(batch_id: int, request: Request, db: Session = Depends(g
         "rejected": batch.rejected_count,
         "created_at": batch.created_at.isoformat() if batch.created_at else None,
     }
+
+
+@router.post("/import/batches/{batch_id}/rollback")
+def rollback_import_batch(batch_id: int, request: Request, db: Session = Depends(get_db)):
+    user = require_login(request, db)
+    batch = db.query(ImportBatch).filter(ImportBatch.id == batch_id, ImportBatch.user_id == user.id).first()
+    if not batch:
+        return JSONResponse({"detail": "Importbatch niet gevonden"}, status_code=404)
+    rows = db.query(Transaction).filter(Transaction.import_batch_id == batch.id).all()
+    conflicts = [tx.id for tx in rows if tx.is_reviewed or tx.parent_id or tx.recurring_id or tx.transfer_id]
+    if conflicts:
+        return JSONResponse({"detail": "Rollback vereist beoordeling", "conflicts": conflicts}, status_code=409)
+    for tx in rows:
+        db.delete(tx)
+    batch.status = "rolled_back"
+    db.commit()
+    return {"batch_id": batch.id, "deleted": len(rows), "status": batch.status}
 
 
 # ===== Split / Specificeer =====
