@@ -49,7 +49,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-12 | P2 | Afgerond | ACT-01 | [Bankstatus en synchronisatiefouten zichtbaar](#act-12) |
 | ACT-13 | P1 | Afgerond | ACT-01 | [Deploymentfouten en healthchecks](#act-13) |
 | ACT-14 | P2 | Afgerond | ACT-13, ACT-03 | [Vaste releaseversies en herstelprocedure](#act-14) |
-| ACT-15 | P1 | Gepland | — | [Backups en herstel aantoonbaar maken](#act-15) |
+| ACT-15 | P1 | Review | — | [Backups en herstel aantoonbaar maken](#act-15) |
 | ACT-16 | P2 | Gepland | ACT-02 | [Gebruikersroutes en navigatie ontwerpen](#act-16) |
 | ACT-17 | P2 | Gepland | ACT-12, ACT-16 | [Centraal actieoverzicht](#act-17) |
 | ACT-18 | P2 | Gepland | ACT-16 | [Herkomst en actualiteit van bedragen](#act-18) |
@@ -285,14 +285,14 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 | Veld | Waarde |
 |---|---|
 | Actie | ACT-15 — backups en herstel aantoonbaar maken |
-| Status | Gepland |
+| Status | Review |
 | Uitvoerder / datum | Codex / 2026-09-23 |
-| Branch / PR | `codex/act-14-release`; PR #162 gemerged |
+| Branch / PR | `codex/act-15-backup-drill`; PR #164 gemerged |
 | Budget bij start | 72% resterend in vijf uur; 95% per week; 0 resetcredits. Afgebakend op constraint, migratie, opslagcontroles en regressietests. |
-| Uitgevoerd | Images krijgen naast `latest` een commit-SHA-tag; Portainer krijgt `IMAGE_TAG` mee; compose gebruikt de vaste tag met `latest` als fallback. |
-| Validatie | CI voor PR #162: test en postgres-migrations geslaagd. |
-| Openstaand | Geen codeblokkade. |
-| Volgende stap | ACT-15: backups, retentie en hersteltest aantoonbaar maken. |
+| Uitgevoerd | Geïsoleerde restoreproef, retentie, externe kopie en beheerlog vastgelegd in `docs/BACKUP-RESTORE-DRILL.md`. |
+| Validatie | Docs-PR #164 gemerged; daadwerkelijke NAS/production-restore is niet uitgevoerd. |
+| Openstaand | Bevoegde beheerder moet een echte geïsoleerde restoreproef uitvoeren en bewijs registreren. |
+| Volgende stap | Restoreproef uitvoeren; daarna ACT-16 oppakken. |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,
