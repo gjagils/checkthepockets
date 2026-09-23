@@ -42,7 +42,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-05 | P1 | Afgerond | ACT-01 | [Veilige configuratie en cookies](#act-05) |
 | ACT-06 | P1 | Afgerond | ACT-01 | [CSRF-bescherming controleren en aanvullen](#act-06) |
 | ACT-07 | P1 | Afgerond | ACT-01, ACT-03 | [Encryptie zonder stille terugval](#act-07) |
-| ACT-08 | P1 | Bezig | — | [Geheimen en Docker-buildcontext opschonen](#act-08) |
+| ACT-08 | P1 | Review | — | [Geheimen en Docker-buildcontext opschonen](#act-08) |
 | ACT-09 | P1 | Gepland | ACT-02, ACT-03 | [Rekeninggebonden importherkenning](#act-09) |
 | ACT-10 | P2 | Gepland | ACT-09 | [Importbatches en resultaatrapport](#act-10) |
 | ACT-11 | P2 | Gepland | ACT-10 | [Import veilig terugdraaien](#act-11) |
@@ -285,14 +285,14 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 | Veld | Waarde |
 |---|---|
 | Actie | ACT-08 — geheimen en Docker-buildcontext opschonen |
-| Status | Bezig |
+| Status | Review |
 | Uitvoerder / datum | Codex / 2026-09-23 |
-| Branch / PR | `codex/act-08-secrets-buildcontext`; PR volgt |
+| Branch / PR | `codex/act-08-secrets-buildcontext`; [PR #148](https://github.com/gjagils/checkthepockets/pull/148), gemerged in `5d0b678` |
 | Budget bij start | 72% resterend in vijf uur; 96% per week; 0 resetcredits. Afgebakend op tracking en buildcontext; secret-rotatie blijft beheeractie. |
 | Uitgevoerd | `.dockerignore` sluit PEM-sleutels, keys en agentmappen uit; `stack.env` wordt uit Git-index verwijderd zonder lokaal bestand te wissen. Historie en rotatie worden geredigeerd gerapporteerd. |
-| Validatie | Tracking/buildcontext-controle en `git diff --check` volgen; geen geheimwaarden in logs of documentatie. |
-| Openstaand | PR/CI en status bepalen; eventuele secret-rotatie moet buiten deze codewijziging door beheer worden uitgevoerd. |
-| Volgende stap | Committen/pushen en controleren dat stack.env niet meer tracked is en PEM-bestanden niet in context vallen. |
+| Validatie | `git check-ignore` bevestigde stack.env en PEM-uitsluiting; normale CI groen in 1m42s en PostgreSQL-check groen in 37s; geen geheimwaarden in logs of documentatie. |
+| Openstaand | Secret-rotatie en besluit over historische Git-inhoud vereisen beheeractie; code/buildcontext is afgerond. |
+| Volgende stap | Beheer roteert waarden indien nodig; voor codewerk kan ACT-09 starten na limietcontrole. |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,
@@ -323,3 +323,4 @@ Voeg per afgeronde actie of overdracht een regel toe. Git bevat de volledige his
 | 2026-09-23 | ACT-05 | Productieconfiguratie en HTTPS-cookies veilig afgedwongen | [PR #142](https://github.com/gjagils/checkthepockets/pull/142), beide checks groen; merge `8ef7401` |
 | 2026-09-23 | ACT-06 | Cross-origin mutaties geblokkeerd in productie | [PR #144](https://github.com/gjagils/checkthepockets/pull/144), beide checks groen; merge `d2292f0` |
 | 2026-09-23 | ACT-07 | Encryptie faalt gesloten bij sleutel-, encryptie- en decryptiefouten | [PR #146](https://github.com/gjagils/checkthepockets/pull/146), beide checks groen; merge `a2bc34c` |
+| 2026-09-23 | ACT-08 | stack.env uit tracking en gevoelige bestanden uit Dockercontext | [PR #148](https://github.com/gjagils/checkthepockets/pull/148), beide checks groen; merge `5d0b678`; secret-rotatie open |
