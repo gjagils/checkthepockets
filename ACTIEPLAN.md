@@ -69,9 +69,9 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-25a | P2 | Afgerond | — | [Rekeningen zonder uid zichtbaar na koppelen](#act-25) |
 | ACT-25b | P2 | Review | ACT-25a | [Beschikbaarheid bunq-rekeningen vaststellen en vervolg kiezen](#act-25) |
 | ACT-26 | P1 | Afgerond | ACT-21 | [Importvoorbeeld zonder gegevens van andere gebruikers](#act-26) |
-| ACT-27 | P2 | Bezig | — | [Compacte spaarplanner](#act-27) |
+| ACT-27 | P2 | Review | — | [Compacte spaarplanner](#act-27) |
 | ACT-27a | P2 | Afgerond | — | [Eén regel per spaarregel, regel Beweging, compacte kop](#act-27) |
-| ACT-27b | P2 | Gereed | ACT-27a | [Toekomstige maanden direct bewerkbaar](#act-27) |
+| ACT-27b | P2 | Review | ACT-27a | [Toekomstige maanden direct bewerkbaar](#act-27) |
 | ACT-28 | P2 | Gereed | — | [Vermogensprognose per persoon](#act-28) |
 | ACT-28a | P2 | Gereed | — | [Rekenkern vermogen per persoon per maand](#act-28) |
 | ACT-28b | P2 | Gepland | ACT-28a | [Plan per 1/1 automatisch vastleggen](#act-28) |
@@ -344,15 +344,15 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 
 | Veld | Waarde |
 |---|---|
-| Actie | ACT-27a — compacte spaarplanner |
-| Status | Afgerond |
+| Actie | ACT-27b — toekomstige maanden direct bewerkbaar |
+| Status | Review |
 | Uitvoerder / datum | Claude Code / 2026-09-23 |
-| Branch / PR | `codex/act-27a-compact-planner`; [PR #194](https://github.com/gjagils/checkthepockets/pull/194) gemerged (`34066d5`), deployment geslaagd |
-| Budget bij start | Claude Code usage-weergave (get_usage), 2026-09-23 15:21: 5-uurslimiet 65% gebruikt (reset 17:50), week 47%; extra usage uit. Daarom alleen 27a; 27b na de reset. |
-| Uitgevoerd | Sticky regelcel als één flexregel met ellipsis; acties via hover/focus (altijd bij `hover: none`). Celafstand 0,2rem/0,45rem, maandkolom 74px, tekst 0,8rem, compacte kop met kleine knoppen, scrollbox tot 100vh−170px. Nieuwe rij 'Beweging' berekend in de template uit het lopende saldo; geen routewijziging. |
-| Validatie | Screenshot 1920×1080 met 15 regels zoals de Excel: alles incl. Beweging en Saldo zichtbaar (voorheen 11 regels en scrollen). `python -m pytest tests/ --tb=short`: 485 passed, 2 skipped, 2846 warnings. Nieuw: tests/test_savings_planner_layout.py (beweging per maand, één regel per spaarregel). |
-| Openstaand | ACT-27b (celbewerking toekomst) na budgetreset. ACT-25: bunq geeft de tweede spaarrekening niet door; wacht op test met alleen die rekening en eventueel Enable Banking support. ACT-15 later. |
-| Volgende stap | ACT-27b starten na budgetcontrole (na reset 17:50). |
+| Branch / PR | `codex/act-27b-inline-edit`; PR volgt |
+| Budget bij start | Claude Code usage-weergave (get_usage), 2026-09-23 15:39: 5-uurslimiet 76% gebruikt, week 49%; gebruiker vroeg door te gaan tot het budget op is. |
+| Uitgevoerd | `POST /savings/entries/update` (was uitgeschakeld, 410) accepteert weer bedragen, maar alleen voor toekomstige maanden van eigen plannen (409 voor verleden/lopende maand, 404 voor anderen, 400 bij ongeldig bedrag; '1.234,56', '12,50' en leeg toegestaan). Een aangepaste maand maakt de regel 'onregelmatig'. Antwoord bevat lopend saldo (met gekoppeld startsaldo) en beweging per maand. Cellen: klikken of Enter om te bewerken, Enter/Tab/Shift+Tab slaan op en gaan verder, Escape annuleert; saldo, beweging, regeltotaal en badge worden direct bijgewerkt. Oude uitgeschakelde implementatie verwijderd. |
+| Validatie | Python 3.12.11: `python -m pytest tests/ --tb=short`: 488 passed, 2 skipped, 2858 warnings. tests/test_savings_planner_layout.py uitgebreid (herberekening, leegmaken, ongeldig bedrag, andere gebruiker, verleden maand, bewerkbare cellen). Het JavaScript is niet end-to-end in een browser getest; route en rendering wel. |
+| Openstaand | ACT-28a–d: gebruiker laat deze door Codex uitvoeren, in volgorde 28a → 28b → 28c → 28d, vanaf main na merge van ACT-27b. ACT-25: test met alleen de ontbrekende bunq-rekening. ACT-15 later. |
+| Volgende stap | Na groene CI mergen, ACT-27 op Afgerond; gebruiker controleert celbewerking in productie. Codex start ACT-28a. |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,

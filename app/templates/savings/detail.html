@@ -8,7 +8,7 @@
 <tr class="savings-row" data-line-id="{{ line.id }}">
     <td class="sticky-col">
         <div class="line-cell{% if line.category_id %} line-has-category{% endif %}">
-            <span class="line-freq-badge" title="{{ freq_label }}">{{ freq_letter }}</span>
+            <span class="line-freq-badge" data-line-badge="{{ line.id }}" title="{{ freq_label }}">{{ freq_letter }}</span>
             <span class="line-name" title="{{ line.name }}{% if line.category %} — gekoppeld aan {{ line.category.name }}{% endif %}">{{ line.name }}</span>
             <div class="line-actions-right">
                 <button type="button" class="btn btn-sm btn-icon" onclick="toggleEditRow({{ line.id }})" title="Bewerken">&#9998;</button>
@@ -49,10 +49,14 @@
         {% if line.category_id %}{% set tx_url = tx_url ~ '&category_id=' ~ line.category_id %}{% endif %}
     {% endif %}
     {% set tx_url = tx_url ~ '&back=' ~ ('/savings/' ~ plan.id) | urlencode ~ '&back_label=' ~ ('Spaarplan ' ~ plan.year) | urlencode %}
-    <td class="text-right savings-cell cell-{{ entry.status }}{% if is_future_empty %} cell-nolink{% endif %}"
+    <td class="text-right savings-cell cell-{{ entry.status }}{% if is_future and entry.id %} cell-editable{% elif is_future_empty %} cell-nolink{% endif %}"
         data-entry-id="{{ entry.id }}"
-        data-month="{{ m }}">
-        {% if is_future_empty %}
+        data-month="{{ m }}"{% if is_future and entry.id %}
+        data-amount="{{ '%.2f'|format(entry.val|abs) if entry.val is not none else '' }}"
+        tabindex="0" title="Klik om het geplande bedrag voor {{ months[m] }} aan te passen"{% endif %}>
+        {% if is_future and entry.id %}
+        <span class="cell-display">{% if entry.val is not none %}&euro;&nbsp;{{ entry.val|abs|euro }}{% else %}-{% endif %}</span>
+        {% elif is_future_empty %}
         <span class="cell-display">
             {% if entry.val is not none %}&euro;&nbsp;{{ entry.val|abs|euro }}{% else %}-{% endif %}
         </span>
@@ -643,6 +647,84 @@ function saveStartingBalance() {
         }
     });
 }
+
+// ── Toekomstige maanden direct bewerken (ACT-27b) ───────────────────
+function editableCells(row) {
+    return Array.prototype.slice.call(row.querySelectorAll('.cell-editable'));
+}
+
+function startCellEdit(td) {
+    if (!td || td.querySelector('input')) return;
+    var display = td.querySelector('.cell-display');
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.inputMode = 'decimal';
+    input.className = 'cell-input';
+    input.value = (td.dataset.amount || '').replace('.', ',');
+    display.style.display = 'none';
+    td.appendChild(input);
+    input.focus();
+    input.select();
+    var done = false;
+    function finish(save, moveBy) {
+        if (done) return;
+        done = true;
+        var value = input.value;
+        input.remove();
+        display.style.display = '';
+        if (save && value.replace(',', '.') !== (td.dataset.amount || '')) {
+            saveCell(td, value);
+        }
+        if (moveBy) {
+            var cells = editableCells(td.parentElement);
+            var next = cells[cells.indexOf(td) + moveBy];
+            if (next) startCellEdit(next);
+        }
+    }
+    input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); finish(true, 0); td.focus(); }
+        else if (e.key === 'Tab') { e.preventDefault(); finish(true, e.shiftKey ? -1 : 1); }
+        else if (e.key === 'Escape') { finish(false, 0); td.focus(); }
+    });
+    input.addEventListener('blur', function () { finish(true, 0); });
+}
+
+function saveCell(td, value) {
+    var formData = new FormData();
+    formData.append('entry_id', td.dataset.entryId);
+    formData.append('amount', value);
+    td.classList.add('cell-saving');
+    fetch('/savings/entries/update', { method: 'POST', body: formData })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            td.classList.remove('cell-saving');
+            if (!data.ok) { alert(data.error || 'Opslaan mislukt'); return; }
+            td.dataset.amount = data.amount === null ? '' : data.amount.toFixed(2);
+            td.querySelector('.cell-display').innerHTML = data.amount === null ? '-' : fmtEuroSigned(data.amount);
+            var total = document.querySelector('.line-total[data-line-id="' + data.line_id + '"]');
+            if (total) total.innerHTML = '<strong>' + fmtEuroSigned(data.line_total) + '</strong>';
+            var badge = document.querySelector('[data-line-badge="' + data.line_id + '"]');
+            if (badge && data.frequency === 'custom') { badge.textContent = 'O'; badge.title = 'Onregelmatig'; }
+            for (var m in data.running_balances) {
+                var bal = data.running_balances[m];
+                var balCell = document.querySelector('.balance-cell[data-month="' + m + '"]');
+                if (balCell) balCell.innerHTML = '<strong class="' + (bal >= 0 ? 'amount-positive' : 'amount-negative') + '">' + fmtEuroSigned(bal) + '</strong>';
+                var mv = data.movements[m];
+                var mvCell = document.querySelector('.movement-cell[data-month="' + m + '"]');
+                if (mvCell) mvCell.innerHTML = '<span class="' + (mv >= 0 ? 'amount-positive' : 'amount-negative') + '">' + fmtEuroSigned(mv) + '</span>';
+            }
+        })
+        .catch(function () { td.classList.remove('cell-saving'); alert('Opslaan mislukt'); });
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.cell-editable').forEach(function (td) {
+        td.addEventListener('click', function () { startCellEdit(td); });
+        td.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' && e.target === td) { e.preventDefault(); startCellEdit(td); }
+        });
+    });
+});
 
 // ── Snel-toevoegen-modal ────────────────────────────────────────────
 function openQuickAdd() {
