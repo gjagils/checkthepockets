@@ -190,6 +190,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 - **Acties:** Loop dagelijkse taken door op desktop en mobiel. Ontwerp logische plaats voor analyse/statistieken en heldere namen voor dashboards. Leg bevindingen en voorgestelde indeling hier vast.
 - **Klaar wanneer:** Taken en navigatieproblemen zijn concreet beschreven; gekozen indeling en belangrijkste routes zijn vastgelegd voor implementatie.
 - **Validatie:** Taakgerichte inspectie van importeren, categoriseren, budget volgen, vermogen bekijken en hypotheekscenario gebruiken.
+- **Besluit:** Zie [dagelijkse routes en navigatie](docs/INFORMATION-ARCHITECTURE.md). ACT-19 implementeert eventuele lege-staat- en foutmeldingaanpassingen; ACT-20 toetst de toegankelijkheid en mobiele eindcontrole.
 
 <a id="act-17"></a>
 
