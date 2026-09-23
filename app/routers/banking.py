@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from app.auth import require_login
 from app.config import APP_URL, ENABLE_BANKING_APP_ID, SUPER_ADMIN_USERNAME
 from app.database import get_db
-from app.models import Account, BankConnection, Transaction, Rule, Category
+from app.models import Account, BankConnection, Transaction, Rule, Category, ImportBatch
 from app.parsers.base import ParsedTransaction
 from app.rules_engine import apply_rules_to_transaction
 from app.template_config import templates
@@ -472,6 +472,9 @@ async def sync_transactions(connection_id: int, request: Request, db: Session = 
     # Import transactions (skip duplicates)
     active_rules = db.query(Rule).filter(Rule.user_id == user.id, Rule.is_active == 1).all()
     imported = skipped = auto_categorized = 0
+    batch = ImportBatch(user_id=user.id, account_id=account.id, source="enable_banking", total_count=len(parsed))
+    db.add(batch)
+    db.flush()
 
     for p in parsed:
         exists = db.query(Transaction).filter(
@@ -504,6 +507,8 @@ async def sync_transactions(connection_id: int, request: Request, db: Session = 
         imported += 1
 
     conn.last_synced_at = datetime.utcnow()
+    batch.imported_count = imported
+    batch.skipped_count = skipped
     db.commit()
 
     # Draai alle regels nogmaals over alle transacties (vangt rename → match
@@ -533,6 +538,8 @@ async def sync_transactions(connection_id: int, request: Request, db: Session = 
             "skipped": skipped,
             "auto_categorized": auto_categorized,
             "extra_categorized": extra,
+            "rejected": 0,
+            "batch": batch,
             "total": len(parsed),
             "account": account,
             "connection": conn,
