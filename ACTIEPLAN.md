@@ -65,7 +65,9 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-24 | P2 | Afgerond | ACT-02 | [Gerichte foutafhandeling en logging](#act-24) |
 | ACT-24a | P2 | Afgerond | ACT-02 | [Twee stille fouten loggen (PR #174)](#act-24) |
 | ACT-24b | P2 | Afgerond | ACT-24a | [Inventarisatie, overige excepts en foutinjectie](#act-24) |
-| ACT-25 | P2 | Gepland | — | [Meerdere bunq- en spaarrekeningen](#act-25) |
+| ACT-25 | P2 | Bezig | — | [Meerdere bunq- en spaarrekeningen](#act-25) |
+| ACT-25a | P2 | Review | — | [Rekeningen zonder uid zichtbaar na koppelen](#act-25) |
+| ACT-25b | P2 | Gepland | ACT-25a | [Beschikbaarheid bunq-rekeningen vaststellen en vervolg kiezen](#act-25) |
 | ACT-26 | P1 | Afgerond | ACT-21 | [Importvoorbeeld zonder gegevens van andere gebruikers](#act-26) |
 
 ## Beschrijving en acceptatiecriteria
@@ -279,6 +281,9 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 - **Klaar wanneer:** Beschikbaarheid is per rekeningtype bevestigd of als beperking vastgelegd; beschikbare rekeningen zijn afzonderlijk herkenbaar, ook zonder recente transacties; herautorisatie dupliceert niet; eigen overboekingen verstoren totalen niet. Splits onderzoek en eventuele implementatie in subacties voordat codewerk start; importwijzigingen hangen af van ACT-09.
 - **Validatie:** Eerst echte accountlijst controleren met toestemming zonder IBANs/tokens in Git; daarna synthetische tests met meerdere spaarrekeningen, ontbrekende transacties, actuele saldi en eigen overboekingen. Een IBAN alleen bewijst geen API-ondersteuning.
 - **Bronnen (geraadpleegd 2026-09-23):** [Enable Banking FAQ](https://enablebanking.com/docs/faq/), [API](https://enablebanking.com/docs/api/reference/), [bunq meerdere rekeningen](https://www.bunq.com/personal/features/bank-accounts); bestaande verwerking in app/routers/banking.py en app/scheduler.py.
+- **Waarneming 2026-09-23:** Bij een autorisatie van twee bunq-spaarrekeningen verscheen alleen de tweede; bij een nieuwe autorisatie van alleen de eerste bleef de lijst leeg. Volgens de gebruiker werkt die rekening normaal in bunq. Enable Banking laat `uid` weg als saldo en transacties niet op te halen zijn; de callback sloeg zulke rekeningen stil over.
+- **ACT-25a:** Bewaar en toon alle rekeningen uit de sessie (IBAN, soort, status), ook zonder `uid`; geen succesmelding als niets op te halen is; log per rekening volgorde, soort en of er een `uid` was, zonder IBAN's of ID's. Klaar wanneer een rekening zonder `uid` zichtbaar is en niet in de synchronisatielijst staat.
+- **ACT-25b:** Na uitrol opnieuw koppelen en de log/resultaatpagina lezen. Ontbreekt de rekening helemaal of komt hij zonder `uid` terug, dan ligt de beperking bij bunq/Enable Banking (navragen bij Enable Banking, CSV-fallback vastleggen); komt hij met `uid` terug, dan verder zoeken in de app. Daarna eigen overboekingen en saldo zonder transacties.
 
 <a id="act-26"></a>
 
@@ -309,15 +314,15 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 
 | Veld | Waarde |
 |---|---|
-| Actie | ACT-23b — scenariovergelijking uit de detailroute |
-| Status | Afgerond |
+| Actie | ACT-25a — rekeningen zonder uid zichtbaar na koppelen |
+| Status | Review |
 | Uitvoerder / datum | Claude Code / 2026-09-23 |
-| Branch / PR | `codex/act-23b-scenario-comparison`; [PR #188](https://github.com/gjagils/checkthepockets/pull/188) gemerged (`d149d9a`) |
-| Budget bij start | Claude Code usage-weergave (get_usage), 2026-09-23 13:47: 5-uurslimiet 29% gebruikt, week 43% gebruikt; extra usage uit. |
-| Uitgevoerd | Nieuwe functies in app/mortgage_calc.py: `bridge_cost_summary`, `default_variant_summary`, `mortgage_budget_sum`, `scenario_monthly_total`, `variant_leftovers`, `add_variant_comparison`, `variant_chart_series`. `scenarios_detail` haalt alleen nog gegevens op, roept deze functies aan en rendert (rekenblok 316 → 104 regels). Een dode tussentoewijzing van `first_5y_refund` is vervallen. |
-| Validatie | Golden master van de volledige templatecontext (96 KB: 4 varianten waarvan één zonder rente, overbrugging, bestaande leningdelen, budget met hypotheekcategorie, bijdragen) en van het terugvalpad zonder rentetabel: byte-identiek op main en branch. `python -m pytest tests/ --tb=short`: 476 passed, 2 skipped (live Enable Banking), 2820 warnings. Nieuw: tests/test_mortgage_scenario_comparison.py. |
-| Openstaand | ACT-08 (rotatie van geheimen), ACT-15 (restoreproef op NAS) en ACT-25 (bunq-accountlijst met geautoriseerde koppeling) vragen handelingen of toegang van de gebruiker. |
-| Volgende stap | Gebruiker: ACT-08-rotatie, ACT-15-restoreproef of ACT-25-accountlijst aanleveren; daarna kan de uitvoering verder. |
+| Branch / PR | `codex/act-25a-unavailable-accounts`; PR volgt |
+| Budget bij start | Claude Code usage-weergave (get_usage), 2026-09-23 14:44: 5-uurslimiet 55% gebruikt, week 46% gebruikt; extra usage uit. Afgebakend op callback, twee templates en tests. |
+| Uitgevoerd | `_describe_session_accounts` bewaart elke sessierekening met `uid`, IBAN (uit details of sessie), BIC, soort (CACC/SVGS → Betaal-/Spaarrekening) en `available`. Resultaatpagina toont alle rekeningen met status en meldt het als niets op te halen is. Synchronisatiepagina toont alleen op te halen rekeningen en noemt de rest. Log: aantal ontvangen/op te halen en per rekening volgorde, soort en uid ja/nee. |
+| Validatie | Python 3.12.11: `python -m pytest tests/ --tb=short`: 480 passed, 2 skipped (live Enable Banking), 2830 warnings. Nieuw: tests/test_bank_session_accounts.py (omzetting, terugval bij detailfout, volledige koppelstroom met en zonder op te halen rekening, loginhoud zonder IBAN/ID). |
+| Openstaand | ACT-25b: na uitrol opnieuw koppelen en log/resultaat lezen. ACT-15 later door de gebruiker. |
+| Volgende stap | Na groene CI mergen en uitrol; gebruiker koppelt bunq opnieuw en deelt de resultaatpagina (zonder IBAN's) of de logregel 'Enable Banking sessie'. |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,

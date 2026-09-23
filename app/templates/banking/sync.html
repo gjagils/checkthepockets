@@ -9,6 +9,17 @@
 <div class="alert alert-error">{{ error }}</div>
 {% endif %}
 
+{% if unavailable_accounts %}
+<div class="alert alert-error">
+    De bank levert geen transacties voor
+    {% for acc in unavailable_accounts %}{{ acc.iban or 'een rekening' }}{% if acc.type %} ({{ acc.type }}){% endif %}{% if not loop.last %}, {% endif %}{% endfor %}.
+    Deze rekening(en) staan daarom niet in de keuzelijst.
+</div>
+{% endif %}
+
+{% if not accounts %}
+<div class="alert alert-error">Deze koppeling heeft geen rekeningen waarvan transacties op te halen zijn. Koppel de bank opnieuw.</div>
+{% else %}
 <div class="card">
     <form method="post" action="/banking/sync/{{ connection.id }}">
         <div class="form-group">
@@ -34,6 +45,7 @@
         <button type="submit" class="btn btn-primary">Transacties ophalen</button>
     </form>
 </div>
+{% endif %}
 
 {% if connection.last_synced_at %}
 <p style="color:var(--muted); margin-top:1rem; font-size:0.85rem;">
