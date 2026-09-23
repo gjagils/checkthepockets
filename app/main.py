@@ -108,6 +108,25 @@ def terms(request: Request):
     return _landing_templates.TemplateResponse("terms.html", {"request": request})
 
 
+@app.get("/healthz")
+def healthz():
+    """Liveness probe: the process is serving requests."""
+    return {"status": "ok"}
+
+
+@app.get("/readyz")
+def readyz():
+    """Readiness probe: the process can reach its configured database."""
+    from sqlalchemy import text
+    from app.database import SessionLocal
+    db = SessionLocal()
+    try:
+        db.execute(text("SELECT 1"))
+    finally:
+        db.close()
+    return {"status": "ready"}
+
+
 app.include_router(auth.router)
 app.include_router(dashboard.router)
 app.include_router(transactions.router)
