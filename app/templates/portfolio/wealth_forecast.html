@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Vermogensprognose - Check Your Pockets{% endblock %}
+{% block container_class %}container-wide{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Vermogensprognose</h1>
+        <p class="muted">Stand aan het begin van de maand. Groen/rood vergelijkt met je bevroren plan per 1 januari.</p>
+    </div>
+    <button class="btn btn-secondary" type="button" onclick="capturePlan()">Plan per 1/1 vastleggen</button>
+</div>
+
+<div class="portfolio-tabs" style="display:flex; gap:.4rem; flex-wrap:wrap; margin-bottom:1rem;">
+    <a class="btn btn-sm {% if selected is none %}btn-primary{% endif %}" href="/portfolio/wealth-forecast?year={{ year }}">Samen</a>
+    {% for item in persons %}
+    <a class="btn btn-sm {% if selected == item.id %}btn-primary{% endif %}" href="/portfolio/wealth-forecast?year={{ year }}&person={{ item.id }}">{{ item.name }}</a>
+    {% endfor %}
+</div>
+
+{% if not persons %}
+<div class="card" style="text-align:center; padding:3rem;">Voeg eerst <a href="/portfolio">personen en bezittingen</a> toe.</div>
+{% else %}
+<div class="accounts-grid" style="margin-bottom:1.25rem;">
+    <section class="card">
+        <p class="muted" style="margin:0 0 .35rem;">Nu{% if selected is none %} · samen{% endif %}</p>
+        <strong style="font-size:1.6rem;">&euro;&nbsp;{{ now_row.forecast.total|euro }}</strong>
+        {% if now_row.plan %}<p class="muted" style="margin:.45rem 0 0;">Plan: &euro;&nbsp;{{ now_row.plan.total|euro }}</p>{% endif %}
+    </section>
+    <section class="card">
+        <p class="muted" style="margin:0 0 .35rem;">Prognose eind {{ year }}</p>
+        <strong style="font-size:1.6rem;">&euro;&nbsp;{{ end_row.forecast.total|euro }}</strong>
+        {% if end_row.difference is not none %}<p class="{% if end_row.difference >= 0 %}status-above{% else %}status-below{% endif %}" style="margin:.45rem 0 0;">{% if end_row.difference >= 0 %}+{% endif %}&euro;&nbsp;{{ end_row.difference|euro }} t.o.v. plan</p>{% endif %}
+    </section>
+    <section class="card">
+        <p class="muted" style="margin:0 0 .35rem;">Planstatus</p>
+        {% if has_plan %}<strong>Plan per 1/1 vastgelegd</strong>{% else %}<strong>Nog geen plan</strong><p class="muted" style="margin:.45rem 0 0;">Leg het vast zodra je uitgangspositie klopt.</p>{% endif %}
+    </section>
+</div>
+
+<div class="card" style="padding:0; overflow:hidden;">
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Maand</th><th class="text-right">Prognose</th><th class="text-right">Plan 1/1</th><th class="text-right">Verschil</th><th class="text-right">Sparen</th><th class="text-right">Beleggen</th></tr></thead>
+            <tbody>
+            {% for row in rows %}
+            <tr>
+                <th>{{ row.label }}</th>
+                <td class="text-right nowrap">&euro;&nbsp;{{ row.forecast.total|euro }}</td>
+                <td class="text-right nowrap">{% if row.plan %}&euro;&nbsp;{{ row.plan.total|euro }}{% else %}<span class="muted">—</span>{% endif %}</td>
+                <td class="text-right nowrap {% if row.difference is not none %}status-{{ row.status }}{% endif %}">{% if row.difference is not none %}{% if row.difference > 0 %}+{% endif %}&euro;&nbsp;{{ row.difference|euro }}{% else %}—{% endif %}</td>
+                <td class="text-right nowrap">&euro;&nbsp;{{ row.forecast.savings|euro }}</td>
+                <td class="text-right nowrap">&euro;&nbsp;{{ row.forecast.portfolio|euro }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script>
+async function capturePlan(confirmed) {
+    const response = await fetch('/portfolio/wealth-plan/{{ year }}/capture', {
+        method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'confirmed=' + (confirmed ? 'true' : 'false')
+    });
+    if (response.status === 409) {
+        if (confirm('Dit vervangt het bestaande plan voor {{ year }}. Doorgaan?')) return capturePlan(true);
+        return;
+    }
+    if (response.ok) window.location.reload();
+}
+</script>
+{% endblock %}

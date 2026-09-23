@@ -82,6 +82,10 @@
     outline-offset: 3px;
 }
 
+.status-above { color: #16734a; font-weight: 650; }
+.status-below { color: #b42318; font-weight: 650; }
+.status-match { color: var(--ctp-denim); font-weight: 650; }
+
 /* ===== Light Theme (Banani) ===== */
 [data-theme="light"] {
     /* Surfaces */
