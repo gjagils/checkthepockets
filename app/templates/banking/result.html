@@ -6,25 +6,40 @@
 </div>
 
 {% if success %}
+{% if available_count %}
 <div class="alert alert-success">
-    <strong>{{ bank_name }}</strong> is succesvol gekoppeld! De volgende rekeningen zijn beschikbaar:
+    <strong>{{ bank_name }}</strong> is gekoppeld. Van {{ available_count }} van de {{ accounts|length }} rekening(en) kunnen transacties worden opgehaald.
 </div>
+{% elif accounts %}
+<div class="alert alert-error">
+    <strong>{{ bank_name }}</strong> heeft de autorisatie bevestigd, maar levert voor geen van de rekeningen transacties.
+    Probeer later opnieuw te koppelen of controleer de rekening in je bankapp.
+</div>
+{% else %}
+<div class="alert alert-error">
+    <strong>{{ bank_name }}</strong> heeft geen rekeningen teruggegeven. Koppel opnieuw en selecteer bij de bank minimaal één rekening.
+</div>
+{% endif %}
 
 {% if accounts %}
 <div class="card">
-    <h2>Gekoppelde rekeningen</h2>
+    <h2>Rekeningen uit deze koppeling</h2>
     <table class="table">
         <thead>
             <tr>
                 <th>IBAN</th>
+                <th>Soort</th>
                 <th>BIC</th>
+                <th>Status</th>
             </tr>
         </thead>
         <tbody>
             {% for acc in accounts %}
             <tr>
                 <td>{{ acc.iban or '-' }}</td>
+                <td>{{ acc.type or '-' }}</td>
                 <td>{{ acc.name or '-' }}</td>
+                <td>{% if acc.available %}Transacties ophalen mogelijk{% else %}Bank levert geen transacties voor deze rekening{% endif %}</td>
             </tr>
             {% endfor %}
         </tbody>
@@ -33,7 +48,7 @@
 {% endif %}
 
 <div style="display:flex; gap:0.75rem; margin-top:1rem;">
-    {% if connection_id %}
+    {% if connection_id and available_count %}
     <a href="/banking/sync/{{ connection_id }}" class="btn btn-primary">Transacties ophalen</a>
     {% endif %}
     <a href="/banking/connect" class="btn">Overzicht koppelingen</a>

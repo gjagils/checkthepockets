@@ -183,6 +183,75 @@ def _consent_valid_until(session_data: dict, fallback_days: int) -> datetime:
     return datetime.utcnow() + timedelta(days=fallback_days)
 
 
+ACCOUNT_TYPE_LABELS = {
+    "CACC": "Betaalrekening",
+    "SVGS": "Spaarrekening",
+    "CARD": "Creditcard",
+    "LOAN": "Lening",
+    "TRAN": "Transactierekening",
+}
+
+
+def _extract_iban(data: dict) -> str:
+    """IBAN uit een Enable Banking-rekening of -details. `account_id` kan een
+    dict óf een lijst zijn, en banken gebruiken verschillende veldnamen."""
+    acc_id = data.get("account_id")
+    if isinstance(acc_id, dict):
+        iban = acc_id.get("iban") or acc_id.get("IBAN") or ""
+        if iban:
+            return iban
+    elif isinstance(acc_id, list):
+        for entry in acc_id:
+            if isinstance(entry, dict):
+                iban = entry.get("iban") or entry.get("IBAN") or ""
+                if iban:
+                    return iban
+    return data.get("iban") or ""
+
+
+def _bic(data: dict) -> str:
+    servicer = data.get("account_servicer")
+    return servicer.get("bic_fi", "") if isinstance(servicer, dict) else ""
+
+
+def _describe_session_accounts(session_accounts, get_details, conn=None) -> list[dict]:
+    """Alle rekeningen uit een Enable Banking-sessie, ook die zonder `uid`.
+
+    Zonder `uid` kan de bank geen saldo of transacties leveren (volgens Enable
+    Banking bv. bij een geblokkeerde of gesloten rekening); die bewaren we met
+    ``available=False`` zodat de gebruiker ziet wat er terugkwam.
+    """
+    described = []
+    for acc in session_accounts or []:
+        if not isinstance(acc, dict):
+            continue
+        uid = acc.get("uid") or acc.get("account_uid")
+        iban = _extract_iban(acc)
+        name = _bic(acc)
+        if uid:
+            try:
+                details = get_details(uid)
+                iban = _extract_iban(details) or iban
+                name = _bic(details) or name
+            except Exception as e:
+                logger.warning("Rekeningdetails ophalen mislukt (koppeling id=%s): %s",
+                               conn.id if conn else None, safe_error_message(e))
+        cash_type = acc.get("cash_account_type") or ""
+        described.append({
+            "uid": uid or None,
+            "iban": iban,
+            "name": name,
+            "type": ACCOUNT_TYPE_LABELS.get(cash_type, cash_type),
+            "available": bool(uid),
+        })
+    return described
+
+
+def _available_accounts(stored_accounts: list[dict]) -> list[dict]:
+    """Rekeningen waarvan transacties op te halen zijn (oude records: altijd met uid)."""
+    return [a for a in stored_accounts if a.get("uid")]
+
+
 # ── OAuth callback ──────────────────────────────────────────────────────────
 
 
@@ -229,34 +298,14 @@ def callback(request: Request, code: str = "", state: str = "", db: Session = De
     session_id = session_data.get("session_id")
     accounts = session_data.get("accounts", [])
 
-    # Enrich accounts with details (IBAN, name)
-    enriched_accounts = []
-    for acc in accounts:
-        uid = acc.get("uid") or acc.get("account_uid")
-        if not uid:
-            continue
-        try:
-            details = enable_banking.get_account_details(uid)
-            # Enable Banking kan account_id als dict OF als lijst teruggeven,
-            # en verschillende banken gebruiken verschillende velden.
-            iban = ""
-            acc_id = details.get("account_id")
-            if isinstance(acc_id, dict):
-                iban = acc_id.get("iban") or acc_id.get("IBAN") or ""
-            elif isinstance(acc_id, list):
-                for entry in acc_id:
-                    if isinstance(entry, dict):
-                        iban = entry.get("iban") or entry.get("IBAN") or ""
-                        if iban:
-                            break
-            if not iban:
-                iban = details.get("iban") or ""
-            name = details.get("account_servicer", {}).get("bic_fi", "") if isinstance(details.get("account_servicer"), dict) else ""
-        except Exception as e:
-            logger.warning("Rekeningdetails ophalen mislukt (koppeling id=%s): %s", conn.id if conn else None, safe_error_message(e))
-            iban = ""
-            name = ""
-        enriched_accounts.append({"uid": uid, "iban": iban, "name": name})
+    enriched_accounts = _describe_session_accounts(accounts, enable_banking.get_account_details, conn)
+    available_count = sum(1 for a in enriched_accounts if a["available"])
+    logger.info(
+        "Enable Banking sessie (koppeling id=%s): %d rekening(en) ontvangen, %d op te halen; %s",
+        conn.id if conn else None, len(enriched_accounts), available_count,
+        ", ".join(f"#{i + 1} {a['type'] or 'onbekend type'} {'met' if a['available'] else 'zonder'} uid"
+                  for i, a in enumerate(enriched_accounts)) or "geen",
+    )
 
     if conn:
         conn.session_id = session_id
@@ -278,6 +327,7 @@ def callback(request: Request, code: str = "", state: str = "", db: Session = De
             "success": True,
             "bank_name": conn.bank_name if conn else "Bank",
             "accounts": enriched_accounts,
+            "available_count": available_count,
             "connection_id": conn.id if conn else None,
         },
     )
@@ -300,10 +350,14 @@ def sync_page(connection_id: int, request: Request, db: Session = Depends(get_db
     if not conn:
         return RedirectResponse("/banking/connect", status_code=302)
 
-    accounts = json.loads(conn.accounts_json or "[]")
+    stored_accounts = json.loads(conn.accounts_json or "[]")
     return templates.TemplateResponse(
         "banking/sync.html",
-        {"request": request, "user": user, "connection": conn, "accounts": accounts},
+        {
+            "request": request, "user": user, "connection": conn,
+            "accounts": _available_accounts(stored_accounts),
+            "unavailable_accounts": [a for a in stored_accounts if not a.get("uid")],
+        },
     )
 
 
@@ -332,7 +386,7 @@ async def sync_transactions(connection_id: int, request: Request, db: Session = 
 
     # Find IBAN for this account from stored data
     stored_accounts = json.loads(conn.accounts_json or "[]")
-    account_info = next((a for a in stored_accounts if a["uid"] == account_uid), None)
+    account_info = next((a for a in stored_accounts if a.get("uid") == account_uid), None)
     account_iban = _normalize_iban(account_info["iban"]) if account_info else None
 
     from app import enable_banking
@@ -354,7 +408,7 @@ async def sync_transactions(connection_id: int, request: Request, db: Session = 
             {
                 "request": request, "user": user,
                 "connection": conn,
-                "accounts": stored_accounts,
+                "accounts": _available_accounts(stored_accounts),
                 "error": f"Kan transacties niet ophalen: {safe_error_message(e)}",
             },
         )
@@ -376,7 +430,7 @@ async def sync_transactions(connection_id: int, request: Request, db: Session = 
             {
                 "request": request, "user": user,
                 "connection": conn,
-                "accounts": stored_accounts,
+                "accounts": _available_accounts(stored_accounts),
                 "error": "Geen transacties gevonden voor de geselecteerde periode.",
             },
         )
