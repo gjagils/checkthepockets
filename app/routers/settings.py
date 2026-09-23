@@ -292,13 +292,13 @@ async def import_confirm(
         if rt.get("start_date"):
             try:
                 start_date = date.fromisoformat(rt["start_date"])
-            except Exception:
-                pass
+            except (TypeError, ValueError):
+                pass  # Invalid date in an uploaded settings file: keep the default.
         if rt.get("end_date"):
             try:
                 end_date = date.fromisoformat(rt["end_date"])
-            except Exception:
-                pass
+            except (TypeError, ValueError):
+                pass  # Invalid date in an uploaded settings file: leave open-ended.
 
         if existing:
             if skip_existing:

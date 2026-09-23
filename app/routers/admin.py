@@ -1,3 +1,4 @@
+import logging
 import datetime
 import secrets
 
@@ -15,6 +16,7 @@ from app.email_service import send_invite_email
 from app.crypto import encrypt_existing_transactions, encryption_enabled
 from app.template_config import templates
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/admin")
 
 
@@ -462,6 +464,7 @@ def _scheduled_jobs_info():
         from app.scheduler import scheduler
         jobs = scheduler.get_jobs()
     except Exception:
+        logger.warning("Scheduler jobs unavailable for admin overview", exc_info=True)
         return []
     out = []
     for job in jobs:

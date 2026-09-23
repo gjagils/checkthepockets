@@ -91,6 +91,7 @@ def landing(request: Request):
     try:
         user = get_current_user(request, db)
     except Exception:
+        logger.warning("Session lookup failed on landing page; showing logged-out view", exc_info=True)
         user = None
     finally:
         db.close()
