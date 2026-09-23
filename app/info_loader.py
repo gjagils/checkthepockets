@@ -6,6 +6,7 @@ aangelegd (content is klein, render-tijd verwaarloosbaar).
 """
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -13,6 +14,8 @@ from typing import Optional
 import frontmatter
 import markdown as md
 import yaml
+
+logger = logging.getLogger(__name__)
 
 DOCS_DIR = Path(__file__).resolve().parent / "docs"
 MANIFEST_PATH = DOCS_DIR / "manifest.yml"
@@ -99,6 +102,7 @@ def _load_raw(path: Path) -> Optional[frontmatter.Post]:
     try:
         return frontmatter.load(path)
     except Exception:
+        logger.warning("Info-artikel %s kon niet worden gelezen", path.name, exc_info=True)
         return None
 
 

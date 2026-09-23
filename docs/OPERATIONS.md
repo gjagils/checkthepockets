@@ -43,6 +43,9 @@ Vermeld bij testresultaten altijd afwijkingen van de vastgelegde omgeving.
 Controleer bij een release PR-CI, build/deploy-run, containerstatus, applicatielogs
 en de relevante gebruikersroute. Meld welke controles niet uitgevoerd konden
 worden. ACT-13 en ACT-14 automatiseren dit verder.
+De regels voor foutafhandeling en loginhoud staan in
+[ERROR-HANDLING.md](ERROR-HANDLING.md); logs bevatten geen tokens, bank-ID's of
+transactie-inhoud.
 
 Bij herstel eerst beoordelen of het databaseschema compatibel is met de vorige
 image. Een oude image terugzetten is niet vanzelf een veilige migratierollback.

@@ -1,3 +1,4 @@
+import logging
 import datetime
 import secrets
 
@@ -32,6 +33,7 @@ from app.template_config import templates
 # Google OAuth setup (only if credentials are configured)
 # ──────────────────────────────────────────────────────────────────────────────
 
+logger = logging.getLogger(__name__)
 _google_oauth = None
 
 if GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET:
@@ -47,7 +49,7 @@ if GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET:
         )
         _google_oauth = _oauth.google
     except Exception:
-        pass
+        logger.exception("Google OAuth configuration failed; Google login is disabled")
 
 
 def google_login_enabled() -> bool:
@@ -679,7 +681,9 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
 
     try:
         token = await _google_oauth.authorize_access_token(request)
-    except Exception:
+    except Exception as exc:
+        # Cancelled logins land here too; log the type only, never tokens or codes.
+        logger.warning("Google OAuth callback failed: %s", type(exc).__name__)
         return templates.TemplateResponse("auth/login.html", {
             "request": request,
             "error": "Google login mislukt. Probeer het opnieuw.",

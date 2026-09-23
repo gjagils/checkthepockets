@@ -214,7 +214,7 @@ def _sync_all_bank_connections():
                     raw = enable_banking.get_transactions(uid)
                     parsed = _map_eb_transactions(raw)
                 except Exception as e:
-                    logger.error("Bank sync fout voor %s/%s: %s", conn.bank_name, uid, e)
+                    logger.error("Bank sync fout voor %s (koppeling id=%s): %s", conn.bank_name, conn.id, enable_banking.safe_error_message(e))
                     continue
 
                 if not parsed:

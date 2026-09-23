@@ -1,3 +1,4 @@
+import logging
 import base64
 import binascii
 import datetime
@@ -18,6 +19,7 @@ from app.auth import require_login
 from app.template_config import templates
 from app.rules_engine import apply_single_rule
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/savings")
 
 MONTH_NAMES_NL = [
@@ -627,8 +629,8 @@ def plan_detail(
     if suggestions_b64:
         try:
             ai_suggestions = json.loads(base64.b64decode(suggestions_b64).decode())
-        except Exception:
-            pass
+        except ValueError:
+            pass  # Tampered or truncated query parameter: show the page without suggestions.
     analyze_status = request.query_params.get("analyze", "")
 
     return templates.TemplateResponse(
@@ -1614,7 +1616,9 @@ def analyze_savings(
                 "category_name": tx.category.name if tx.category else None,
             })
         except Exception:
-            continue  # Skip transactions with decryption issues
+            # Skip unreadable rows (e.g. decryption failures) but never silently.
+            logger.warning("Transactie id=%s overgeslagen bij spaaranalyse", tx.id, exc_info=True)
+            continue
 
     # Get existing line names
     existing_lines = [line.name for line in plan.lines]

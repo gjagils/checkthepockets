@@ -17,6 +17,7 @@ from app.config import APP_URL, ENABLE_BANKING_APP_ID, SUPER_ADMIN_USERNAME
 from app.database import get_db
 from app.models import Account, BankConnection, Transaction, Rule, Category, ImportBatch
 from app.parsers.base import ParsedTransaction
+from app.enable_banking import safe_error_message
 from app.import_service import store_parsed_transactions
 from app.template_config import templates
 
@@ -65,8 +66,8 @@ def _render_connect(request: Request, user, db: Session, country: str = "NL", er
         try:
             banks = enable_banking.list_banks(country, psu_type="personal")
         except Exception as e:
-            logger.error("Banklijst ophalen mislukt (%s): %s", country, e)
-            error = error or f"Kan banklijst niet ophalen: {e}"
+            logger.error("Banklijst ophalen mislukt (%s): %s", country, safe_error_message(e))
+            error = error or f"Kan banklijst niet ophalen: {safe_error_message(e)}"
     else:
         error = error or "Enable Banking is niet geconfigureerd."
 
@@ -123,7 +124,7 @@ async def start_connect(request: Request, db: Session = Depends(get_db)):
         bank = enable_banking.find_bank(bank_name, bank_country)
     except Exception as e:
         return _render_connect(request, user, db, country=bank_country,
-                               error=f"Kan banklijst niet ophalen: {e}")
+                               error=f"Kan banklijst niet ophalen: {safe_error_message(e)}")
     if not bank:
         return _render_connect(request, user, db, country=bank_country,
                                error=f"Bank '{bank_name}' niet gevonden voor {bank_country}. Kies een bank uit de lijst.")
@@ -148,9 +149,9 @@ async def start_connect(request: Request, db: Session = Depends(get_db)):
             valid_days=valid_days,
         )
     except Exception as e:
-        logger.error("Enable Banking /auth mislukt voor %s/%s: %s", bank_name, bank_country, e)
+        logger.error("Enable Banking /auth mislukt voor %s/%s: %s", bank_name, bank_country, safe_error_message(e))
         return _render_connect(request, user, db, country=bank_country,
-                               error=f"Kan autorisatie niet starten: {e}")
+                               error=f"Kan autorisatie niet starten: {safe_error_message(e)}")
 
     # Create pending connection
     conn = BankConnection(
@@ -216,12 +217,13 @@ def callback(request: Request, code: str = "", state: str = "", db: Session = De
     try:
         session_data = enable_banking.create_session(code)
     except Exception as e:
+        logger.error("Enable Banking sessie aanmaken mislukt: %s", safe_error_message(e))
         if conn:
             conn.status = "revoked"
             db.commit()
         return templates.TemplateResponse(
             "banking/result.html",
-            {"request": request, "user": user, "success": False, "error": f"Kan sessie niet aanmaken: {e}"},
+            {"request": request, "user": user, "success": False, "error": f"Kan sessie niet aanmaken: {safe_error_message(e)}"},
         )
 
     session_id = session_data.get("session_id")
@@ -250,7 +252,8 @@ def callback(request: Request, code: str = "", state: str = "", db: Session = De
             if not iban:
                 iban = details.get("iban") or ""
             name = details.get("account_servicer", {}).get("bic_fi", "") if isinstance(details.get("account_servicer"), dict) else ""
-        except Exception:
+        except Exception as e:
+            logger.warning("Rekeningdetails ophalen mislukt (koppeling id=%s): %s", conn.id if conn else None, safe_error_message(e))
             iban = ""
             name = ""
         enriched_accounts.append({"uid": uid, "iban": iban, "name": name})
@@ -333,7 +336,7 @@ async def sync_transactions(connection_id: int, request: Request, db: Session = 
     account_iban = _normalize_iban(account_info["iban"]) if account_info else None
 
     from app import enable_banking
-    logger.info("Bank sync gestart: %s account=%s from=%s to=%s", conn.bank_name, account_uid, date_from, date_to)
+    logger.info("Bank sync gestart: %s koppeling id=%s from=%s to=%s", conn.bank_name, conn.id, date_from, date_to)
     try:
         raw_transactions = enable_banking.get_transactions(
             account_uid,
@@ -342,9 +345,9 @@ async def sync_transactions(connection_id: int, request: Request, db: Session = 
         )
         logger.info("Bank sync: %d ruwe transacties opgehaald", len(raw_transactions))
     except Exception as e:
-        logger.error("Bank sync fout: %s", e)
+        logger.error("Bank sync fout (koppeling id=%s): %s", conn.id, safe_error_message(e))
         conn.last_sync_status = "error"
-        conn.last_sync_error = str(e)[:500]
+        conn.last_sync_error = safe_error_message(e)[:500]
         db.commit()
         return templates.TemplateResponse(
             "banking/sync.html",
@@ -352,7 +355,7 @@ async def sync_transactions(connection_id: int, request: Request, db: Session = 
                 "request": request, "user": user,
                 "connection": conn,
                 "accounts": stored_accounts,
-                "error": f"Kan transacties niet ophalen: {e}",
+                "error": f"Kan transacties niet ophalen: {safe_error_message(e)}",
             },
         )
 
@@ -550,7 +553,8 @@ async def rename_connection(connection_id: int, request: Request, db: Session = 
     # handmatig aangepaste account-namen laten we staan).
     try:
         stored_accounts = json.loads(conn.accounts_json or "[]")
-    except Exception:
+    except ValueError:
+        logger.warning("Ongeldige rekeninglijst bij koppeling id=%s; rekeningnamen niet bijgewerkt", conn.id)
         stored_accounts = []
     bank_key = conn.bank_name.lower().replace(" ", "_")
     uids = [a.get("uid") for a in stored_accounts if a.get("uid")]
@@ -612,8 +616,8 @@ def disconnect(connection_id: int, request: Request, db: Session = Depends(get_d
         from app import enable_banking
         try:
             enable_banking.delete_session(conn.session_id)
-        except Exception:
-            logger.warning("Unable to revoke remote banking session for connection id=%s", conn.id, exc_info=True)
+        except Exception as e:
+            logger.warning("Unable to revoke remote banking session for connection id=%s: %s", conn.id, safe_error_message(e))
 
     conn.status = "revoked"
     conn.session_id = None

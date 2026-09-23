@@ -6,6 +6,7 @@ from datetime import datetime, timezone, timedelta
 
 import jwt as pyjwt
 import requests
+from urllib.parse import urlsplit
 
 from app.config import ENABLE_BANKING_APP_ID, ENABLE_BANKING_PRIVATE_KEY_PATH
 
@@ -42,6 +43,18 @@ def _headers() -> dict:
     return {"Authorization": f"Bearer {_make_jwt()}"}
 
 
+_ID_PATH_PARENTS = {"sessions", "accounts"}
+
+
+def _redact_url(url) -> str:
+    """Path of an API URL without session/account IDs or query parameters."""
+    segments = urlsplit(str(url)).path.split("/")
+    for i in range(1, len(segments)):
+        if segments[i - 1] in _ID_PATH_PARENTS and segments[i]:
+            segments[i] = "<id>"
+    return "/".join(segments)
+
+
 class EnableBankingError(requests.HTTPError):
     """HTTP-fout van de Enable Banking API, inclusief de foutcode en
     -melding uit de JSON-body (bv. WRONG_ASPSP_PROVIDED). De standaard
@@ -58,8 +71,21 @@ class EnableBankingError(requests.HTTPError):
             detail = " — ".join(parts)
         except ValueError:
             detail = (response.text or "")[:200]
-        msg = f"{response.status_code} {detail or 'onbekende fout'} (url: {response.url})"
+        msg = f"{response.status_code} {detail or 'onbekende fout'} (pad: {_redact_url(response.url)})"
         super().__init__(msg, response=response)
+
+
+def safe_error_message(exc: Exception) -> str:
+    """Error text for logs and users without session/account IDs.
+
+    Network errors from requests quote the full request path, so only the
+    exception type is kept for those.
+    """
+    if isinstance(exc, EnableBankingError):
+        return str(exc)
+    if isinstance(exc, requests.RequestException):
+        return f"verbinding met Enable Banking mislukt ({type(exc).__name__})"
+    return f"{type(exc).__name__}: {exc}"
 
 
 def _check(r: requests.Response) -> requests.Response:

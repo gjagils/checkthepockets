@@ -58,9 +58,9 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-21 | P3 | Afgerond | ACT-02 | [Importlogica afzonderlijk testbaar maken](#act-21) |
 | ACT-22 | P3 | Gereed | ACT-02 | [Spaar- en terugkerende logica opsplitsen](#act-22) |
 | ACT-23 | P3 | Gereed | ACT-02 | [Hypotheeklogica opsplitsen](#act-23) |
-| ACT-24 | P2 | Gereed | ACT-02 | [Gerichte foutafhandeling en logging](#act-24) |
+| ACT-24 | P2 | Review | ACT-02 | [Gerichte foutafhandeling en logging](#act-24) |
 | ACT-24a | P2 | Afgerond | ACT-02 | [Twee stille fouten loggen (PR #174)](#act-24) |
-| ACT-24b | P2 | Gereed | ACT-24a | [Inventarisatie, overige excepts en foutinjectie](#act-24) |
+| ACT-24b | P2 | Review | ACT-24a | [Inventarisatie, overige excepts en foutinjectie](#act-24) |
 | ACT-25 | P2 | Gepland | — | [Meerdere bunq- en spaarrekeningen](#act-25) |
 | ACT-26 | P1 | Afgerond | ACT-21 | [Importvoorbeeld zonder gegevens van andere gebruikers](#act-26) |
 
@@ -299,15 +299,15 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 
 | Veld | Waarde |
 |---|---|
-| Actie | ACT-26 — importvoorbeeld zonder gegevens van andere gebruikers |
-| Status | Afgerond |
+| Actie | ACT-24b — inventarisatie, overige excepts en foutinjectie |
+| Status | Review |
 | Uitvoerder / datum | Claude Code / 2026-09-23 |
-| Branch / PR | `codex/act-26-import-preview-isolation`; [PR #178](https://github.com/gjagils/checkthepockets/pull/178) gemerged (`f104c13`) |
-| Budget bij start | Claude Code usage-weergave (get_usage), 2026-09-23 13:16: 5-uurslimiet 9% gebruikt, week 40% gebruikt; extra usage uit. |
-| Uitgevoerd | `find_import_account` en `existing_import_hashes` in app/import_service.py. `/import` en `/import/map` zoeken duplicaten alleen op de doelrekening (zelfde bank + IBAN als bij bevestigen); `/import/confirm` gebruikt dezelfde rekeningbepaling. Het voorbeeld markeert ook herhalingen binnen het bestand, omdat bevestigen die overslaat. |
-| Validatie | Python 3.12.11: `python -m pytest tests/ --tb=short`: 423 passed, 2 skipped (live Enable Banking), 2771 warnings. Nieuw: tests/test_import_preview.py (andere gebruiker, andere eigen rekening, doelrekening, nieuwe rekening, herhaling in bestand, aangepaste CSV, voorbeeld = bevestigresultaat); faalt op de oude code. |
-| Openstaand | Productievalidatie na uitrol. ACT-24b, ACT-22 en ACT-23 volgen. ACT-08-rotatie, ACT-15-restoreproef en ACT-25 vragen toegang of handelingen van de gebruiker. |
-| Volgende stap | ACT-24b na budgetcontrole. |
+| Branch / PR | `codex/act-24b-error-handling`; PR volgt |
+| Budget bij start | Claude Code usage-weergave (get_usage), 2026-09-23 13:24: 5-uurslimiet 12% gebruikt, week 40% gebruikt; extra usage uit. |
+| Uitgevoerd | Inventarisatie en regels in docs/ERROR-HANDLING.md (40 brede excepts over, 4 versmald). `safe_error_message` en ID-redactie in `EnableBankingError`: geen sessie-/rekening-ID's of querystrings in logs, UI of `last_sync_error`; ook netwerkfouten van requests. Operationele fouten die stil verdwenen worden gelogd: Google OAuth-configuratie en callback, sessieopzoeking op landingspagina, rekeningdetails en sessie aanmaken bij Enable Banking, beschadigde rekeninglijst, onleesbare transacties in spaaranalyse, schedulerjobs in admin, info-artikelen. Gebruikersinvoer (spaarsuggesties, datums in instellingenimport) vangt alleen `ValueError`/`TypeError`. |
+| Validatie | Python 3.12.11: `python -m pytest tests/ --tb=short`: 430 passed, 2 skipped (live Enable Banking), 2785 warnings. Nieuw: tests/test_error_handling.py met foutinjectie voor API- en netwerkfout, ontkoppelen, handmatige sync, scheduler-sync, inbox-middleware en landingspagina; controleert loginhoud en foutrespons. |
+| Openstaand | Productievalidatie na uitrol (loginhoud in Portainer controleren). E-mailadres in email_service-log is bewust behouden (zie docs/ERROR-HANDLING.md). ACT-22 en ACT-23 volgen; ACT-08, ACT-15 en ACT-25 vragen handelingen van de gebruiker. |
+| Volgende stap | Na groene CI mergen, ACT-24 en ACT-24b op Afgerond zetten; daarna ACT-22 na budgetcontrole. |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,
