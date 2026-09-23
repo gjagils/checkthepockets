@@ -46,7 +46,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-09 | P1 | Afgerond | ACT-02, ACT-03 | [Rekeninggebonden importherkenning](#act-09) |
 | ACT-10 | P2 | Afgerond | ACT-09 | [Importbatches en resultaatrapport](#act-10) |
 | ACT-11 | P2 | Afgerond | ACT-10 | [Import veilig terugdraaien](#act-11) |
-| ACT-12 | P2 | Gepland | ACT-01 | [Bankstatus en synchronisatiefouten zichtbaar](#act-12) |
+| ACT-12 | P2 | Afgerond | ACT-01 | [Bankstatus en synchronisatiefouten zichtbaar](#act-12) |
 | ACT-13 | P1 | Gepland | ACT-01 | [Deploymentfouten en healthchecks](#act-13) |
 | ACT-14 | P2 | Gepland | ACT-13, ACT-03 | [Vaste releaseversies en herstelprocedure](#act-14) |
 | ACT-15 | P1 | Gepland | — | [Backups en herstel aantoonbaar maken](#act-15) |
@@ -284,15 +284,15 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 
 | Veld | Waarde |
 |---|---|
-| Actie | ACT-12 — bankstatus en synchronisatiefouten zichtbaar |
+| Actie | ACT-13 — deploymentfouten en healthchecks |
 | Status | Gepland |
 | Uitvoerder / datum | Codex / 2026-09-23 |
-| Branch / PR | `codex/act-11-import-rollback`; PR #155 gemerged |
+| Branch / PR | `codex/act-12-bank-status`; PR #157 gemerged |
 | Budget bij start | 72% resterend in vijf uur; 95% per week; 0 resetcredits. Afgebakend op constraint, migratie, opslagcontroles en regressietests. |
-| Uitgevoerd | Importbatch-koppeling toegevoegd via import_batch_id; rollback is eigenaargebonden en verwijdert alleen onaangeraakte transacties; review-, split-, recurring- en transferconflicten geven 409 met betrokken IDs; batchstatus wordt rolled_back. |
-| Validatie | CI-run voor PR #155: test en postgres-migrations geslaagd. |
+| Uitgevoerd | Importbatch-koppeling en veilige rollback via PR #155; synchronisatiestatus en beperkte foutmelding via PR #157; migraties 062 en 063 toegevoegd. |
+| Validatie | CI voor PR #155 en #157: test en postgres-migrations geslaagd. |
 | Openstaand | Geen codeblokkade. |
-| Volgende stap | ACT-12: synchronisatiestatus, laatste succesvolle update en concrete foutmelding zichtbaar maken. |
+| Volgende stap | ACT-13: deploymentcontrole, healthchecks en foutpropagatie aanscherpen. |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,
