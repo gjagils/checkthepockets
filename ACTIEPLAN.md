@@ -36,7 +36,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ID | Prioriteit | Status | Afhankelijk van | Actie |
 |---|---|---|---|---|
 | ACT-01 | P1 | Afgerond | — | [Reproduceerbare ontwikkel- en testomgeving](#act-01) |
-| ACT-02 | P1 | Gepland | ACT-01 | [Testfouten onderzoeken en herstellen](#act-02) |
+| ACT-02 | P1 | Afgerond | ACT-01 | [Testfouten onderzoeken en herstellen](#act-02) |
 | ACT-03 | P1 | Gepland | ACT-01 | [PostgreSQL en migraties toetsen](#act-03) |
 | ACT-04 | P1 | Gepland | ACT-01 | [Accountstatus en sessie-intrekking](#act-04) |
 | ACT-05 | P1 | Gepland | ACT-01 | [Veilige configuratie en cookies](#act-05) |
@@ -75,9 +75,9 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 
 ### ACT-02 — Testfouten onderzoeken en herstellen
 
-- **Acties:** Herhaal de nulmeting in de juiste omgeving. Classificeer elke resterende fout als codefout, testfout of omgevingsprobleem; registreer herstel als subactie indien nodig.
+- **Acties:** De nulmeting is opnieuw uitgevoerd in de vastgelegde Python 3.12-omgeving. De eerdere 121 fouten kwamen uit de afwijkende lokale Python 3.14/FastAPI/Starlette-omgeving. De drie Enable Banking-fouten in de eerste schone run waren enerzijds te vroege config-inlezing en anderzijds live netwerktests zonder toegang; beide zijn opgelost door runtime-configuratie en opt-in live tests.
 - **Klaar wanneer:** Alle tests slagen of iedere uitzondering heeft een concrete oorzaak, opvolgactie en expliciete acceptatie; geen stilzwijgend overslaan van falende tests.
-- **Validatie:** Volledige suite en gerichte regressietests; bewaar samenvatting in de overdracht.
+- **Validatie:** `pip check`, `scripts/check_environment.py` en `python -m pytest tests/ --tb=short`: **405 passed, 2 skipped, 2703 warnings in 47.48s**. De twee skips zijn expliciet bedoelde live Enable Banking-tests (`ENABLE_BANKING_LIVE_TESTS=true`); de overige suite is offline en groen. De waarschuwingen zijn hoofdzakelijk Python 3.12-deprecations en zijn geen testfouten; opvolging valt onder ACT-24.
 
 <a id="act-03"></a>
 
@@ -284,15 +284,15 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 
 | Veld | Waarde |
 |---|---|
-| Actie | ACT-01 — reproduceerbare ontwikkel- en testomgeving |
+| Actie | ACT-02 — testfouten onderzoeken en herstellen |
 | Status | Afgerond |
 | Uitvoerder / datum | Codex / 2026-09-23 |
-| Branch / PR | `codex/act-01-reproduceerbare-omgeving`; [PR #135](https://github.com/gjagils/checkthepockets/pull/135), gemerged in `0032f6d` |
-| Budget bij start | 22% resterend in 5 uur; 88% resterend in week; geen gekocht tegoed. Geschat: één afgebakende omgevingsactie met reserve voor CI/afronding. |
-| Uitgevoerd | Python 3.12.11 vastgelegd; runtime- en dev-locks toegevoegd; CI/Docker omgevingscontrole toegevoegd; Enable Banking-configuratie leest runtimewaarden bij gebruik; live tests zijn opt-in. |
-| Validatie | Schone Python 3.12.11-omgeving: `pip check`, `scripts/check_environment.py` en volledige suite geslaagd: 405 passed, 2 skipped, 2703 warnings in 47.48s. De twee skips zijn live Enable Banking-tests; deze zijn alleen opt-in. |
-| Openstaand | Geen ACT-01-werk meer. De 2703 waarschuwingen zijn geregistreerd voor latere onderhoudsacties; zij blokkeren ACT-01 niet. |
-| Volgende stap | Voor een volgende actie eerst limieten opnieuw controleren; eerstvolgende inhoudelijke kandidaat is ACT-02. |
+| Branch / PR | `codex/act-02-testresultaten`; volgt |
+| Budget bij start | 80% resterend in vijf uur; 97% per week; 0 resetcredits. Afgebakend als documentatie en validatie na ACT-01. |
+| Uitgevoerd | Testresultaten in de juiste omgeving herhaald; eerdere fouten geclassificeerd; Enable Banking-tests deterministisch gemaakt. |
+| Validatie | 405 passed, 2 skipped, 2703 warnings in 47.48s; pip check en omgevingscontrole geslaagd. |
+| Openstaand | Geen ACT-02-werk; waarschuwingen zijn geregistreerd onder ACT-24. |
+| Volgende stap | ACT-03 of ACT-04; limieten opnieuw controleren vóór start. |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,
@@ -317,3 +317,4 @@ Voeg per afgeronde actie of overdracht een regel toe. Git bevat de volledige his
 
 | 2026-09-23 | Inrichting afgerond | PR #134 gemerged (a65a899) | Groene GitHub CI |
 | 2026-09-23 | ACT-01 | Python 3.12-omgeving, locks en deterministische offline tests ingevoerd | [PR #135](https://github.com/gjagils/checkthepockets/pull/135), CI groen; merge `0032f6d` |
+| 2026-09-23 | ACT-02 | Testresultaten gereproduceerd en eerdere fouten geclassificeerd | Deze PR; 405 passed, 2 skipped, 2703 warnings |
