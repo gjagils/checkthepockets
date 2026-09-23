@@ -52,6 +52,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=latest
+            type=raw,value=${{ github.sha }}
             type=sha,prefix=
 
       - name: Build and push app
@@ -89,7 +90,7 @@ jobs:
           STACK_INFO=$(curl --fail-with-body -sS -H "X-API-Key: $PORTAINER_API_TOKEN" \
             "$PORTAINER_URL/api/stacks/$PORTAINER_NGINX_STACK_ID")
           ENDPOINT_ID=$(echo "$STACK_INFO" | jq -r '.EndpointId')
-          CURRENT_ENV=$(echo "$STACK_INFO" | jq '.Env // []')
+          CURRENT_ENV=$(echo "$STACK_INFO" | jq --arg tag "${{ github.sha }}" '(.Env // []) | map(select(.name != "IMAGE_TAG")) + [{"name":"IMAGE_TAG","value":$tag}]')
 
           IMAGE_LOWER=$(echo "$IMAGE_NAME" | tr '[:upper:]' '[:lower:]')
           echo "Pulling latest nginx image..."
@@ -119,13 +120,13 @@ jobs:
           STACK_INFO=$(curl --fail-with-body -sS -H "X-API-Key: $PORTAINER_API_TOKEN" \
             "$PORTAINER_URL/api/stacks/$PORTAINER_STACK_ID")
           ENDPOINT_ID=$(echo "$STACK_INFO" | jq -r '.EndpointId')
-          CURRENT_ENV=$(echo "$STACK_INFO" | jq '.Env // []')
+          CURRENT_ENV=$(echo "$STACK_INFO" | jq --arg tag "${{ github.sha }}" '(.Env // []) | map(select(.name != "IMAGE_TAG")) + [{"name":"IMAGE_TAG","value":$tag}]')
 
           IMAGE_LOWER=$(echo "$IMAGE_NAME" | tr '[:upper:]' '[:lower:]')
           echo "Pulling latest app image..."
           curl --fail-with-body -sS -X POST \
             -H "X-API-Key: $PORTAINER_API_TOKEN" \
-            "$PORTAINER_URL/api/endpoints/$ENDPOINT_ID/docker/images/create?fromImage=ghcr.io%2F${IMAGE_LOWER}&tag=latest"
+            "$PORTAINER_URL/api/endpoints/$ENDPOINT_ID/docker/images/create?fromImage=ghcr.io%2F${IMAGE_LOWER}&tag=${{ github.sha }}"
           echo "App image pulled."
 
           STACK_FILE=$(cat docker-compose.yml)

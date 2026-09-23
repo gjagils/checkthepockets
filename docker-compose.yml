@@ -1,6 +1,6 @@
 services:
   app:
-    image: ghcr.io/gjagils/checkthepockets:latest
+    image: ghcr.io/gjagils/checkthepockets:${IMAGE_TAG:-latest}
     container_name: checkthepockets
     restart: unless-stopped
     networks:
