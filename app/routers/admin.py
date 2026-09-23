@@ -71,6 +71,7 @@ def toggle_active(user_id: int, request: Request, db: Session = Depends(get_db))
         if SUPER_ADMIN_USERNAME and target.username == SUPER_ADMIN_USERNAME:
             return RedirectResponse("/admin/users", status_code=302)
         target.is_active = 0 if target.is_active else 1
+        target.session_version = (target.session_version or 0) + 1
         db.commit()
     return RedirectResponse("/admin/users", status_code=302)
 

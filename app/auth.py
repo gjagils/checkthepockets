@@ -19,8 +19,8 @@ def verify_password(password: str, password_hash: str) -> bool:
     return bcrypt.checkpw(password.encode(), password_hash.encode())
 
 
-def create_session_cookie(user_id: int) -> str:
-    return _signer.dumps({"uid": user_id})
+def create_session_cookie(user_id: int, session_version: int = 0) -> str:
+    return _signer.dumps({"uid": user_id, "sv": session_version})
 
 
 def get_session_user_id(request: Request) -> int | None:
@@ -35,10 +35,20 @@ def get_session_user_id(request: Request) -> int | None:
 
 
 def get_current_user(request: Request, db: Session) -> User | None:
-    user_id = get_session_user_id(request)
-    if user_id is None:
+    token = request.cookies.get(COOKIE_NAME)
+    if not token:
         return None
-    return db.query(User).filter(User.id == user_id).first()
+    try:
+        data = _signer.loads(token, max_age=SESSION_MAX_AGE)
+    except (BadSignature, SignatureExpired):
+        return None
+    user_id = data.get("uid")
+    user = db.query(User).filter(User.id == user_id).first() if user_id else None
+    if not user or not user.is_active:
+        return None
+    if data.get("sv", 0) != (user.session_version or 0):
+        return None
+    return user
 
 
 def require_login(request: Request, db: Session) -> User:
@@ -53,15 +63,20 @@ class LoginRequired(Exception):
     pass
 
 
-def set_session_cookie(response: RedirectResponse, user_id: int) -> RedirectResponse:
+def set_session_cookie(response: RedirectResponse, user_id: int, session_version: int = 0) -> RedirectResponse:
     response.set_cookie(
         COOKIE_NAME,
-        create_session_cookie(user_id),
+        create_session_cookie(user_id, session_version),
         max_age=SESSION_MAX_AGE,
         httponly=True,
         samesite="lax",
     )
     return response
+
+
+def revoke_sessions(user: User) -> None:
+    """Invalidate every previously issued cookie for this user."""
+    user.session_version = (user.session_version or 0) + 1
 
 
 # Whitelist van toegestane startpagina-routes. Label voor de UI-dropdown.
