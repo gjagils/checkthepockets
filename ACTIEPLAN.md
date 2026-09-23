@@ -58,8 +58,11 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-21 | P3 | Afgerond | ACT-02 | [Importlogica afzonderlijk testbaar maken](#act-21) |
 | ACT-22 | P3 | Gepland | ACT-02 | [Spaar- en terugkerende logica opsplitsen](#act-22) |
 | ACT-23 | P3 | Gepland | ACT-02 | [Hypotheeklogica opsplitsen](#act-23) |
-| ACT-24 | P2 | Gepland | ACT-02 | [Gerichte foutafhandeling en logging](#act-24) |
+| ACT-24 | P2 | Gereed | ACT-02 | [Gerichte foutafhandeling en logging](#act-24) |
+| ACT-24a | P2 | Afgerond | ACT-02 | [Twee stille fouten loggen (PR #174)](#act-24) |
+| ACT-24b | P2 | Gereed | ACT-24a | [Inventarisatie, overige excepts en foutinjectie](#act-24) |
 | ACT-25 | P2 | Gepland | — | [Meerdere bunq- en spaarrekeningen](#act-25) |
+| ACT-26 | P1 | Gereed | ACT-21 | [Importvoorbeeld zonder gegevens van andere gebruikers](#act-26) |
 
 ## Beschrijving en acceptatiecriteria
 
@@ -255,6 +258,8 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 - **Acties:** Inventariseer brede excepts en stil ingeslikte fouten. Onderscheid verwachte gebruikersfouten van operationele fouten en voeg bruikbare logging toe zonder gevoelige inhoud.
 - **Klaar wanneer:** Operationele fouten verdwijnen niet stil; gebruikers krijgen passende feedback; logs onthullen geen geheimen of transactiedetails.
 - **Validatie:** Foutinjectie voor kritieke paden en controle van foutrespons/loginhoud.
+- **Stand 2026-09-23:** ACT-24a ([PR #174](https://github.com/gjagils/checkthepockets/pull/174), merge `f5639e1`) logt twee stil ingeslikte fouten: de inbox-telling in app/main.py en het intrekken van een Enable Banking-sessie in app/routers/banking.py. Dit is een eerste deel; de actie is daarmee niet klaar. Er zijn geen tests toegevoegd.
+- **ACT-24b — resterend:** (1) Leg de inventarisatie vast: 44 brede `except`/`except Exception` in app/, waarvan er 5 direct `pass`/`continue` doen (settings.py:295 en :300, auth.py:49, admin.py:527, savings.py:630). Per geval: verwachte gebruikersfout, operationele fout of bewust genegeerd, met reden. (2) Voeg logging of gebruikersfeedback toe waar een operationele fout nu verdwijnt. (3) Voorkom gevoelige inhoud in logs: `EnableBankingError` neemt de request-URL op in de melding, dus `exc_info=True` bij het intrekken van de sessie (ACT-24a) logt de sessie-ID; bij andere Enable Banking-aanroepen kunnen account-ID's zo in de logs komen. Redigeer de URL of log alleen status en foutcode. (4) Foutinjectietests voor de kritieke paden die loginhoud en foutrespons controleren, inclusief ACT-24a.
 
 <a id="act-25"></a>
 
@@ -264,6 +269,15 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 - **Klaar wanneer:** Beschikbaarheid is per rekeningtype bevestigd of als beperking vastgelegd; beschikbare rekeningen zijn afzonderlijk herkenbaar, ook zonder recente transacties; herautorisatie dupliceert niet; eigen overboekingen verstoren totalen niet. Splits onderzoek en eventuele implementatie in subacties voordat codewerk start; importwijzigingen hangen af van ACT-09.
 - **Validatie:** Eerst echte accountlijst controleren met toestemming zonder IBANs/tokens in Git; daarna synthetische tests met meerdere spaarrekeningen, ontbrekende transacties, actuele saldi en eigen overboekingen. Een IBAN alleen bewijst geen API-ondersteuning.
 - **Bronnen (geraadpleegd 2026-09-23):** [Enable Banking FAQ](https://enablebanking.com/docs/faq/), [API](https://enablebanking.com/docs/api/reference/), [bunq meerdere rekeningen](https://www.bunq.com/personal/features/bank-accounts); bestaande verwerking in app/routers/banking.py en app/scheduler.py.
+
+<a id="act-26"></a>
+
+### ACT-26 — Importvoorbeeld zonder gegevens van andere gebruikers
+
+- **Aanleiding:** Gevonden tijdens ACT-21b (PR #175). `/import` en `/import/map` in app/routers/transactions.py markeren een voorbeeldrij als "al geïmporteerd" als de `import_hash` bij willekeurig welke gebruiker of rekening bestaat. Het voorbeeld toont dan ten onrechte duplicaten, en een gebruiker kan indirect afleiden dat een andere gebruiker een identieke transactie heeft. De opslag in `/import/confirm` controleert wel correct per rekening (ACT-09/ACT-21), dus er gaan geen gegevens verloren.
+- **Acties:** Beperk de duplicaatcontrole in het voorbeeld tot de doelrekening van de ingelogde gebruiker, via dezelfde rekeningbepaling (bank + IBAN) als bij bevestigen. Heeft de gebruiker die rekening nog niet, dan is niets een duplicaat. Leg die gedeelde regel vast in app/import_service.py, zodat voorbeeld en opslag niet uit elkaar lopen.
+- **Klaar wanneer:** Het voorbeeld toont alleen duplicaten van de eigen doelrekening; transacties van andere gebruikers of andere eigen rekeningen tellen niet mee; het getoonde aantal nieuw/dubbel komt overeen met het resultaat van bevestigen.
+- **Validatie:** Routetests voor bekende bank en aangepaste CSV met: dezelfde hash bij een andere gebruiker, op een andere eigen rekening, op de doelrekening en een nog niet bestaande rekening. Controleer dat de aantallen in voorbeeld en bevestiging gelijk zijn.
 
 ## Onderbouwing van de eerste analyse
 
@@ -292,8 +306,8 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 | Budget bij start | Claude Code usage-weergave (get_usage), 2026-09-23 12:56: 5-uurslimiet 2% gebruikt, week 39% gebruikt; extra usage uit. Afgebakend op CSV-opslag, tests, CI en merge. |
 | Uitgevoerd | `store_confirmed_csv_rows` in app/import_service.py deelt duplicaatcontrole per rekening en transactieopbouw met bankimport/scheduler; `/import/confirm` doet alleen HTTP, rekening, batch en nabewerking. CSV-gedrag ongewijzigd: duplicaat vóór validatie, afkeuren bij ongeldige datum/bedrag, CSV-categorie gaat vóór regels. `ImportResult` telt nu ook `rejected`. |
 | Validatie | Python 3.12.11, `pip check` en `scripts/check_environment.py` schoon; `python -m pytest tests/ --tb=short`: 420 passed, 2 skipped (live Enable Banking), 2741 warnings. Nieuw: tests/test_import_service.py (bank/scheduler-opslag, CSV-rijen, route en herhaalde bevestiging). |
-| Openstaand | Bevinding buiten scope: CSV-voorbeeld (`/import`, `/import/map`) markeert duplicaten op basis van `import_hash` van álle gebruikers; de opslag zelf is correct per rekening. ACT-24 heeft PR #174 gemerged maar staat nog op Gepland. ACT-15 vereist nog een echte geïsoleerde NAS-restoreproef. |
-| Volgende stap | Productievalidatie van de CSV-import na uitrol staat nog open. Volgende kandidaat: ACT-24-status bijwerken of ACT-22/ACT-23 oppakken na budgetcontrole. |
+| Openstaand | Bevinding uit het CSV-voorbeeld is vastgelegd als ACT-26 (P1, Gereed). ACT-24 is gesplitst: ACT-24a (#174) is afgerond, ACT-24b is Gereed. ACT-15 vereist nog een echte geïsoleerde NAS-restoreproef. |
+| Volgende stap | Pak ACT-26 op na budgetcontrole. Productievalidatie van de CSV-import na uitrol staat nog open. |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,
@@ -326,3 +340,4 @@ Voeg per afgeronde actie of overdracht een regel toe. Git bevat de volledige his
 | 2026-09-23 | ACT-07 | Encryptie faalt gesloten bij sleutel-, encryptie- en decryptiefouten | [PR #146](https://github.com/gjagils/checkthepockets/pull/146), beide checks groen; merge `a2bc34c` |
 | 2026-09-23 | ACT-08 | stack.env uit tracking en gevoelige bestanden uit Dockercontext | [PR #148](https://github.com/gjagils/checkthepockets/pull/148), beide checks groen; merge `5d0b678`; secret-rotatie open |
 | 2026-09-23 | ACT-21 | CSV-bevestiging, bank-sync en scheduler gebruiken één importservice | [PR #171](https://github.com/gjagils/checkthepockets/pull/171) en [PR #175](https://github.com/gjagils/checkthepockets/pull/175), beide checks groen; merge `df98838`; productievalidatie open |
+| 2026-09-23 | ACT-24a | Twee stille fouten worden gelogd; ACT-24 gesplitst, ACT-24b open | [PR #174](https://github.com/gjagils/checkthepockets/pull/174), merge `f5639e1`; geen tests, sessie-ID kan in de logmelding staan |
