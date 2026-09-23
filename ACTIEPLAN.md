@@ -50,12 +50,12 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-13 | P1 | Afgerond | ACT-01 | [Deploymentfouten en healthchecks](#act-13) |
 | ACT-14 | P2 | Afgerond | ACT-13, ACT-03 | [Vaste releaseversies en herstelprocedure](#act-14) |
 | ACT-15 | P1 | Review | — | [Backups en herstel aantoonbaar maken](#act-15) |
-| ACT-16 | P2 | Gepland | ACT-02 | [Gebruikersroutes en navigatie ontwerpen](#act-16) |
-| ACT-17 | P2 | Gepland | ACT-12, ACT-16 | [Centraal actieoverzicht](#act-17) |
-| ACT-18 | P2 | Gepland | ACT-16 | [Herkomst en actualiteit van bedragen](#act-18) |
-| ACT-19 | P2 | Gepland | ACT-16 | [Navigatie, foutmeldingen en lege schermen](#act-19) |
-| ACT-20 | P2 | Gepland | ACT-17, ACT-18, ACT-19 | [Toegankelijkheid en mobiele eindcontrole](#act-20) |
-| ACT-21 | P3 | Gepland | ACT-02 | [Importlogica afzonderlijk testbaar maken](#act-21) |
+| ACT-16 | P2 | Afgerond | ACT-02 | [Gebruikersroutes en navigatie ontwerpen](#act-16) |
+| ACT-17 | P2 | Afgerond | ACT-12, ACT-16 | [Centraal actieoverzicht](#act-17) |
+| ACT-18 | P2 | Afgerond | ACT-16 | [Herkomst en actualiteit van bedragen](#act-18) |
+| ACT-19 | P2 | Afgerond | ACT-16 | [Navigatie, foutmeldingen en lege schermen](#act-19) |
+| ACT-20 | P2 | Afgerond | ACT-17, ACT-18, ACT-19 | [Toegankelijkheid en mobiele eindcontrole](#act-20) |
+| ACT-21 | P3 | Bezig | ACT-02 | [Importlogica afzonderlijk testbaar maken](#act-21) |
 | ACT-22 | P3 | Gepland | ACT-02 | [Spaar- en terugkerende logica opsplitsen](#act-22) |
 | ACT-23 | P3 | Gepland | ACT-02 | [Hypotheeklogica opsplitsen](#act-23) |
 | ACT-24 | P2 | Gepland | ACT-02 | [Gerichte foutafhandeling en logging](#act-24) |
@@ -285,15 +285,15 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 
 | Veld | Waarde |
 |---|---|
-| Actie | ACT-15 — backups en herstel aantoonbaar maken |
-| Status | Review |
+| Actie | ACT-21 — importlogica afzonderlijk testbaar maken |
+| Status | Bezig |
 | Uitvoerder / datum | Codex / 2026-09-23 |
-| Branch / PR | `codex/act-15-backup-drill`; PR #164 gemerged |
+| Branch / PR | `codex/act-21a-shared-bank-import`; PR #171 gemerged |
 | Budget bij start | 72% resterend in vijf uur; 95% per week; 0 resetcredits. Afgebakend op constraint, migratie, opslagcontroles en regressietests. |
-| Uitgevoerd | Geïsoleerde restoreproef, retentie, externe kopie en beheerlog vastgelegd in `docs/BACKUP-RESTORE-DRILL.md`. |
-| Validatie | Docs-PR #164 gemerged; daadwerkelijke NAS/production-restore is niet uitgevoerd. |
-| Openstaand | Bevoegde beheerder moet een echte geïsoleerde restoreproef uitvoeren en bewijs registreren. |
-| Volgende stap | Restoreproef uitvoeren; daarna ACT-16 oppakken. |
+| Uitgevoerd | ACT-16 navigatieontwerp via PR #166; ACT-17 actieoverzicht via #167; ACT-18 broninformatie via #168; ACT-19 lege schermen via #169; ACT-20 focus/mobiel via #170. ACT-21a centraliseert opslag voor Enable Banking en scheduler via #171. |
+| Validatie | PR #167 t/m #171: test en postgres-migrations geslaagd. |
+| Openstaand | ACT-21b verplaatst CSV-confirmatie naar dezelfde importservice; ACT-15 vereist nog een echte geïsoleerde NAS-restoreproef. |
+| Volgende stap | ACT-21b afbakenen en de CSV-opslag verplaatsen naar de gedeelde service. |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,
