@@ -1,4 +1,4 @@
-# CLAUDE.md — gedeelde repository-instructies
+# AGENTS.md — gedeelde repository-instructies
 
 Lees vóór werkzaamheden:
 
