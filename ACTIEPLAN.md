@@ -38,7 +38,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-01 | P1 | Afgerond | — | [Reproduceerbare ontwikkel- en testomgeving](#act-01) |
 | ACT-02 | P1 | Afgerond | ACT-01 | [Testfouten onderzoeken en herstellen](#act-02) |
 | ACT-03 | P1 | Afgerond | ACT-01 | [PostgreSQL en migraties toetsen](#act-03) |
-| ACT-04 | P1 | Bezig | ACT-01 | [Accountstatus en sessie-intrekking](#act-04) |
+| ACT-04 | P1 | Afgerond | ACT-01 | [Accountstatus en sessie-intrekking](#act-04) |
 | ACT-05 | P1 | Gepland | ACT-01 | [Veilige configuratie en cookies](#act-05) |
 | ACT-06 | P1 | Gepland | ACT-01 | [CSRF-bescherming controleren en aanvullen](#act-06) |
 | ACT-07 | P1 | Gepland | ACT-01, ACT-03 | [Encryptie zonder stille terugval](#act-07) |
@@ -285,14 +285,14 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 | Veld | Waarde |
 |---|---|
 | Actie | ACT-04 — accountstatus en sessie-intrekking |
-| Status | Bezig |
+| Status | Afgerond |
 | Uitvoerder / datum | Codex / 2026-09-23 |
-| Branch / PR | `codex/act-04-sessie-intrekking`; PR volgt |
+| Branch / PR | `codex/act-04-sessie-intrekking`; [PR #140](https://github.com/gjagils/checkthepockets/pull/140), gemerged in `f313593` |
 | Budget bij start | 78% resterend in vijf uur; 97% per week; 0 resetcredits. Afgebakend op accountstatus, sessieversie, migratie en regressietests. |
-| Uitgevoerd | `session_version` toegevoegd; beschermde verzoeken controleren activiteit en sessieversie; reset/wijziging/deactivatie trekken sessies in; 2 regressietests toegevoegd. |
-| Validatie | Gerichte tests 15 geslaagd; volledige suite 407 passed, 2 skipped, 2705 warnings in 46.06s. CI en migratie volgen. |
-| Openstaand | CI-run, PR-merge en status naar Afgerond bij groene checks. |
-| Volgende stap | Committen/pushen en CI afwachten. |
+| Uitgevoerd | `session_version` toegevoegd; beschermde verzoeken controleren activiteit en sessieversie; reset/wijziging/deactivatie trekken sessies in; 2 regressietests toegevoegd; Alembic 059 toegevoegd. |
+| Validatie | Gerichte tests 15 geslaagd; lokale volledige suite 407 passed, 2 skipped, 2705 warnings in 46.06s; normale CI groen in 1m42s en PostgreSQL-migratiecheck groen in 30s. |
+| Openstaand | Geen ACT-04-werk. |
+| Volgende stap | Voor ACT-05 limieten opnieuw controleren; daarna veilige configuratie en cookies. |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,
@@ -319,3 +319,4 @@ Voeg per afgeronde actie of overdracht een regel toe. Git bevat de volledige his
 | 2026-09-23 | ACT-01 | Python 3.12-omgeving, locks en deterministische offline tests ingevoerd | [PR #135](https://github.com/gjagils/checkthepockets/pull/135), CI groen; merge `0032f6d` |
 | 2026-09-23 | ACT-02 | Testresultaten gereproduceerd en eerdere fouten geclassificeerd | Deze PR; 405 passed, 2 skipped, 2703 warnings |
 | 2026-09-23 | ACT-03 | PostgreSQL 16-migratie en schema gecontroleerd in CI | [PR #138](https://github.com/gjagils/checkthepockets/pull/138), beide checks groen; merge `bb2fa44` |
+| 2026-09-23 | ACT-04 | Accountstatus en sessie-intrekking toegevoegd | [PR #140](https://github.com/gjagils/checkthepockets/pull/140), beide checks groen; merge `f313593` |
