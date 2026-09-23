@@ -67,7 +67,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-24b | P2 | Afgerond | ACT-24a | [Inventarisatie, overige excepts en foutinjectie](#act-24) |
 | ACT-25 | P2 | Bezig | — | [Meerdere bunq- en spaarrekeningen](#act-25) |
 | ACT-25a | P2 | Afgerond | — | [Rekeningen zonder uid zichtbaar na koppelen](#act-25) |
-| ACT-25b | P2 | Gereed | ACT-25a | [Beschikbaarheid bunq-rekeningen vaststellen en vervolg kiezen](#act-25) |
+| ACT-25b | P2 | Review | ACT-25a | [Beschikbaarheid bunq-rekeningen vaststellen en vervolg kiezen](#act-25) |
 | ACT-26 | P1 | Afgerond | ACT-21 | [Importvoorbeeld zonder gegevens van andere gebruikers](#act-26) |
 
 ## Beschrijving en acceptatiecriteria
@@ -283,7 +283,8 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 - **Bronnen (geraadpleegd 2026-09-23):** [Enable Banking FAQ](https://enablebanking.com/docs/faq/), [API](https://enablebanking.com/docs/api/reference/), [bunq meerdere rekeningen](https://www.bunq.com/personal/features/bank-accounts); bestaande verwerking in app/routers/banking.py en app/scheduler.py.
 - **Waarneming 2026-09-23:** Bij een autorisatie van twee bunq-spaarrekeningen verscheen alleen de tweede; bij een nieuwe autorisatie van alleen de eerste bleef de lijst leeg. Volgens de gebruiker werkt die rekening normaal in bunq. Enable Banking laat `uid` weg als saldo en transacties niet op te halen zijn; de callback sloeg zulke rekeningen stil over.
 - **ACT-25a:** Bewaar en toon alle rekeningen uit de sessie (IBAN, soort, status), ook zonder `uid`; geen succesmelding als niets op te halen is; log per rekening volgorde, soort en of er een `uid` was, zonder IBAN's of ID's. Klaar wanneer een rekening zonder `uid` zichtbaar is en niet in de synchronisatielijst staat.
-- **ACT-25b:** Na uitrol opnieuw koppelen en de log/resultaatpagina lezen. Ontbreekt de rekening helemaal of komt hij zonder `uid` terug, dan ligt de beperking bij bunq/Enable Banking (navragen bij Enable Banking, CSV-fallback vastleggen); komt hij met `uid` terug, dan verder zoeken in de app. Daarna eigen overboekingen en saldo zonder transacties.
+- **Uitkomst ACT-25a in productie:** twee rekeningen aangevinkt, `POST /sessions` gaf er één terug (met uid, door bunq als `CARD` gelabeld); de tweede ontbrak volledig.
+- **ACT-25b:** Vul rekeningen aan uit `GET /sessions/{id}` (`accounts`/`accounts_data`) en log aantallen en veldnamen. Na uitrol opnieuw koppelen en de log/resultaatpagina lezen. Ontbreekt de rekening helemaal of komt hij zonder `uid` terug, dan ligt de beperking bij bunq/Enable Banking (navragen bij Enable Banking, CSV-fallback vastleggen); komt hij met `uid` terug, dan verder zoeken in de app. Daarna eigen overboekingen en saldo zonder transacties.
 
 <a id="act-26"></a>
 
@@ -314,15 +315,15 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 
 | Veld | Waarde |
 |---|---|
-| Actie | ACT-25a — rekeningen zonder uid zichtbaar na koppelen |
-| Status | Afgerond |
+| Actie | ACT-25b — rekeningen aanvullen uit GET /sessions en diagnose |
+| Status | Review |
 | Uitvoerder / datum | Claude Code / 2026-09-23 |
-| Branch / PR | `codex/act-25a-unavailable-accounts`; [PR #191](https://github.com/gjagils/checkthepockets/pull/191) gemerged (`8a58ab7`), deployment geslaagd |
-| Budget bij start | Claude Code usage-weergave (get_usage), 2026-09-23 14:44: 5-uurslimiet 55% gebruikt, week 46% gebruikt; extra usage uit. Afgebakend op callback, twee templates en tests. |
-| Uitgevoerd | `_describe_session_accounts` bewaart elke sessierekening met `uid`, IBAN (uit details of sessie), BIC, soort (CACC/SVGS → Betaal-/Spaarrekening) en `available`. Resultaatpagina toont alle rekeningen met status en meldt het als niets op te halen is. Synchronisatiepagina toont alleen op te halen rekeningen en noemt de rest. Log: aantal ontvangen/op te halen en per rekening volgorde, soort en uid ja/nee. |
-| Validatie | Python 3.12.11: `python -m pytest tests/ --tb=short`: 480 passed, 2 skipped (live Enable Banking), 2830 warnings. Nieuw: tests/test_bank_session_accounts.py (omzetting, terugval bij detailfout, volledige koppelstroom met en zonder op te halen rekening, loginhoud zonder IBAN/ID). |
-| Openstaand | ACT-25b: na uitrol opnieuw koppelen en log/resultaat lezen. ACT-15 later door de gebruiker. |
-| Volgende stap | Na groene CI mergen en uitrol; gebruiker koppelt bunq opnieuw en deelt de resultaatpagina (zonder IBAN's) of de logregel 'Enable Banking sessie'. |
+| Branch / PR | `codex/act-25b-session-accounts`; PR volgt |
+| Budget bij start | Voortzetting van ACT-25a binnen dezelfde budgetcontrole (5-uurslimiet 55% gebruikt, week 46%). |
+| Uitgevoerd | Na POST /sessions vraagt de callback GET /sessions/{id} op; uid's die daar wel en in het POST-antwoord niet staan, worden toegevoegd en via de details verrijkt (IBAN, soort). Mislukt het opvragen, dan blijft het POST-resultaat staan. Log: veldnamen van het POST-antwoord en per rekening (geen waarden), en aantallen in accounts/accounts_data/extra. |
+| Validatie | Python 3.12.11: `python -m pytest tests/ --tb=short`: 483 passed, 2 skipped (live Enable Banking), 2838 warnings. tests/test_bank_session_accounts.py uitgebreid (aanvullen, mislukte opvraag, veldnamen in log). |
+| Openstaand | Na uitrol koppelt de gebruiker bunq twee keer: met beide spaarrekeningen en met alleen de ontbrekende. De logregels 'Enable Banking sessie' bepalen het vervolg (fix in app of melding bij Enable Banking + CSV-fallback). |
+| Volgende stap | Na groene CI mergen en uitrol afwachten; daarna de twee logregels van de gebruiker analyseren. |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,

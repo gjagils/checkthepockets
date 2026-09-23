@@ -1,4 +1,4 @@
-"""Accounts without a uid in an Enable Banking session stay visible (ACT-25a)."""
+"""Accounts from an Enable Banking session stay visible (ACT-25a/b)."""
 import json
 import logging
 import os
@@ -18,7 +18,7 @@ from app.auth import create_session_cookie
 from app.database import Base, SessionLocal, engine
 from app.main import app
 from app.models import BankConnection, User
-from app.routers.banking import _describe_session_accounts
+from app.routers.banking import _describe_session_accounts, _merge_session_uids
 
 SAVINGS_WITHOUT_UID = {
     "account_id": {"iban": "NL11BUNQ0000000001"}, "cash_account_type": "SVGS",
@@ -30,6 +30,8 @@ SAVINGS_WITH_UID = {
 
 
 def _details(uid):
+    if uid == "uid-savings-3":
+        return {"account_id": {"iban": "NL33BUNQ0000000003"}, "cash_account_type": "SVGS"}
     return {"account_id": [{"iban": "NL22BUNQ0000000002"}], "account_servicer": {"bic_fi": "BUNQNL2A"}}
 
 
@@ -51,6 +53,16 @@ def test_describe_falls_back_to_session_iban_when_details_fail():
     assert (account["iban"], account["available"]) == ("NL22BUNQ0000000002", True)
 
 
+def test_merge_adds_uids_missing_from_post_response():
+    merged = _merge_session_uids(
+        [SAVINGS_WITH_UID],
+        {"accounts": ["uid-savings-2", "uid-savings-3"],
+         "accounts_data": [{"uid": "uid-savings-3", "identification_hash": "h"}, {"uid": "uid-savings-4"}]},
+    )
+    assert merged == [SAVINGS_WITH_UID, {"uid": "uid-savings-3"}, {"uid": "uid-savings-4"}]
+    assert _merge_session_uids([SAVINGS_WITH_UID], {}) == [SAVINGS_WITH_UID]
+
+
 @pytest.fixture
 def banking_client(monkeypatch):
     Base.metadata.create_all(bind=engine)
@@ -69,6 +81,7 @@ def banking_client(monkeypatch):
     monkeypatch.setattr(enable_banking, "consent_days_for", lambda bank: 90)
     monkeypatch.setattr(enable_banking, "start_authorization", start_authorization)
     monkeypatch.setattr(enable_banking, "get_account_details", _details)
+    monkeypatch.setattr(enable_banking, "get_session", lambda session_id: {"accounts": [], "accounts_data": []})
     client = TestClient(app, follow_redirects=False)
     client.cookies.set("session", create_session_cookie(user.id))
     try:
@@ -118,3 +131,36 @@ def test_callback_without_fetchable_accounts_is_not_reported_as_success(banking_
     conn = db.query(BankConnection).one()
     sync_page = client.get(f"/banking/sync/{conn.id}")
     assert "Deze koppeling heeft geen rekeningen waarvan transacties op te halen zijn" in sync_page.text
+
+
+def test_callback_adds_account_listed_only_in_session_lookup(banking_client, caplog):
+    client, db, state, monkeypatch = banking_client
+    monkeypatch.setattr(enable_banking, "get_session", lambda session_id: {
+        "accounts": ["uid-savings-2", "uid-savings-3"],
+        "accounts_data": [{"uid": "uid-savings-2"}, {"uid": "uid-savings-3"}],
+    })
+
+    with caplog.at_level(logging.INFO, logger="app.routers.banking"):
+        response = _authorize(client, state, monkeypatch, [SAVINGS_WITH_UID])
+
+    assert "Van 2 van de 2 rekening(en)" in response.text
+    assert "NL33BUNQ0000000003" in response.text
+    stored = json.loads(db.query(BankConnection).one().accounts_json)
+    assert [(a["uid"], a["type"]) for a in stored] == [("uid-savings-2", "Spaarrekening"), ("uid-savings-3", "Spaarrekening")]
+    assert "2 in accounts, 2 in accounts_data, 1 extra" in caplog.text
+    assert "1 rekening(en) met velden [['account_id', 'cash_account_type', 'uid']]" in caplog.text
+    assert "uid-savings-3" not in caplog.text
+
+
+def test_callback_survives_failed_session_lookup(banking_client, caplog):
+    client, db, state, monkeypatch = banking_client
+
+    def fail(session_id):
+        raise RuntimeError("lookup failed")
+
+    monkeypatch.setattr(enable_banking, "get_session", fail)
+    with caplog.at_level(logging.WARNING, logger="app.routers.banking"):
+        response = _authorize(client, state, monkeypatch, [SAVINGS_WITH_UID])
+
+    assert "Van 1 van de 1 rekening(en)" in response.text
+    assert "Enable Banking sessie opvragen mislukt" in caplog.text

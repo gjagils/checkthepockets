@@ -228,6 +228,7 @@ def _describe_session_accounts(session_accounts, get_details, conn=None) -> list
         uid = acc.get("uid") or acc.get("account_uid")
         iban = _extract_iban(acc)
         name = _bic(acc)
+        details = None
         if uid:
             try:
                 details = get_details(uid)
@@ -236,7 +237,7 @@ def _describe_session_accounts(session_accounts, get_details, conn=None) -> list
             except Exception as e:
                 logger.warning("Rekeningdetails ophalen mislukt (koppeling id=%s): %s",
                                conn.id if conn else None, safe_error_message(e))
-        cash_type = acc.get("cash_account_type") or ""
+        cash_type = acc.get("cash_account_type") or (details or {}).get("cash_account_type") or ""
         described.append({
             "uid": uid or None,
             "iban": iban,
@@ -245,6 +246,24 @@ def _describe_session_accounts(session_accounts, get_details, conn=None) -> list
             "available": bool(uid),
         })
     return described
+
+
+def _merge_session_uids(session_accounts, session_info: dict, conn=None) -> list:
+    """Voeg rekeningen toe die wel in GET /sessions staan maar niet in het
+    antwoord van POST /sessions. Van die extra rekeningen is alleen de `uid`
+    bekend; IBAN en soort komen uit de details."""
+    known = {
+        acc.get("uid") or acc.get("account_uid")
+        for acc in session_accounts or [] if isinstance(acc, dict)
+    }
+    listed = [u for u in session_info.get("accounts") or [] if isinstance(u, str)]
+    data_uids = [d.get("uid") for d in session_info.get("accounts_data") or [] if isinstance(d, dict)]
+    extra = [u for u in dict.fromkeys(listed + [u for u in data_uids if u]) if u not in known]
+    logger.info(
+        "Enable Banking sessie opgevraagd (koppeling id=%s): %d in accounts, %d in accounts_data, %d extra",
+        conn.id if conn else None, len(listed), len(data_uids), len(extra),
+    )
+    return list(session_accounts or []) + [{"uid": u} for u in extra]
 
 
 def _available_accounts(stored_accounts: list[dict]) -> list[dict]:
@@ -297,6 +316,21 @@ def callback(request: Request, code: str = "", state: str = "", db: Session = De
 
     session_id = session_data.get("session_id")
     accounts = session_data.get("accounts", [])
+    # Diagnose (ACT-25b): alleen veldnamen, nooit waarden.
+    logger.info(
+        "Enable Banking sessie aangemaakt (koppeling id=%s): velden %s; %d rekening(en) met velden %s",
+        conn.id if conn else None, sorted(session_data), len(accounts) if isinstance(accounts, list) else -1,
+        [sorted(acc) if isinstance(acc, dict) else type(acc).__name__ for acc in accounts]
+        if isinstance(accounts, list) else type(accounts).__name__,
+    )
+    # POST /sessions geeft soms minder rekeningen terug dan de gebruiker koos;
+    # vul aan met de lijst van GET /sessions (ACT-25b).
+    if session_id:
+        try:
+            accounts = _merge_session_uids(accounts, enable_banking.get_session(session_id), conn)
+        except Exception as e:
+            logger.warning("Enable Banking sessie opvragen mislukt (koppeling id=%s): %s",
+                           conn.id if conn else None, safe_error_message(e))
 
     enriched_accounts = _describe_session_accounts(accounts, enable_banking.get_account_details, conn)
     available_count = sum(1 for a in enriched_accounts if a["available"])
