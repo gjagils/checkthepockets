@@ -495,6 +495,7 @@ async def sync_transactions(connection_id: int, request: Request, db: Session = 
             counterparty_iban=p.counterparty_iban,
             balance_after=p.balance_after,
             import_hash=p.import_hash,
+            import_batch_id=batch.id,
         )
         db.add(db_tx)
         db.flush()
