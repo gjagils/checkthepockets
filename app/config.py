@@ -49,5 +49,13 @@ def validate_production_config() -> None:
         errors.append("APP_URL must use https:// in production")
     if not COOKIE_SECURE:
         errors.append("COOKIE_SECURE must be true in production")
+    if not FIELD_ENCRYPTION_KEY:
+        errors.append("FIELD_ENCRYPTION_KEY must be configured in production")
+    else:
+        try:
+            from cryptography.fernet import Fernet
+            Fernet(FIELD_ENCRYPTION_KEY.encode())
+        except Exception:
+            errors.append("FIELD_ENCRYPTION_KEY is not a valid Fernet key")
     if errors:
         raise RuntimeError("Unsafe production configuration: " + "; ".join(errors))
