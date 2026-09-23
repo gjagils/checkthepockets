@@ -286,13 +286,13 @@ De branchversie beschrijft lopend werk; na merge wordt de centrale stand bijgewe
 | Veld | Waarde |
 |---|---|
 | Actie | Repository-inrichting; geen verbeteractie gestart |
-| Status | Review — documentatie opgesteld, publicatie volgt |
+| Status | Review — documentatie gepubliceerd in PR #134 |
 | Uitvoerder / datum | Codex / 2026-09-23 |
-| Branch / PR | `codex/repository-actieplan`; PR volgt bij publicatie |
+| Branch / PR | `codex/repository-actieplan`; [PR #134](https://github.com/gjagils/checkthepockets/pull/134) |
 | Uitgevoerd | Centraal actieplan, gedeelde workflow, technische context en beide agentingangen opgesteld; oude Claude-snelkoppeling verwijst naar gedeelde workflow |
 | Validatie | Lokale Markdown-links en actie-ID’s gecontroleerd; `git diff --check` geslaagd. Alleen documentatie gewijzigd; runtime-tests niet herhaald. |
-| Openstaand | GitHub-publicatie; implementatieacties nog niet vrijgegeven |
-| Volgende stap | Publiceer documentatie; bij vrijgave ACT-01 starten |
+| Openstaand | PR-CI en merge; implementatieacties nog niet vrijgegeven |
+| Volgende stap | Controleer PR #134 en merge na groene CI; bij vrijgave ACT-01 starten |
 
 Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,
