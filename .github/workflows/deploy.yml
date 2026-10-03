@@ -108,7 +108,8 @@ jobs:
               \"Env\": $CURRENT_ENV,
               \"Prune\": true
             }" \
-            "$PORTAINER_URL/api/stacks/$PORTAINER_NGINX_STACK_ID?endpointId=$ENDPOINT_ID"
+            "$PORTAINER_URL/api/stacks/$PORTAINER_NGINX_STACK_ID?endpointId=$ENDPOINT_ID" \
+            | jq '{Id, Name, Status, message}'   # nooit de volledige stack loggen: die bevat de env-secrets
           echo "Nginx deploy complete."
 
       - name: Deploy app stack via Portainer API
@@ -138,5 +139,6 @@ jobs:
               \"Env\": $CURRENT_ENV,
               \"Prune\": true
             }" \
-            "$PORTAINER_URL/api/stacks/$PORTAINER_STACK_ID?endpointId=$ENDPOINT_ID"
+            "$PORTAINER_URL/api/stacks/$PORTAINER_STACK_ID?endpointId=$ENDPOINT_ID" \
+            | jq '{Id, Name, Status, message}'   # nooit de volledige stack loggen: die bevat de env-secrets
           echo "App deploy complete."
