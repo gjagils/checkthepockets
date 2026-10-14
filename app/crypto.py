@@ -55,7 +55,11 @@ class EncryptedText(TypeDecorator):
 
     def process_result_value(self, value, dialect):
         """Decrypt after reading from DB."""
-        if value is None or _fernet is None:
+        if value is None:
+            return value
+        if _fernet is None:
+            if _encryption_configured:
+                raise RuntimeError("FIELD_ENCRYPTION_KEY is configured but invalid; refusing to return ciphertext")
             return value
         # Values without Fernet's marker are legacy plaintext. Ciphertext that
         # has the marker but fails authentication is corruption/key mismatch.
@@ -73,25 +77,34 @@ def encryption_enabled() -> bool:
 
 def encrypt_existing_transactions(db) -> int:
     """
-    Re-save all transactions to trigger encryption of existing plain-text data.
+    Encrypt transactions that are still stored as plain text.
     Only useful when FIELD_ENCRYPTION_KEY is newly set.
     Returns number of transactions processed.
+
+    The raw column values are read with type_coerce (the ORM would hand back the
+    already-decrypted value, so a plaintext/ciphertext check on it is meaningless)
+    and written back through a Core UPDATE, which runs the encrypting bind processor.
     """
     if _fernet is None:
         return 0
 
+    from sqlalchemy import Text, select, type_coerce, update
     from app.models import Transaction
-    transactions = db.query(Transaction).all()
+
+    fields = ("counterparty", "counterparty_iban", "description")
+    rows = db.execute(
+        select(Transaction.id, *[type_coerce(getattr(Transaction, f), Text) for f in fields])
+    ).all()
     count = 0
-    for tx in transactions:
-        # Access the raw value to check if it's already encrypted (starts with 'gAAA')
-        for field in ("counterparty", "counterparty_iban", "description"):
-            val = getattr(tx, field)
-            if val and not val.startswith("gAAA"):
-                # Unencrypted — re-assign to trigger encryption on next flush
-                setattr(tx, field, val)
-                count += 1
-                break
+    for row in rows:
+        values = {
+            field: raw
+            for field, raw in zip(fields, row[1:])
+            if raw and not raw.startswith("gAAAA")
+        }
+        if values:
+            db.execute(update(Transaction).where(Transaction.id == row[0]).values(**values))
+            count += 1
 
     db.commit()
     return count

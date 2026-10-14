@@ -206,15 +206,11 @@ def apply_single_rule(
 def suggest_rules(db: Session, user_id: int) -> list[dict]:
     """Suggest rules based on categorized transactions with recurring counterparties."""
     from app.models import Account
-    from sqlalchemy import func
 
-    # Find counterparties that are consistently categorized the same way
-    results = (
-        db.query(
-            Transaction.counterparty,
-            Transaction.category_id,
-            func.count(Transaction.id).label("count"),
-        )
+    # Count (counterparty, category) pairs in Python: the counterparty is an EncryptedText
+    # column (random IV per value), so SQL GROUP BY never groups equal names.
+    rows = (
+        db.query(Transaction.counterparty, Transaction.category_id)
         .join(Account)
         .filter(
             Account.user_id == user_id,
@@ -222,12 +218,21 @@ def suggest_rules(db: Session, user_id: int) -> list[dict]:
             Transaction.counterparty != "",
             Transaction.category_id.isnot(None),
         )
-        .group_by(Transaction.counterparty, Transaction.category_id)
-        .having(func.count(Transaction.id) >= 2)
-        .order_by(func.count(Transaction.id).desc())
-        .limit(20)
         .all()
     )
+    counts: dict[tuple, int] = {}
+    names: dict[tuple, str] = {}
+    for counterparty, category_id in rows:
+        if not counterparty:
+            continue
+        key = (counterparty, category_id)
+        counts[key] = counts.get(key, 0) + 1
+        names.setdefault(key, counterparty)
+    results = [
+        (names[key], key[1], count)
+        for key, count in sorted(counts.items(), key=lambda kv: -kv[1])
+        if count >= 2
+    ][:20]
 
     # Filter out counterparties that already have a rule
     existing_rules = (
