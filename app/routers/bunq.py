@@ -1,4 +1,4 @@
-"""bunq API-koppeling met een eigen persoonlijke API-sleutel (ACT-31a: verbinden en rekeningen tonen)."""
+"""bunq API-koppeling met een eigen persoonlijke API-sleutel (ACT-31): rekeningen kiezen en importeren."""
 import datetime
 import logging
 
@@ -8,10 +8,11 @@ from sqlalchemy.orm import Session
 
 from app.auth import require_login
 from app.bunq_client import BunqClient, BunqError
+from app.bunq_sync import account_kind_for, refresh_links, resolve_account, sync_connection
 from app.config import BUNQ_API_BASE, SUPER_ADMIN_USERNAME
 from app.crypto import encryption_enabled
 from app.database import get_db
-from app.models import BunqConnection
+from app.models import Account, BunqAccountLink, BunqConnection
 from app.template_config import templates
 
 logger = logging.getLogger(__name__)
@@ -27,29 +28,42 @@ def _connection(db: Session, user_id: int) -> BunqConnection | None:
     return db.query(BunqConnection).filter(BunqConnection.user_id == user_id).first()
 
 
+def _links(db: Session, connection: BunqConnection | None) -> list[BunqAccountLink]:
+    if connection is None:
+        return []
+    rows = db.query(BunqAccountLink).filter_by(connection_id=connection.id).all()
+    return sorted(rows, key=lambda l: (l.bunq_status != "ACTIVE", l.description or ""))
+
+
 def _render(request, user, db, **extra):
+    connection = _connection(db, user.id)
+    own_accounts = db.query(Account).filter(Account.user_id == user.id).order_by(Account.name).all()
     context = {
-        "request": request, "user": user, "connection": _connection(db, user.id),
+        "request": request, "user": user, "connection": connection,
+        "links": _links(db, connection), "own_accounts": own_accounts,
         "encryption_ready": encryption_enabled(), "sandbox": "sandbox" in BUNQ_API_BASE,
-        "accounts": None, "error": None, "success": None,
+        "reports": None, "dry_run": False, "error": None, "success": None,
     }
     context.update(extra)
     return templates.TemplateResponse("banking/bunq.html", context)
 
 
+def _guard(request, db):
+    user = require_login(request, db)
+    return user, (None if _allowed(user) else RedirectResponse("/banking/connect", status_code=302))
+
+
 @router.get("")
 def bunq_page(request: Request, db: Session = Depends(get_db)):
-    user = require_login(request, db)
-    if not _allowed(user):
-        return RedirectResponse("/banking/connect", status_code=302)
-    return _render(request, user, db)
+    user, denied = _guard(request, db)
+    return denied or _render(request, user, db)
 
 
 @router.post("")
 def bunq_save_key(request: Request, api_key: str = Form(...), db: Session = Depends(get_db)):
-    user = require_login(request, db)
-    if not _allowed(user):
-        return RedirectResponse("/banking/connect", status_code=302)
+    user, denied = _guard(request, db)
+    if denied:
+        return denied
     api_key = api_key.strip()
     if not encryption_enabled():
         return _render(request, user, db, error="Opslaan geweigerd: veldversleuteling (FIELD_ENCRYPTION_KEY) staat niet aan.")
@@ -71,22 +85,22 @@ def bunq_save_key(request: Request, api_key: str = Form(...), db: Session = Depe
 
 @router.post("/check")
 def bunq_check(request: Request, db: Session = Depends(get_db)):
-    """Open a session and list all monetary accounts (read-only)."""
-    user = require_login(request, db)
-    if not _allowed(user):
-        return RedirectResponse("/banking/connect", status_code=302)
+    """Open a session and refresh the list of bunq accounts (read-only)."""
+    user, denied = _guard(request, db)
+    if denied:
+        return denied
     connection = _connection(db, user.id)
     if connection is None:
         return RedirectResponse("/banking/bunq", status_code=302)
 
     client = BunqClient(BUNQ_API_BASE)
-    accounts = None
     error = None
     try:
         session = client.connect(connection.api_key, connection.private_key_pem, connection.installation_token)
         connection.private_key_pem = session.private_key_pem
         connection.installation_token = session.installation_token
         accounts = client.list_accounts(session)
+        refresh_links(db, connection, accounts)
         connection.last_status = "ok"
         connection.last_error = None
         logger.info("bunq: %d rekeningen opgehaald (soorten: %s)", len(accounts),
@@ -98,15 +112,69 @@ def bunq_check(request: Request, db: Session = Depends(get_db)):
         logger.warning("bunq: controle mislukt (%s, HTTP %s)", exc.kind, exc.status)
     connection.last_checked_at = datetime.datetime.utcnow()
     db.commit()
-    return _render(request, user, db, accounts=accounts, error=error)
+    return _render(request, user, db, error=error)
+
+
+@router.post("/accounts")
+async def bunq_save_accounts(request: Request, db: Session = Depends(get_db)):
+    """Save which bunq accounts to import, their kind, and the own account they map to."""
+    user, denied = _guard(request, db)
+    if denied:
+        return denied
+    connection = _connection(db, user.id)
+    if connection is None:
+        return RedirectResponse("/banking/bunq", status_code=302)
+    form = await request.form()
+    enabled_ids = {int(v) for v in form.getlist("enable") if str(v).isdigit()}
+    for link in _links(db, connection):
+        link.enabled = 1 if link.id in enabled_ids else 0
+        kind = form.get(f"kind_{link.id}") or account_kind_for(link.bunq_kind)
+        choice = form.get(f"account_{link.id}") or "auto"
+        if link.enabled:
+            account = resolve_account(db, user.id, link, choice, kind)
+            if link.account_id != account.id:
+                link.last_payment_id = None   # andere doelrekening: opnieuw vanaf het begin
+            link.account_id = account.id
+        elif link.account is not None:
+            # Soort mag ook van een niet-geselecteerde, al gekoppelde rekening wijzigen.
+            link.account.kind = kind if kind in ("payment", "savings") else link.account.kind
+    db.commit()
+    return _render(request, user, db, success="Selectie opgeslagen.")
+
+
+@router.post("/sync")
+def bunq_sync(request: Request, mode: str = Form("preview"), db: Session = Depends(get_db)):
+    """Preview (nothing stored) or import the payments of all selected accounts."""
+    user, denied = _guard(request, db)
+    if denied:
+        return denied
+    connection = _connection(db, user.id)
+    if connection is None:
+        return RedirectResponse("/banking/bunq", status_code=302)
+    dry_run = mode != "import"
+    reports, error = None, None
+    try:
+        reports = sync_connection(db, connection, BunqClient(BUNQ_API_BASE), dry_run)
+        db.commit()
+    except BunqError as exc:
+        db.rollback()
+        error = str(exc)
+        logger.warning("bunq: synchronisatie mislukt (%s, HTTP %s)", exc.kind, exc.status)
+    except Exception:
+        db.rollback()
+        logger.exception("bunq: synchronisatie mislukt")
+        error = "Synchroniseren is niet gelukt; er is niets opgeslagen. Zie de serverlog."
+    return _render(request, user, db, reports=reports, dry_run=dry_run, error=error)
 
 
 @router.post("/delete")
 def bunq_delete(request: Request, db: Session = Depends(get_db)):
-    user = require_login(request, db)
-    if _allowed(user):
-        connection = _connection(db, user.id)
-        if connection:
-            db.delete(connection)
-            db.commit()
+    user, denied = _guard(request, db)
+    if denied:
+        return denied
+    connection = _connection(db, user.id)
+    if connection:
+        db.query(BunqAccountLink).filter_by(connection_id=connection.id).delete(synchronize_session=False)
+        db.delete(connection)
+        db.commit()
     return RedirectResponse("/banking/bunq", status_code=302)

@@ -3,10 +3,11 @@
 {% block content %}
 <div class="page-header">
     <h1>bunq koppelen</h1>
-    <p class="subtitle">Verbind met je eigen bunq API-sleutel en bekijk welke rekeningen bunq teruggeeft. Er worden nog geen transacties geïmporteerd.</p>
+    <p class="subtitle">Verbind met je eigen bunq API-sleutel, kies welke rekeningen je importeert en bekijk eerst een voorbeeld.</p>
 </div>
 
 {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+{% if success %}<div class="alert alert-success">{{ success }}</div>{% endif %}
 {% if sandbox %}<div class="alert">Testmodus: verbonden met de bunq-sandbox.</div>{% endif %}
 
 <div class="card" style="margin-bottom:1.5rem;">
@@ -36,25 +37,91 @@
     {% endif %}
 </div>
 
-{% if accounts is not none %}
-<div class="card">
-    <h2>Rekeningen volgens bunq ({{ accounts|length }})</h2>
-    {% if accounts %}
+{% if reports is not none %}
+<div class="card" style="margin-bottom:1.5rem;">
+    <h2>{{ 'Voorbeeld (er is niets opgeslagen)' if dry_run else 'Import afgerond' }}</h2>
+    {% if reports %}
     <table class="table" style="font-size:0.9rem;">
-        <thead><tr><th>Naam</th><th>Soort</th><th>IBAN</th><th>Status</th><th style="text-align:right;">Saldo</th></tr></thead>
+        <thead><tr><th>Rekening</th><th style="text-align:right;">Opgehaald</th><th style="text-align:right;">Nieuw</th>
+            <th style="text-align:right;">Al aanwezig (CSV)</th><th style="text-align:right;">Al eerder geïmporteerd</th>
+            {% if not dry_run %}<th style="text-align:right;">Overboekingen gekoppeld</th>{% endif %}</tr></thead>
         <tbody>
-        {% for a in accounts %}
+        {% for r in reports %}
         <tr>
-            <td>{{ a.description or '—' }}</td>
-            <td>{{ a.kind|replace('MonetaryAccount', '') }}</td>
-            <td>{{ a.iban or '—' }}</td>
-            <td>{{ a.status }}</td>
-            <td style="text-align:right;">{% if a.balance is not none %}{{ a.currency }} {{ a.balance }}{% else %}—{% endif %}</td>
+            <td>{{ r.link.description or r.link.iban }}</td>
+            {% if r.error %}
+            <td colspan="{{ 4 if dry_run else 5 }}" style="color:var(--ctp-danger, #c0392b);">{{ r.error }}</td>
+            {% else %}
+            <td style="text-align:right;">{{ r.fetched }}</td>
+            <td style="text-align:right;"><strong>{{ r.new }}</strong></td>
+            <td style="text-align:right;">{{ r.matched_existing }}</td>
+            <td style="text-align:right;">{{ r.already_imported }}</td>
+            {% if not dry_run %}<td style="text-align:right;">{{ r.transfers_linked }}</td>{% endif %}
+            {% endif %}
         </tr>
         {% endfor %}
         </tbody>
     </table>
-    {% else %}<p class="muted">bunq gaf geen rekeningen terug.</p>{% endif %}
+    {% if dry_run %}
+    <p class="muted" style="font-size:0.85rem;">"Al aanwezig" zijn betalingen die op dezelfde datum, met hetzelfde bedrag en dezelfde tegenpartij of omschrijving al op de rekening staan; die worden overgeslagen.
+        Staat bij een rekening met CSV-historie bijna alles onder "Nieuw", controleer dan of je aan de juiste rekening koppelt.</p>
+    <form method="post" action="/banking/bunq/sync">
+        <input type="hidden" name="mode" value="import">
+        <button type="submit" class="btn btn-primary">Nu importeren</button>
+    </form>
+    {% endif %}
+    {% else %}
+    <p class="muted">Geen rekeningen geselecteerd.</p>
+    {% endif %}
+</div>
+{% endif %}
+
+{% if links %}
+<div class="card">
+    <h2>Rekeningen volgens bunq ({{ links|length }})</h2>
+    <form method="post" action="/banking/bunq/accounts">
+    <table class="table" style="font-size:0.9rem;">
+        <thead><tr><th>Importeren</th><th>Naam</th><th>IBAN</th><th>Status</th><th style="text-align:right;">Saldo</th><th>Soort</th><th>Importeren naar</th></tr></thead>
+        <tbody>
+        {% for l in links %}
+        {% set kind = (l.account.kind if l.account else ('savings' if l.bunq_kind and 'Savings' in l.bunq_kind else 'payment')) %}
+        <tr {% if l.bunq_status != 'ACTIVE' %}class="muted"{% endif %}>
+            <td><input type="checkbox" name="enable" value="{{ l.id }}" {% if l.enabled %}checked{% endif %}></td>
+            <td>{{ l.description or '—' }}</td>
+            <td>{{ l.iban or '—' }}</td>
+            <td>{{ l.bunq_status }}</td>
+            <td style="text-align:right;">{% if l.balance is not none %}{{ l.balance }}{% else %}—{% endif %}</td>
+            <td>
+                <select name="kind_{{ l.id }}">
+                    <option value="payment" {% if kind == 'payment' %}selected{% endif %}>Betaalrekening</option>
+                    <option value="savings" {% if kind == 'savings' %}selected{% endif %}>Spaarrekening</option>
+                </select>
+            </td>
+            <td>
+                <select name="account_{{ l.id }}">
+                    <option value="auto" {% if not l.account_id %}selected{% endif %}>Automatisch (IBAN) of nieuw</option>
+                    <option value="new">Nieuwe rekening</option>
+                    {% for a in own_accounts %}
+                    <option value="{{ a.id }}" {% if l.account_id == a.id %}selected{% endif %}>{{ a.name or a.bank|upper }}{% if a.iban %} · {{ a.iban }}{% endif %}</option>
+                    {% endfor %}
+                </select>
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    <p class="muted" style="font-size:0.85rem;">Heb je een rekening al via CSV geïmporteerd (bijvoorbeeld "Bunq Samen spaar"), kies die dan onder "Importeren naar", zodat de historie niet dubbel komt.
+        Geannuleerde rekeningen staan standaard uit.</p>
+    <button type="submit" class="btn btn-primary">Selectie opslaan</button>
+    </form>
+
+    <div style="display:flex; gap:0.5rem; margin-top:1rem; flex-wrap:wrap;">
+        <form method="post" action="/banking/bunq/sync"><input type="hidden" name="mode" value="preview">
+            <button type="submit" class="btn">Voorbeeld tonen</button></form>
+        <form method="post" action="/banking/bunq/sync"><input type="hidden" name="mode" value="import">
+            <button type="submit" class="btn btn-primary"
+                    onclick="return confirm('Betalingen van de geselecteerde rekeningen nu importeren?')">Importeren</button></form>
+    </div>
 </div>
 {% endif %}
 {% endblock %}

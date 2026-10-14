@@ -96,6 +96,7 @@ class Account(Base):
     iban = Column(String(34), nullable=True)
     bank = Column(String(50), nullable=False)  # "abn_amro", "bunq", "ics"
     external_uid = Column(String(255), nullable=True, index=True)  # Enable Banking account_uid
+    kind = Column(String(20), nullable=False, default="payment", server_default="payment")  # "payment" of "savings"
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     user = relationship("User", back_populates="accounts")
@@ -860,3 +861,27 @@ class BunqConnection(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     user = relationship("User")
+
+
+class BunqAccountLink(Base):
+    """Een rekening uit bunq en of/naar welke eigen rekening die geïmporteerd wordt (ACT-31b)."""
+    __tablename__ = "bunq_account_links"
+
+    id = Column(Integer, primary_key=True)
+    connection_id = Column(Integer, ForeignKey("bunq_connections.id", ondelete="CASCADE"), nullable=False, index=True)
+    bunq_account_id = Column(Integer, nullable=False)
+    description = Column(String(255), nullable=True)
+    iban = Column(String(34), nullable=True)
+    bunq_kind = Column(String(60), nullable=True)        # bv. MonetaryAccountSavings
+    bunq_status = Column(String(30), nullable=True)      # ACTIVE, CANCELLED, ...
+    balance = Column(Numeric(14, 2), nullable=True)
+    enabled = Column(Integer, nullable=False, default=0, server_default="0")
+    account_id = Column(Integer, ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True)
+    last_payment_id = Column(Integer, nullable=True)     # hoogste betaling-id die verwerkt is
+    last_synced_at = Column(DateTime, nullable=True)
+
+    account = relationship("Account")
+
+    __table_args__ = (
+        UniqueConstraint("connection_id", "bunq_account_id", name="uq_bunq_link_account"),
+    )

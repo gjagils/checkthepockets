@@ -20,6 +20,7 @@
         <h3 style="margin:0 0 0.5rem 0; color:var(--text, #1a1a1a);">{{ acc.name or (acc.iban or acc.bank|upper) }}</h3>
         <div class="account-header">
             <span class="pill">{{ acc.bank|upper }}</span>
+            {% if acc.kind == 'savings' %}<span class="pill">SPAAR</span>{% endif %}
             <span class="muted">{{ acc.transactions|length }} transacties</span>
         </div>
         {% if acc.iban %}

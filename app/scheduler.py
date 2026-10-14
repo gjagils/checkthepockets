@@ -290,6 +290,40 @@ def _sync_all_bank_connections():
         db.close()
 
 
+@logged_job("bunq_sync")
+def _sync_all_bunq():
+    """Import new payments of all selected bunq accounts (ACT-31b)."""
+    from app.bunq_client import BunqClient, BunqError
+    from app.bunq_sync import sync_connection
+    from app.config import BUNQ_API_BASE
+    from app.database import SessionLocal
+    from app.models import BunqAccountLink, BunqConnection
+
+    db = SessionLocal()
+    try:
+        connections = [
+            c for c in db.query(BunqConnection).all()
+            if db.query(BunqAccountLink).filter_by(connection_id=c.id, enabled=1).count()
+        ]
+        if not connections:
+            return "geen bunq-koppelingen met geselecteerde rekeningen"
+        total = 0
+        for connection in connections:
+            try:
+                reports = sync_connection(db, connection, BunqClient(BUNQ_API_BASE), dry_run=False)
+                db.commit()
+                total += sum(r.new for r in reports)
+            except BunqError as exc:
+                db.rollback()
+                logger.warning("bunq sync mislukt (%s, HTTP %s)", exc.kind, exc.status)
+            except Exception:
+                db.rollback()
+                logger.exception("bunq sync mislukt")
+        return f"{total} bunq-transacties geïmporteerd uit {len(connections)} koppeling(en)"
+    finally:
+        db.close()
+
+
 def start_scheduler():
     """Start the background scheduler with all configured jobs."""
     if ENABLE_BANKING_APP_ID:
@@ -303,6 +337,16 @@ def start_scheduler():
             replace_existing=True,
         )
         logger.info("Bank sync ingepland om 01:00 en 17:00 Europe/Amsterdam")
+
+    scheduler.add_job(
+        _sync_all_bunq,
+        "cron",
+        hour="1,17",
+        minute=30,
+        timezone=NL_TZ,
+        id="bunq_sync",
+        replace_existing=True,
+    )
 
     scheduler.add_job(
         _run_weekly_digests,
