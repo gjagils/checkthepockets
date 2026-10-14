@@ -8,7 +8,7 @@ import calendar as _calendar
 from datetime import date as date_type, timedelta, datetime as _datetime
 from decimal import Decimal, InvalidOperation
 from typing import List
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, urlencode
 
 from fastapi import APIRouter, Depends, Request, UploadFile, File, Form, Query
 from fastapi.responses import RedirectResponse, StreamingResponse, JSONResponse
@@ -712,10 +712,12 @@ def link_recurring(
                 # Redirect back with proposal banner
                 candidate_ids = ",".join(str(c.id) for c in candidates)
                 sep = "&" if "?" in redirect_to else "?"
-                return safe_redirect(
-                    f"{redirect_to}{sep}recurring_proposals={candidate_ids}&recurring_item={item.id}&recurring_name={item.name}",
-                    status_code=302,
-                )
+                query = urlencode({
+                    "recurring_proposals": candidate_ids,
+                    "recurring_item": item.id,
+                    "recurring_name": item.name,
+                })
+                return safe_redirect(f"{redirect_to}{sep}{query}", "/transactions", status_code=302)
     else:
         # Unlink
         tx.recurring_id = None

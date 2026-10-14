@@ -81,6 +81,7 @@ def category_spending_average(
             or_(*conditions),
             Transaction.amount < 0,
             Transaction.is_excluded == 0,
+            Transaction.is_projected == 0,
             Transaction.transfer_id.is_(None),
             Category.exclude_from_budget == 0,
         )
