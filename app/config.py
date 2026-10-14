@@ -28,6 +28,8 @@ SUPER_ADMIN_USERNAME = os.getenv("SUPER_ADMIN_USERNAME", "")
 
 # Sprint 17 — AI rule suggestions
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+# Model voor AI-suggesties; overschrijfbaar zodat een uitgefaseerd model geen codewijziging vraagt.
+ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL") or "claude-sonnet-5-5"
 
 # Sprint 18 — Google OAuth login
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
