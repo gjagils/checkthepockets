@@ -29,6 +29,7 @@ from app.config import (
 )
 from app.email_service import send_verification_email, send_password_reset_email
 from app import rate_limit
+from app.validation import clean_email as _clean_email
 from app.rate_limit import is_rate_limited, record_failed_attempt, clear_attempts
 from app.template_config import templates
 
@@ -565,24 +566,6 @@ def change_password(
         "auth/settings.html",
         _settings_ctx(request, user, success="Wachtwoord succesvol gewijzigd"),
     )
-
-
-def _clean_email(raw: str) -> str | None:
-    """Basis e-mail-validatie: strip whitespace, lowercase, verwacht één '@'
-    met iets ervoor en iets erna. Geen volledige RFC-validatie — we willen
-    alleen overduidelijke typos afvangen. Return None als ongeldig."""
-    if raw is None:
-        return None
-    cleaned = raw.strip().lower()
-    if not cleaned:
-        return ""  # explicitly cleared
-    if " " in cleaned or cleaned.count("@") != 1:
-        return None
-    local, _, domain = cleaned.partition("@")
-    if not local or not domain or "." not in domain:
-        return None
-    return cleaned
-
 
 @router.post("/settings/email")
 def update_email(

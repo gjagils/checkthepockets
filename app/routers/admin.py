@@ -116,7 +116,7 @@ def admin_update_user_email(
     """Laat een admin het e-mailadres van een user (zichzelf of ander)
     wijzigen. Basis validatie via _clean_email in auth-module."""
     _require_admin(request, db)
-    from app.routers.auth import _clean_email
+    from app.validation import clean_email as _clean_email
     target = db.query(User).filter(User.id == user_id).first()
     if not target:
         return RedirectResponse("/admin/users", status_code=302)

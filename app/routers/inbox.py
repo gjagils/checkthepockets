@@ -1,39 +1,14 @@
 from fastapi import APIRouter, Depends, Form, Query, Request
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 
 from app.auth import require_login
 from app.database import get_db
 from app.models import Account, Category, RecurringTransaction, Transaction
 from app.redirects import safe_redirect
 from app.template_config import templates
+from app.transaction_queries import inbox_count, inbox_query as _inbox_query  # noqa: F401  (inbox_count: bestaande importeurs)
 
 router = APIRouter()
-
-
-def _inbox_query(db: Session, user_id: int):
-    """Transacties zonder categorie, excl. split-parents, projecties en excluded."""
-    split_parent_ids = (
-        db.query(Transaction.parent_id)
-        .filter(Transaction.parent_id.isnot(None))
-        .distinct()
-        .scalar_subquery()
-    )
-    return (
-        db.query(Transaction)
-        .join(Account)
-        .options(joinedload(Transaction.account))
-        .filter(
-            Account.user_id == user_id,
-            Transaction.category_id.is_(None),
-            Transaction.is_excluded == 0,
-            Transaction.is_projected == 0,
-            Transaction.id.notin_(split_parent_ids),
-        )
-    )
-
-
-def inbox_count(db: Session, user_id: int) -> int:
-    return _inbox_query(db, user_id).count()
 
 
 def _grouped_categories(db: Session, user_id: int):

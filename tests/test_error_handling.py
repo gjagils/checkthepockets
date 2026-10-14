@@ -94,7 +94,7 @@ def test_manual_sync_failure_is_stored_and_logged_without_ids(db, banking_user, 
         raise _network_error(f"/accounts/{account_uid}/transactions")
 
     monkeypatch.setattr(enable_banking, "get_transactions", fail)
-    with caplog.at_level(logging.INFO, logger="app.routers.banking"):
+    with caplog.at_level(logging.INFO, logger="app.bank_sync"):
         response = client.post(f"/banking/sync/{conn.id}", data={"account_uid": ACCOUNT_UID})
 
     assert response.status_code == 200
@@ -104,7 +104,7 @@ def test_manual_sync_failure_is_stored_and_logged_without_ids(db, banking_user, 
     stored = db.get(BankConnection, conn.id)
     assert stored.last_sync_status == "error"
     _assert_no_ids(stored.last_sync_error)
-    assert "Bank sync fout" in caplog.text
+    assert "Bank sync fout voor Testbank" in caplog.text
     _assert_no_ids(caplog.text)
 
 
@@ -115,7 +115,7 @@ def test_scheduler_sync_failure_is_logged_without_account_uid(db, banking_user, 
         raise _network_error(f"/accounts/{account_uid}/transactions")
 
     monkeypatch.setattr(enable_banking, "get_transactions", fail)
-    with caplog.at_level(logging.ERROR, logger="app.scheduler"):
+    with caplog.at_level(logging.ERROR, logger="app.bank_sync"):
         _sync_all_bank_connections()
 
     assert "Bank sync fout voor Testbank" in caplog.text
@@ -130,7 +130,7 @@ def test_inbox_count_failure_is_logged_and_page_still_renders(db, monkeypatch, c
     def fail(db, user_id):
         raise RuntimeError("database unavailable")
 
-    monkeypatch.setattr("app.routers.inbox.inbox_count", fail)
+    monkeypatch.setattr("app.transaction_queries.inbox_count", fail)
     client = TestClient(app, follow_redirects=False)
     client.cookies.set("session", create_session_cookie(user.id))
     with caplog.at_level(logging.WARNING, logger="app.main"):

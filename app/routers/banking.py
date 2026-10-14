@@ -3,8 +3,7 @@
 import json
 import logging
 import uuid
-from datetime import date as date_type, datetime, timedelta, timezone
-from decimal import Decimal, InvalidOperation
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Request
 
@@ -12,14 +11,12 @@ logger = logging.getLogger(__name__)
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
-from app import clock
+from app import bank_sync, clock
 from app.auth import require_login
 from app.config import APP_URL, ENABLE_BANKING_APP_ID, SUPER_ADMIN_USERNAME
 from app.database import get_db
-from app.models import Account, BankConnection, Rule, ImportBatch
-from app.parsers.base import ParsedTransaction
+from app.models import Account, BankConnection
 from app.enable_banking import safe_error_message
-from app.import_service import store_parsed_transactions
 from app.template_config import templates
 
 router = APIRouter(prefix="/banking")
@@ -34,14 +31,7 @@ def _is_banking_allowed(user) -> bool:
     return bool(SUPER_ADMIN_USERNAME and user.username == SUPER_ADMIN_USERNAME)
 
 
-def _normalize_iban(value: str | None) -> str | None:
-    """Canoniek IBAN: spaties weg, uppercase. Voorkomt match-misses door
-    verschillen tussen API-responses (NL81 BUNQ 2088 ...) en DB-records
-    (NL81BUNQ2088...)."""
-    if not value:
-        return None
-    clean = "".join(value.split()).upper()
-    return clean or None
+_normalize_iban = bank_sync.normalize_iban  # alias; de logica staat in app/bank_sync.py
 
 
 # ── Bank selection page ─────────────────────────────────────────────────────
@@ -426,25 +416,17 @@ async def sync_transactions(connection_id: int, request: Request, db: Session = 
     if not account_uid:
         return RedirectResponse(f"/banking/sync/{connection_id}", status_code=302)
 
-    # Find IBAN for this account from stored data
     stored_accounts = json.loads(conn.accounts_json or "[]")
-    account_info = next((a for a in stored_accounts if a.get("uid") == account_uid), None)
-    account_iban = _normalize_iban(account_info["iban"]) if account_info else None
 
-    from app import enable_banking
-    logger.info("Bank sync gestart: %s koppeling id=%s from=%s to=%s", conn.bank_name, conn.id, date_from, date_to)
-    try:
-        raw_transactions = enable_banking.get_transactions(
-            account_uid,
-            date_from=date_from or None,
-            date_to=date_to or None,
+    result = bank_sync.sync_account(
+        db, conn, account_uid, date_from=date_from or None, date_to=date_to or None,
+    )
+    db.commit()
+    if result.status != "ok":
+        error = (
+            f"Kan transacties niet ophalen: {result.error}" if result.status == "fetch_error"
+            else "Geen transacties gevonden voor de geselecteerde periode."
         )
-        logger.info("Bank sync: %d ruwe transacties opgehaald", len(raw_transactions))
-    except Exception as e:
-        logger.error("Bank sync fout (koppeling id=%s): %s", conn.id, safe_error_message(e))
-        conn.last_sync_status = "error"
-        conn.last_sync_error = safe_error_message(e)[:500]
-        db.commit()
         return templates.TemplateResponse(
             request,
             "banking/sync.html",
@@ -452,160 +434,16 @@ async def sync_transactions(connection_id: int, request: Request, db: Session = 
                 "request": request, "user": user,
                 "connection": conn,
                 "accounts": _available_accounts(stored_accounts),
-                "error": f"Kan transacties niet ophalen: {safe_error_message(e)}",
+                "error": error,
             },
         )
 
-    # Map to ParsedTransaction
-    parsed = _map_eb_transactions(raw_transactions)
-
-    # Filter op datum (API geeft soms meer terug dan gevraagd)
-    if date_from:
-        parsed = [p for p in parsed if str(p.date) >= date_from]
-    if date_to:
-        parsed = [p for p in parsed if str(p.date) <= date_to]
-
-    logger.info("Bank sync: %d transacties na datumfilter", len(parsed))
-
-    if not parsed:
-        return templates.TemplateResponse(
-            request,
-            "banking/sync.html",
-            {
-                "request": request, "user": user,
-                "connection": conn,
-                "accounts": _available_accounts(stored_accounts),
-                "error": "Geen transacties gevonden voor de geselecteerde periode.",
-            },
-        )
-
-    # Find or create the Account record.
-    #
-    # Match-strategie (in volgorde):
-    #   1. Primair op external_uid (stabiele Enable Banking account_uid).
-    #   2. Fallback op (bank, genormaliseerde IBAN) — ook als het Account
-    #      al een external_uid heeft die verschilt van de huidige. Dat
-    #      dekt: reauthorisatie na 90 dagen (nieuwe uid voor zelfde
-    #      rekening) én legacy accounts aangemaakt vóór external_uid-kolom.
-    #
-    # Pas nadat we een Account hebben gevonden óf nieuw aangemaakt, wordt
-    # external_uid op de huidige sync-uid gezet. Zo kan een sync nooit
-    # meer stiekem een nieuw duplicate Account aanmaken als er al een
-    # bestaand Account voor dezelfde bank+IBAN is.
-    bank_key = conn.bank_name.lower().replace(" ", "_")
-    display = (conn.display_name or conn.bank_name).strip()
-    preferred_name = f"{display} - {account_iban}" if account_iban else display
-    account = db.query(Account).filter(
-        Account.user_id == user.id,
-        Account.external_uid == account_uid,
-    ).first()
-    matched_by = "external_uid" if account else None
-
-    if not account and account_iban:
-        # Zoek alle accounts met gelijke bank + genormaliseerde IBAN.
-        # We matchen in Python omdat bestaande DB-records whitespace of
-        # andere casing kunnen hebben (pre-normalisatie).
-        iban_candidates = (
-            db.query(Account)
-            .filter(
-                Account.user_id == user.id,
-                Account.bank == bank_key,
-                Account.iban.isnot(None),
-            )
-            .all()
-        )
-        normalized_matches = [
-            a for a in iban_candidates
-            if _normalize_iban(a.iban) == account_iban
-        ]
-        if normalized_matches:
-            # Prefereer een match zonder external_uid (legacy). Anders pak
-            # de eerste; we linken alsnog — maar loggen een WARNING zodat
-            # we multi-uid-scenario's in het oog houden.
-            legacy = [a for a in normalized_matches if a.external_uid is None]
-            if legacy:
-                account = legacy[0]
-                matched_by = "iban_legacy_fallback"
-            else:
-                account = normalized_matches[0]
-                matched_by = "iban_fallback_reauth"
-                logger.warning(
-                    "Bank sync: matched Account id=%s op IBAN %s terwijl het "
-                    "al een andere external_uid=%s had; nieuwe uid=%s werd "
-                    "gelinkt. Mogelijk reauthorisatie.",
-                    account.id, account_iban, account.external_uid, account_uid,
-                )
-
-    if account:
-        # Zet/updat external_uid en IBAN canoniek op het Account record.
-        if account.external_uid != account_uid:
-            account.external_uid = account_uid
-        if account_iban and _normalize_iban(account.iban) != account_iban:
-            account.iban = account_iban
-        # Synchroniseer de naam met de connection-display_name, tenzij de
-        # gebruiker het account handmatig een custom naam heeft gegeven.
-        autogen_prefixes = (f"{conn.bank_name} -", f"{display} -", f"{conn.bank_name}",)
-        if account.name == f"{conn.bank_name} - account" or any(
-            account.name.startswith(p) for p in autogen_prefixes
-        ):
-            account.name = preferred_name
-        logger.info(
-            "Bank sync: using existing Account id=%s name=%s matched_by=%s",
-            account.id, account.name, matched_by,
-        )
-    else:
-        account = Account(
-            user_id=user.id,
-            name=preferred_name,
-            iban=account_iban or None,
-            bank=bank_key,
-            external_uid=account_uid,
-        )
-        db.add(account)
-        db.flush()
-        # WAARSCHUWING: een sync die een nieuw Account aanmaakt is verdacht
-        # voor een bestaande gebruiker — verwachte flow is dat het Account
-        # al bestaat (aangemaakt bij connect). Log zichtbaar zodat we dit
-        # type situaties bij toekomstige bugs in één oogopslag zien.
-        logger.warning(
-            "Bank sync: created NEW Account id=%s name=%s bank=%s iban=%s "
-            "uid=%s — check of er géén ander Account voor deze IBAN bestaat.",
-            account.id, account.name, bank_key, account_iban, account_uid,
-        )
-
-    # Import transactions (skip duplicates)
-    active_rules = db.query(Rule).filter(Rule.user_id == user.id, Rule.is_active == 1).all()
-    batch = ImportBatch(user_id=user.id, account_id=account.id, source="enable_banking", total_count=len(parsed))
-    db.add(batch)
-    db.flush()
-    result = store_parsed_transactions(db, account, parsed, active_rules, batch.id)
+    # Re-run the rules over all transactions (catches rename -> match chains), link recurring items and
+    # refresh projections. The "extra" count is kept apart from "auto-categorised on import".
+    extra = bank_sync.post_import(db, user.id)
+    db.commit()
     imported, skipped, auto_categorized = result.imported, result.skipped, result.auto_categorized
-
-    conn.last_synced_at = clock.now_utc()
-    conn.last_sync_status = "success"
-    conn.last_sync_error = None
-    batch.imported_count = imported
-    batch.skipped_count = skipped
-    db.commit()
-
-    # Draai alle regels nogmaals over alle transacties (vangt rename → match
-    # ketens en categoriseert eerder geïmporteerde transacties waarvoor nu
-    # een matchende regel bestaat). We houden dit aantal apart zodat het niet
-    # in het 'auto-gecategoriseerd bij deze import' getal wordt geteld.
-    from app.rules_engine import apply_rules_to_all
-    extra = apply_rules_to_all(db, user.id)
-    if extra:
-        logger.info("Bank sync: %d extra bestaande transacties gecategoriseerd via apply_rules_to_all", extra)
-
-    # Auto-link recurring and sync projections
-    from app.recurring_service import auto_link_recurring_after_import
-    from app.recurring_service import cleanup_matched_projected, sync_projected_transactions
-    auto_link_recurring_after_import(db, user.id)
-    cleanup_matched_projected(user.id, db)
-    # Re-sync projected transactions for current month to reflect new imports
-    _today = clock.today_nl()
-    sync_projected_transactions(user.id, _today.year, _today.month, db)
-    db.commit()
+    batch, account = result.batch, result.account
 
     return templates.TemplateResponse(
         request,
@@ -618,7 +456,7 @@ async def sync_transactions(connection_id: int, request: Request, db: Session = 
             "extra_categorized": extra,
             "rejected": 0,
             "batch": batch,
-            "total": len(parsed),
+            "total": result.total,
             "account": account,
             "connection": conn,
         },
@@ -725,79 +563,4 @@ def disconnect(connection_id: int, request: Request, db: Session = Depends(get_d
     return RedirectResponse("/banking/connect", status_code=302)
 
 
-# ── Transaction mapping ─────────────────────────────────────────────────────
-
-
-def _map_eb_transactions(raw: list[dict]) -> list[ParsedTransaction]:
-    """Map Enable Banking API transaction objects to ParsedTransaction."""
-    result = []
-    for tx in raw:
-        try:
-            # Date: booking_date or value_date
-            date_str = tx.get("booking_date") or tx.get("value_date") or tx.get("transaction_date")
-            if not date_str:
-                continue
-            tx_date = date_type.fromisoformat(date_str[:10])
-
-            # Amount
-            amount_obj = tx.get("transaction_amount") or {}
-            amount_str = amount_obj.get("amount", "0")
-            currency = amount_obj.get("currency", "EUR")
-            amount = Decimal(amount_str)
-
-            # Credit/debit indicator
-            if tx.get("credit_debit_indicator") == "DBIT" and amount > 0:
-                amount = -amount
-
-            # Description
-            desc_parts = []
-            if tx.get("remittance_information"):
-                info = tx["remittance_information"]
-                if isinstance(info, list):
-                    desc_parts.extend(info)
-                elif isinstance(info, dict):
-                    desc_parts.extend(info.get("unstructured", []))
-                else:
-                    desc_parts.append(str(info))
-            if tx.get("additional_information"):
-                desc_parts.append(tx["additional_information"])
-            description = " ".join(desc_parts).strip() or "Geen omschrijving"
-
-            # Counterparty
-            counterparty = None
-            counterparty_iban = None
-            creditor = tx.get("creditor") or {}
-            debtor = tx.get("debtor") or {}
-            party = creditor or debtor
-            if party:
-                counterparty = party.get("name")
-            creditor_acc = tx.get("creditor_account") or {}
-            debtor_acc = tx.get("debtor_account") or {}
-            party_acc = creditor_acc or debtor_acc
-            if party_acc:
-                counterparty_iban = party_acc.get("iban")
-
-            # Balance after (if available)
-            balance_after = None
-            if tx.get("balance_after_transaction"):
-                bal = tx["balance_after_transaction"]
-                bal_amount = bal.get("balance_amount", {})
-                if bal_amount.get("amount"):
-                    try:
-                        balance_after = Decimal(bal_amount["amount"])
-                    except (InvalidOperation, ValueError):
-                        pass
-
-            result.append(ParsedTransaction(
-                date=tx_date,
-                amount=amount,
-                currency=currency,
-                description=description,
-                counterparty=counterparty,
-                counterparty_iban=counterparty_iban,
-                balance_after=balance_after,
-            ))
-        except (ValueError, InvalidOperation, KeyError):
-            continue
-
-    return result
+_map_eb_transactions = bank_sync.map_eb_transactions  # alias; de logica staat in app/bank_sync.py

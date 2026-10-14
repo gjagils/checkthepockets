@@ -5,7 +5,6 @@ Uses APScheduler to run scheduled background jobs.
 """
 
 import functools
-import json
 import logging
 import traceback
 from datetime import datetime, timedelta
@@ -82,7 +81,7 @@ def compute_digest_stats(db, user_id: int, now_utc: datetime | None = None):
     """
     from sqlalchemy import func
     from app.models import Account, Transaction
-    from app.routers.inbox import inbox_count
+    from app.transaction_queries import inbox_count
 
     today = (now_utc or clock.now_utc()).date()
     since = today - timedelta(days=7)
@@ -194,13 +193,13 @@ def _capture_january_wealth_plans():
 def _sync_all_bank_connections():
     """Sync transactions for all active bank connections.
 
-    Returns een korte string met aantallen voor de scheduler-log.
+    Uses the same service as the manual sync page (app/bank_sync.py): ImportBatch per import, status
+    fields on the connection, IBAN matching, and one failing account never undoes the others.
+    Returns a short string with counts for the scheduler log.
     """
+    from app import bank_sync
     from app.database import SessionLocal
-    from app.models import Account, BankConnection, Rule
-    from app.import_service import store_parsed_transactions
-
-    total_imported = 0
+    from app.models import BankConnection
 
     db = SessionLocal()
     try:
@@ -208,83 +207,36 @@ def _sync_all_bank_connections():
             BankConnection.status == "active",
             BankConnection.session_id.isnot(None),
         ).all()
-
         if not connections:
             logger.info("Bank sync: geen actieve koppelingen gevonden")
             return "geen actieve koppelingen"
 
-        from app import enable_banking
-        from app.routers.banking import _map_eb_transactions
-
+        imported = failed = 0
+        user_ids: set[int] = set()
         for conn in connections:
-            accounts = json.loads(conn.accounts_json or "[]")
-            for acc_info in accounts:
-                uid = acc_info.get("uid")
-                if not uid:
-                    continue
+            try:
+                results = bank_sync.sync_connection(db, conn)
+                db.commit()
+            except Exception:
+                db.rollback()
+                logger.exception("Bank sync mislukt voor koppeling id=%s", conn.id)
+                failed += 1
+                continue
+            imported += sum(r.imported for r in results)
+            failed += sum(1 for r in results if r.status == "fetch_error")
+            if any(r.status == "ok" for r in results):
+                user_ids.add(conn.user_id)
 
-                try:
-                    raw = enable_banking.get_transactions(uid)
-                    parsed = _map_eb_transactions(raw)
-                except Exception as e:
-                    logger.error("Bank sync fout voor %s (koppeling id=%s): %s", conn.bank_name, conn.id, enable_banking.safe_error_message(e))
-                    continue
-
-                if not parsed:
-                    continue
-
-                # Find or create account
-                iban = acc_info.get("iban")
-                bank_key = conn.bank_name.lower().replace(" ", "_")
-                account = db.query(Account).filter(
-                    Account.user_id == conn.user_id,
-                    Account.iban == iban,
-                ).first()
-                if not account:
-                    account = Account(
-                        user_id=conn.user_id,
-                        name=f"{conn.bank_name} - {iban or 'account'}",
-                        iban=iban,
-                        bank=bank_key,
-                    )
-                    db.add(account)
-                    db.flush()
-
-                active_rules = db.query(Rule).filter(
-                    Rule.user_id == conn.user_id, Rule.is_active == 1
-                ).all()
-
-                imported = store_parsed_transactions(db, account, parsed, active_rules).imported
-
-                if imported:
-                    logger.info("Bank sync: %d transacties geimporteerd voor %s (%s)",
-                                imported, conn.bank_name, iban)
-                    total_imported += imported
-
-            conn.last_synced_at = clock.now_utc()
-
-        db.commit()
-
-        # Draai alle regels nogmaals (vangt rename → match ketens)
-        synced_user_ids = {c.user_id for c in connections}
-        from app.rules_engine import apply_rules_to_all
-        for user_id in synced_user_ids:
-            extra = apply_rules_to_all(db, user_id)
-            if extra:
-                logger.info("Bank sync: %d extra transacties gecategoriseerd voor user %d", extra, user_id)
-
-        # Auto-link recurring, then sync projections
-        from app.recurring_service import auto_link_recurring_after_import
-        from app.recurring_service import cleanup_matched_projected, sync_projected_transactions
-        today = clock.now_utc().date()
-        for user_id in synced_user_ids:
-            auto_link_recurring_after_import(db, user_id)
-            cleanup_matched_projected(user_id, db)
-            sync_projected_transactions(user_id, today.year, today.month, db)
-        db.commit()
+        for user_id in user_ids:
+            try:
+                bank_sync.post_import(db, user_id)
+                db.commit()
+            except Exception:
+                db.rollback()
+                logger.exception("Bank sync: vervolgstappen mislukt voor user %s", user_id)
 
         logger.info("Bank sync voltooid voor %d koppelingen", len(connections))
-        return f"{total_imported} tx geïmporteerd uit {len(connections)} koppeling(en)"
+        return f"{imported} tx geïmporteerd uit {len(connections)} koppeling(en), {failed} mislukt"
     finally:
         db.close()
 

@@ -36,7 +36,7 @@ def test_badge_shows_for_a_logged_in_page_load():
 
 
 def test_no_badge_query_for_health_static_anonymous_or_mutations(monkeypatch):
-    import app.routers.inbox as inbox
+    import app.transaction_queries as inbox
 
     calls = []
     monkeypatch.setattr(inbox, "inbox_count", lambda db, uid: calls.append(uid) or 0)
