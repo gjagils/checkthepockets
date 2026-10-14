@@ -40,3 +40,23 @@ def test_no_deprecated_time_calls_left_in_app():
             if needle in text:
                 offenders.append(f"{path}: {needle}")
     assert offenders == []
+
+
+def test_scheduler_really_schedules_in_amsterdam_time(monkeypatch):
+    """APScheduler 3.11 draait zonder pytz; de schedules moeten nog steeds op NL-tijd staan."""
+    from apscheduler.schedulers.background import BackgroundScheduler
+
+    import app.scheduler as sched
+
+    fresh = BackgroundScheduler(timezone=sched.NL_TZ)
+    monkeypatch.setattr(sched, "scheduler", fresh)
+    sched.start_scheduler()
+    try:
+        jobs = {job.id: job for job in fresh.get_jobs()}
+        assert {"bunq_sync", "wealth_plan_january"} <= set(jobs)
+        nxt = jobs["bunq_sync"].next_run_time
+        assert nxt is not None and nxt.utcoffset() == nxt.astimezone(clock.NL_TZ).utcoffset()
+        assert (nxt.hour, nxt.minute) in {(1, 30), (17, 30)}          # 01:30 en 17:30 Amsterdam
+    finally:
+        if fresh.running:
+            fresh.shutdown(wait=False)
