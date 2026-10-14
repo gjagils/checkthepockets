@@ -293,15 +293,22 @@ def sync_projected_transactions(user_id: int, year: int, month: int, db: Session
                 # No real match — ensure projected placeholder exists (upsert logic)
                 proj = db.query(Transaction).filter(Transaction.import_hash == proj_hash).first()
                 if proj:
-                    # Update existing projected transaction in case amount/category/account changed
-                    proj.amount = item.amount_expected
-                    proj.description = item.name
-                    proj.counterparty = item.counterparty or item.name
-                    proj.category_id = item.category_id
-                    proj.recurring_id = item.id
+                    # Update the existing projection only where it differs from the recurring item, so a
+                    # page view that finds everything in sync writes nothing (the dashboard, budgets and
+                    # transaction list call this on every GET).
+                    wanted = {
+                        "amount": item.amount_expected,
+                        "description": item.name,
+                        "counterparty": item.counterparty or item.name,
+                        "category_id": item.category_id,
+                        "recurring_id": item.id,
+                    }
                     if item.account_id:
-                        proj.account_id = item.account_id
-                    changed = True
+                        wanted["account_id"] = item.account_id
+                    for field, value in wanted.items():
+                        if getattr(proj, field) != value:
+                            setattr(proj, field, value)
+                            changed = True
                 else:
                     # Gebruik de gekoppelde rekening van de recurring indien aanwezig
                     proj_account_id = item.account_id or default_account.id
