@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import require_login
 from app.bunq_client import BunqClient, BunqError
-from app.bunq_sync import account_kind_for, refresh_links, resolve_account, sync_connection
+from app.bunq_sync import account_kind_for, iban_taken, refresh_links, resolve_account, sync_connection
 from app.config import BUNQ_API_BASE, SUPER_ADMIN_USERNAME
 from app.crypto import encryption_enabled
 from app.database import get_db
@@ -42,7 +42,7 @@ def _render(request, user, db, **extra):
         "request": request, "user": user, "connection": connection,
         "links": _links(db, connection), "own_accounts": own_accounts,
         "encryption_ready": encryption_enabled(), "sandbox": "sandbox" in BUNQ_API_BASE,
-        "reports": None, "dry_run": False, "error": None, "success": None,
+        "reports": None, "dry_run": False, "error": None, "success": None, "warnings": [],
     }
     context.update(extra)
     return templates.TemplateResponse("banking/bunq.html", context)
@@ -126,20 +126,32 @@ async def bunq_save_accounts(request: Request, db: Session = Depends(get_db)):
         return RedirectResponse("/banking/bunq", status_code=302)
     form = await request.form()
     enabled_ids = {int(v) for v in form.getlist("enable") if str(v).isdigit()}
-    for link in _links(db, connection):
-        link.enabled = 1 if link.id in enabled_ids else 0
-        kind = form.get(f"kind_{link.id}") or account_kind_for(link.bunq_kind)
-        choice = form.get(f"account_{link.id}") or "auto"
-        if link.enabled:
-            account = resolve_account(db, user.id, link, choice, kind)
-            if link.account_id != account.id:
-                link.last_payment_id = None   # andere doelrekening: opnieuw vanaf het begin
-            link.account_id = account.id
-        elif link.account is not None:
-            # Soort mag ook van een niet-geselecteerde, al gekoppelde rekening wijzigen.
-            link.account.kind = kind if kind in ("payment", "savings") else link.account.kind
-    db.commit()
-    return _render(request, user, db, success="Selectie opgeslagen.")
+    warnings = []
+    try:
+        for link in _links(db, connection):
+            link.enabled = 1 if link.id in enabled_ids else 0
+            kind = form.get(f"kind_{link.id}") or account_kind_for(link.bunq_kind)
+            choice = form.get(f"account_{link.id}") or "auto"
+            if link.enabled:
+                account = resolve_account(db, user.id, link, choice, kind)
+                if link.account_id != account.id:
+                    link.last_payment_id = None   # andere doelrekening: opnieuw vanaf het begin
+                link.account_id = account.id
+                other = iban_taken(db, user.id, account, link.iban) if link.iban and account.iban != link.iban else None
+                if other is not None:
+                    warnings.append(
+                        f"{link.description or link.iban}: het IBAN staat al op de rekening "
+                        f"\u201c{other.name}\u201d. Voeg die twee rekeningen eerst samen (Rekeningen \u2192 Samenvoegen) "
+                        f"en kies daarna de samengevoegde rekening.")
+            elif link.account is not None:
+                # Soort mag ook van een niet-geselecteerde, al gekoppelde rekening wijzigen.
+                link.account.kind = kind if kind in ("payment", "savings") else link.account.kind
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.exception("bunq: selectie opslaan mislukt")
+        return _render(request, user, db, error="Opslaan is niet gelukt; er is niets gewijzigd. Zie de serverlog.")
+    return _render(request, user, db, success="Selectie opgeslagen.", warnings=warnings)
 
 
 @router.post("/sync")
