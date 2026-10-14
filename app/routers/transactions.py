@@ -1056,41 +1056,31 @@ async def bulk_action(request: Request, db: Session = Depends(get_db)):
 def duplicates_page(request: Request, db: Session = Depends(get_db)):
     user = require_login(request, db)
 
-    # Find (date, amount, counterparty) combos with 2+ transactions
-    dup_groups = (
-        db.query(
-            Transaction.date,
-            Transaction.amount,
-            Transaction.counterparty,
-            func.count(Transaction.id).label("cnt"),
-        )
+    # Pre-select (date, amount) pairs that occur more than once: both columns are plain.
+    # The counterparty is an EncryptedText column (random IV per value), so it cannot be
+    # grouped or compared in SQL; that part is done in Python after loading.
+    pairs = (
+        db.query(Transaction.date, Transaction.amount)
         .join(Account)
         .filter(Account.user_id == user.id, Transaction.is_excluded == 0)
-        .group_by(Transaction.date, Transaction.amount, Transaction.counterparty)
+        .group_by(Transaction.date, Transaction.amount)
         .having(func.count(Transaction.id) > 1)
-        .order_by(Transaction.date.desc())
+        .subquery()
+    )
+    candidates = (
+        db.query(Transaction)
+        .join(Account)
+        .join(pairs, (Transaction.date == pairs.c.date) & (Transaction.amount == pairs.c.amount))
+        .options(joinedload(Transaction.category))
+        .filter(Account.user_id == user.id, Transaction.is_excluded == 0)
+        .order_by(Transaction.date.desc(), Transaction.id)
         .all()
     )
-
-    # Fetch the actual transactions per group
-    groups = []
-    for grp in dup_groups:
-        txs = (
-            db.query(Transaction)
-            .join(Account)
-            .options(joinedload(Transaction.category))
-            .filter(
-                Account.user_id == user.id,
-                Transaction.date == grp.date,
-                Transaction.amount == grp.amount,
-                Transaction.counterparty == grp.counterparty,
-                Transaction.is_excluded == 0,
-            )
-            .order_by(Transaction.id)
-            .all()
-        )
-        if len(txs) > 1:
-            groups.append(txs)
+    grouped: dict[tuple, list] = {}
+    for tx in candidates:
+        key = (tx.date, tx.amount, (tx.counterparty or "").strip().lower())
+        grouped.setdefault(key, []).append(tx)
+    groups = [txs for txs in grouped.values() if len(txs) > 1]
 
     return templates.TemplateResponse(
         "transactions/duplicates.html",

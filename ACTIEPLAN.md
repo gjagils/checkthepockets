@@ -78,7 +78,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-29 | P2 | Gepland | ACT-28 | [Verkoopfactor per bezit in de vermogensprognose](#act-29) |
 | ACT-30 | P2 | Review | — | [Rekeningen samenvoegen met preview](#act-30) |
 | ACT-31 | P2 | Review | ACT-25 | [bunq API-koppeling met eigen sleutel](#act-31) |
-| ACT-32 | P1 | Gepland | — | [Encryptie-bugs: duplicaten, regelsuggesties, herversleutelen](#act-32) |
+| ACT-32 | P1 | Review | — | [Encryptie-bugs: duplicaten, regelsuggesties, herversleutelen](#act-32) |
 | ACT-33 | P1 | Gepland | — | [Auth-fixes: uitnodiging, e-mailverificatie, rate limiting, proxy](#act-33) |
 | ACT-34 | P1 | Gepland | — | [Crash- en datafouten in routes](#act-34) |
 | ACT-35 | P1 | Gepland | — | [XSS in templates](#act-35) |
@@ -434,6 +434,7 @@ commit `339a4d8`; controleer ze bij het oppakken.
 - **Acties:** Duplicaten en regelsuggesties in Python groeperen na laden van de eigen transacties (lost ook de N+1 per groep op). Herversleutelen via ruwe kolomwaarden en `flag_modified` of directe `update()`. Read-path fail-closed in `app/crypto.py`.
 - **Klaar wanneer:** Met `FIELD_ENCRYPTION_KEY` gezet toont de duplicatenpagina echte duplicaten en geeft `suggest_rules` suggesties; herversleutelen verandert de ruwe DB-waarde aantoonbaar; ongeldige sleutel geeft een fout, geen ciphertext.
 - **Validatie:** Tests die met een testsleutel draaien en de ruwe kolomwaarde controleren; bestaande tests zonder sleutel blijven groen.
+- **Uitkomst (Review, 2026-10-14, Claude Code):** alle vier bevestigd en opgelost. Duplicatenpagina selecteert eerst op de platte kolommen (datum, bedrag) en groepeert de tegenpartij in Python (niet-hoofdlettergevoelig); `suggest_rules` telt in Python; `encrypt_existing_transactions` leest de ruwe waarde met `type_coerce` en schrijft via een Core-UPDATE (de ORM gaf de ontsleutelde waarde terug, dus er werd nooit iets versleuteld); de leespad weigert nu ook als de sleutel geconfigureerd maar ongeldig is. Vier nieuwe tests met versleuteling aan, alle vier rood zonder de fix. Lokaal Python 3.14 zonder psycopg2: 529 passed, 3 skipped; Python 3.12 en PostgreSQL via CI.
 
 <a id="act-33"></a>
 
@@ -667,3 +668,4 @@ Voeg per afgeronde actie of overdracht een regel toe. Git bevat de volledige his
 | 2026-10-14 | ACT-31b fix | bunq-sync gaf 500 (`integer out of range`): bunq-id's (bv. 2932017837) passen niet in 32 bits; `bunq_account_links.bunq_account_id` en `last_payment_id` zijn nu BIGINT (migratie 068). Productielog bevestigde de oorzaak; samenvoegen van de twee spaarrekeningen werkte (271 dubbel samengevoegd) | Claude Code; PR-CI (PostgreSQL) open |
 | 2026-10-14 | AI-model | AI-regelsuggesties gaven 404 (`claude-sonnet-4-20250514` bestaat niet meer): model nu via `ANTHROPIC_MODEL` (standaard `claude-sonnet-5-5`), 4 plekken in ai_suggest.py; review C13 deels | Claude Code; 525 passed, 3 skipped (Python 3.14, nagebootste client); niet getest tegen de echte API |
 | 2026-10-14 | Codereview | Volledige scan vóór het UI-redesign; ACT-32 t/m ACT-52 als Gepland toegevoegd | Claude Code; docs/CODE-REVIEW-2026-10-14.md; 512 passed, 3 skipped (Python 3.12 via uv); branch `claude/check-pockets-suite-review-fd0da6` |
+| 2026-10-14 | ACT-32 | Encryptie-bugs uit de review (A1, A2, A3, B11) opgelost met tests die met versleuteling draaien | Claude Code; 529 passed, 3 skipped; PR-CI open |
