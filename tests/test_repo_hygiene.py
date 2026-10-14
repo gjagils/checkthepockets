@@ -62,3 +62,13 @@ def test_no_gitlinks_or_ds_store_are_tracked():
     lines = listing.stdout.splitlines()
     assert not [l for l in lines if l.startswith("160000")]               # kapotte submodule
     assert not [l for l in lines if l.endswith(".DS_Store")]
+
+
+def test_lint_is_configured_and_part_of_the_ci():
+    pyproject = (ROOT / "pyproject.toml").read_text()
+    assert "[tool.ruff.lint]" in pyproject and '"F"' in pyproject
+    ci = (ROOT / ".github/workflows/ci.yml").read_text()
+    assert "ruff check" in ci
+    lock = (ROOT / "requirements-dev.txt").read_text()
+    assert re.search(r"^ruff==", lock, re.M) and re.search(r"^pytest-cov==", lock, re.M)
+    assert (ROOT / ".github/dependabot.yml").exists()
