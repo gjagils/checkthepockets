@@ -123,3 +123,18 @@ Git en Markdown zijn voldoende voor planning en overdracht. Voor codewerk blijve
 Python/dependencies nodig; voor publicatie zijn GitHub-toegang en voor deployment
 de bestaande infrastructuur vereist. De GitHub CLI is optioneel: dezelfde PR- en
 CI-handelingen kunnen via de GitHub-webinterface.
+
+## Conventie voor routes en foutafhandeling
+
+Zo gedragen routes zich, zodat een fout overal hetzelfde aanvoelt (review C4). Nieuwe en aangeraakte routes
+volgen dit; bestaande routes worden bij het aanraken meegenomen.
+- **Niet gevonden of niet van jou:** `404` via `get_owned_or_404` / `get_owned_transaction_or_404`
+  (`app/ownership.py`). Nooit een `403` (dat verraadt dat het object bestaat) en niet stilletjes redirecten.
+- **Ongeldige invoer in een formulier:** redirect (`303`) terug naar de pagina met `?error=<code>`; de pagina
+  toont de melding. Parse invoer met `app/forms.py`; een ongeldige waarde is nooit een `500`.
+- **AJAX/`fetch`-routes:** JSON met `{"ok": false, "error": "<code>"}` en een passende statuscode (`400`, `404`, `409`).
+- **Na een succesvolle POST:** redirect met `303`; een doelpad uit een formulier gaat door
+  `app/redirects.safe_redirect`.
+- **Pagina's (GET) schrijven niet** behalve wanneer een afgeleide toestand echt achterloopt (projecties); een
+  verversing zonder wijziging doet geen UPDATE of commit.
+- **Beheerdersroutes:** `require_admin` en `is_super_admin` uit `app/auth.py`.
