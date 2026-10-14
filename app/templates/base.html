@@ -65,7 +65,7 @@
                 <a href="/admin/users" class="nav-link-subtle nav-admin-link {{ 'active' if path.startswith('/admin') }}" title="Admin">⚙ Admin</a>
                 {% endif %}
                 <a href="/settings" class="nav-avatar" title="Instellingen">{{ user.username[0] | upper }}</a>
-                <a href="/logout" class="nav-logout-link">Uitloggen</a>
+                <form method="post" action="/logout" class="logout-form"><button type="submit" class="nav-logout-link">Uitloggen</button></form>
             </div>
         </nav>
         <nav class="nav-sub">
@@ -166,7 +166,7 @@
                 <a href="/admin/users" class="m-nav-main {{ 'active' if path.startswith('/admin') }}">⚙ Admin</a>
                 {% endif %}
                 <a href="/settings" class="m-nav-main {{ 'active' if path.startswith('/settings') }}">Instellingen</a>
-                <a href="/logout" class="m-nav-main">Uitloggen</a>
+                <form method="post" action="/logout" class="logout-form"><button type="submit" class="m-nav-main">Uitloggen</button></form>
             </div>
         </aside>
     </div>

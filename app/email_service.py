@@ -1,6 +1,7 @@
 """Email sending via Resend.com. Falls back to a no-op if RESEND_API_KEY is not set."""
 
 import logging
+from html import escape as _esc
 from app.config import RESEND_API_KEY, RESEND_FROM_EMAIL, APP_URL
 
 logger = logging.getLogger(__name__)
@@ -85,7 +86,7 @@ def send_weekly_digest(
     rows = "".join(
         f"""
         <tr>
-            <td style="padding:0.4rem 0; color:#333;">{name}</td>
+            <td style="padding:0.4rem 0; color:#333;">{_esc(str(name))}</td>
             <td style="padding:0.4rem 0; text-align:right; font-weight:700; color:#111;">{count}</td>
         </tr>
         """
@@ -96,7 +97,7 @@ def send_weekly_digest(
 
     html = f"""
     <div style="font-family:sans-serif; max-width:520px; margin:0 auto; color:#222;">
-        <h2 style="margin-bottom:0.25rem;">Hoi {username},</h2>
+        <h2 style="margin-bottom:0.25rem;">Hoi {_esc(username)},</h2>
         <p style="color:#666; margin-top:0;">Je wekelijkse overzicht van Check Your Pockets.</p>
 
         <h3 style="margin-top:1.75rem;">Afgelopen week binnengekomen</h3>
@@ -134,7 +135,7 @@ def send_invite_email(to: str, token: str, invited_by: str) -> bool:
     html = f"""
     <div style="font-family:sans-serif; max-width:480px; margin:0 auto;">
         <h2>Je bent uitgenodigd voor Check Your Pockets</h2>
-        <p>{invited_by} heeft je uitgenodigd om een account aan te maken.</p>
+        <p>{_esc(invited_by)} heeft je uitgenodigd om een account aan te maken.</p>
         <p style="margin:1.5rem 0;">
             <a href="{url}" style="background:#F9A800; color:#fff; padding:0.75rem 1.5rem;
                border-radius:8px; text-decoration:none; font-weight:700;">

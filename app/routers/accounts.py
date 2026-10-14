@@ -208,18 +208,6 @@ def delete_account(account_id: int, request: Request, db: Session = Depends(get_
     return RedirectResponse("/accounts", status_code=302)
 
 
-@router.post("/accounts/delete-all-transactions")
-def delete_all_transactions(request: Request, db: Session = Depends(get_db)):
-    """Delete all transactions for the current user (for testing)."""
-    user = require_login(request, db)
-    accounts = db.query(Account).filter(Account.user_id == user.id).all()
-    account_ids = [a.id for a in accounts]
-    if account_ids:
-        db.query(Transaction).filter(Transaction.account_id.in_(account_ids)).delete(synchronize_session=False)
-        db.commit()
-    return RedirectResponse("/accounts", status_code=302)
-
-
 def _own_account(db: Session, user_id: int, account_id: int | None) -> Account | None:
     if account_id is None:
         return None
