@@ -37,12 +37,14 @@
         {% for person in persons %}
         <div style="display:flex; justify-content:space-between; align-items:center; padding:0.4rem 0; border-bottom:1px solid var(--ctp-border);">
             <span>{{ person.name }}</span>
-            <form method="post" action="/portfolio/persons/{{ person.id }}/delete" style="display:inline;">
+            <form method="post" action="/persons/{{ person.id }}/delete" style="display:inline;">
+                <input type="hidden" name="redirect_to" value="/portfolio">
                 <button type="submit" class="btn btn-sm btn-danger" onclick='return confirm({{ ((person.name) ~ ' verwijderen?')|tojson }})'>x</button>
             </form>
         </div>
         {% endfor %}
-        <form method="post" action="/portfolio/persons" style="display:flex; gap:0.5rem; margin-top:0.75rem;">
+        <form method="post" action="/persons" style="display:flex; gap:0.5rem; margin-top:0.75rem;">
+            <input type="hidden" name="redirect_to" value="/portfolio">
             <input type="text" name="name" placeholder="Naam" required class="budget-input" style="flex:1; text-align:left; width:auto;">
             <button type="submit" class="btn btn-sm btn-primary">Toevoegen</button>
         </form>

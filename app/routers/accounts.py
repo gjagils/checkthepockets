@@ -12,6 +12,7 @@ from app.models import (
 )
 from app.account_merge import merge_accounts, plan_merge
 from app.auth import require_login
+from app.ownership import get_owned_or_404
 from app.template_config import templates
 
 logger = logging.getLogger(__name__)
@@ -179,9 +180,9 @@ def update_account(
 ):
     """Rename an account and set whether it is a payment or savings account."""
     user = require_login(request, db)
-    account = _own_account(db, user.id, account_id)
+    account = get_owned_or_404(db, Account, account_id, user.id)
     name = " ".join(name.split())
-    if account and name:
+    if name:
         account.name = name[:255]
         if kind in ("payment", "savings"):
             account.kind = kind
@@ -225,9 +226,7 @@ def merge_account_page(
 ):
     """Choose a target account and preview what merging would do."""
     user = require_login(request, db)
-    source = _own_account(db, user.id, account_id)
-    if not source:
-        return RedirectResponse("/accounts", status_code=302)
+    source = get_owned_or_404(db, Account, account_id, user.id)
     others = (
         db.query(Account)
         .filter(Account.user_id == user.id, Account.id != source.id)
@@ -258,10 +257,10 @@ def merge_account(
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
-    source = _own_account(db, user.id, account_id)
-    target = _own_account(db, user.id, target_id)
-    if not source or not target or source.id == target.id:
-        return RedirectResponse("/accounts", status_code=302)
+    source = get_owned_or_404(db, Account, account_id, user.id)
+    target = get_owned_or_404(db, Account, target_id, user.id)
+    if source.id == target.id:
+        return RedirectResponse("/accounts", status_code=303)
     try:
         result = merge_accounts(db, source, target)
         db.commit()

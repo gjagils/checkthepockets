@@ -8,6 +8,7 @@ from app.auth import require_login
 from app.database import get_db
 from app.models import Person
 from app.person_utils import format_age_nl
+from app.redirects import safe_redirect
 from app.template_config import templates
 
 router = APIRouter(prefix="/persons")
@@ -50,6 +51,7 @@ def create_person(
     request: Request,
     name: str = Form(...),
     birthdate: str = Form(""),
+    redirect_to: str = Form("/persons"),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
@@ -68,7 +70,7 @@ def create_person(
             sort_order=max_order,
         ))
         db.commit()
-    return RedirectResponse("/persons", status_code=302)
+    return safe_redirect(redirect_to, "/persons")
 
 
 @router.post("/{person_id}/rename")
@@ -97,6 +99,7 @@ def rename_person(
 def delete_person(
     person_id: int,
     request: Request,
+    redirect_to: str = Form("/persons"),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
@@ -108,7 +111,7 @@ def delete_person(
     if person:
         db.delete(person)
         db.commit()
-    return RedirectResponse("/persons", status_code=302)
+    return safe_redirect(redirect_to, "/persons")
 
 
 def _swap(a: Person, b: Person) -> None:

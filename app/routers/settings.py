@@ -9,8 +9,11 @@ from sqlalchemy.orm import Session
 import io
 
 from app.database import get_db
-from app.models import Category, Rule, RecurringTransaction, Budget
-from app.auth import require_login
+from app.models import Account, Budget, Category, RecurringTransaction, Rule, Transaction, User
+from app.auth import (
+    COOKIE_NAME, allowed_start_pages, hash_password, require_login, revoke_sessions, verify_password,
+)
+from app.validation import clean_email as _clean_email
 from app.template_config import templates
 
 logger = logging.getLogger(__name__)
@@ -130,14 +133,14 @@ async def import_preview(
         return templates.TemplateResponse(
             request,
             "auth/settings.html",
-            {"request": request, "user": user, "import_error": "Ongeldig JSON-bestand."},
+            _settings_ctx(request, user, import_error="Ongeldig JSON-bestand."),
         )
 
     if data.get("version") != 1:
         return templates.TemplateResponse(
             request,
             "auth/settings.html",
-            {"request": request, "user": user, "import_error": "Onbekende versie van het exportbestand."},
+            _settings_ctx(request, user, import_error="Onbekende versie van het exportbestand."),
         )
 
     counts = {
@@ -384,8 +387,7 @@ async def import_confirm(
         return templates.TemplateResponse(
             request,
             "auth/settings.html",
-            {"request": request, "user": user,
-             "import_error": "Het bestand bevat ongeldige waarden; er is niets geïmporteerd."},
+            _settings_ctx(request, user, import_error="Het bestand bevat ongeldige waarden; er is niets geïmporteerd."),
         )
 
     msg = (
@@ -399,5 +401,283 @@ async def import_confirm(
     return templates.TemplateResponse(
         request,
         "auth/settings.html",
-        {"request": request, "user": user, "import_success": msg},
+        _settings_ctx(request, user, import_success=msg),
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Account settings (start page, password, e-mail, digest, delete)
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _settings_ctx(request: Request, user: User, **extra) -> dict:
+    """Basiscontext voor auth/settings.html (zodat elke render alle vaste
+    opties ontvangt zoals de startpagina-dropdown)."""
+    ctx = {
+        "request": request,
+        "user": user,
+        "start_page_options": allowed_start_pages(user),
+    }
+    ctx.update(extra)
+    return ctx
+
+
+@router.get("")
+def settings_page(request: Request, db: Session = Depends(get_db)):
+    user = require_login(request, db)
+    return templates.TemplateResponse(
+        request,
+        "auth/settings.html", _settings_ctx(request, user),
+    )
+
+
+@router.post("/start-page")
+def update_start_page(
+    request: Request,
+    start_page: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    user = require_login(request, db)
+    options = allowed_start_pages(user)
+    if not any(opt["path"] == start_page for opt in options):
+        return templates.TemplateResponse(
+            request,
+            "auth/settings.html",
+            _settings_ctx(
+                request, user,
+                start_page_error="Onbekende startpagina-optie.",
+            ),
+            status_code=400,
+        )
+    user.start_page = start_page
+    db.commit()
+    return templates.TemplateResponse(
+        request,
+        "auth/settings.html",
+        _settings_ctx(request, user, start_page_success="Startpagina opgeslagen."),
+    )
+
+
+@router.post("/password")
+def change_password(
+    request: Request,
+    current_password: str = Form(...),
+    new_password: str = Form(...),
+    new_password_confirm: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    user = require_login(request, db)
+
+    errors = []
+    if not verify_password(current_password, user.password_hash):
+        errors.append("Huidig wachtwoord is onjuist")
+    if len(new_password) < 8:
+        errors.append("Nieuw wachtwoord moet minimaal 8 tekens zijn")
+    if new_password != new_password_confirm:
+        errors.append("Nieuwe wachtwoorden komen niet overeen")
+
+    if errors:
+        return templates.TemplateResponse(
+            request,
+            "auth/settings.html",
+            _settings_ctx(request, user, errors=errors),
+            status_code=400,
+        )
+
+    user.password_hash = hash_password(new_password)
+    revoke_sessions(user)
+    db.commit()
+
+    return templates.TemplateResponse(
+        request,
+        "auth/settings.html",
+        _settings_ctx(request, user, success="Wachtwoord succesvol gewijzigd"),
+    )
+
+@router.post("/email")
+def update_email(
+    request: Request,
+    email: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """Laat een user zijn/haar eigen e-mailadres zetten of wijzigen. Geen
+    verificatie-flow — dit is een kleine-gebruikersgroep app, we vertrouwen
+    de eigenaar."""
+    user = require_login(request, db)
+    cleaned = _clean_email(email)
+    if cleaned is None:
+        return templates.TemplateResponse(
+            request,
+            "auth/settings.html",
+            _settings_ctx(request, user, email_error="Geen geldig e-mailadres."),
+        )
+    user.email = cleaned or None
+    db.commit()
+    return templates.TemplateResponse(
+        request,
+        "auth/settings.html",
+        _settings_ctx(
+            request, user,
+            email_success=("E-mailadres opgeslagen." if cleaned else "E-mailadres verwijderd."),
+        ),
+    )
+
+
+@router.post("/digest")
+def update_digest_preferences(
+    request: Request,
+    enabled: str = Form(""),
+    weekday: int = Form(4),
+    hour: int = Form(8),
+    db: Session = Depends(get_db),
+):
+    user = require_login(request, db)
+
+    user.weekly_digest_enabled = 1 if enabled == "1" else 0
+    if 0 <= weekday <= 6:
+        user.weekly_digest_weekday = weekday
+    if 0 <= hour <= 23:
+        user.weekly_digest_hour = hour
+    db.commit()
+
+    return templates.TemplateResponse(
+        request,
+        "auth/settings.html",
+        _settings_ctx(request, user, digest_success="Digest-voorkeuren opgeslagen"),
+    )
+
+
+@router.post("/digest/test")
+def send_test_digest(request: Request, db: Session = Depends(get_db)):
+    """Verstuur direct een digest-mail naar de huidige user, zonder de 6-dagen-
+    skip te triggeren of te wachten op de wekelijkse cron-tick. Gebruikt om
+    SMTP/Resend-config te valideren zonder tot het ingestelde dag+uur te wachten.
+
+    `weekly_digest_last_sent_at` wordt bewust NIET geüpdatet, zodat de echte
+    wekelijkse digest deze week alsnog plaatsvindt.
+    """
+    import logging
+    log = logging.getLogger(__name__)
+    user = require_login(request, db)
+
+    if not user.email:
+        return templates.TemplateResponse(
+            request,
+            "auth/settings.html",
+            _settings_ctx(request, user, digest_test_error="Geen e-mailadres gevonden voor je account."),
+        )
+
+    # Pre-flight diagnostic: rapporteer aan de gebruiker als de Resend-key
+    # ontbreekt, in plaats van een generieke "Versturen mislukt".
+    from app.config import RESEND_API_KEY, RESEND_FROM_EMAIL
+    if not RESEND_API_KEY:
+        log.warning(
+            "Testdigest aangevraagd door %s maar RESEND_API_KEY is leeg — "
+            "stel de env-var in op de deploy en herstart de container.",
+            user.username,
+        )
+        return templates.TemplateResponse(
+            request,
+            "auth/settings.html",
+            _settings_ctx(
+                request, user,
+                digest_test_error=(
+                    "RESEND_API_KEY is niet ingesteld op deze deploy. "
+                    "Voeg 'm toe in Portainer (env-var) en redeploy."
+                ),
+            ),
+        )
+
+    from app.scheduler import compute_digest_stats
+    from app.email_service import send_weekly_digest
+
+    log.info(
+        "Testdigest start: user=%s to=%s from=%s",
+        user.username, user.email, RESEND_FROM_EMAIL,
+    )
+    per_account, uncat_total, new_total = compute_digest_stats(db, user.id)
+    sent = send_weekly_digest(
+        to=user.email,
+        username=user.username,
+        per_account=per_account,
+        uncat_total=uncat_total,
+        new_total=new_total,
+    )
+    if sent:
+        log.info("Testdigest succesvol verzonden naar %s", user.email)
+        return templates.TemplateResponse(
+            request,
+            "auth/settings.html",
+            _settings_ctx(
+                request, user,
+                digest_test_success=f"Testdigest verzonden naar {user.email}. Check ook je spam-folder.",
+            ),
+        )
+    log.error(
+        "Testdigest mislukt voor %s — Resend gaf een error terug "
+        "(check container-logs voor stacktrace).",
+        user.email,
+    )
+    return templates.TemplateResponse(
+        request,
+        "auth/settings.html",
+        _settings_ctx(
+            request, user,
+            digest_test_error=(
+                "Versturen mislukt. Mogelijke oorzaken: from-domein niet "
+                f"geverifieerd in Resend ({RESEND_FROM_EMAIL}), API-key "
+                "verlopen, of je test-mail mag alleen naar het account-"
+                "geregistreerde e-mailadres (gratis tier zonder eigen domein)."
+            ),
+        ),
+    )
+
+
+@router.post("/delete-account")
+def delete_account(
+    request: Request,
+    confirm_password: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    user = require_login(request, db)
+
+    if not verify_password(confirm_password, user.password_hash):
+        return templates.TemplateResponse(
+            request,
+            "auth/settings.html",
+            _settings_ctx(request, user, delete_error="Wachtwoord is onjuist"),
+            status_code=400,
+        )
+
+    db.delete(user)
+    db.commit()
+
+    response = RedirectResponse("/login", status_code=302)
+    response.delete_cookie(COOKIE_NAME)
+    return response
+
+
+@router.post("/delete-transactions")
+def delete_all_transactions(
+    request: Request,
+    confirm_password: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    user = require_login(request, db)
+
+    if not verify_password(confirm_password, user.password_hash):
+        return templates.TemplateResponse(
+            request,
+            "auth/settings.html",
+            _settings_ctx(request, user, tx_delete_error="Wachtwoord is onjuist"),
+            status_code=400,
+        )
+
+    account_ids = db.query(Account.id).filter(Account.user_id == user.id).subquery()
+    deleted = db.query(Transaction).filter(Transaction.account_id.in_(account_ids)).delete(synchronize_session=False)
+    db.commit()
+
+    return templates.TemplateResponse(
+        request,
+        "auth/settings.html",
+        _settings_ctx(request, user, success=f"{deleted} transactie(s) verwijderd."),
     )

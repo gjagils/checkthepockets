@@ -395,39 +395,6 @@ def capture_yearly_wealth_plan(
     return JSONResponse({"ok": True, "year": year})
 
 
-@router.post("/persons")
-def add_person(
-    request: Request,
-    name: str = Form(...),
-    db: Session = Depends(get_db),
-):
-    user = require_login(request, db)
-    name = name.strip()
-    if name:
-        max_order = db.query(Person).filter(Person.user_id == user.id).count()
-        person = Person(user_id=user.id, name=name, sort_order=max_order)
-        db.add(person)
-        db.commit()
-    return RedirectResponse("/portfolio", status_code=302)
-
-
-@router.post("/persons/{person_id}/delete")
-def delete_person(
-    person_id: int,
-    request: Request,
-    db: Session = Depends(get_db),
-):
-    user = require_login(request, db)
-    person = db.query(Person).filter(
-        Person.id == person_id,
-        Person.user_id == user.id,
-    ).first()
-    if person:
-        db.delete(person)
-        db.commit()
-    return RedirectResponse("/portfolio", status_code=302)
-
-
 @router.post("/assets")
 def add_asset(
     request: Request,
