@@ -231,3 +231,33 @@ def test_routes_select_accounts_preview_and_import(monkeypatch, db):
     assert "Import afgerond" in done.text
     db.expire_all()
     assert db.query(Transaction).filter_by(account_id=csv_id).count() == 2  # CSV + Bakker
+
+
+def test_linking_to_account_without_iban_when_iban_is_taken_does_not_crash(monkeypatch, db):
+    """Twee eigen rekeningen voor hetzelfde IBAN (CSV zonder IBAN + bankkoppeling met IBAN)."""
+    user = User(username="bunq-dup", password_hash="x")
+    db.add(user)
+    db.flush()
+    with_iban = Account(user_id=user.id, name="Spaar bunq", bank="bunq", iban="NL01BUNQ0000000001")
+    csv_account = Account(user_id=user.id, name="Bunq Samen spaar", bank="bunq")
+    db.add_all([with_iban, csv_account])
+    db.commit()
+    csv_id, iban_id = csv_account.id, with_iban.id
+
+    monkeypatch.setattr(bunq_router, "SUPER_ADMIN_USERNAME", user.username)
+    monkeypatch.setattr(bunq_router, "encryption_enabled", lambda: True)
+    monkeypatch.setattr(bunq_router, "BunqClient", lambda base: _client(FakeBunq({1: [[]]})))
+    client = TestClient(app, follow_redirects=False)
+    client.cookies.set("session", create_session_cookie(user.id))
+    client.post("/banking/bunq", data={"api_key": API_KEY})
+    client.post("/banking/bunq/check")
+    link = db.query(BunqAccountLink).one()
+
+    page = client.post("/banking/bunq/accounts", data={
+        "enable": str(link.id), f"kind_{link.id}": "savings", f"account_{link.id}": str(csv_id)})
+    assert page.status_code == 200
+    assert "samenvoegen" in page.text.lower()
+    db.expire_all()
+    assert db.get(BunqAccountLink, link.id).account_id == csv_id
+    assert db.get(Account, csv_id).iban is None          # IBAN blijft op de andere rekening
+    assert db.get(Account, iban_id).iban == "NL01BUNQ0000000001"
