@@ -59,3 +59,6 @@ def validate_production_config() -> None:
             errors.append("FIELD_ENCRYPTION_KEY is not a valid Fernet key")
     if errors:
         raise RuntimeError("Unsafe production configuration: " + "; ".join(errors))
+
+# bunq API (ACT-31). Zet op https://public-api.sandbox.bunq.com/v1 om te testen met nepgeld.
+BUNQ_API_BASE = os.getenv("BUNQ_API_BASE", "https://api.bunq.com/v1")

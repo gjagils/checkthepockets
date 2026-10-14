@@ -76,6 +76,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-28d | P2 | Afgerond | ACT-28c | [Losse boekingen per cel](#act-28) |
 | ACT-29 | P2 | Gepland | ACT-28 | [Verkoopfactor per bezit in de vermogensprognose](#act-29) |
 | ACT-30 | P2 | Review | — | [Rekeningen samenvoegen met preview](#act-30) |
+| ACT-31 | P2 | Review | ACT-25 | [bunq API-koppeling met eigen sleutel](#act-31) |
 
 ## Beschrijving en acceptatiecriteria
 
@@ -376,6 +377,14 @@ belemmeringen en één eerstvolgende stap. Bewaar de afgeronde samenvatting hier
 - **Validatie:** lokaal Python 3.14 zonder psycopg2: 502 passed, 3 skipped. PostgreSQL en Python 3.12 via CI.
 - **Open:** productiecontrole met de echte ABN-rekeningen na uitrol.
 
+### ACT-31 — bunq API-koppeling met eigen sleutel
+
+- **Probleem:** bunq loopt via Enable Banking en geeft de tweede spaarrekening niet door (ACT-25b). De bunq-API geeft per gebruiker alle rekeningen.
+- **ACT-31a (Review):** `/banking/bunq` (alleen beheerder, zoals de bankkoppeling): API-sleutel invoeren, versleuteld opslaan (`BunqConnection`, migratie 066; weigert opslaan zonder veldversleuteling), verbinden (installation → device-server → session-server, POST's ondertekend) en alle rekeningen met soort, IBAN, status en saldo tonen. Alleen lezen; geen transacties. Bij een geweigerde opgeslagen installatie (bv. IP gewijzigd) wordt het apparaat één keer opnieuw geregistreerd. `BUNQ_API_BASE` kan naar de sandbox wijzen.
+- **Aannames/beperkingen:** het serverantwoord wordt niet op handtekening gecontroleerd (alleen TLS); paginering van rekeningen is `count=200` zonder doorbladeren; de sleutel is gebonden aan het uitgaande IP-adres van de server.
+- **Validatie:** lokaal Python 3.14 zonder psycopg2, nagebootste bunq: 509 passed, 3 skipped. PostgreSQL-migratie en Python 3.12 via CI. Niet getest tegen echte bunq of sandbox.
+- **Volgende stappen:** sleutel invoeren op de NAS en kijken of de tweede spaarrekening verschijnt (beslist ACT-31b: transactie-sync via `store_parsed_transactions`, koppeling aan bestaande rekeningen op IBAN, eigen overboekingen).
+
 ## Besluitenlog
 
 | Datum | Besluit | Reden / gevolgen |
@@ -420,3 +429,4 @@ Voeg per afgeronde actie of overdracht een regel toe. Git bevat de volledige his
 | 2026-09-23 | ACT-28 | Vermogensprognose, bevroren plan per 1/1, verschilweergave en losse maandboekingen per persoon/bezit | [PR #199](https://github.com/gjagils/checkthepockets/pull/199), [#201](https://github.com/gjagils/checkthepockets/pull/201), [#202](https://github.com/gjagils/checkthepockets/pull/202), [#203](https://github.com/gjagils/checkthepockets/pull/203); alle checks groen; merge `fde6ebb`; deployments geslaagd; schermcontrole open |
 | 2026-09-23 | Review ACT-28 | Documentatie aangevuld (aannames, validatie op 3.12, open schermcontrole); ACT-29 toegevoegd; ACT-25b op Geblokkeerd | Claude Code; 496 passed, 2 skipped in Python 3.12 |
 | 2026-10-14 | ACT-30 | Rekeningen samenvoegen met preview | Claude Code; 502 passed, 3 skipped (Python 3.14); PR-CI open |
+| 2026-10-14 | ACT-31a | bunq-koppeling: sleutel invoeren en rekeningen tonen (alleen lezen) | Claude Code; 509 passed, 3 skipped (Python 3.14, nagebootste bunq); PR-CI open |
