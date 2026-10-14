@@ -81,9 +81,19 @@ def resolve_account(db: Session, user_id: int, link: BunqAccountLink, choice: st
         db.flush()
     else:
         account.kind = kind
-        if not account.iban and link.iban:
+        if not account.iban and link.iban and not iban_taken(db, user_id, account, link.iban):
             account.iban = link.iban
     return account
+
+
+def iban_taken(db: Session, user_id: int, account: Account, iban: str) -> Account | None:
+    """Another own account on the same bank that already has this IBAN (unique per user, IBAN, bank)."""
+    return next(
+        (a for a in db.query(Account).filter(
+            Account.user_id == user_id, Account.bank == account.bank, Account.id != account.id)
+         if a.iban and _iban_key(a.iban) == _iban_key(iban)),
+        None,
+    )
 
 
 def _to_parsed(payment: BunqPayment) -> ParsedTransaction:

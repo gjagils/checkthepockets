@@ -8,6 +8,7 @@
 
 {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
 {% if success %}<div class="alert alert-success">{{ success }}</div>{% endif %}
+{% for w in warnings %}<div class="alert alert-error">{{ w }}</div>{% endfor %}
 {% if sandbox %}<div class="alert">Testmodus: verbonden met de bunq-sandbox.</div>{% endif %}
 
 <div class="card" style="margin-bottom:1.5rem;">
