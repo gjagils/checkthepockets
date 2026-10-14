@@ -4,6 +4,11 @@
 <div class="page-header">
     <h1>Rekeningen</h1>
 </div>
+{% if merged %}
+<div class="card" style="margin-bottom:1rem;">
+    Rekeningen samengevoegd: {{ merged[0] }} transacties verplaatst, {{ merged[1] }} dubbele samengevoegd.
+</div>
+{% endif %}
 
 {% if accounts %}
 <div class="accounts-grid">
@@ -87,6 +92,9 @@
 
         <div class="account-actions">
             <a href="/?account_id={{ acc.id }}" class="btn btn-sm">Bekijk transacties</a>
+            {% if accounts|length > 1 %}
+            <a href="/accounts/{{ acc.id }}/merge" class="btn btn-sm">Samenvoegen</a>
+            {% endif %}
             <form method="post" action="/accounts/{{ acc.id }}/delete" style="display:inline;"
                   onsubmit="return confirm('Weet je zeker dat je deze rekening en alle transacties wilt verwijderen?')">
                 <button type="submit" class="btn btn-sm btn-danger">Verwijderen</button>

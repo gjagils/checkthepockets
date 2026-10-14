@@ -75,6 +75,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-28c | P2 | Afgerond | ACT-28a, ACT-28b | [Pagina Vermogensprognose](#act-28) |
 | ACT-28d | P2 | Afgerond | ACT-28c | [Losse boekingen per cel](#act-28) |
 | ACT-29 | P2 | Gepland | ACT-28 | [Verkoopfactor per bezit in de vermogensprognose](#act-29) |
+| ACT-30 | P2 | Review | — | [Rekeningen samenvoegen met preview](#act-30) |
 
 ## Beschrijving en acceptatiecriteria
 
@@ -367,6 +368,14 @@ Voor een actie-overdracht vervang je bovenstaande waarden door het concrete
 actie-ID, branch/PR, veranderingen, testcommando’s en resultaten, open besluiten,
 belemmeringen en één eerstvolgende stap. Bewaar de afgeronde samenvatting hieronder.
 
+### ACT-30 — Rekeningen samenvoegen met preview
+
+- **Probleem:** een CSV-rekening en een bankkoppeling van dezelfde rekening bestaan los naast elkaar en bevatten overlappende transacties met verschillende `import_hash`.
+- **Gedrag:** `/accounts/{id}/merge` toont een preview (te verplaatsen en dubbele transacties); pas na bevestiging worden transacties verplaatst, dubbelen op datum + bedrag + tegenpartij of omschrijving één-op-één samengevoegd (categorie, controlestatus, uitsluiting, terugkerende post en koppelingen blijven behouden) en wordt de bronrekening verwijderd. Twijfelgevallen worden verplaatst, niet samengevoegd.
+- **Onderdelen:** app/account_merge.py, routes in app/routers/accounts.py, accounts/merge.html, tests/test_account_merge.py. Geen migratie.
+- **Validatie:** lokaal Python 3.14 zonder psycopg2: 502 passed, 3 skipped. PostgreSQL en Python 3.12 via CI.
+- **Open:** productiecontrole met de echte ABN-rekeningen na uitrol.
+
 ## Besluitenlog
 
 | Datum | Besluit | Reden / gevolgen |
@@ -410,3 +419,4 @@ Voeg per afgeronde actie of overdracht een regel toe. Git bevat de volledige his
 | 2026-09-23 | ACT-28a | Jaarrekenkern per persoon met koersmomentopnames, groei, inleg, verkoopfactor en gedeelde spaarrekeningen | [PR #199](https://github.com/gjagils/checkthepockets/pull/199), beide checks groen; merge `85caa2c` |
 | 2026-09-23 | ACT-28 | Vermogensprognose, bevroren plan per 1/1, verschilweergave en losse maandboekingen per persoon/bezit | [PR #199](https://github.com/gjagils/checkthepockets/pull/199), [#201](https://github.com/gjagils/checkthepockets/pull/201), [#202](https://github.com/gjagils/checkthepockets/pull/202), [#203](https://github.com/gjagils/checkthepockets/pull/203); alle checks groen; merge `fde6ebb`; deployments geslaagd; schermcontrole open |
 | 2026-09-23 | Review ACT-28 | Documentatie aangevuld (aannames, validatie op 3.12, open schermcontrole); ACT-29 toegevoegd; ACT-25b op Geblokkeerd | Claude Code; 496 passed, 2 skipped in Python 3.12 |
+| 2026-10-14 | ACT-30 | Rekeningen samenvoegen met preview | Claude Code; 502 passed, 3 skipped (Python 3.14); PR-CI open |

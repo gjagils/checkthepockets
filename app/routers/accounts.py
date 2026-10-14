@@ -1,4 +1,5 @@
 import json
+import logging
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse
@@ -9,14 +10,24 @@ from app.database import get_db
 from app.models import (
     Account, BankConnection, Transaction, SavingsPlan, Category, Rule, Person,
 )
+from app.account_merge import merge_accounts, plan_merge
 from app.auth import require_login
 from app.template_config import templates
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _parse_merged(value: str | None) -> tuple[int, int] | None:
+    try:
+        moved, dup = (value or "").split("-")
+        return int(moved), int(dup)
+    except ValueError:
+        return None
+
+
 @router.get("/accounts")
-def accounts_list(request: Request, db: Session = Depends(get_db)):
+def accounts_list(request: Request, merged: str | None = None, db: Session = Depends(get_db)):
     user = require_login(request, db)
     accounts = (
         db.query(Account)
@@ -123,6 +134,7 @@ def accounts_list(request: Request, db: Session = Depends(get_db)):
             "persons": persons,
             "bank_info_by_account_id": bank_info_by_account_id,
             "latest_tx_by_account_id": latest_tx_by_account_id,
+            "merged": _parse_merged(merged),
         },
     )
 
@@ -186,3 +198,63 @@ def delete_all_transactions(request: Request, db: Session = Depends(get_db)):
         db.query(Transaction).filter(Transaction.account_id.in_(account_ids)).delete(synchronize_session=False)
         db.commit()
     return RedirectResponse("/accounts", status_code=302)
+
+
+def _own_account(db: Session, user_id: int, account_id: int | None) -> Account | None:
+    if account_id is None:
+        return None
+    return db.query(Account).filter(Account.id == account_id, Account.user_id == user_id).first()
+
+
+@router.get("/accounts/{account_id}/merge")
+def merge_account_page(
+    account_id: int,
+    request: Request,
+    target_id: int | None = None,
+    db: Session = Depends(get_db),
+):
+    """Choose a target account and preview what merging would do."""
+    user = require_login(request, db)
+    source = _own_account(db, user.id, account_id)
+    if not source:
+        return RedirectResponse("/accounts", status_code=302)
+    others = (
+        db.query(Account)
+        .filter(Account.user_id == user.id, Account.id != source.id)
+        .order_by(Account.name)
+        .all()
+    )
+    target = _own_account(db, user.id, target_id)
+    if target is not None and target.id == source.id:
+        target = None
+    plan = plan_merge(db, source, target) if target else None
+    return templates.TemplateResponse(
+        "accounts/merge.html",
+        {
+            "request": request, "user": user, "source": source, "others": others,
+            "target": target, "plan": plan,
+            "move_count": len(plan.move) if plan else 0,
+            "duplicate_count": len(plan.duplicates) if plan else 0,
+        },
+    )
+
+
+@router.post("/accounts/{account_id}/merge")
+def merge_account(
+    account_id: int,
+    request: Request,
+    target_id: int = Form(...),
+    db: Session = Depends(get_db),
+):
+    user = require_login(request, db)
+    source = _own_account(db, user.id, account_id)
+    target = _own_account(db, user.id, target_id)
+    if not source or not target or source.id == target.id:
+        return RedirectResponse("/accounts", status_code=302)
+    result = merge_accounts(db, source, target)
+    db.commit()
+    logger.info(
+        "Account %s samengevoegd in %s: %d verplaatst, %d dubbel samengevoegd",
+        account_id, target.id, result.moved, result.merged_duplicates,
+    )
+    return RedirectResponse(f"/accounts?merged={result.moved}-{result.merged_duplicates}", status_code=302)
