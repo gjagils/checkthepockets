@@ -10,9 +10,12 @@ Secrets (API key, tokens, private key) never appear in exceptions or logs.
 import base64
 import json
 import logging
+import time
 import uuid
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
+from zoneinfo import ZoneInfo
 
 import requests
 from cryptography.hazmat.primitives import hashes, serialization
@@ -42,6 +45,18 @@ class BunqAccount:
     iban: str | None
     balance: Decimal | None
     currency: str
+
+
+@dataclass
+class BunqPayment:
+    id: int
+    booked_on: "datetime.date"
+    amount: Decimal
+    currency: str
+    description: str
+    counterparty_name: str | None
+    counterparty_iban: str | None
+    balance_after: Decimal | None
 
 
 @dataclass
@@ -201,3 +216,69 @@ class BunqClient:
                     iban=iban, balance=amount, currency=balance.get("currency") or "EUR",
                 ))
         return accounts
+
+    def list_payments(self, session: BunqSession, bunq_account_id: int,
+                       newer_than_id: int | None = None, pause=time.sleep) -> list[BunqPayment]:
+        """All payments of one account, newest first; stops at newer_than_id when given.
+
+        Follows bunq's older_url pagination, pausing between pages for the rate limit.
+        """
+        path = f"/user/{session.user_id}/monetary-account/{bunq_account_id}/payment?count=200"
+        payments: list[BunqPayment] = []
+        for page in range(MAX_PAGES):
+            if page:
+                pause(PAGE_PAUSE)
+            response = self._request("GET", path, token=session.token)
+            reached_known = False
+            for entry in response.get("Response", []):
+                raw = entry.get("Payment") if isinstance(entry, dict) else None
+                payment = parse_payment(raw) if isinstance(raw, dict) else None
+                if payment is None:
+                    continue
+                if newer_than_id is not None and payment.id <= newer_than_id:
+                    reached_known = True
+                    continue
+                payments.append(payment)
+            older = (response.get("Pagination") or {}).get("older_url")
+            if reached_known or not older:
+                return payments
+            path = older[3:] if older.startswith("/v1") else older
+        raise BunqError("Te veel pagina's bij bunq; synchronisatie afgebroken.")
+
+
+NL_TZ = ZoneInfo("Europe/Amsterdam")
+PAGE_PAUSE = 1.1  # bunq: max 3 GET's per 3 seconden per endpoint
+MAX_PAGES = 200
+
+
+def _decimal(value) -> Decimal | None:
+    try:
+        return Decimal(str(value)) if value is not None else None
+    except InvalidOperation:
+        return None
+
+
+def parse_payment(raw: dict) -> BunqPayment | None:
+    """Map one bunq Payment object; None if it lacks an id, date or amount."""
+    amount = _decimal((raw.get("amount") or {}).get("value"))
+    created = raw.get("created")
+    if raw.get("id") is None or amount is None or not created:
+        return None
+    try:
+        moment = datetime.strptime(created[:19], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+    alias = raw.get("counterparty_alias") or {}
+    after = raw.get("balance_after_mutation") or {}
+    return BunqPayment(
+        id=int(raw["id"]),
+        booked_on=moment.astimezone(NL_TZ).date(),
+        amount=amount,
+        currency=(raw.get("amount") or {}).get("currency") or "EUR",
+        description=(raw.get("description") or "").strip(),
+        counterparty_name=alias.get("display_name") if isinstance(alias, dict) else None,
+        counterparty_iban=alias.get("iban") if isinstance(alias, dict) else None,
+        balance_after=_decimal(after.get("value")),
+    )
+
+

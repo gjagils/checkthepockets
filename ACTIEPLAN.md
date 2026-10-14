@@ -77,6 +77,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-29 | P2 | Gepland | ACT-28 | [Verkoopfactor per bezit in de vermogensprognose](#act-29) |
 | ACT-30 | P2 | Review | — | [Rekeningen samenvoegen met preview](#act-30) |
 | ACT-31 | P2 | Review | ACT-25 | [bunq API-koppeling met eigen sleutel](#act-31) |
+| ACT-32 | P2 | Gepland | ACT-31, ACT-28 | [Persoonspagina: verwachting betaalrekeningen en vermogen](#act-32) |
 
 ## Beschrijving en acceptatiecriteria
 
@@ -385,6 +386,15 @@ belemmeringen en één eerstvolgende stap. Bewaar de afgeronde samenvatting hier
 - **Validatie:** lokaal Python 3.14 zonder psycopg2, nagebootste bunq: 509 passed, 3 skipped. PostgreSQL-migratie en Python 3.12 via CI. Niet getest tegen echte bunq of sandbox.
 - **Volgende stappen:** sleutel invoeren op de NAS en kijken of de tweede spaarrekening verschijnt (beslist ACT-31b: transactie-sync via `store_parsed_transactions`, koppeling aan bestaande rekeningen op IBAN, eigen overboekingen).
 
+- **ACT-31b (Review):** rekeningen aanvinken om te importeren, soort (betaal/spaar; standaard uit bunq, `accounts.kind`) en doelrekening kiezen (bestaande rekening, IBAN-match of nieuw); voorbeeld zonder opslaan en daarna importeren; betalingen via de `payment`-endpoint met paginering en incrementele sync (`last_payment_id`); identiteit via het bunq-id (twee identieke betalingen blijven beide bestaan); betalingen die al via CSV op dezelfde rekening staan worden overgeslagen (datum + bedrag + tegenpartij/omschrijving, één-op-één, alleen tegen niet-bunq-boekingen); overboekingen tussen eigen rekeningen worden automatisch gekoppeld (`transfer_id`) bij tegenrekening-IBAN, omgekeerd bedrag, ≤3 dagen verschil en precies één kandidaat; geplande sync om 01:30 en 17:30 (`bunq_sync`). Op de rekeningenpagina zijn naam en soort (betaal/spaar) aanpasbaar (`POST /accounts/{id}/update`); IBAN en eigenaar(s) zijn zichtbaar, het IBAN is alleen-lezen. Migratie 067. Bunq kent geen endpoint voor aandelen (bunq Stocks) in de documentatie; die blijven handmatig in Portfolio.
+- **Validatie ACT-31b:** lokaal Python 3.14 zonder psycopg2, nagebootste bunq: 519 passed, 3 skipped. PostgreSQL-migratie en Python 3.12 via CI. Niet getest tegen echte bunq-betalingen.
+
+### ACT-32 — Persoonspagina: verwachting betaalrekeningen en vermogen
+
+- **Doel (gebruiker, 2026-10-14):** een pagina per persoon met een overzicht van wat je verwacht op de betaalrekeningen en een vermogensdeel.
+- **Basis die er al is:** eigenaren per rekening, soort rekening (ACT-31b), terugkerende posten en projecties, vermogensprognose per persoon (ACT-28).
+- **Nog te beslissen vóór start:** welke periode de verwachting beslaat, hoe gedeelde rekeningen over personen verdeeld worden (zoals ACT-28: gelijk), en of spaarrekeningen in het vermogensdeel meetellen.
+
 ## Besluitenlog
 
 | Datum | Besluit | Reden / gevolgen |
@@ -431,3 +441,4 @@ Voeg per afgeronde actie of overdracht een regel toe. Git bevat de volledige his
 | 2026-10-14 | ACT-30 | Rekeningen samenvoegen met preview | Claude Code; 502 passed, 3 skipped (Python 3.14); PR-CI open |
 | 2026-10-14 | ACT-30 fix | Samenvoegen gaf 500 (UniqueViolation op `uq_transaction_account_import_hash`): exacte hash-matches krijgen nu voorrang, ook bij verschoven zichtbare datum; fout toont melding en rollback | Claude Code; 505 passed, 3 skipped (Python 3.14); PR-CI open; productielog bevestigde de oorzaak |
 | 2026-10-14 | ACT-31a | bunq-koppeling: sleutel invoeren en rekeningen tonen (alleen lezen) | Claude Code; 509 passed, 3 skipped (Python 3.14, nagebootste bunq); PR-CI open |
+| 2026-10-14 | ACT-31b | bunq: rekeningen kiezen, betalingen importeren met dubbelcheck tegen CSV, overboekingen koppelen, geplande sync; knoppenrij op rekeningkaart breekt af | Claude Code; 519 passed, 3 skipped (Python 3.14, nagebootste bunq); PR-CI open |

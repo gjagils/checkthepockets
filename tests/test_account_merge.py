@@ -223,3 +223,30 @@ def test_same_hash_with_shifted_visible_date_is_a_duplicate_not_a_move(db):
     db.commit()
     assert (result.moved, result.merged_duplicates) == (0, 1)
     assert db.query(Transaction).count() == 1
+
+
+def test_account_can_be_renamed_and_typed_by_owner_only(db):
+    user, source, _ = _setup(db)
+    intruder = User(username="renamer", password_hash="x")
+    db.add(intruder)
+    db.commit()
+    account_id = source.id
+
+    client = TestClient(app, follow_redirects=False)
+    client.cookies.set("session", create_session_cookie(user.id))
+    resp = client.post(f"/accounts/{account_id}/update", data={"name": "  Samen   Betaal  ", "kind": "savings"})
+    assert resp.status_code == 302
+    db.expire_all()
+    renamed = db.get(Account, account_id)
+    assert renamed.name == "Samen Betaal" and renamed.kind == "savings"
+
+    client.post(f"/accounts/{account_id}/update", data={"name": "   ", "kind": "payment"})
+    db.expire_all()
+    assert db.get(Account, account_id).name == "Samen Betaal"  # leeg wordt genegeerd
+
+    other = TestClient(app, follow_redirects=False)
+    other.cookies.set("session", create_session_cookie(intruder.id))
+    other.post(f"/accounts/{account_id}/update", data={"name": "Gekaapt", "kind": "payment"})
+    db.expire_all()
+    assert db.get(Account, account_id).name == "Samen Betaal"
+
