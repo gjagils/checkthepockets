@@ -10,7 +10,9 @@ from sqlalchemy import (
     DateTime,
     Text,
     ForeignKey,
+    Index,
     UniqueConstraint,
+    text,
     Table,
 )
 from sqlalchemy.orm import relationship
@@ -37,9 +39,9 @@ class User(Base):
     username = Column(String(150), unique=True, nullable=False)
     password_hash = Column(String(255), nullable=False)
     email = Column(String(255), nullable=True)
-    is_verified = Column(Integer, default=1)   # 1 = verified, 0 = pending email verification
-    is_admin = Column(Integer, default=0)       # 1 = admin
-    is_active = Column(Integer, default=1)      # 0 = deactivated by admin
+    is_verified = Column(Integer, default=1, nullable=False)   # 1 = verified, 0 = pending email verification
+    is_admin = Column(Integer, default=0, nullable=False)       # 1 = admin
+    is_active = Column(Integer, default=1, nullable=False)      # 0 = deactivated by admin
     session_version = Column(Integer, nullable=False, default=0)
     # Hypotheek-module feature-flag (GJA-47). Losgekoppeld van is_admin zodat
     # hypotheek-toegang een persoonlijke-finance keuze is, niet systeembeheer.
@@ -48,9 +50,9 @@ class User(Base):
     created_at = Column(DateTime, default=clock.now_utc)
 
     # Weekly digest voorkeuren — opt-in, jouw eigen ritme.
-    weekly_digest_enabled = Column(Integer, default=0)        # 1 = abonneer, 0 = uit
-    weekly_digest_weekday = Column(Integer, default=4)        # 0=ma ... 6=zo, default vrijdag
-    weekly_digest_hour = Column(Integer, default=8)           # 0..23 in Europe/Amsterdam
+    weekly_digest_enabled = Column(Integer, default=0, nullable=False)        # 1 = abonneer, 0 = uit
+    weekly_digest_weekday = Column(Integer, default=4, nullable=False)        # 0=ma ... 6=zo, default vrijdag
+    weekly_digest_hour = Column(Integer, default=8, nullable=False)           # 0..23 in Europe/Amsterdam
     weekly_digest_last_sent_at = Column(DateTime, nullable=True)
 
     # Startpagina: de route die getoond wordt bij inloggen of bezoek aan "/".
@@ -83,7 +85,7 @@ class AuthToken(Base):
     email = Column(String(255), nullable=True)        # stored on invite tokens
     expires_at = Column(DateTime, nullable=False)
     used_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=clock.now_utc)
+    created_at = Column(DateTime, default=clock.now_utc, nullable=False)
 
     user = relationship("User", back_populates="auth_tokens")
 
@@ -92,7 +94,7 @@ class Account(Base):
     __tablename__ = "accounts"
 
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     name = Column(String(255), nullable=False)
     iban = Column(String(34), nullable=True)
     bank = Column(String(50), nullable=False)  # "abn_amro", "bunq", "ics"
@@ -124,17 +126,17 @@ class Category(Base):
     __tablename__ = "categories"
 
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     account_id = Column(Integer, ForeignKey("accounts.id"), nullable=True)
     name = Column(String(100), nullable=False)
     parent_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
     color = Column(String(7), nullable=True)
     created_at = Column(DateTime, default=clock.now_utc)
     is_income = Column(Integer, default=0)
-    sort_order = Column(Integer, default=0)
-    exclude_from_budget = Column(Integer, default=0)
-    exclude_from_totals = Column(Integer, default=0)
-    is_archived = Column(Integer, default=0)
+    sort_order = Column(Integer, default=0, nullable=False)
+    exclude_from_budget = Column(Integer, default=0, nullable=False)
+    exclude_from_totals = Column(Integer, default=0, nullable=False)
+    is_archived = Column(Integer, default=0, nullable=False)
     # LIN-45: markering waarmee een scenario-factor wordt toegepast.
     # Waardes: "municipal" | "insurance" | "mortgage" | NULL (geen auto-factor).
     cost_scale_type = Column(String(20), nullable=True)
@@ -148,6 +150,12 @@ class Category(Base):
 
     __table_args__ = (
         UniqueConstraint("user_id", "account_id", "name", name="uq_user_account_category"),
+        # NULL != NULL: the constraint above does not stop duplicate names among the
+        # categories that belong to no account ("global" ones).
+        Index(
+            "uq_user_category_global_name", "user_id", "name", unique=True,
+            postgresql_where=text("account_id IS NULL"), sqlite_where=text("account_id IS NULL"),
+        ),
     )
 
 
@@ -155,7 +163,7 @@ class Rule(Base):
     __tablename__ = "rules"
 
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     name = Column(String(100), nullable=False)
     is_active = Column(Integer, default=1)  # 1=active, 0=inactive
 
@@ -170,7 +178,7 @@ class Rule(Base):
     # THEN actions
     assign_category_id = Column(Integer, ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)
     action_rename_counterparty = Column(String(255), nullable=True)
-    action_set_reviewed = Column(Integer, default=0)
+    action_set_reviewed = Column(Integer, default=0, nullable=False)
 
     created_at = Column(DateTime, default=clock.now_utc)
 
@@ -183,7 +191,7 @@ class RecurringTransaction(Base):
     __tablename__ = "recurring_transactions"
 
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     account_id = Column(Integer, ForeignKey("accounts.id"), nullable=True)
     name = Column(String(150), nullable=False)
     amount_expected = Column(Numeric(12, 2), nullable=False)
@@ -214,8 +222,8 @@ class RuleSuggestion(Base):
     category_id = Column(Integer, ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)
     category_name = Column(String(100), nullable=True)
     reasoning = Column(Text, nullable=True)
-    uncat_count = Column(Integer, default=0)
-    cat_count = Column(Integer, default=0)
+    uncat_count = Column(Integer, default=0, nullable=False)
+    cat_count = Column(Integer, default=0, nullable=False)
     created_at = Column(DateTime, default=clock.now_utc)
 
     user = relationship("User")
@@ -244,8 +252,8 @@ class Transaction(Base):
     __tablename__ = "transactions"
 
     id = Column(Integer, primary_key=True)
-    account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
-    date = Column(Date, nullable=False)
+    account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False, index=True)
+    date = Column(Date, nullable=False, index=True)
     # Oorspronkelijke boekingsdatum door de bank; wordt gevuld zodra de
     # zichtbare datum verplaatst wordt bij koppelen aan een terugkerend item
     # waarvan de periode afwijkt (bv. hypotheek op 31-12 voor de januari-termijn).
@@ -256,14 +264,14 @@ class Transaction(Base):
     counterparty = Column(EncryptedText, nullable=True)        # encrypted when FIELD_ENCRYPTION_KEY is set
     counterparty_iban = Column(EncryptedText, nullable=True)   # encrypted when FIELD_ENCRYPTION_KEY is set
     balance_after = Column(Numeric(12, 2), nullable=True)
-    category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
-    parent_id = Column(Integer, ForeignKey("transactions.id", ondelete="CASCADE"), nullable=True)
+    category_id = Column(Integer, ForeignKey("categories.id"), nullable=True, index=True)
+    parent_id = Column(Integer, ForeignKey("transactions.id", ondelete="CASCADE"), nullable=True, index=True)
     import_hash = Column(String(64), nullable=False)
-    is_excluded = Column(Integer, default=0)
-    is_reviewed = Column(Integer, default=0)
-    is_projected = Column(Integer, default=0)
-    recurring_id = Column(Integer, ForeignKey("recurring_transactions.id", ondelete="SET NULL"), nullable=True)
-    transfer_id = Column(Integer, ForeignKey("transactions.id", ondelete="SET NULL"), nullable=True)
+    is_excluded = Column(Integer, default=0, nullable=False)
+    is_reviewed = Column(Integer, default=0, nullable=False)
+    is_projected = Column(Integer, default=0, nullable=False)
+    recurring_id = Column(Integer, ForeignKey("recurring_transactions.id", ondelete="SET NULL"), nullable=True, index=True)
+    transfer_id = Column(Integer, ForeignKey("transactions.id", ondelete="SET NULL"), nullable=True, index=True)
     assigned_by_rule_id = Column(Integer, ForeignKey("rules.id", ondelete="SET NULL"), nullable=True, index=True)
     import_batch_id = Column(Integer, ForeignKey("import_batches.id", ondelete="SET NULL"), nullable=True, index=True)
     created_at = Column(DateTime, default=clock.now_utc)
@@ -274,7 +282,15 @@ class Transaction(Base):
 
     account = relationship("Account", back_populates="transactions")
     category = relationship("Category", back_populates="transactions")
-    parent = relationship("Transaction", remote_side="Transaction.id", foreign_keys="[Transaction.parent_id]", backref="children")
+    parent = relationship(
+        "Transaction", remote_side="Transaction.id", foreign_keys="[Transaction.parent_id]", back_populates="children",
+    )
+    # Split parts die hun ouder volgen: een ORM-delete van de ouder verwijdert ze ook (anders werden ze
+    # wezen met parent_id NULL); de database doet hetzelfde via ON DELETE CASCADE.
+    children = relationship(
+        "Transaction", foreign_keys="[Transaction.parent_id]", back_populates="parent",
+        cascade="all, delete-orphan", passive_deletes=True,
+    )
     assigned_by_rule = relationship("Rule", foreign_keys=[assigned_by_rule_id])
 
 
@@ -322,6 +338,7 @@ class SavingsPlan(Base):
 
     __table_args__ = (
         UniqueConstraint("account_id", "year", name="uq_savings_plan_account_year"),
+        Index("ix_savings_plans_user_year", "user_id", "year"),
     )
 
 
@@ -329,10 +346,10 @@ class SavingsLine(Base):
     __tablename__ = "savings_lines"
 
     id = Column(Integer, primary_key=True)
-    plan_id = Column(Integer, ForeignKey("savings_plans.id", ondelete="CASCADE"), nullable=False)
+    plan_id = Column(Integer, ForeignKey("savings_plans.id", ondelete="CASCADE"), nullable=False, index=True)
     name = Column(String(255), nullable=False)
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
-    is_income = Column(Integer, default=0)
+    is_income = Column(Integer, default=0, nullable=False)
     annual_budget = Column(Numeric(12, 2), default=0)
     frequency = Column(String(20), nullable=False, default="monthly")
     default_amount = Column(Numeric(12, 2), default=0)
@@ -350,7 +367,7 @@ class SavingsEntry(Base):
     __tablename__ = "savings_entries"
 
     id = Column(Integer, primary_key=True)
-    line_id = Column(Integer, ForeignKey("savings_lines.id", ondelete="CASCADE"), nullable=False)
+    line_id = Column(Integer, ForeignKey("savings_lines.id", ondelete="CASCADE"), nullable=False, index=True)
     month = Column(Integer, nullable=False)
     amount = Column(Numeric(12, 2), nullable=True)
     status = Column(String(20), default="forecast")  # forecast, pending, confirmed
@@ -392,10 +409,10 @@ class Person(Base):
     __tablename__ = "persons"
 
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     name = Column(String(100), nullable=False)
     birthdate = Column(Date, nullable=True)
-    sort_order = Column(Integer, default=0)
+    sort_order = Column(Integer, default=0, nullable=False)
     created_at = Column(DateTime, default=clock.now_utc)
 
     user = relationship("User", back_populates="persons")
