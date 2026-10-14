@@ -117,3 +117,15 @@ uitgeschakeld zodat localhost-login werkt.
 ongebruikte imports en variabelen, ongedefinieerde namen). `make cov` toont testdekking zonder
 drempel; `make check` doet lint en tests zoals de CI. Het uitbreiden van de regelset (importvolgorde,
 `UP`, `B`) en `ruff format` gebeuren als aparte, mechanische wijzigingen.
+
+## Migraties
+
+Alembic-migraties zijn **PostgreSQL-only**: productie draait op PostgreSQL en de migraties gebruiken
+PostgreSQL-gedrag. De SQLite-tests bouwen hun schema met `Base.metadata.create_all` en bewijzen de
+migraties dus niet. De CI-job `postgres-migrations` doet dat wel: `upgrade head`, een controle dat de
+modellen en het gemigreerde schema niet uiteenlopen (autogenerate geeft een lege diff; server defaults
+tellen niet mee omdat de modellen Python-defaults gebruiken), `downgrade base` en opnieuw `upgrade head`,
+plus de gevallen met echte data in `tests/test_migrations_postgres.py`. Lokaal kun je die tests draaien
+met een eigen PostgreSQL en `POSTGRES_TEST_URL=postgresql+psycopg2://... python -m pytest tests/test_migrations_postgres.py`.
+Een nieuwe migratie die een uniek geheel toevoegt aan bestaande data moet eerst controleren of de data
+dat toelaat (zie 069) in plaats van de deploy te laten falen.
