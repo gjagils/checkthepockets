@@ -9,21 +9,14 @@ from app import clock
 from app.database import get_db
 from app.models import Account, Transaction, Category, Budget, BankConnection
 from app.auth import require_login
+from app.transaction_queries import transaction_years
+from app.nl_format import MONTHS_NL_SHORT, month_names_by_number
 from app.template_config import templates
 
 router = APIRouter()
 
-MONTH_NAMES_NL = [
-    "", "Jan", "Feb", "Mrt", "Apr", "Mei", "Jun",
-    "Jul", "Aug", "Sep", "Okt", "Nov", "Dec",
-]
-
-MONTH_NAMES_NL_FULL = {
-    0: "Heel jaar",
-    1: "Januari", 2: "Februari", 3: "Maart", 4: "April",
-    5: "Mei", 6: "Juni", 7: "Juli", 8: "Augustus",
-    9: "September", 10: "Oktober", 11: "November", 12: "December",
-}
+MONTH_NAMES_NL = MONTHS_NL_SHORT
+MONTH_NAMES_NL_FULL = month_names_by_number("Heel jaar")
 
 
 def _decimal_to_float(d):
@@ -44,14 +37,7 @@ def dashboard(
     current_year = year if year else today.year
 
     # Years for selector
-    tx_years = (
-        db.query(func.extract("year", Transaction.date).label("yr"))
-        .join(Account)
-        .filter(Account.user_id == user.id)
-        .distinct()
-        .all()
-    )
-    years = sorted({int(r.yr) for r in tx_years} | {current_year})
+    years = transaction_years(db, user.id, current_year)
 
     # Base transaction filters
     base_tx_filter = [

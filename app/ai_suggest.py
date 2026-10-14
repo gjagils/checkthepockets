@@ -5,11 +5,11 @@ Sprint 17 — extracts merchant names from bank descriptions, suggests categorie
 If ANTHROPIC_API_KEY is not set, only regex parsing is available (no AI suggestions).
 """
 
-import json
 import logging
 import re
 
-from app.config import ANTHROPIC_API_KEY, ANTHROPIC_MODEL
+from app import ai_client
+from app.config import ANTHROPIC_API_KEY
 
 logger = logging.getLogger(__name__)
 
@@ -113,41 +113,25 @@ def suggest_rule(
     cat_list = ", ".join(c["name"] for c in categories) or "(geen categorieën)"
 
     try:
-        import anthropic
-
-        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-        resp = client.messages.create(
-            model=ANTHROPIC_MODEL,
+        result = ai_client.call_json(
+            (
+                "Analyseer deze Nederlandse banktransactie en stel een "
+                "categoriseerregel voor.\n\n"
+                f"Omschrijving: {description}\n"
+                f"Tegenpartij: {counterparty or 'onbekend'}\n"
+                f"Geëxtraheerde merchant (regex): {merchant}\n\n"
+                f"Beschikbare categorieën: {cat_list}\n\n"
+                "Antwoord UITSLUITEND als JSON (geen markdown):\n"
+                "{\n"
+                '  "match_value": "korte unieke zoekterm voor deze merchant",\n'
+                '  "match_field": "description" of "counterparty",\n'
+                '  "counterparty_clean": "schone volledige naam",\n'
+                '  "category_name": "best passende categorie uit de lijst, of null",\n'
+                '  "reasoning": "1 zin uitleg in het Nederlands"\n'
+                "}"
+            ),
             max_tokens=300,
-            messages=[
-                {
-                    "role": "user",
-                    "content": (
-                        "Analyseer deze Nederlandse banktransactie en stel een "
-                        "categoriseerregel voor.\n\n"
-                        f"Omschrijving: {description}\n"
-                        f"Tegenpartij: {counterparty or 'onbekend'}\n"
-                        f"Geëxtraheerde merchant (regex): {merchant}\n\n"
-                        f"Beschikbare categorieën: {cat_list}\n\n"
-                        "Antwoord UITSLUITEND als JSON (geen markdown):\n"
-                        "{\n"
-                        '  "match_value": "korte unieke zoekterm voor deze merchant",\n'
-                        '  "match_field": "description" of "counterparty",\n'
-                        '  "counterparty_clean": "schone volledige naam",\n'
-                        '  "category_name": "best passende categorie uit de lijst, of null",\n'
-                        '  "reasoning": "1 zin uitleg in het Nederlands"\n'
-                        "}"
-                    ),
-                }
-            ],
         )
-
-        text = resp.content[0].text.strip()
-        # Strip optional markdown fencing
-        if text.startswith("```"):
-            text = text.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
-
-        result = json.loads(text)
 
         # Resolve category name → id (exact match first, then partial)
         result["category_id"] = None
@@ -205,44 +189,29 @@ def suggest_rules_bulk(
     )
 
     try:
-        import anthropic
-
-        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-        resp = client.messages.create(
-            model=ANTHROPIC_MODEL,
+        results = ai_client.call_json(
+            (
+                "Analyseer deze gegroepeerde transactiepatronen uit een Nederlandse "
+                "persoonlijke financiele app. Geef per groep een regelsuggestie.\n\n"
+                f"Patronen:\n{groups_text}\n\n"
+                f"Beschikbare subcategorieen (kies ALLEEN uit deze IDs):\n{cat_list}\n\n"
+                "Antwoord UITSLUITEND als JSON array (geen markdown).\n"
+                "Per item:\n"
+                "[\n"
+                "  {\n"
+                '    "match_value": "zoekterm voor herkenning (kort, uniek)",\n'
+                '    "match_field": "description",\n'
+                '    "counterparty_clean": "schone naam voor tegenpartij",\n'
+                '    "category_id": category ID als integer uit de lijst hierboven, of null,\n'
+                '    "category_name": "naam van de gekozen categorie, of null",\n'
+                '    "reasoning": "1 zin uitleg in het Nederlands"\n'
+                "  }\n"
+                "]\n"
+                "BELANGRIJK: category_id moet een BESTAAND id uit de lijst zijn, "
+                "of null als er geen passende is. Geef alle items terug."
+            ),
             max_tokens=4000,
-            messages=[
-                {
-                    "role": "user",
-                    "content": (
-                        "Analyseer deze gegroepeerde transactiepatronen uit een Nederlandse "
-                        "persoonlijke financiele app. Geef per groep een regelsuggestie.\n\n"
-                        f"Patronen:\n{groups_text}\n\n"
-                        f"Beschikbare subcategorieen (kies ALLEEN uit deze IDs):\n{cat_list}\n\n"
-                        "Antwoord UITSLUITEND als JSON array (geen markdown).\n"
-                        "Per item:\n"
-                        "[\n"
-                        "  {\n"
-                        '    "match_value": "zoekterm voor herkenning (kort, uniek)",\n'
-                        '    "match_field": "description",\n'
-                        '    "counterparty_clean": "schone naam voor tegenpartij",\n'
-                        '    "category_id": category ID als integer uit de lijst hierboven, of null,\n'
-                        '    "category_name": "naam van de gekozen categorie, of null",\n'
-                        '    "reasoning": "1 zin uitleg in het Nederlands"\n'
-                        "  }\n"
-                        "]\n"
-                        "BELANGRIJK: category_id moet een BESTAAND id uit de lijst zijn, "
-                        "of null als er geen passende is. Geef alle items terug."
-                    ),
-                }
-            ],
         )
-
-        text = resp.content[0].text.strip()
-        if text.startswith("```"):
-            text = text.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
-
-        results = json.loads(text)
 
         # Build ID lookup
         cat_by_id = {c["id"]: c for c in categories}
@@ -417,48 +386,33 @@ def enrich_recurring_with_ai(
     )
 
     try:
-        import anthropic
-
-        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-        resp = client.messages.create(
-            model=ANTHROPIC_MODEL,
+        results = ai_client.call_json(
+            (
+                "Analyseer deze kandidaat-terugkerende transacties uit een persoonlijke "
+                "financiele app. Filter op echte terugkerende betalingen (abonnementen, "
+                "vaste lasten, salaris, etc.) en verwijder eenmalige patronen.\n\n"
+                f"Kandidaten:\n{candidates_text}\n\n"
+                f"Al bestaande terugkerende items: {existing_list}\n"
+                f"Beschikbare categorieen: {cat_list}\n\n"
+                "Antwoord UITSLUITEND als JSON array (geen markdown).\n"
+                "Filter kandidaten die al bestaan als terugkerend item.\n"
+                "Per item:\n"
+                "[\n"
+                "  {\n"
+                '    "counterparty_original": "originele naam",\n'
+                '    "name": "schone naam voor weergave",\n'
+                '    "frequency": "weekly|monthly|quarterly|yearly",\n'
+                '    "amount": bedrag als nummer (negatief = uitgave),\n'
+                '    "category_name": "best passende categorie of null",\n'
+                '    "counterparty_match": "zoekterm voor auto-matching",\n'
+                '    "is_recurring": true of false,\n'
+                '    "reasoning": "korte uitleg in het Nederlands"\n'
+                "  }\n"
+                "]\n"
+                "Geef alleen items terug waar is_recurring=true."
+            ),
             max_tokens=1000,
-            messages=[
-                {
-                    "role": "user",
-                    "content": (
-                        "Analyseer deze kandidaat-terugkerende transacties uit een persoonlijke "
-                        "financiele app. Filter op echte terugkerende betalingen (abonnementen, "
-                        "vaste lasten, salaris, etc.) en verwijder eenmalige patronen.\n\n"
-                        f"Kandidaten:\n{candidates_text}\n\n"
-                        f"Al bestaande terugkerende items: {existing_list}\n"
-                        f"Beschikbare categorieen: {cat_list}\n\n"
-                        "Antwoord UITSLUITEND als JSON array (geen markdown).\n"
-                        "Filter kandidaten die al bestaan als terugkerend item.\n"
-                        "Per item:\n"
-                        "[\n"
-                        "  {\n"
-                        '    "counterparty_original": "originele naam",\n'
-                        '    "name": "schone naam voor weergave",\n'
-                        '    "frequency": "weekly|monthly|quarterly|yearly",\n'
-                        '    "amount": bedrag als nummer (negatief = uitgave),\n'
-                        '    "category_name": "best passende categorie of null",\n'
-                        '    "counterparty_match": "zoekterm voor auto-matching",\n'
-                        '    "is_recurring": true of false,\n'
-                        '    "reasoning": "korte uitleg in het Nederlands"\n'
-                        "  }\n"
-                        "]\n"
-                        "Geef alleen items terug waar is_recurring=true."
-                    ),
-                }
-            ],
         )
-
-        text = resp.content[0].text.strip()
-        if text.startswith("```"):
-            text = text.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
-
-        results = json.loads(text)
 
         # Resolve category names to IDs
         for item in results:
@@ -531,49 +485,34 @@ def analyze_savings_with_ai(
     existing_text = ", ".join(existing_lines) if existing_lines else "(geen)"
 
     try:
-        import anthropic
-
-        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-        resp = client.messages.create(
-            model=ANTHROPIC_MODEL,
+        results = ai_client.call_json(
+            (
+                f"Analyseer de transacties op de spaarrekening '{account_name}' "
+                f"voor het jaar {year}. Stel een spaarplan voor.\n\n"
+                f"Transactie-overzicht per tegenpartij:\n{summary_text}\n"
+                f"{patterns_text}\n\n"
+                f"Al bestaande spaarregels: {existing_text}\n\n"
+                "Stel spaarregels voor die passen bij deze transacties. Denk aan:\n"
+                "- Maandelijkse stortingen (inkomen op spaarrekening)\n"
+                "- Maandelijkse opnames (uitgaven vanaf spaarrekening)\n"
+                "- Kwartaal/jaarlijkse patronen\n"
+                "- Eenmalige grote bedragen\n\n"
+                "Antwoord UITSLUITEND als JSON array (geen markdown).\n"
+                "Filter regels die al bestaan.\n"
+                "Per item:\n"
+                "[\n"
+                "  {\n"
+                '    "name": "beschrijvende naam voor spaarregel",\n'
+                '    "amount": gemiddeld bedrag per keer (altijd positief),\n'
+                '    "frequency": "monthly|quarterly|biannual|yearly|one-off",\n'
+                '    "is_income": true als geld binnenkomt (storting), false als het uitgaat (opname),\n'
+                '    "reasoning": "korte uitleg in het Nederlands"\n'
+                "  }\n"
+                "]\n"
+                "Sorteer op belangrijkheid (grootste impact eerst)."
+            ),
             max_tokens=1500,
-            messages=[
-                {
-                    "role": "user",
-                    "content": (
-                        f"Analyseer de transacties op de spaarrekening '{account_name}' "
-                        f"voor het jaar {year}. Stel een spaarplan voor.\n\n"
-                        f"Transactie-overzicht per tegenpartij:\n{summary_text}\n"
-                        f"{patterns_text}\n\n"
-                        f"Al bestaande spaarregels: {existing_text}\n\n"
-                        "Stel spaarregels voor die passen bij deze transacties. Denk aan:\n"
-                        "- Maandelijkse stortingen (inkomen op spaarrekening)\n"
-                        "- Maandelijkse opnames (uitgaven vanaf spaarrekening)\n"
-                        "- Kwartaal/jaarlijkse patronen\n"
-                        "- Eenmalige grote bedragen\n\n"
-                        "Antwoord UITSLUITEND als JSON array (geen markdown).\n"
-                        "Filter regels die al bestaan.\n"
-                        "Per item:\n"
-                        "[\n"
-                        "  {\n"
-                        '    "name": "beschrijvende naam voor spaarregel",\n'
-                        '    "amount": gemiddeld bedrag per keer (altijd positief),\n'
-                        '    "frequency": "monthly|quarterly|biannual|yearly|one-off",\n'
-                        '    "is_income": true als geld binnenkomt (storting), false als het uitgaat (opname),\n'
-                        '    "reasoning": "korte uitleg in het Nederlands"\n'
-                        "  }\n"
-                        "]\n"
-                        "Sorteer op belangrijkheid (grootste impact eerst)."
-                    ),
-                }
-            ],
         )
-
-        text = resp.content[0].text.strip()
-        if text.startswith("```"):
-            text = text.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
-
-        results = json.loads(text)
         return results
 
     except Exception as exc:

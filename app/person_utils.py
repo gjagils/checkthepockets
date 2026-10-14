@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import datetime
 from app import clock
+from app.nl_format import MONTHS_NL_FULL
 
 
 def age_years(birthdate: datetime.date | None, today: datetime.date | None = None) -> int | None:
@@ -36,10 +37,7 @@ def format_age_nl(birthdate: datetime.date | None, today: datetime.date | None =
     return f"{years} jaar"
 
 
-MONTH_NAMES_NL_FULL = [
-    "", "januari", "februari", "maart", "april", "mei", "juni",
-    "juli", "augustus", "september", "oktober", "november", "december",
-]
+MONTH_NAMES_NL_FULL = [name.lower() for name in MONTHS_NL_FULL]
 
 
 def months_until_18(

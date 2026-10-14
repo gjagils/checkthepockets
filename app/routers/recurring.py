@@ -20,6 +20,7 @@ from app.recurring_service import (
     sync_projected_transactions,
 )
 from app.redirects import safe_redirect
+from app.nl_format import MONTHS_NL_FULL
 from app.template_config import templates
 
 router = APIRouter()
@@ -36,10 +37,7 @@ NL_MONTH_ABBREVS = [
     "Jul", "Aug", "Sep", "Okt", "Nov", "Dec",
 ]
 
-MONTH_NAMES_NL = [
-    "", "Januari", "Februari", "Maart", "April", "Mei", "Juni",
-    "Juli", "Augustus", "September", "Oktober", "November", "December",
-]
+MONTH_NAMES_NL = MONTHS_NL_FULL
 
 
 @router.post("/recurring/projected/{projected_tx_id}/skip")

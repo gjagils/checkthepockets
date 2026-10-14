@@ -12,15 +12,13 @@ from app.forms import parse_amount
 from app.database import get_db
 from app.models import Account, Budget, BudgetPreset, BudgetPresetLine, Category, RecurringTransaction, Transaction
 from app.auth import require_login
+from app.transaction_queries import transaction_years
+from app.nl_format import month_names_by_number
 from app.template_config import templates
 
 router = APIRouter(prefix="/budgets")
 
-MONTH_NAMES_NL = {
-    1: "Januari", 2: "Februari", 3: "Maart", 4: "April",
-    5: "Mei", 6: "Juni", 7: "Juli", 8: "Augustus",
-    9: "September", 10: "Oktober", 11: "November", 12: "December",
-}
+MONTH_NAMES_NL = month_names_by_number()
 
 
 @router.get("")
@@ -384,14 +382,7 @@ def budget_overview(
     )
 
     # Years with transactions
-    tx_years = (
-        db.query(func.extract("year", Transaction.date).label("yr"))
-        .join(Account)
-        .filter(Account.user_id == user.id)
-        .distinct()
-        .all()
-    )
-    years = sorted({int(r.yr) for r in tx_years} | {current_year})
+    years = transaction_years(db, user.id, current_year)
 
     return templates.TemplateResponse(
         request,

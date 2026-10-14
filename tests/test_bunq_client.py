@@ -114,7 +114,7 @@ def test_error_message_has_no_secrets():
 
 
 def _client_for(user, monkeypatch, fake, admin=True, encryption=True):
-    monkeypatch.setattr(bunq_router, "SUPER_ADMIN_USERNAME", user.username if admin else "someone-else")
+    monkeypatch.setattr("app.auth.SUPER_ADMIN_USERNAME", user.username if admin else "someone-else")
     monkeypatch.setattr(bunq_router, "encryption_enabled", lambda: encryption)
     monkeypatch.setattr(bunq_router, "BunqClient", lambda base: BunqClient("https://api.bunq.test/v1", http=fake))
     client = TestClient(app, follow_redirects=False)
