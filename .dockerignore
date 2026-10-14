@@ -3,7 +3,9 @@ node_modules
 .github
 .env
 stack.env
+# Alleen *.md in de root (README, ACTIEPLAN, ...); app/docs/*.md (kennisbank) moet in het image.
 *.md
+docs/
 __pycache__
 *.pyc
 .pytest_cache
@@ -11,7 +13,8 @@ tests
 .venv
 *.pem
 keys/
-stack.env
+*.db
+.DS_Store
 .agents/
 .codex/
 .claude/
