@@ -78,10 +78,10 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-29 | P2 | Gepland | ACT-28 | [Verkoopfactor per bezit in de vermogensprognose](#act-29) |
 | ACT-30 | P2 | Review | — | [Rekeningen samenvoegen met preview](#act-30) |
 | ACT-31 | P2 | Review | ACT-25 | [bunq API-koppeling met eigen sleutel](#act-31) |
-| ACT-32 | P1 | Review | — | [Encryptie-bugs: duplicaten, regelsuggesties, herversleutelen](#act-32) |
-| ACT-33 | P1 | Gepland | — | [Auth-fixes: uitnodiging, e-mailverificatie, rate limiting, proxy](#act-33) |
-| ACT-34 | P1 | Gepland | — | [Crash- en datafouten in routes](#act-34) |
-| ACT-35 | P1 | Gepland | — | [XSS in templates](#act-35) |
+| ACT-32 | P1 | Afgerond | — | [Encryptie-bugs: duplicaten, regelsuggesties, herversleutelen](#act-32) |
+| ACT-33 | P1 | Afgerond | — | [Auth-fixes: uitnodiging, e-mailverificatie, rate limiting, proxy](#act-33) |
+| ACT-34 | P1 | Afgerond | — | [Crash- en datafouten in routes](#act-34) |
+| ACT-35 | P1 | Afgerond | — | [XSS in templates](#act-35) |
 | ACT-36 | P2 | Gepland | — | [Repo-hygiëne, configuratie en deploy-trigger](#act-36) |
 | ACT-37 | P3 | Gepland | — | [Tooling: ruff, pyproject, coverage, dependabot](#act-37) |
 | ACT-38 | P2 | Gepland | — | [Verouderde API's: TemplateResponse, lifespan, tijd](#act-38) |
@@ -100,6 +100,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-51 | P2 | Gepland | ACT-39 | [HTTP-vangnet voor redesign-schermen en parsers](#act-51) |
 | ACT-52 | P3 | Gepland | ACT-41 | [Model-typing: Boolean, enums, Mapped](#act-52) |
 | ACT-53 | P2 | Gepland | ACT-31, ACT-28 | [Persoonspagina: verwachting betaalrekeningen en vermogen](#act-53) |
+| ACT-54 | P2 | Gepland | — | [Regelvoorstellen leesbaar: volledige omschrijving en groepering](#act-54) |
 
 ## Beschrijving en acceptatiecriteria
 
@@ -616,6 +617,17 @@ commit `339a4d8`; controleer ze bij het oppakken.
 - **Klaar wanneer:** Templates vergelijken booleans niet meer met `1`; nieuwe code heeft typed modellen; autogenerate blijft leeg na de migratie.
 - **Validatie:** Volledige suite, PostgreSQL-CI met up/down/up, productievalidatie na uitrol.
 
+### ACT-54 — Regelvoorstellen leesbaar: volledige omschrijving en groepering
+
+- **Aanleiding (gebruiker, 2026-10-14):** in de tabel met regelvoorstellen (`/rules`) zijn "Herkenning" en "Tegenpartij" smalle invoervelden van één regel; lange bankomschrijvingen vallen weg en voorstellen die met dezelfde tekst beginnen zijn niet te onderscheiden.
+- **Voorstel:** elk voorstel als kaartje met twee regels (Herkenning als meegroeiend tekstvak over de volle breedte; daaronder Tegenpartij, Rekening, Categorie); een grijs voorbeeld met de volledige omschrijving van één echte transactie; klikbare aantallen met een lijst die de hele omschrijving en datum toont; voorstellen met dezelfde zoekterm groeperen.
+- **Klaar wanneer:** de volledige omschrijving is zichtbaar zonder af te kappen en de zes bijna-identieke "SEPA Periodieke overboeking"-rijen zijn te onderscheiden.
+
+
+### Fase 1 (ACT-32 t/m ACT-35) — uitkomst, 2026-10-14, Claude Code
+
+Alle vijf PR's gemerged en gedeployed (Build and Deploy geslaagd): ACT-32 [#215](https://github.com/gjagils/checkthepockets/pull/215), ACT-33 [#216](https://github.com/gjagils/checkthepockets/pull/216), ACT-34a [#217](https://github.com/gjagils/checkthepockets/pull/217), ACT-34b [#218](https://github.com/gjagils/checkthepockets/pull/218), ACT-35 [#219](https://github.com/gjagils/checkthepockets/pull/219). A12 was al opgelost in #211. ACT-34 is gesplitst in 34a (A4, A6–A11, A14) en 34b (A13, A15, B9). Gevonden bovenop de review: de instellingen-import was niet atomair (nu wel), en inline `confirm('…{{ naam }}…')` in elf templates was een stored-XSS-route (gebruikersnaam op `admin/users.html`); beide opgelost. Productievalidatie open: uitloggen via POST-knop, IP-gedrag van de inlogbegrenzing achter Cloudflare/nginx, de duplicatenpagina met echte versleutelde data, en de AI-modelnaam (`ANTHROPIC_MODEL`, standaard `claude-sonnet-5-5`, niet tegen de echte API getest).
+
 ## Besluitenlog
 
 | Datum | Besluit | Reden / gevolgen |
@@ -626,6 +638,7 @@ commit `339a4d8`; controleer ze bij het oppakken.
 | 2026-09-23 | Oude Linear-items blijven extern totdat relevant werk bewust is overgenomen | Geen claim dat de volledige bestaande backlog al is gemigreerd |
 | 2026-09-23 | Vermogensprognose per persoon, kleuren t.o.v. plan 1/1 (ACT-28) | Vervangt de handmatige kopie in de spreadsheet; bouwt voort op Portfolio en spaarplanner |
 | 2026-09-23 | Gebruiker vraagt alle openstaande acties af te werken; ACT-22 en ACT-23 naar Gereed | Uitvoering blijft één actie tegelijk met budgetcontrole; ACT-08-rotatie, ACT-15-restoreproef en ACT-25-accountonderzoek vragen toegang of handelingen van de gebruiker |
+| 2026-10-14 | Review-acties vrijgegeven: fase 1 (ACT-32 t/m 35) met doorlopende mergetoestemming zodra CI groen is; fase 2 (ACT-36 t/m 40) vrijgegeven | Fase 3 en 4 (structuur, front-end) per PR of per fase opnieuw vragen. Statusregistratie na merge gebundeld in een docs-PR per fase |
 
 ## Uitvoeringslog
 
@@ -669,3 +682,4 @@ Voeg per afgeronde actie of overdracht een regel toe. Git bevat de volledige his
 | 2026-10-14 | AI-model | AI-regelsuggesties gaven 404 (`claude-sonnet-4-20250514` bestaat niet meer): model nu via `ANTHROPIC_MODEL` (standaard `claude-sonnet-5-5`), 4 plekken in ai_suggest.py; review C13 deels | Claude Code; 525 passed, 3 skipped (Python 3.14, nagebootste client); niet getest tegen de echte API |
 | 2026-10-14 | Codereview | Volledige scan vóór het UI-redesign; ACT-32 t/m ACT-52 als Gepland toegevoegd | Claude Code; docs/CODE-REVIEW-2026-10-14.md; 512 passed, 3 skipped (Python 3.12 via uv); branch `claude/check-pockets-suite-review-fd0da6` |
 | 2026-10-14 | ACT-32 | Encryptie-bugs uit de review (A1, A2, A3, B11) opgelost met tests die met versleuteling draaien | Claude Code; 529 passed, 3 skipped; PR-CI open |
+| 2026-10-14 | ACT-32 t/m ACT-35 | Fase 1 van de codereview afgerond: encryptie-bugs, auth-hardening, crash- en datafouten (a en b), XSS | #215, #216, #217, #218, #219 gemerged; CI groen; productievalidatie deels open (zie fase 1 — uitkomst) |
