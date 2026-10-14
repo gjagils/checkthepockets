@@ -1,9 +1,11 @@
+import ipaddress
 import logging
 import datetime
 import secrets
 
 from fastapi import APIRouter, Depends, Request, Form
 from fastapi.responses import RedirectResponse
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -26,6 +28,7 @@ from app.config import (
     SUPER_ADMIN_USERNAME,
 )
 from app.email_service import send_verification_email, send_password_reset_email
+from app import rate_limit
 from app.rate_limit import is_rate_limited, record_failed_attempt, clear_attempts
 from app.template_config import templates
 
@@ -76,10 +79,29 @@ def _enforce_super_admin(user: "User", db: Session) -> None:
 
 
 def _client_ip(request: Request) -> str:
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.client.host if request.client else "unknown"
+    """Best-effort client address for rate limiting.
+
+    X-Forwarded-For is only believed when the direct peer is a private/loopback address
+    (our reverse proxy / tunnel); then the right-most public entry wins, because proxies
+    append and everything to its left is client-controlled. A direct (public) peer cannot
+    spoof its address with a header.
+    """
+    peer = request.client.host if request.client else "unknown"
+    try:
+        peer_ip = ipaddress.ip_address(peer)
+    except ValueError:
+        return peer
+    if not (peer_ip.is_private or peer_ip.is_loopback):
+        return peer
+    forwarded = request.headers.get("x-forwarded-for", "")
+    for entry in reversed([e.strip() for e in forwarded.split(",") if e.strip()]):
+        try:
+            candidate = ipaddress.ip_address(entry)
+        except ValueError:
+            continue
+        if not (candidate.is_private or candidate.is_loopback):
+            return str(candidate)
+    return peer
 
 
 def _create_token(db: Session, user_id: int | None, token_type: str,
@@ -95,6 +117,22 @@ def _create_token(db: Session, user_id: int | None, token_type: str,
     ))
     db.commit()
     return token
+
+
+def _find_valid_token(db: Session, token: str, token_type: str) -> AuthToken | None:
+    """Return a valid, unused, unexpired token without consuming it."""
+    if not token:
+        return None
+    return db.query(AuthToken).filter(
+        AuthToken.token == token,
+        AuthToken.token_type == token_type,
+        AuthToken.used_at.is_(None),
+        AuthToken.expires_at > datetime.datetime.utcnow(),
+    ).first()
+
+
+def _too_many(bucket: str, request: Request, max_attempts: int, window: int = 600) -> bool:
+    return rate_limit.hit(bucket, _client_ip(request), max_attempts, window)
 
 
 def _consume_token(db: Session, token: str, token_type: str) -> AuthToken | None:
@@ -218,12 +256,26 @@ def register(
     invite: str = Form(""),
     db: Session = Depends(get_db),
 ):
-    errors = []
+    if _too_many("register", request, max_attempts=5):
+        return templates.TemplateResponse(
+            "auth/register.html",
+            {"request": request, "errors": ["Te veel pogingen. Probeer het over een paar minuten opnieuw."],
+             "username": username, "email": email, "invite": invite},
+            status_code=429,
+        )
 
-    # Validate invite if registration is closed
+    errors = []
+    username = username.strip()[:50]
+    clean_email = _clean_email(email)
+    if clean_email is None:
+        errors.append("Dit e-mailadres lijkt niet te kloppen")
+        clean_email = ""
+
+    # The invite is only checked here and consumed together with the user below, so a typo
+    # in the form does not burn it.
     invite_token = None
     if not REGISTRATION_OPEN:
-        invite_token = _consume_token(db, invite, "invite")
+        invite_token = _find_valid_token(db, invite, "invite")
         if not invite_token:
             errors.append("Ongeldige of verlopen uitnodigingslink.")
 
@@ -235,7 +287,7 @@ def register(
         errors.append("Wachtwoorden komen niet overeen")
     if db.query(User).filter(User.username == username).first():
         errors.append("Gebruikersnaam is al in gebruik")
-    if email and db.query(User).filter(User.email == email).first():
+    if clean_email and db.query(User).filter(func.lower(User.email) == clean_email).first():
         errors.append("Dit e-mailadres is al in gebruik")
 
     if errors:
@@ -252,11 +304,25 @@ def register(
     user = User(
         username=username,
         password_hash=hash_password(password),
-        email=email.strip() or None,
-        is_verified=0 if (REQUIRE_EMAIL_VERIFICATION and email) else 1,
+        email=clean_email or None,
+        is_verified=0 if (REQUIRE_EMAIL_VERIFICATION and clean_email) else 1,
         is_admin=1 if is_first_user else 0,
     )
     db.add(user)
+    db.flush()
+    if invite_token is not None:
+        # Atomic claim: of two concurrent registrations with one invite only one wins.
+        claimed = db.query(AuthToken).filter(
+            AuthToken.id == invite_token.id, AuthToken.used_at.is_(None),
+        ).update({"used_at": datetime.datetime.utcnow()}, synchronize_session=False)
+        if claimed != 1:
+            db.rollback()
+            return templates.TemplateResponse(
+                "auth/register.html",
+                {"request": request, "errors": ["Ongeldige of verlopen uitnodigingslink."],
+                 "username": username, "email": email, "invite": invite},
+                status_code=400,
+            )
     db.commit()
     db.refresh(user)
 
@@ -310,8 +376,13 @@ def forgot_password(
     email: str = Form(...),
     db: Session = Depends(get_db),
 ):
-    # Always show the same message to prevent user enumeration
-    user = db.query(User).filter(User.email == email.strip()).first()
+    # Always show the same message to prevent user enumeration, also when rate limited
+    # (per IP and per address, so one mailbox cannot be flooded from many IPs either).
+    cleaned = (email or "").strip().lower()
+    limited = _too_many("forgot_ip", request, max_attempts=5) or (
+        bool(cleaned) and rate_limit.hit("forgot_email", cleaned, 3, 3600)
+    )
+    user = None if limited else db.query(User).filter(func.lower(User.email) == cleaned).first()
     if user and user.email:
         token = _create_token(db, user.id, "reset_password", hours=1)
         send_password_reset_email(user.email, token)
@@ -349,6 +420,13 @@ def reset_password(
     new_password_confirm: str = Form(...),
     db: Session = Depends(get_db),
 ):
+    if _too_many("reset", request, max_attempts=10):
+        return templates.TemplateResponse(
+            "auth/reset_password.html",
+            {"request": request, "token": token,
+             "errors": ["Te veel pogingen. Probeer het over een paar minuten opnieuw."]},
+            status_code=429,
+        )
     errors = []
     if len(new_password) < 8:
         errors.append("Wachtwoord moet minimaal 8 tekens zijn")
@@ -698,11 +776,20 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
             "google_login_enabled": True,
         })
 
-    email = userinfo["email"]
+    # Without a verified address anyone could claim a local account by registering that
+    # address at Google; never link or create on an unverified email.
+    if not userinfo.get("email_verified"):
+        return templates.TemplateResponse("auth/login.html", {
+            "request": request,
+            "error": "Je Google-e-mailadres is niet geverifieerd, dus we kunnen je niet inloggen.",
+            "google_login_enabled": True,
+        })
+
+    email = userinfo["email"].strip().lower()
     name = userinfo.get("name", email.split("@")[0])
 
-    # Look up existing user by email
-    user = db.query(User).filter(User.email == email).first()
+    # Look up existing user by email (case-insensitive)
+    user = db.query(User).filter(func.lower(User.email) == email).first()
 
     if not user:
         if not REGISTRATION_OPEN:
@@ -747,8 +834,14 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
     return set_session_cookie(response, user.id, user.session_version)
 
 
-@router.get("/logout")
+@router.post("/logout")
 def logout():
-    response = RedirectResponse("/login", status_code=302)
+    response = RedirectResponse("/login", status_code=303)
     response.delete_cookie(COOKIE_NAME)
     return response
+
+
+@router.get("/logout")
+def logout_get():
+    """A GET must not log anyone out (a cross-site <img src=/logout> would); go home instead."""
+    return RedirectResponse("/", status_code=302)

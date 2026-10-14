@@ -2168,3 +2168,8 @@ a.cell-display:hover { text-decoration: none; color: inherit; }
 .scenario-budget-delta { font-variant-numeric: tabular-nums; }
 .scenario-budget-delta.pos { color: var(--orange); }
 .scenario-budget-delta.neg { color: var(--red, #d13c3c); }
+
+/* Uitloggen is een POST-formulier; de knop ziet eruit als de oude link. */
+.logout-form { display: inline; margin: 0; }
+button.nav-logout-link, button.m-nav-main { font: inherit; cursor: pointer; background: none; }
+button.m-nav-main { border: none; width: 100%; text-align: left; }
