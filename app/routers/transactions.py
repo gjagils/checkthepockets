@@ -7,13 +7,12 @@ import uuid
 import calendar as _calendar
 from datetime import date as date_type, timedelta, datetime as _datetime
 from decimal import Decimal, InvalidOperation
-from typing import List
-from urllib.parse import quote_plus, urlencode
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Request, UploadFile, File, Form, Query
 from fastapi.responses import RedirectResponse, StreamingResponse, JSONResponse
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func, or_, tuple_
+from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 
 from app.database import get_db
@@ -1001,7 +1000,7 @@ def export_transactions(
         ])
 
     output.seek(0)
-    filename = f"transacties-export.csv"
+    filename = "transacties-export.csv"
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type="text/csv",

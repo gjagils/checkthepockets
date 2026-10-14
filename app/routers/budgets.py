@@ -356,7 +356,6 @@ def budget_overview(
     # Use find_matching_transaction which handles encrypted fields correctly
     from app.recurring_schedule import get_period_range
     from app.recurring_service import find_matching_transaction
-    import calendar as cal
     expected_income = Decimal("0")
     for item in active_recurring:
         if not is_active_in_month(item, current_year, current_month):

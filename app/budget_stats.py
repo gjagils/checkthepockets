@@ -6,7 +6,6 @@ hanteren.
 """
 from __future__ import annotations
 
-import datetime
 from decimal import Decimal
 
 from sqlalchemy import func

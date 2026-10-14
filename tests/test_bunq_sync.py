@@ -22,7 +22,6 @@ from app.main import app
 from app.models import (
     Account, BunqAccountLink, BunqConnection, ImportBatch, Transaction, User,
 )
-from app.parsers.base import ParsedTransaction
 
 API_KEY = "sandbox_0123456789abcdef0123456789abcdef"
 

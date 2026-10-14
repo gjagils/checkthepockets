@@ -2,7 +2,7 @@
 import hashlib
 import os
 import tempfile
-from datetime import datetime, date, timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest

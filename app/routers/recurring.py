@@ -1,4 +1,3 @@
-import hashlib
 from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import List
@@ -6,7 +5,7 @@ from typing import List
 from fastapi import APIRouter, Depends, Request, Form, Query
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import func, or_
+from sqlalchemy import func
 
 from app.database import get_db
 from app.models import Account, Transaction, Category, RecurringTransaction, RecurringSuggestion

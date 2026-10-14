@@ -19,7 +19,6 @@ from app.auth import (
     require_login,
     user_start_page,
     allowed_start_pages,
-    START_PAGE_OPTIONS,
     COOKIE_NAME,
 )
 from app.config import (

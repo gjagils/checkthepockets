@@ -21,7 +21,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 from app.auth import LoginRequired, get_current_user
-from app.database import get_db
 from app.routers import auth, transactions, accounts, categories, rules, budgets, recurring, dashboard, savings, analytics, portfolio, networth, settings, admin, banking, bunq, inbox, persons, mortgage, info
 from app.scheduler import start_scheduler
 

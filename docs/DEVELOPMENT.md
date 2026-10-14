@@ -20,6 +20,7 @@ python -m pip install -r requirements-dev.txt
 python -m pip check
 python scripts/check_environment.py
 python -m pytest tests/ --tb=short
+python -m ruff check app tests alembic scripts   # statische controle (ook in de CI)
 ```
 
 Windows: gebruik `py -3.12 -m venv .venv` en activeer via
@@ -64,7 +65,7 @@ via Portainer; `docker-compose.yml` is geen complete lokale databaseomgeving.
   behouden. Open ondergrenzen worden bij lockgeneratie naar concrete versies opgelost.
 - `requirements.txt`: gegenereerde, exact gepinde runtime-dependencies inclusief
   transitieve packages. Docker installeert dit bestand.
-- `requirements-dev.in`: neemt de runtime-lock over en voegt pytest toe.
+- `requirements-dev.in`: neemt de runtime-lock over en voegt pytest, pytest-cov en ruff toe.
 - `requirements-dev.txt`: gegenereerde testomgeving met dezelfde runtimeversies.
 
 Wijzig `.in`-bestanden en genereer beide locks met onderstaande vastgelegde resolver.
@@ -106,3 +107,10 @@ Voor productie moet `ENVIRONMENT=production`, `APP_URL` een HTTPS-URL en
 voorbeeldwaarde zijn. De applicatie stopt bij opstarten wanneer deze voorwaarden
 niet gelden. In lokale ontwikkeling blijft HTTP toegestaan en worden Secure-cookies
 uitgeschakeld zodat localhost-login werkt.
+
+## Linten en dekking
+
+`make lint` draait `ruff check` met de regels uit `pyproject.toml` (nu syntaxfouten en pyflakes:
+ongebruikte imports en variabelen, ongedefinieerde namen). `make cov` toont testdekking zonder
+drempel; `make check` doet lint en tests zoals de CI. Het uitbreiden van de regelset (importvolgorde,
+`UP`, `B`) en `ruff format` gebeuren als aparte, mechanische wijzigingen.

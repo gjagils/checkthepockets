@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, Form, Query, Request
-from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session, joinedload
 
 from app.auth import require_login

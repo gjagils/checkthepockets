@@ -6,7 +6,7 @@ from decimal import Decimal
 from fastapi import APIRouter, Depends, Request, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import case, func, or_, and_
+from sqlalchemy import case, func, or_
 
 from app.database import get_db
 from app.models import Account, Transaction, Category

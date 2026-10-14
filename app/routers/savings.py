@@ -1395,9 +1395,6 @@ def accept_ai_suggestion(
     db.flush()
 
     # Try to fill with actual transaction data
-    tx_totals = _get_transaction_totals_by_month(
-        db, plan.account_id, plan.year, category_id=None
-    )
     # For this line, match by searching transactions with the line name in counterparty
     search_name = name.strip().lower()
     all_txs = (
@@ -1456,7 +1453,6 @@ def analyze_savings(
 
     # Get all transactions for this account in the plan year
     from sqlalchemy.orm import joinedload as jl
-    from app.models import Category as Cat
     transactions = (
         db.query(Transaction)
         .options(jl(Transaction.category))

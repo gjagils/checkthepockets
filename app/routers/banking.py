@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from app.auth import require_login
 from app.config import APP_URL, ENABLE_BANKING_APP_ID, SUPER_ADMIN_USERNAME
 from app.database import get_db
-from app.models import Account, BankConnection, Transaction, Rule, Category, ImportBatch
+from app.models import Account, BankConnection, Rule, ImportBatch
 from app.parsers.base import ParsedTransaction
 from app.enable_banking import safe_error_message
 from app.import_service import store_parsed_transactions

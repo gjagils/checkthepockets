@@ -1,0 +1,19 @@
+# Tooling-configuratie. De applicatie zelf wordt niet als pakket geïnstalleerd; dependencies staan in
+# requirements*.in (bron) en requirements*.txt (lock, gegenereerd met uv; zie docs/DEVELOPMENT.md).
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+extend-exclude = ["alembic/versions"]
+
+[tool.ruff.lint]
+# Begonnen met correctheid: syntaxfouten en pyflakes (ongebruikte imports/variabelen, ongedefinieerde namen).
+# Uitbreiden naar I (importvolgorde), UP en B volgt als aparte, mechanische commit (ACT-37b).
+select = ["E9", "F"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["app"]
+omit = ["app/docs/*"]

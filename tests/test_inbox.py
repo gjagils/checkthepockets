@@ -102,7 +102,7 @@ def test_inbox_shows_only_uncategorized_of_current_user(db_session):
     acc_b = _make_account(db_session, bob, "Bob Main")
     cat = _make_category(db_session, alice, "Boodschappen")
 
-    tx_uncat = _make_tx(db_session, acc_a, category_id=None, counterparty="AH", tag="u1")
+    _make_tx(db_session, acc_a, category_id=None, counterparty="AH", tag="u1")
     _make_tx(db_session, acc_a, category_id=cat.id, counterparty="Jumbo", tag="c1")
     _make_tx(db_session, acc_b, category_id=None, counterparty="Other", tag="other")
 

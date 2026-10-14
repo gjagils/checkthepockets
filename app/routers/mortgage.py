@@ -26,7 +26,6 @@ from app.models import (
 )
 from app.mortgage_rate_ocr import extract_rate_text
 from app.mortgage_rate_parser import (
-    ParsedRate,
     compare_with_existing,
     parse_bulk_rates,
 )

@@ -45,6 +45,8 @@ colorama==0.4.6 ; sys_platform == 'win32'
     # via
     #   -r requirements.txt
     #   pytest
+coverage==7.16.2
+    # via pytest-cov
 cryptography==43.0.3
     # via
     #   -r requirements.txt
@@ -127,7 +129,9 @@ pillow==12.3.0
     #   -r requirements.txt
     #   pdfplumber
 pluggy==1.6.0
-    # via pytest
+    # via
+    #   pytest
+    #   pytest-cov
 psycopg2-binary==2.9.10
     # via -r requirements.txt
 pycparser==3.0 ; implementation_name != 'PyPy' and platform_python_implementation != 'PyPy'
@@ -150,6 +154,10 @@ pypdfium2==5.13.0
     #   -r requirements.txt
     #   pdfplumber
 pytest==8.3.4
+    # via
+    #   -r requirements-dev.in
+    #   pytest-cov
+pytest-cov==7.1.0
     # via -r requirements-dev.in
 python-dotenv==1.0.1
     # via -r requirements.txt
@@ -171,6 +179,8 @@ requests==2.32.3
     #   resend
 resend==2.4.0
     # via -r requirements.txt
+ruff==0.17.0
+    # via -r requirements-dev.in
 six==1.17.0
     # via
     #   -r requirements.txt

@@ -1,4 +1,3 @@
-from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Depends, Request, Form, Query
 from fastapi.responses import RedirectResponse, JSONResponse
@@ -6,7 +5,6 @@ from sqlalchemy.orm import Session
 
 import logging
 from collections import defaultdict
-from decimal import Decimal
 
 logger = logging.getLogger(__name__)
 
@@ -362,7 +360,6 @@ def suggestion_transactions(suggestion_id: int, request: Request, db: Session = 
         return JSONResponse({"transactions": []})
 
     # In-Python filtering (encrypted fields don't support ILIKE)
-    from datetime import timedelta, date
     all_txs = (
         db.query(Transaction)
         .join(Account)

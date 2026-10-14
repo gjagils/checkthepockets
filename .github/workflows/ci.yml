@@ -34,6 +34,9 @@ jobs:
           python -m pip check
           python scripts/check_environment.py
 
+      - name: Lint (ruff)
+        run: python -m ruff check app tests alembic scripts
+
       - name: Run tests
         run: python -m pytest tests/ --tb=short
 

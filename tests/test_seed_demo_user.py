@@ -4,7 +4,6 @@ from __future__ import annotations
 import os
 import tempfile
 from datetime import date
-from decimal import Decimal
 
 import pytest
 
@@ -136,7 +135,7 @@ def test_seed_creates_demo_user_with_expected_volume(db_session):
 def test_seed_is_idempotent(db_session):
     today = date(2026, 6, 15)
 
-    first = seed_demo_user(today=today, db=db_session)
+    seed_demo_user(today=today, db=db_session)
     first_volume = (
         db_session.query(Transaction).count(),
         db_session.query(Budget).count(),

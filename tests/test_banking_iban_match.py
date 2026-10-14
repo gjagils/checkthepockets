@@ -166,8 +166,8 @@ def test_orphan_detects_bunq_tx_on_abn_via_iban_hint(db_session):
     gebruiker heeft ook een bunq-rekening → moet als verdacht getoond worden."""
     admin = _make_user(db_session)
     abn = _make_account(db_session, admin, "ABN Samen Betaal", "abn_amro", "NL91ABNA0417164300")
-    bunq = _make_account(db_session, admin, "Bunq Samen spaar", "bunq", "NL81BUNQ2088619097")
-    tx = _make_tx(
+    _make_account(db_session, admin, "Bunq Samen spaar", "bunq", "NL81BUNQ2088619097")
+    _make_tx(
         db_session, abn,
         datetime.date(2026, 4, 19),
         Decimal("4.03"),

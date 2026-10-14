@@ -98,7 +98,7 @@ def test_root_shows_landing_when_logged_out():
 
 
 def test_login_redirects_to_start_page(db_session):
-    u = _make_user(db_session, "alice", start_page="/savings")
+    _make_user(db_session, "alice", start_page="/savings")
 
     client = TestClient(app, follow_redirects=False)
     resp = client.post("/login", data={"username": "alice", "password": "password123"})
