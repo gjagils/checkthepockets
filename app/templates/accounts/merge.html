@@ -5,6 +5,7 @@
     <h1>Rekening samenvoegen</h1>
 </div>
 
+{% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
 <div class="card">
     <p>Voeg <strong>{{ source.name or source.bank|upper }}</strong>
         ({{ source.transactions|length }} transacties) samen met een andere rekening.

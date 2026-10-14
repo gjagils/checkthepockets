@@ -50,21 +50,44 @@ def _same_booking(source: Transaction, target: Transaction) -> bool:
 def plan_merge(db: Session, source: Account, target: Account) -> MergePlan:
     """Decide per source transaction whether it moves or duplicates a target one."""
     plan = MergePlan()
+    target_txs = db.query(Transaction).filter(Transaction.account_id == target.id).order_by(Transaction.id).all()
+    by_hash = {t.import_hash: t for t in target_txs}  # unique per account
     candidates: dict[tuple, list[Transaction]] = {}
-    for tx in db.query(Transaction).filter(Transaction.account_id == target.id).order_by(Transaction.id):
+    for tx in target_txs:
         candidates.setdefault((tx.date, tx.amount), []).append(tx)
 
-    for tx in db.query(Transaction).filter(Transaction.account_id == source.id).order_by(Transaction.date, Transaction.id):
+    source_txs = (
+        db.query(Transaction).filter(Transaction.account_id == source.id)
+        .order_by(Transaction.date, Transaction.id).all()
+    )
+    matches: dict[int, Transaction] = {}
+    claimed: set[int] = set()
+
+    # Pass 1: an identical import_hash is always the same booking, whatever the visible
+    # date is now (linking to a recurring item can shift it). It must claim its target
+    # first: otherwise a fuzzy match could take it and the exact twin would be moved,
+    # violating the unique (account, import_hash) index.
+    for tx in source_txs:
+        match = by_hash.get(tx.import_hash)
+        if match is not None:
+            matches[tx.id] = match
+            claimed.add(match.id)
+
+    # Pass 2: same booking by counterparty or description among what is left.
+    for tx in source_txs:
+        if tx.id in matches:
+            continue
         pool = candidates.get((tx.date, tx.amount), [])
-        # An exact hash match wins over a fuzzy one.
-        match = next((t for t in pool if t.import_hash == tx.import_hash), None)
-        if match is None:
-            match = next((t for t in pool if _same_booking(tx, t)), None)
-        if match is None:
-            plan.move.append(tx)
+        match = next((t for t in pool if t.id not in claimed and _same_booking(tx, t)), None)
+        if match is not None:
+            claimed.add(match.id)
+            matches[tx.id] = match
+
+    for tx in source_txs:
+        if tx.id in matches:
+            plan.duplicates.append(MergePair(source=tx, target=matches[tx.id]))
         else:
-            pool.remove(match)
-            plan.duplicates.append(MergePair(source=tx, target=match))
+            plan.move.append(tx)
     return plan
 
 
