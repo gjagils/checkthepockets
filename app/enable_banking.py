@@ -11,6 +11,8 @@ from urllib.parse import urlsplit
 from app.config import ENABLE_BANKING_APP_ID, ENABLE_BANKING_PRIVATE_KEY_PATH
 
 API_BASE = "https://api.enablebanking.com"
+# (connect, read) seconds: a hanging connection must not block the scheduler thread forever.
+TIMEOUT = (5, 30)
 
 
 def _load_private_key() -> bytes:
@@ -107,7 +109,7 @@ def list_banks(country: str = "NL", psu_type: str | None = None) -> list[dict]:
     Met psu_type (bv. "personal") worden alleen banken teruggegeven die dat
     type klant ondersteunen — een business-only bank geeft anders een 422
     bij /auth."""
-    r = requests.get(f"{API_BASE}/aspsps", params={"country": country}, headers=_headers())
+    r = requests.get(f"{API_BASE}/aspsps", params={"country": country}, headers=_headers(), timeout=TIMEOUT)
     _check(r)
     banks = r.json().get("aspsps", [])
     if psu_type:
@@ -166,41 +168,41 @@ def start_authorization(
         "redirect_url": redirect_url,
         "psu_type": psu_type,
     }
-    r = requests.post(f"{API_BASE}/auth", json=body, headers=_headers())
+    r = requests.post(f"{API_BASE}/auth", json=body, headers=_headers(), timeout=TIMEOUT)
     _check(r)
     return r.json()
 
 
 def create_session(code: str) -> dict:
     """Exchange authorization code for a session. Returns {session_id, accounts: [...]}."""
-    r = requests.post(f"{API_BASE}/sessions", json={"code": code}, headers=_headers())
+    r = requests.post(f"{API_BASE}/sessions", json={"code": code}, headers=_headers(), timeout=TIMEOUT)
     _check(r)
     return r.json()
 
 
 def get_session(session_id: str) -> dict:
     """Get session status and accounts."""
-    r = requests.get(f"{API_BASE}/sessions/{session_id}", headers=_headers())
+    r = requests.get(f"{API_BASE}/sessions/{session_id}", headers=_headers(), timeout=TIMEOUT)
     _check(r)
     return r.json()
 
 
 def delete_session(session_id: str) -> None:
     """Revoke consent and delete session."""
-    r = requests.delete(f"{API_BASE}/sessions/{session_id}", headers=_headers())
+    r = requests.delete(f"{API_BASE}/sessions/{session_id}", headers=_headers(), timeout=TIMEOUT)
     _check(r)
 
 
 def get_account_details(account_uid: str) -> dict:
     """Get account holder info and IBAN."""
-    r = requests.get(f"{API_BASE}/accounts/{account_uid}/details", headers=_headers())
+    r = requests.get(f"{API_BASE}/accounts/{account_uid}/details", headers=_headers(), timeout=TIMEOUT)
     _check(r)
     return r.json()
 
 
 def get_balances(account_uid: str) -> dict:
     """Get current balances for an account."""
-    r = requests.get(f"{API_BASE}/accounts/{account_uid}/balances", headers=_headers())
+    r = requests.get(f"{API_BASE}/accounts/{account_uid}/balances", headers=_headers(), timeout=TIMEOUT)
     _check(r)
     return r.json()
 
@@ -223,6 +225,7 @@ def get_transactions(
             f"{API_BASE}/accounts/{account_uid}/transactions",
             params=params,
             headers=_headers(),
+            timeout=TIMEOUT,
         )
         _check(r)
         data = r.json()

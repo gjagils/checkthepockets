@@ -5,7 +5,10 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from app.database import get_db
-from app.models import Account, Category, Transaction
+from app.models import (
+    Account, Budget, BudgetPresetLine, Category, MortgageScenarioBudget, RecurringSuggestion,
+    RecurringTransaction, Rule, RuleSuggestion, SavingsLine, Transaction,
+)
 from app.auth import require_login
 from app.template_config import templates
 
@@ -401,6 +404,41 @@ def reorder_categories(
     return JSONResponse({"ok": True})
 
 
+def delete_category_tree(db: Session, user_id: int, category_id: int) -> None:
+    """Delete a category and its subcategories without violating foreign keys.
+
+    PostgreSQL enforces what SQLite tests do not: transactions, savings lines and budgets
+    reference categories without ON DELETE, and budgets are NOT NULL. So transactions and
+    savings lines are detached (category cleared), budget rows of these categories are
+    removed, optional references (rules, recurring items, suggestions) are cleared, and
+    only then the categories themselves are deleted.
+    """
+    ids = [category_id]
+    frontier = [category_id]
+    while frontier:
+        children = [
+            row.id for row in db.query(Category.id).filter(
+                Category.parent_id.in_(frontier), Category.user_id == user_id)
+        ]
+        frontier = [c for c in children if c not in ids]
+        ids.extend(frontier)
+
+    for model, column in (
+        (Transaction, "category_id"), (SavingsLine, "category_id"),
+        (RecurringTransaction, "category_id"), (RuleSuggestion, "category_id"),
+        (RecurringSuggestion, "category_id"), (Rule, "assign_category_id"),
+    ):
+        db.query(model).filter(getattr(model, column).in_(ids)).update(
+            {column: None}, synchronize_session=False)
+    for model in (Budget, BudgetPresetLine, MortgageScenarioBudget):
+        db.query(model).filter(model.category_id.in_(ids)).delete(synchronize_session=False)
+
+    # Children first so no row still points at a parent that is already gone.
+    db.query(Category).filter(Category.id.in_(ids), Category.id != category_id).delete(
+        synchronize_session=False)
+    db.query(Category).filter(Category.id == category_id).delete(synchronize_session=False)
+
+
 @router.post("/{category_id}/delete")
 def delete_category(
     request: Request,
@@ -421,12 +459,7 @@ def delete_category(
     if not cat:
         return RedirectResponse(redirect_url, status_code=302)
 
-    db.query(Category).filter(
-        Category.parent_id == category_id,
-        Category.user_id == user.id,
-    ).delete()
-
-    db.delete(cat)
+    delete_category_tree(db, user.id, category_id)
     db.commit()
 
     return RedirectResponse(redirect_url, status_code=302)

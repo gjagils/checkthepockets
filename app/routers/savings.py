@@ -123,6 +123,8 @@ def _get_transaction_totals_by_month(
         )
         .filter(
             Transaction.account_id == account_id,
+            Transaction.is_excluded == 0,
+            Transaction.is_projected == 0,
             func.extract("year", Transaction.date) == year,
         )
     )
@@ -139,6 +141,8 @@ def _has_transactions_in_month(db: Session, account_id: int, year: int, month: i
         db.query(Transaction.id)
         .filter(
             Transaction.account_id == account_id,
+            Transaction.is_excluded == 0,
+            Transaction.is_projected == 0,
             func.extract("year", Transaction.date) == year,
             func.extract("month", Transaction.date) == month,
         )
