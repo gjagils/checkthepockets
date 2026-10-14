@@ -352,9 +352,10 @@ def budget_overview(
         )
         .all()
     )
-    # Use find_matching_transaction which handles encrypted fields correctly
+    # Use MatchContext, which handles the encrypted fields in Python and loads each period once
     from app.recurring_schedule import get_period_range
-    from app.recurring_service import find_matching_transaction
+    from app.recurring_service import MatchContext
+    ctx = MatchContext(db, user.id)
     expected_income = Decimal("0")
     for item in active_recurring:
         if not is_active_in_month(item, current_year, current_month):
@@ -364,7 +365,7 @@ def budget_overview(
         period_start, period_end = get_period_range(
             item.frequency, datetime.date(current_year, current_month, 1)
         )
-        matched = find_matching_transaction(db, user.id, item, period_start, period_end)
+        matched = ctx.find(item, period_start, period_end)
         if not matched:
             expected_income += item.amount_expected
 
