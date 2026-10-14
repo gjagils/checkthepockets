@@ -30,8 +30,9 @@ macOS en Linux worden gecontroleerd; Windows is hiermee niet afzonderlijk getest
 
 De huidige tests maken SQLite-testdatabases aan en simuleren externe diensten.
 Gebruik een schone shell zonder productievariabelen of een productie-`.env`.
-Voeg nooit echte banktokens of productie-dumps toe voor tests. PostgreSQL-integratie
-met Alembic-migraties wordt apart behandeld in ACT-03; SQLite-tests bewijzen dat niet.
+Voeg nooit echte banktokens of productie-dumps toe voor tests. SQLite-tests bewijzen
+PostgreSQL-gedrag niet (bijvoorbeeld foreign keys en 32-bit-integers); de CI-job
+`postgres-migrations` controleert migraties en schema op PostgreSQL 16 (ACT-03).
 
 ## Lokaal de applicatie draaien
 
@@ -97,8 +98,8 @@ Een volledige containerbuild vraagt een draaiende Docker-daemon:
 docker build -t checkthepockets:local .
 ```
 
-Neem lokale sleutels niet mee in een buildcontext. ACT-08 behandelt de bestaande
-buildcontext-uitsluitingen. Een CI-build op een schone Git-checkout bevat geen lokale
+Neem lokale sleutels niet mee in een buildcontext; `.dockerignore` sluit `*.pem`, `keys/`,
+`.env` en `stack.env` uit (ACT-08). Een CI-build op een schone Git-checkout bevat geen lokale
 niet-gevolgde sleutels. Productievalidatie en herstel staan in OPERATIONS.md.
 
 Voor productie moet `ENVIRONMENT=production`, `APP_URL` een HTTPS-URL en

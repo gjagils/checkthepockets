@@ -10,10 +10,12 @@ GitHub → GitHub Actions → GHCR → Tailscale → Portainer → Docker op Syn
 - [PR-CI](../.github/workflows/ci.yml): Python volgens `.python-version` (3.12), installatie van
   `requirements-dev.txt`, omgevingscontrole en `python -m pytest tests/ --tb=short`.
 - [Deployment](../.github/workflows/deploy.yml): push naar main bouwt images en
-  werkt Portainer bij. Markdown-wijzigingen zijn uitgesloten van de deploytrigger.
+  werkt Portainer bij. Wijzigingen in alleen de Markdown in de repository-root, `docs/`
+  of `.claude/` triggeren geen deployment; `app/docs/` (de kennisbank in het image) wel.
+  Deployments lopen na elkaar (`concurrency: deploy-main`).
 - Containerstart voert `alembic upgrade head` uit vóór Uvicorn.
-- Huidige app-image: `ghcr.io/gjagils/checkthepockets:latest`; overgang naar
-  specifieke releaseversies is gepland in ACT-14.
+- App-image: `ghcr.io/gjagils/checkthepockets:<commit-sha>` (ook `latest`); de deployment
+  zet `IMAGE_TAG` op de commit, zodat een eerdere versie terug te zetten is (ACT-14).
 
 De echte workflowbestanden bepalen het gedrag; controleer die voordat je releaset.
 Dit document legt bestaande infrastructuur vast, maar beweert niet dat de
@@ -30,19 +32,20 @@ Runtimevariabelen staan beschreven in [app/config.py](../app/config.py),
 [.env.example](../.env.example) en de composebestanden. Productiewaarden horen in
 het daarvoor bestemde secrets-/deploymentbeheer, niet in documentatie of commits.
 Een nieuwe bijdrager krijgt die toegang apart; geen coding-agentplugin is vereist.
-`stack.env` wordt momenteel nog door Git gevolgd: ACT-08 behandelt onderzoek en
-verwijdering uit tracking. Kopieer geen bestaande waarden naar voorbeelden.
+`stack.env` wordt niet meer door Git gevolgd en staat in `.gitignore` en `.dockerignore`
+(ACT-08). Kopieer geen bestaande waarden naar voorbeelden.
 
 ## Verificatie en herstel
 
 Gebruik een geïsoleerde testdatabase, nooit de productiedatabase, voor tests en
 migratieproeven. De [ontwikkelhandleiding](DEVELOPMENT.md) beschrijft de reproduceerbare
-Python-omgeving en locks. PostgreSQL-/migratiecontroles volgen in ACT-03.
+Python-omgeving en locks. De CI-job `postgres-migrations` controleert migraties en schema
+op PostgreSQL 16 (ACT-03).
 Vermeld bij testresultaten altijd afwijkingen van de vastgelegde omgeving.
 
 Controleer bij een release PR-CI, build/deploy-run, containerstatus, applicatielogs
 en de relevante gebruikersroute. Meld welke controles niet uitgevoerd konden
-worden. ACT-13 en ACT-14 automatiseren dit verder.
+worden. De deployment faalt bij een fout van Portainer (ACT-13).
 De regels voor foutafhandeling en loginhoud staan in
 [ERROR-HANDLING.md](ERROR-HANDLING.md); logs bevatten geen tokens, bank-ID's of
 transactie-inhoud.

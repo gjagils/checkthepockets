@@ -15,7 +15,7 @@ from starlette.middleware.sessions import SessionMiddleware
 # de default root-level WARNING is en er geen handler op stdout staat.
 # LOG_LEVEL kan via env-var worden overschreven (DEBUG/INFO/WARNING/ERROR).
 logging.basicConfig(
-    level=os.getenv("LOG_LEVEL", "INFO").upper(),
+    level=(os.getenv("LOG_LEVEL") or "INFO").upper(),
     format="%(asctime)s %(levelname)-8s [%(name)s] %(message)s",
 )
 logger = logging.getLogger(__name__)

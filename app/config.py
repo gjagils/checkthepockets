@@ -9,7 +9,7 @@ DATABASE_URL = os.getenv(
 )
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development").lower()
 SECRET_KEY = os.getenv("SECRET_KEY", "change-me-in-production")
-SESSION_MAX_AGE = int(os.getenv("SESSION_MAX_AGE", "86400"))  # 24 hours
+SESSION_MAX_AGE = int(os.getenv("SESSION_MAX_AGE") or "86400")  # 24 hours; een lege waarde telt als niet gezet
 
 # Sprint 14 — Auth & security
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
@@ -63,4 +63,4 @@ def validate_production_config() -> None:
         raise RuntimeError("Unsafe production configuration: " + "; ".join(errors))
 
 # bunq API (ACT-31). Zet op https://public-api.sandbox.bunq.com/v1 om te testen met nepgeld.
-BUNQ_API_BASE = os.getenv("BUNQ_API_BASE", "https://api.bunq.com/v1")
+BUNQ_API_BASE = os.getenv("BUNQ_API_BASE") or "https://api.bunq.com/v1"

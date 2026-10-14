@@ -9,7 +9,7 @@ acceptatiecriteria, besluiten en overdracht. Chatgeschiedenis, Linear, MCP,
 plugins, persoonlijke skills en lokale agentinstellingen zijn niet vereist.
 Bestaande Linear-issues zijn niet automatisch gemigreerd: neem relevante issues
 alleen op na controle op overlap, met een verwijzing naar hun oorspronkelijke ID.
-`BACKLOG.md` blijft een historisch archief en krijgt geen nieuwe acties.
+[`docs/archive/BACKLOG.md`](archive/BACKLOG.md) blijft een historisch archief en krijgt geen nieuwe acties.
 
 Deze werkwijze vervangt de eerdere Linear-routine en agentgebonden ready-labels.
 Ook als een oude lokale skill anders zegt, gebruik je voor dit verbeterprogramma
@@ -64,8 +64,8 @@ De gebruiker heeft op 2026-09-23 uitvoering vrijgegeven onder deze voorwaarden:
   linkcontrole en `git diff --check`.
 - Gebruik de Python-versie uit `.github/workflows/ci.yml` (bij opstellen: 3.12)
   en de dependencies uit de repository. Leg afwijkende omgevingen vast.
-- De bestaande testopdracht is `python -m pytest tests/ --tb=short`.
-  Dit is nog geen garantie van reproduceerbaarheid: daarvoor bestaat ACT-01.
+- De testopdracht is `python -m pytest tests/ --tb=short` in de Python-omgeving uit de
+  locks (ACT-01); afwijkende lokale omgevingen kunnen andere uitslagen geven.
 - Leg testopdrachten, uitslag en beperkingen in de overdracht vast. Presenteer
   een lokale fout met afwijkende dependencies niet als bewezen productiefout.
 - Houd geheimen, bankgegevens en productie-dumps buiten Git, PRs en logs.
