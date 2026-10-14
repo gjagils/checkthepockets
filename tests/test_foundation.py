@@ -1,6 +1,4 @@
 """ACT-39: de gedeelde testbasis (tests/conftest.py) doet wat hij belooft."""
-import os
-
 import pytest
 from sqlalchemy.exc import IntegrityError
 
@@ -16,8 +14,9 @@ def test_foreign_keys_are_enforced_like_in_postgresql(db):
 
 
 def test_there_is_one_shared_test_database():
-    assert str(engine.url).startswith("sqlite:///")
-    assert str(engine.url).endswith(os.environ["DATABASE_URL"].removeprefix("sqlite:///"))
+    from tests.conftest import _DB_FILE
+
+    assert engine.url.database == _DB_FILE.name
 
 
 @pytest.mark.parametrize("round_", [1, 2])
