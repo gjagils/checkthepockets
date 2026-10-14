@@ -67,3 +67,15 @@ en `last_sync_error`. Elke rekening draait in een eigen savepoint: een rekening 
 rekeningen van dezelfde koppeling (en andere koppelingen) onaangetast; de koppeling krijgt dan status
 `error` met de foutmelding (zonder account-id's). Controleer na een uitrol de scheduler-log
 (`/admin/scheduler`, "Recente runs") en de status van de koppeling op `/banking/connect`.
+
+## Scheduler: één proces, geen dubbele jobs
+
+De achtergrondjobs (banksync, bunq-sync, digests, vermogensplan) draaien in het webproces. Draai je meer
+dan één worker of container, dan heeft elk proces een eigen scheduler en zou elke job meerdere keren lopen.
+- Zet `SCHEDULER_ENABLED=false` in alle processen behalve één. Dit is het hoofdmiddel en werkt overal.
+- Optioneel: `SCHEDULER_LOCK=true` laat elke job een PostgreSQL advisory lock nemen, zodat hij ook zonder
+  bovenstaande instelling nooit tegelijk draait. Gebruik dit **alleen met een directe databaseverbinding**: achter
+  een transaction-pooler (een Neon-verbinding met `-pooler`) zijn sessie-locks onbetrouwbaar en kan een lock blijven
+  hangen, waardoor een job wordt overgeslagen. Standaard staat het daarom uit.
+- Jobs hebben `coalesce`, `max_instances=1` en `misfire_grace_time=3600`: na een herstart worden gemiste runs van
+  het afgelopen uur één keer ingehaald, nooit parallel.

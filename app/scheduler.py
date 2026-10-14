@@ -5,6 +5,8 @@ Uses APScheduler to run scheduled background jobs.
 """
 
 import functools
+import zlib
+from contextlib import contextmanager
 import logging
 import traceback
 from datetime import datetime, timedelta
@@ -17,9 +19,46 @@ from app.config import ENABLE_BANKING_APP_ID
 logger = logging.getLogger(__name__)
 
 NL_TZ = clock.NL_TZ  # zoneinfo; APScheduler 3.11 heeft pytz niet meer nodig
-scheduler = BackgroundScheduler(timezone=NL_TZ)
+# Eén run per job tegelijk; gemiste runs (bijv. na een herstart) binnen een uur nog inhalen, maar maximaal
+# één keer ("coalesce") in plaats van elke gemiste run apart.
+scheduler = BackgroundScheduler(
+    timezone=NL_TZ,
+    job_defaults={"coalesce": True, "max_instances": 1, "misfire_grace_time": 3600},
+)
 
 _SUMMARY_MAX_LEN = 5000
+
+
+@contextmanager
+def job_lock(job_id: str):
+    """Yield True when this process may run `job_id`, False when another process already does.
+
+    A PostgreSQL session-level advisory lock on a dedicated autocommit connection, held for the whole
+    job. With `--workers N` or a second container every process has its own scheduler; without this
+    each job would run N times (double bank imports, double digest mails). Off unless SCHEDULER_LOCK=true
+    (see config: session locks misbehave behind a transaction pooler such as Neon's), and other databases
+    (SQLite in tests) have no lock: always True.
+    """
+    from sqlalchemy import text
+
+    from app import config, database
+
+    engine = database.engine
+    if not config.SCHEDULER_LOCK or engine.dialect.name != "postgresql":
+        yield True
+        return
+    key = zlib.crc32(f"checkthepockets:{job_id}".encode())
+    conn = engine.connect().execution_options(isolation_level="AUTOCOMMIT")
+    acquired = False
+    try:
+        acquired = bool(conn.execute(text("SELECT pg_try_advisory_lock(:key)"), {"key": key}).scalar())
+        yield acquired
+    finally:
+        try:
+            if acquired:
+                conn.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": key})
+        finally:
+            conn.close()
 
 
 def logged_job(job_id: str):
@@ -34,6 +73,13 @@ def logged_job(job_id: str):
     def decorator(fn):
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
+            with job_lock(job_id) as acquired:
+                if not acquired:
+                    logger.info("Scheduler job %s draait al in een ander proces; overgeslagen", job_id)
+                    return "overgeslagen: draait al in een ander proces"
+                return _run_logged(fn, job_id, *args, **kwargs)
+
+        def _run_logged(fn, job_id, *args, **kwargs):
             from app.database import SessionLocal
             from app.models import SchedulerRunLog
 

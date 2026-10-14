@@ -81,9 +81,9 @@ jobs:
           DATABASE_URL: postgresql://checkthepockets:checkthepockets@localhost:5432/checkthepockets_ci
         run: python scripts/check_postgres_schema.py
 
-      - name: Migration tests (drift, up/down/up, data cases)
+      - name: PostgreSQL tests (migrations, scheduler lock)
         env:
           POSTGRES_TEST_URL: postgresql://checkthepockets:checkthepockets@localhost:5432/checkthepockets_ci
         run: |
           python -m pip install pytest==8.3.4
-          python -m pytest tests/test_migrations_postgres.py --tb=short -p no:warnings
+          python -m pytest tests/test_migrations_postgres.py tests/test_scheduler_lock_postgres.py --tb=short -p no:warnings
