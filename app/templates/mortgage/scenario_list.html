@@ -7,15 +7,15 @@
 </div>
 
 {% if flash == 'created' %}
-<div class="card" style="margin-bottom:1rem; background:#e7f5e7; border:1px solid #4caf50;">
+<div class="card card-success">
     <strong>✓</strong> Scenario aangemaakt.
 </div>
 {% elif flash == 'archived' %}
-<div class="card" style="margin-bottom:1rem; background:#e7f5e7; border:1px solid #4caf50;">
+<div class="card card-success">
     <strong>✓</strong> Scenario gearchiveerd.
 </div>
 {% elif flash == 'unarchived' %}
-<div class="card" style="margin-bottom:1rem; background:#e7f5e7; border:1px solid #4caf50;">
+<div class="card card-success">
     <strong>✓</strong> Scenario hersteld.
 </div>
 {% endif %}

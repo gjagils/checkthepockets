@@ -154,7 +154,7 @@
         <div class="card" style="margin-bottom:1rem; border-left:4px solid var(--gold);">
             <h3 style="margin-bottom:0.75rem; color:var(--navy);">
                 Verwacht deze periode
-                <span class="pill" style="background:rgba(249,168,0,0.15); color:#b07500; margin-left:0.4rem;">{{ items_due|length }}</span>
+                <span class="pill" style="background:rgba(249,168,0,0.15); color:var(--orange); margin-left:0.4rem;">{{ items_due|length }}</span>
             </h3>
             {% for entry in items_due %}
             {% set item = entry.item %}
