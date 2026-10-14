@@ -212,6 +212,7 @@ def merge_account_page(
     request: Request,
     target_id: int | None = None,
     db: Session = Depends(get_db),
+    error: str | None = None,
 ):
     """Choose a target account and preview what merging would do."""
     user = require_login(request, db)
@@ -232,7 +233,7 @@ def merge_account_page(
         "accounts/merge.html",
         {
             "request": request, "user": user, "source": source, "others": others,
-            "target": target, "plan": plan,
+            "target": target, "plan": plan, "error": error,
             "move_count": len(plan.move) if plan else 0,
             "duplicate_count": len(plan.duplicates) if plan else 0,
         },
@@ -251,8 +252,16 @@ def merge_account(
     target = _own_account(db, user.id, target_id)
     if not source or not target or source.id == target.id:
         return RedirectResponse("/accounts", status_code=302)
-    result = merge_accounts(db, source, target)
-    db.commit()
+    try:
+        result = merge_accounts(db, source, target)
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.exception("Samenvoegen van rekening %s in %s mislukt", account_id, target_id)
+        return merge_account_page(
+            account_id, request, target_id=target_id, db=db,
+            error="Samenvoegen is niet gelukt. Er is niets gewijzigd; zie de serverlog voor de oorzaak.",
+        )
     logger.info(
         "Account %s samengevoegd in %s: %d verplaatst, %d dubbel samengevoegd",
         account_id, target.id, result.moved, result.merged_duplicates,

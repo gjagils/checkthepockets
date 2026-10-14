@@ -164,3 +164,62 @@ def test_other_users_cannot_merge_my_accounts(db):
     client.post(f"/accounts/{source.id}/merge", data={"target_id": target.id})
     db.expire_all()
     assert db.query(Account).filter_by(id=source.id).first() is not None
+
+
+def test_exact_hash_match_is_not_stolen_by_a_fuzzy_match(db):
+    """Twee bronregels met dezelfde tegenpartij op één dag, één doelregel met de hash van de tweede.
+
+    Zonder voorrang voor exacte hashes pakt de eerste bronregel de doelregel via de tegenpartij;
+    de tweede wordt dan verplaatst en botst op de unieke (rekening, import_hash)-index.
+    """
+    _, source, target = _setup(db)
+    db.add_all([
+        _tx(source, 1, "-3.00", "Koffie", "csv-b", "omschrijving B"),
+        _tx(source, 1, "-3.00", "Koffie", "csv-a", "omschrijving A"),
+        _tx(target, 1, "-3.00", "Koffie", "csv-a", "omschrijving A"),
+    ])
+    db.flush()
+    source_id = source.id
+
+    result = merge_accounts(db, source, target)
+    db.commit()
+
+    assert (result.moved, result.merged_duplicates) == (1, 1)
+    assert db.query(Transaction).count() == 2
+    assert db.query(Account).filter_by(id=source_id).first() is None
+
+
+def test_failed_merge_shows_an_error_and_keeps_data(db, monkeypatch):
+    user, source, target = _setup(db)
+    db.add(_tx(source, 1, "-10.00", "Albert Heijn", "csv-1"))
+    db.commit()
+    source_id, target_id = source.id, target.id
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("kapot")
+
+    monkeypatch.setattr("app.routers.accounts.merge_accounts", boom)
+    client = TestClient(app, follow_redirects=False)
+    client.cookies.set("session", create_session_cookie(user.id))
+    resp = client.post(f"/accounts/{source_id}/merge", data={"target_id": target_id})
+    assert resp.status_code == 200
+    assert "niet gelukt" in resp.text
+    db.expire_all()
+    assert db.query(Account).filter_by(id=source_id).first() is not None
+    assert db.query(Transaction).count() == 1
+
+
+def test_same_hash_with_shifted_visible_date_is_a_duplicate_not_a_move(db):
+    """Koppelen aan een terugkerende post kan de zichtbare datum verschuiven; de hash blijft."""
+    _, source, target = _setup(db)
+    db.add_all([
+        _tx(source, 31, "-900.00", "Hypotheek", "same-hash", "termijn"),
+        Transaction(account_id=target.id, date=date(2026, 6, 1), amount=Decimal("-900.00"),
+                    counterparty="Hypotheek", description="termijn", import_hash="same-hash",
+                    original_date=date(2026, 5, 31)),
+    ])
+    db.flush()
+    result = merge_accounts(db, source, target)
+    db.commit()
+    assert (result.moved, result.merged_duplicates) == (0, 1)
+    assert db.query(Transaction).count() == 1
