@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}bunq koppelen - Check Your Pockets{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>bunq koppelen</h1>
+    <p class="subtitle">Verbind met je eigen bunq API-sleutel en bekijk welke rekeningen bunq teruggeeft. Er worden nog geen transacties geïmporteerd.</p>
+</div>
+
+{% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+{% if sandbox %}<div class="alert">Testmodus: verbonden met de bunq-sandbox.</div>{% endif %}
+
+<div class="card" style="margin-bottom:1.5rem;">
+    {% if connection %}
+    <h2>Sleutel opgeslagen</h2>
+    <p class="muted">Versleuteld bewaard. Laatste controle:
+        {% if connection.last_checked_at %}{{ connection.last_checked_at.strftime('%d-%m-%Y %H:%M') }} ({{ 'gelukt' if connection.last_status == 'ok' else 'mislukt' }}){% else %}nog niet{% endif %}</p>
+    <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+        <form method="post" action="/banking/bunq/check"><button type="submit" class="btn btn-primary">Rekeningen ophalen</button></form>
+        <form method="post" action="/banking/bunq/delete"
+              onsubmit="return confirm('Sleutel uit Check The Pockets verwijderen? Trek hem ook in via de bunq-app.')">
+            <button type="submit" class="btn btn-danger">Sleutel verwijderen</button>
+        </form>
+    </div>
+    {% else %}
+    <h2>API-sleutel invoeren</h2>
+    {% if not encryption_ready %}
+    <div class="alert alert-error">Veldversleuteling staat niet aan; de sleutel wordt dan niet opgeslagen.</div>
+    {% endif %}
+    <p class="muted" style="font-size:0.85rem;">Maak de sleutel aan in de bunq-app (Instellingen → Ontwikkelaars → API-sleutels).
+        De sleutel kan betalingen doen: bewaar hem nergens anders en plak hem alleen hier.
+        Hij wordt gebonden aan het IP-adres van deze server.</p>
+    <form method="post" action="/banking/bunq" autocomplete="off" style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+        <input type="password" name="api_key" placeholder="bunq API-sleutel" required style="min-width:20rem;" autocomplete="off">
+        <button type="submit" class="btn btn-primary" {% if not encryption_ready %}disabled{% endif %}>Opslaan</button>
+    </form>
+    {% endif %}
+</div>
+
+{% if accounts is not none %}
+<div class="card">
+    <h2>Rekeningen volgens bunq ({{ accounts|length }})</h2>
+    {% if accounts %}
+    <table class="table" style="font-size:0.9rem;">
+        <thead><tr><th>Naam</th><th>Soort</th><th>IBAN</th><th>Status</th><th style="text-align:right;">Saldo</th></tr></thead>
+        <tbody>
+        {% for a in accounts %}
+        <tr>
+            <td>{{ a.description or '—' }}</td>
+            <td>{{ a.kind|replace('MonetaryAccount', '') }}</td>
+            <td>{{ a.iban or '—' }}</td>
+            <td>{{ a.status }}</td>
+            <td style="text-align:right;">{% if a.balance is not none %}{{ a.currency }} {{ a.balance }}{% else %}—{% endif %}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}<p class="muted">bunq gaf geen rekeningen terug.</p>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

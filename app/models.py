@@ -843,3 +843,20 @@ class SchedulerRunLog(Base):
     finished_at = Column(DateTime, nullable=True)
     status = Column(String(16), nullable=False, default="running")  # running|ok|error
     summary = Column(Text, nullable=True)
+
+
+class BunqConnection(Base):
+    """Eigen bunq API-sleutel van een gebruiker (ACT-31). Alle geheimen zijn versleuteld."""
+    __tablename__ = "bunq_connections"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True)
+    api_key = Column(EncryptedText, nullable=False)
+    private_key_pem = Column(EncryptedText, nullable=True)       # eigen RSA-sleutel voor ondertekenen
+    installation_token = Column(EncryptedText, nullable=True)
+    last_checked_at = Column(DateTime, nullable=True)
+    last_status = Column(String(20), nullable=False, default="never")  # never, ok, error
+    last_error = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    user = relationship("User")
