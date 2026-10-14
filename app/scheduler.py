@@ -11,14 +11,13 @@ import traceback
 from datetime import datetime, timedelta
 
 from apscheduler.schedulers.background import BackgroundScheduler
-from pytz import timezone as pytz_timezone
 
 from app import clock
 from app.config import ENABLE_BANKING_APP_ID
 
 logger = logging.getLogger(__name__)
 
-NL_TZ = pytz_timezone("Europe/Amsterdam")
+NL_TZ = clock.NL_TZ  # zoneinfo; APScheduler 3.11 heeft pytz niet meer nodig
 scheduler = BackgroundScheduler(timezone=NL_TZ)
 
 _SUMMARY_MAX_LEN = 5000
