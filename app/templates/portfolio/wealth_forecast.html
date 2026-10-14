@@ -76,19 +76,19 @@
 {% block scripts %}
 <script>
 async function capturePlan(confirmed) {
-    const response = await fetch('/portfolio/wealth-plan/{{ year }}/capture', {
+    const response = await fetch('/portfolio/wealth-plan/' + {{ year|tojson }} + '/capture', {
         method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: 'confirmed=' + (confirmed ? 'true' : 'false')
     });
     if (response.status === 409) {
-        if (confirm('Dit vervangt het bestaande plan voor {{ year }}. Doorgaan?')) return capturePlan(true);
+        if (confirm('Dit vervangt het bestaande plan voor ' + {{ year|tojson }} + '. Doorgaan?')) return capturePlan(true);
         return;
     }
     if (response.ok) window.location.reload();
 }
 document.querySelectorAll('.wealth-adjustment').forEach(function(input) {
     input.addEventListener('change', async function() {
-        const body = new URLSearchParams({asset_id: input.dataset.asset, person_id: input.dataset.person, year: '{{ year }}', month: input.dataset.month, amount: input.value});
+        const body = new URLSearchParams({asset_id: input.dataset.asset, person_id: input.dataset.person, year: {{ year|tojson }}, month: input.dataset.month, amount: input.value});
         const response = await fetch('/portfolio/wealth-adjustments', {method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: body.toString()});
         if (response.ok) window.location.reload();
     });

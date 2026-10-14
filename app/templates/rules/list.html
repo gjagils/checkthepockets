@@ -613,7 +613,7 @@ function aiSuggest() {
     const body = new FormData();
     body.append('description', matchValue);
     {% if prefill and prefill.match_value %}
-    body.append('description', '{{ prefill.match_value|e }}');
+    body.append('description', {{ prefill.match_value|tojson }});
     {% endif %}
 
     fetch('/rules/suggest', { method: 'POST', body: body })

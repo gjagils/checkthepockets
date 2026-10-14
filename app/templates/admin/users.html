@@ -187,7 +187,7 @@
                             </button>
                         </form>
                         <form method="post" action="/admin/users/{{ u.id }}/delete" style="display:inline;"
-                              onsubmit="return confirm('Gebruiker {{ u.username }} en alle bijbehorende data permanent verwijderen?')">
+                              onsubmit='return confirm({{ ('Gebruiker ' ~ (u.username) ~ ' en alle bijbehorende data permanent verwijderen?')|tojson }})'>
                             <button type="submit" class="btn btn-sm btn-danger">Verwijder</button>
                         </form>
                     </div>
