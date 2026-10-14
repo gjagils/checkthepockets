@@ -401,6 +401,7 @@ def _render_recurring_page(
             }
 
     return templates.TemplateResponse(
+        request,
         "recurring/list.html",
         {
             "request": request, "user": user,

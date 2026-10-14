@@ -155,6 +155,7 @@ def mortgage_index(request: Request, db: Session = Depends(get_db)):
         .all()
     )
     return templates.TemplateResponse(
+        request,
         "mortgage/index.html",
         {"request": request, "user": user, "scenarios": scenarios},
     )
@@ -166,6 +167,7 @@ def household_form(request: Request, db: Session = Depends(get_db)):
     household = _get_or_create_household(db, user.id)
     saved = request.query_params.get("saved") == "1"
     return templates.TemplateResponse(
+        request,
         "mortgage/household.html",
         {"request": request, "user": user, "household": household, "saved": saved},
     )
@@ -276,6 +278,7 @@ def rates_index(request: Request, db: Session = Depends(get_db)):
     bulk_new = request.query_params.get("new")
     bulk_upd = request.query_params.get("upd")
     return templates.TemplateResponse(
+        request,
         "mortgage/rates.html",
         {
             "request": request,
@@ -399,6 +402,7 @@ def rates_bulk_preview(
     existing = _rates_for_user(db, user.id)
     new_rows, update_rows = compare_with_existing(parse_result.rows, existing)
     return templates.TemplateResponse(
+        request,
         "mortgage/rates.html",
         {
             "request": request,
@@ -434,6 +438,7 @@ async def rates_bulk_screenshot(
 
     if not ocr.ok:
         return templates.TemplateResponse(
+            request,
             "mortgage/rates.html",
             {
                 "request": request,
@@ -454,6 +459,7 @@ async def rates_bulk_screenshot(
     parse_result = parse_bulk_rates(ocr.text)
     new_rows, update_rows = compare_with_existing(parse_result.rows, existing)
     return templates.TemplateResponse(
+        request,
         "mortgage/rates.html",
         {
             "request": request,
@@ -483,6 +489,7 @@ def rates_bulk_import(
         existing = _rates_for_user(db, user.id)
         new_rows, update_rows = compare_with_existing(parse_result.rows, existing)
         return templates.TemplateResponse(
+            request,
             "mortgage/rates.html",
             {
                 "request": request,
@@ -644,6 +651,7 @@ def scenarios_list(
         .count()
     )
     return templates.TemplateResponse(
+        request,
         "mortgage/scenario_list.html",
         {
             "request": request,
@@ -660,6 +668,7 @@ def scenarios_list(
 def scenarios_new(request: Request, db: Session = Depends(get_db)):
     user = _require_mortgage_access(request, db)
     return templates.TemplateResponse(
+        request,
         "mortgage/scenario_form.html",
         {"request": request, "user": user, "scenario": None, "mode": "new"},
     )
@@ -944,6 +953,7 @@ def scenarios_detail(
     chart_series = mortgage_calc.variant_chart_series(variant_stats)
 
     return templates.TemplateResponse(
+        request,
         "mortgage/scenario_detail.html",
         {
             "request": request,
@@ -1146,6 +1156,7 @@ def scenarios_edit_form(
     user = _require_mortgage_access(request, db)
     scenario = _get_scenario(db, user.id, scenario_id)
     return templates.TemplateResponse(
+        request,
         "mortgage/scenario_form.html",
         {"request": request, "user": user, "scenario": scenario, "mode": "edit"},
     )

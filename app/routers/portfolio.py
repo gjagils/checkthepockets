@@ -186,6 +186,7 @@ def portfolio_overview(
                 chart_data["future"].append(float(round(month_total, 2)))
 
     return templates.TemplateResponse(
+        request,
         "portfolio/index.html",
         {
             "request": request,
@@ -236,6 +237,7 @@ def capital_dashboard(
             selected = "samen"
 
     return templates.TemplateResponse(
+        request,
         "portfolio/dashboard.html",
         {
             "request": request,
@@ -314,6 +316,7 @@ def wealth_forecast_page(
         for holding in holdings
     ]
     return templates.TemplateResponse(
+        request,
         "portfolio/wealth_forecast.html",
         {
             "request": request,

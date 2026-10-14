@@ -492,6 +492,7 @@ def transaction_list(
     )
 
     return templates.TemplateResponse(
+        request,
         "transactions/list.html",
         {
             "request": request,
@@ -817,6 +818,7 @@ def edit_transaction_page(
         redirect_to = ""
 
     return templates.TemplateResponse(
+        request,
         "transactions/edit.html",
         {
             "request": request,
@@ -892,6 +894,7 @@ def create_transaction_page(
     )
 
     return templates.TemplateResponse(
+        request,
         "transactions/create.html",
         {
             "request": request,
@@ -1097,6 +1100,7 @@ def duplicates_page(request: Request, db: Session = Depends(get_db)):
     groups = [txs for txs in grouped.values() if len(txs) > 1]
 
     return templates.TemplateResponse(
+        request,
         "transactions/duplicates.html",
         {"request": request, "user": user, "groups": groups},
     )
@@ -1130,6 +1134,7 @@ async def exclude_duplicates(request: Request, db: Session = Depends(get_db)):
 def import_page(request: Request, db: Session = Depends(get_db)):
     user = require_login(request, db)
     return templates.TemplateResponse(
+        request,
         "transactions/import.html",
         {
             "request": request,
@@ -1153,6 +1158,7 @@ async def import_csv(
     content = await file.read()
     if not content:
         return templates.TemplateResponse(
+            request,
             "transactions/import.html",
             {"request": request, "user": user, "banks": {k: v[0] for k, v in PARSERS.items()}, "error": "Leeg bestand"},
             status_code=400,
@@ -1163,12 +1169,14 @@ async def import_csv(
         headers, csv_preview = _get_csv_headers_and_preview(content)
         if not headers:
             return templates.TemplateResponse(
+                request,
                 "transactions/import.html",
                 {"request": request, "user": user, "banks": {k: v[0] for k, v in PARSERS.items()},
                  "error": "Kon geen kolomkoppen vinden in het CSV-bestand"},
                 status_code=400,
             )
         return templates.TemplateResponse(
+            request,
             "transactions/import_map.html",
             {
                 "request": request, "user": user,
@@ -1183,6 +1191,7 @@ async def import_csv(
     # ── Known bank ───────────────────────────────────────────────────────────
     if bank not in PARSERS:
         return templates.TemplateResponse(
+            request,
             "transactions/import.html",
             {"request": request, "user": user, "banks": {k: v[0] for k, v in PARSERS.items()}, "error": "Onbekende bank geselecteerd"},
             status_code=400,
@@ -1193,6 +1202,7 @@ async def import_csv(
         detected_iban, parsed = parser(content)
     except ParseError as e:
         return templates.TemplateResponse(
+            request,
             "transactions/import.html",
             {"request": request, "user": user, "banks": {k: v[0] for k, v in PARSERS.items()}, "error": f"Fout bij verwerken: {e}"},
             status_code=400,
@@ -1200,6 +1210,7 @@ async def import_csv(
 
     if not parsed:
         return templates.TemplateResponse(
+            request,
             "transactions/import.html",
             {"request": request, "user": user, "banks": {k: v[0] for k, v in PARSERS.items()}, "error": "Geen transacties gevonden in het bestand"},
             status_code=400,
@@ -1210,6 +1221,7 @@ async def import_csv(
     preview_rows, tx_data = _build_preview(parsed, existing_hashes)
 
     return templates.TemplateResponse(
+        request,
         "transactions/import_preview.html",
         {
             "request": request, "user": user,
@@ -1248,6 +1260,7 @@ async def import_map(request: Request, db: Session = Depends(get_db)):
     if "date" not in col_mapping or "amount" not in col_mapping:
         headers, csv_preview = _get_csv_headers_and_preview(content)
         return templates.TemplateResponse(
+            request,
             "transactions/import_map.html",
             {
                 "request": request, "user": user,
@@ -1263,6 +1276,7 @@ async def import_map(request: Request, db: Session = Depends(get_db)):
     if not parsed:
         headers, csv_preview = _get_csv_headers_and_preview(content)
         return templates.TemplateResponse(
+            request,
             "transactions/import_map.html",
             {
                 "request": request, "user": user,
@@ -1279,6 +1293,7 @@ async def import_map(request: Request, db: Session = Depends(get_db)):
     preview_rows, tx_data = _build_preview(parsed, existing_hashes)
 
     return templates.TemplateResponse(
+        request,
         "transactions/import_preview.html",
         {
             "request": request, "user": user,
@@ -1355,6 +1370,7 @@ async def import_confirm(request: Request, db: Session = Depends(get_db)):
     db.commit()
 
     return templates.TemplateResponse(
+        request,
         "transactions/import_result.html",
         {
             "request": request, "user": user,
@@ -1433,6 +1449,7 @@ def split_transaction_page(
     )
 
     return templates.TemplateResponse(
+        request,
         "transactions/split.html",
         {
             "request": request,
@@ -1464,6 +1481,7 @@ async def split_transaction(
     content = await file.read()
     if not content:
         return templates.TemplateResponse(
+            request,
             "transactions/split.html",
             {
                 "request": request,
@@ -1479,6 +1497,7 @@ async def split_transaction(
         parsed_lines = parse_ics_pdf(content)
     except ParseError as e:
         return templates.TemplateResponse(
+            request,
             "transactions/split.html",
             {
                 "request": request,
@@ -1541,6 +1560,7 @@ async def split_transaction(
             .all()
         )
         return templates.TemplateResponse(
+            request,
             "transactions/split.html",
             {
                 "request": request,
@@ -1553,6 +1573,7 @@ async def split_transaction(
         )
 
     return templates.TemplateResponse(
+        request,
         "transactions/split_result.html",
         {
             "request": request,

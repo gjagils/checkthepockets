@@ -393,6 +393,7 @@ def budget_overview(
     years = sorted({int(r.yr) for r in tx_years} | {current_year})
 
     return templates.TemplateResponse(
+        request,
         "budgets/overview.html",
         {
             "request": request,

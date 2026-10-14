@@ -74,6 +74,7 @@ def info_index(
     categories = _visible_categories(user, effective)
 
     response = templates.TemplateResponse(
+        request,
         "info/index.html",
         {
             "request": request,
@@ -104,6 +105,7 @@ def info_category(
     categories = _visible_categories(user, effective)
 
     response = templates.TemplateResponse(
+        request,
         "info/category.html",
         {
             "request": request,
@@ -142,6 +144,7 @@ def info_article(
     categories = _visible_categories(user, effective)
 
     response = templates.TemplateResponse(
+        request,
         "info/article.html",
         {
             "request": request,

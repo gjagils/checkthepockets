@@ -292,6 +292,7 @@ def _level1_yearly(request, db, user, current_year, years, base_tx_filter, today
         })
 
     return templates.TemplateResponse(
+        request,
         "dashboard/index.html",
         {
             "request": request,
@@ -473,6 +474,7 @@ def _level2_categories(request, db, user, current_year, month, years, base_tx_fi
 
     month_name = MONTH_NAMES_NL_FULL.get(month, "")
     return templates.TemplateResponse(
+        request,
         "dashboard/index.html",
         {
             "request": request,
@@ -610,6 +612,7 @@ def _level3_subcategories(request, db, user, current_year, month, category_id,
 
     month_name = MONTH_NAMES_NL_FULL.get(month, "")
     return templates.TemplateResponse(
+        request,
         "dashboard/index.html",
         {
             "request": request,
