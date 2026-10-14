@@ -250,3 +250,42 @@ def test_account_can_be_renamed_and_typed_by_owner_only(db):
     db.expire_all()
     assert db.get(Account, account_id).name == "Samen Betaal"
 
+
+
+def test_same_named_categories_are_folded_instead_of_crashing(db):
+    """A12: uq_user_account_category liet het samenvoegen crashen bij gelijknamige categorieën."""
+    from app.models import Budget, Rule
+
+    user, source, target = _setup(db)
+    src_cat = Category(user_id=user.id, account_id=source.id, name="Boodschappen")
+    tgt_cat = Category(user_id=user.id, account_id=target.id, name="Boodschappen")
+    only_src = Category(user_id=user.id, account_id=source.id, name="Alleen bron")
+    child = Category(user_id=user.id, account_id=source.id, name="Groente")
+    db.add_all([src_cat, tgt_cat, only_src])
+    db.flush()
+    child.parent_id = src_cat.id
+    db.add(child)
+    db.add_all([
+        _tx(source, 1, "-10.00", "AH", "csv-1", category_id=src_cat.id),
+        Budget(user_id=user.id, category_id=src_cat.id, year=2026, month=5, amount=Decimal("100")),
+        Budget(user_id=user.id, category_id=tgt_cat.id, year=2026, month=5, amount=Decimal("200")),
+        Budget(user_id=user.id, category_id=src_cat.id, year=2026, month=6, amount=Decimal("300")),
+        Rule(user_id=user.id, name="ah", match_field="counterparty", match_type="contains",
+             match_value="AH", assign_category_id=src_cat.id),
+    ])
+    db.flush()
+    plan = plan_merge(db, source, target)
+    assert [(c.name) for c, _ in plan.category_merges] == ["Boodschappen"]
+    src_cat_id, tgt_cat_id, only_id, child_id = src_cat.id, tgt_cat.id, only_src.id, child.id
+
+    result = merge_accounts(db, source, target)
+    db.commit()
+
+    assert result.merged_categories == 1
+    assert db.get(Category, src_cat_id) is None
+    assert db.query(Transaction).one().category_id == tgt_cat_id
+    assert db.get(Category, only_id).account_id == target.id      # niet-conflicterend: verhuisd
+    assert db.get(Category, child_id).parent_id == tgt_cat_id      # kind hangt nu onder de blijvende
+    budgets = {(b.month): (b.category_id, b.amount) for b in db.query(Budget)}
+    assert budgets == {5: (tgt_cat_id, Decimal("200.00")), 6: (tgt_cat_id, Decimal("300.00"))}
+    assert db.query(Rule).one().assign_category_id == tgt_cat_id
