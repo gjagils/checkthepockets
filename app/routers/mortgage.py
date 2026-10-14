@@ -1,5 +1,6 @@
 """Hypotheek-rekenmodule — alleen toegankelijk voor admins."""
 import datetime
+from dataclasses import asdict, dataclass
 from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
@@ -269,6 +270,17 @@ def _rates_for_user(db: Session, user_id: int) -> list[MortgageRateTable]:
     )
 
 
+def _render_rates(request: Request, user, rates, *, status_code: int = 200, **context):
+    """Render mortgage/rates.html with its default context; `context` overrides or adds (bulk_*, flash, error...)."""
+    base = {
+        "request": request, "user": user, "rates": rates,
+        "flash": None, "error": None,
+        "bulk_new_count": 0, "bulk_updated_count": 0,
+    }
+    base.update(context)
+    return templates.TemplateResponse(request, "mortgage/rates.html", base, status_code=status_code)
+
+
 @router.get("/rentes")
 def rates_index(request: Request, db: Session = Depends(get_db)):
     user = _require_mortgage_access(request, db)
@@ -277,18 +289,10 @@ def rates_index(request: Request, db: Session = Depends(get_db)):
     error = request.query_params.get("error")
     bulk_new = request.query_params.get("new")
     bulk_upd = request.query_params.get("upd")
-    return templates.TemplateResponse(
-        request,
-        "mortgage/rates.html",
-        {
-            "request": request,
-            "user": user,
-            "rates": rates,
-            "flash": flash,
-            "error": error,
-            "bulk_new_count": int(bulk_new) if bulk_new and bulk_new.isdigit() else 0,
-            "bulk_updated_count": int(bulk_upd) if bulk_upd and bulk_upd.isdigit() else 0,
-        },
+    return _render_rates(
+        request, user, rates, flash=flash, error=error,
+        bulk_new_count=int(bulk_new) if bulk_new and bulk_new.isdigit() else 0,
+        bulk_updated_count=int(bulk_upd) if bulk_upd and bulk_upd.isdigit() else 0,
     )
 
 
@@ -401,21 +405,10 @@ def rates_bulk_preview(
     parse_result = parse_bulk_rates(raw_text)
     existing = _rates_for_user(db, user.id)
     new_rows, update_rows = compare_with_existing(parse_result.rows, existing)
-    return templates.TemplateResponse(
-        request,
-        "mortgage/rates.html",
-        {
-            "request": request,
-            "user": user,
-            "rates": existing,
-            "flash": None,
-            "error": None,
-            "bulk_raw_text": raw_text,
-            "bulk_parsed": parse_result,
-            "bulk_new_rows": new_rows,
-            "bulk_update_rows": update_rows,
-            "bulk_mode": "preview",
-        },
+    return _render_rates(
+        request, user, existing,
+        bulk_raw_text=raw_text, bulk_parsed=parse_result,
+        bulk_new_rows=new_rows, bulk_update_rows=update_rows, bulk_mode="preview",
     )
 
 
@@ -437,42 +430,18 @@ async def rates_bulk_screenshot(
     ocr = extract_rate_text(image_bytes, media_type)
 
     if not ocr.ok:
-        return templates.TemplateResponse(
-            request,
-            "mortgage/rates.html",
-            {
-                "request": request,
-                "user": user,
-                "rates": existing,
-                "flash": None,
-                "error": None,
-                "bulk_raw_text": "",
-                "bulk_parsed": None,
-                "bulk_new_rows": [],
-                "bulk_update_rows": [],
-                "bulk_mode": None,
-                "bulk_error": ocr.error,
-            },
-            status_code=400,
+        return _render_rates(
+            request, user, existing, status_code=400,
+            bulk_raw_text="", bulk_parsed=None, bulk_new_rows=[], bulk_update_rows=[],
+            bulk_mode=None, bulk_error=ocr.error,
         )
 
     parse_result = parse_bulk_rates(ocr.text)
     new_rows, update_rows = compare_with_existing(parse_result.rows, existing)
-    return templates.TemplateResponse(
-        request,
-        "mortgage/rates.html",
-        {
-            "request": request,
-            "user": user,
-            "rates": existing,
-            "flash": "screenshot_parsed",
-            "error": None,
-            "bulk_raw_text": ocr.text,
-            "bulk_parsed": parse_result,
-            "bulk_new_rows": new_rows,
-            "bulk_update_rows": update_rows,
-            "bulk_mode": "preview",
-        },
+    return _render_rates(
+        request, user, existing, flash="screenshot_parsed",
+        bulk_raw_text=ocr.text, bulk_parsed=parse_result,
+        bulk_new_rows=new_rows, bulk_update_rows=update_rows, bulk_mode="preview",
     )
 
 
@@ -488,27 +457,15 @@ def rates_bulk_import(
     if parse_result.has_errors or not parse_result.rows:
         existing = _rates_for_user(db, user.id)
         new_rows, update_rows = compare_with_existing(parse_result.rows, existing)
-        return templates.TemplateResponse(
-            request,
-            "mortgage/rates.html",
-            {
-                "request": request,
-                "user": user,
-                "rates": existing,
-                "flash": None,
-                "error": None,
-                "bulk_raw_text": raw_text,
-                "bulk_parsed": parse_result,
-                "bulk_new_rows": new_rows,
-                "bulk_update_rows": update_rows,
-                "bulk_mode": "preview",
-                "bulk_error": (
-                    "Import geannuleerd: los eerst de foutmeldingen op."
-                    if parse_result.has_errors
-                    else "Niets te importeren."
-                ),
-            },
-            status_code=400,
+        return _render_rates(
+            request, user, existing, status_code=400,
+            bulk_raw_text=raw_text, bulk_parsed=parse_result,
+            bulk_new_rows=new_rows, bulk_update_rows=update_rows, bulk_mode="preview",
+            bulk_error=(
+                "Import geannuleerd: los eerst de foutmeldingen op."
+                if parse_result.has_errors
+                else "Niets te importeren."
+            ),
         )
 
     existing = {
@@ -553,6 +510,55 @@ def _get_scenario(db: Session, user_id: int, scenario_id: int) -> MortgageScenar
     if not row:
         raise HTTPException(status_code=404, detail="Scenario niet gevonden")
     return row
+
+
+@dataclass
+class ScenarioForm:
+    """The scenario form fields (create and edit), still as the raw strings the browser sent."""
+    name: str = ""
+    valuation: str = ""
+    offer: str = ""
+    renovation_cost: str = ""
+    own_contribution: str = ""
+    sale_old_home: str = ""
+    energy_label: str = "A"
+    notes: str = ""
+    funda_url: str = ""
+    photo_url: str = ""
+    purchase_fee_pct: str = ""
+    sale_fee_pct: str = ""
+    municipal_cost_factor: str = ""
+    insurance_cost_factor: str = ""
+    monthly_refund_usage: str = ""
+    woz_value: str = ""
+    transfer_date_new: str = ""
+    sale_date_old: str = ""
+    bridge_amount_override: str = ""
+
+
+def scenario_form(
+    name: str = Form(""),
+    valuation: str = Form(""),
+    offer: str = Form(""),
+    renovation_cost: str = Form(""),
+    own_contribution: str = Form(""),
+    sale_old_home: str = Form(""),
+    energy_label: str = Form("A"),
+    notes: str = Form(""),
+    funda_url: str = Form(""),
+    photo_url: str = Form(""),
+    purchase_fee_pct: str = Form(""),
+    sale_fee_pct: str = Form(""),
+    municipal_cost_factor: str = Form(""),
+    insurance_cost_factor: str = Form(""),
+    monthly_refund_usage: str = Form(""),
+    woz_value: str = Form(""),
+    transfer_date_new: str = Form(""),
+    sale_date_old: str = Form(""),
+    bridge_amount_override: str = Form(""),
+) -> ScenarioForm:
+    """FastAPI dependency: the 19 scenario fields were written out in full in both the create and the edit route."""
+    return ScenarioForm(name=name, valuation=valuation, offer=offer, renovation_cost=renovation_cost, own_contribution=own_contribution, sale_old_home=sale_old_home, energy_label=energy_label, notes=notes, funda_url=funda_url, photo_url=photo_url, purchase_fee_pct=purchase_fee_pct, sale_fee_pct=sale_fee_pct, municipal_cost_factor=municipal_cost_factor, insurance_cost_factor=insurance_cost_factor, monthly_refund_usage=monthly_refund_usage, woz_value=woz_value, transfer_date_new=transfer_date_new, sale_date_old=sale_date_old, bridge_amount_override=bridge_amount_override)
 
 
 def _apply_scenario_form(
@@ -723,51 +729,12 @@ def _auto_create_variants(db: Session, user_id: int, scenario: MortgageScenario)
 @router.post("/scenarios")
 def scenarios_create(
     request: Request,
-    name: str = Form(""),
-    valuation: str = Form(""),
-    offer: str = Form(""),
-    renovation_cost: str = Form(""),
-    own_contribution: str = Form(""),
-    sale_old_home: str = Form(""),
-    energy_label: str = Form("A"),
-    notes: str = Form(""),
-    funda_url: str = Form(""),
-    photo_url: str = Form(""),
-    purchase_fee_pct: str = Form(""),
-    sale_fee_pct: str = Form(""),
-    municipal_cost_factor: str = Form(""),
-    insurance_cost_factor: str = Form(""),
-    monthly_refund_usage: str = Form(""),
-    woz_value: str = Form(""),
-    transfer_date_new: str = Form(""),
-    sale_date_old: str = Form(""),
-    bridge_amount_override: str = Form(""),
+    form: ScenarioForm = Depends(scenario_form),
     db: Session = Depends(get_db),
 ):
     user = _require_mortgage_access(request, db)
     s = MortgageScenario(user_id=user.id)
-    _apply_scenario_form(
-        s,
-        name=name,
-        valuation=valuation,
-        offer=offer,
-        renovation_cost=renovation_cost,
-        own_contribution=own_contribution,
-        sale_old_home=sale_old_home,
-        energy_label=energy_label,
-        notes=notes,
-        funda_url=funda_url,
-        photo_url=photo_url,
-        purchase_fee_pct=purchase_fee_pct,
-        sale_fee_pct=sale_fee_pct,
-        municipal_cost_factor=municipal_cost_factor,
-        insurance_cost_factor=insurance_cost_factor,
-        monthly_refund_usage=monthly_refund_usage,
-        woz_value=woz_value,
-        transfer_date_new=transfer_date_new,
-        sale_date_old=sale_date_old,
-        bridge_amount_override=bridge_amount_override,
-    )
+    _apply_scenario_form(s, **asdict(form))
     db.add(s)
     db.commit()
     db.refresh(s)
@@ -1166,51 +1133,12 @@ def scenarios_edit_form(
 def scenarios_edit(
     scenario_id: int,
     request: Request,
-    name: str = Form(""),
-    valuation: str = Form(""),
-    offer: str = Form(""),
-    renovation_cost: str = Form(""),
-    own_contribution: str = Form(""),
-    sale_old_home: str = Form(""),
-    energy_label: str = Form("A"),
-    notes: str = Form(""),
-    funda_url: str = Form(""),
-    photo_url: str = Form(""),
-    purchase_fee_pct: str = Form(""),
-    sale_fee_pct: str = Form(""),
-    municipal_cost_factor: str = Form(""),
-    insurance_cost_factor: str = Form(""),
-    monthly_refund_usage: str = Form(""),
-    woz_value: str = Form(""),
-    transfer_date_new: str = Form(""),
-    sale_date_old: str = Form(""),
-    bridge_amount_override: str = Form(""),
+    form: ScenarioForm = Depends(scenario_form),
     db: Session = Depends(get_db),
 ):
     user = _require_mortgage_access(request, db)
     scenario = _get_scenario(db, user.id, scenario_id)
-    _apply_scenario_form(
-        scenario,
-        name=name,
-        valuation=valuation,
-        offer=offer,
-        renovation_cost=renovation_cost,
-        own_contribution=own_contribution,
-        sale_old_home=sale_old_home,
-        energy_label=energy_label,
-        notes=notes,
-        funda_url=funda_url,
-        photo_url=photo_url,
-        purchase_fee_pct=purchase_fee_pct,
-        sale_fee_pct=sale_fee_pct,
-        municipal_cost_factor=municipal_cost_factor,
-        insurance_cost_factor=insurance_cost_factor,
-        monthly_refund_usage=monthly_refund_usage,
-        woz_value=woz_value,
-        transfer_date_new=transfer_date_new,
-        sale_date_old=sale_date_old,
-        bridge_amount_override=bridge_amount_override,
-    )
+    _apply_scenario_form(scenario, **asdict(form))
     db.commit()
     return RedirectResponse(
         f"/hypotheek/scenarios/{scenario.id}?flash=updated", status_code=302,
