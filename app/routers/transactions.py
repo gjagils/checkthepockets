@@ -5,7 +5,7 @@ import io
 import json
 import uuid
 import calendar as _calendar
-from datetime import date as date_type, timedelta, datetime as _datetime
+from datetime import date as date_type, timedelta
 from decimal import Decimal, InvalidOperation
 from urllib.parse import urlencode
 
@@ -23,11 +23,15 @@ from app.parsers import abn_amro, bunq, ics, ing, rabobank
 from app.parsers.base import ParseError, ParsedTransaction
 from app.parsers.ics_pdf import parse_ics_pdf
 from app.import_service import existing_import_hashes, find_import_account, store_confirmed_csv_rows
-from app.recurring_service import auto_link_recurring_after_import, find_recurring_candidates
+from app.recurring_service import find_recurring_candidates, resync_after_import
 from app.rules_engine import apply_rules_to_transaction
 from app.redirects import safe_redirect
 from app.nl_format import MONTHS_NL_FULL
+from app.parsers.custom_csv import (
+    CUSTOM_CSV_FIELDS, csv_headers_and_preview as _get_csv_headers_and_preview, parse_custom_csv as _parse_custom_csv,
+)
 from app.template_config import templates
+from app.transaction_queries import transaction_years
 
 router = APIRouter()
 
@@ -42,105 +46,6 @@ PARSERS = {
     "ing": ("ING", ing.parse),
     "rabobank": ("Rabobank", rabobank.parse),
 }
-
-# Fields available for custom CSV column mapping
-CUSTOM_CSV_FIELDS = [
-    ("date",              "Datum *"),
-    ("amount",            "Bedrag *"),
-    ("description",       "Omschrijving"),
-    ("counterparty",      "Tegenpartij"),
-    ("counterparty_iban", "IBAN tegenpartij"),
-    ("balance_after",     "Saldo na"),
-    ("category",          "Categorie (naam)"),
-]
-
-
-def _get_csv_headers_and_preview(content: bytes) -> tuple[list[str], list[list[str]]]:
-    """Return (headers, first_5_data_rows) from raw CSV bytes."""
-    text = content.decode("utf-8-sig", errors="replace")
-    reader = csv.reader(io.StringIO(text))
-    try:
-        headers = next(reader)
-    except StopIteration:
-        return [], []
-    preview = []
-    for i, row in enumerate(reader):
-        if i >= 5:
-            break
-        preview.append(row)
-    return headers, preview
-
-
-def _parse_custom_csv(content: bytes, col_mapping: dict) -> list[ParsedTransaction]:
-    """Parse a generic CSV using a user-defined column mapping."""
-    text = content.decode("utf-8-sig", errors="replace")
-    reader = csv.DictReader(io.StringIO(text))
-
-    date_col   = col_mapping.get("date", "")
-    amount_col = col_mapping.get("amount", "")
-    desc_col   = col_mapping.get("description", "")
-    cp_col     = col_mapping.get("counterparty", "")
-    iban_col   = col_mapping.get("counterparty_iban", "")
-    bal_col    = col_mapping.get("balance_after", "")
-    cat_col    = col_mapping.get("category", "")
-
-    DATE_FMTS = ["%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%m/%d/%Y", "%d.%m.%Y", "%Y%m%d"]
-
-    parsed = []
-    for row in reader:
-        # --- date ---
-        date_str = row.get(date_col, "").strip() if date_col else ""
-        parsed_date = None
-        for fmt in DATE_FMTS:
-            try:
-                parsed_date = _datetime.strptime(date_str, fmt).date()
-                break
-            except ValueError:
-                pass
-        if not parsed_date:
-            continue
-
-        # --- amount ---
-        raw_amt = row.get(amount_col, "").strip().replace("\xa0", "").replace(" ", "") if amount_col else ""
-        # Handle European format  1.234,56  or  1,234.56
-        if "," in raw_amt and "." in raw_amt:
-            if raw_amt.rindex(",") > raw_amt.rindex("."):  # 1.234,56
-                raw_amt = raw_amt.replace(".", "").replace(",", ".")
-            else:
-                raw_amt = raw_amt.replace(",", "")
-        elif "," in raw_amt:
-            raw_amt = raw_amt.replace(",", ".")
-        try:
-            amount = Decimal(raw_amt)
-        except InvalidOperation:
-            continue
-
-        description   = row.get(desc_col, "").strip() if desc_col else ""
-        counterparty  = row.get(cp_col, "").strip()   if cp_col   else ""
-        iban          = row.get(iban_col, "").strip()  if iban_col else ""
-        category_name = row.get(cat_col, "").strip()   if cat_col  else ""
-
-        balance = None
-        if bal_col:
-            bal_raw = row.get(bal_col, "").strip().replace(",", ".").replace(" ", "")
-            try:
-                balance = Decimal(bal_raw)
-            except InvalidOperation:
-                pass
-
-        ptx = ParsedTransaction(
-            date=parsed_date,
-            amount=amount,
-            currency="EUR",
-            description=description or None,
-            counterparty=counterparty or None,
-            counterparty_iban=iban or None,
-            balance_after=balance,
-        )
-        ptx._category_name = category_name  # type: ignore[attr-defined]
-        parsed.append(ptx)
-    return parsed
-
 
 def _build_preview(parsed: list[ParsedTransaction], existing_hashes: set) -> tuple[list[dict], str]:
     """Return (preview_rows for template, base64 tx_data for hidden form field)."""
@@ -176,17 +81,8 @@ PER_PAGE = 50
 
 
 def _available_tx_years(db, user_id: int, current_year_num: int) -> list[int]:
-    """Unieke jaren waarin de gebruiker transacties heeft + huidig jaar."""
-    rows = (
-        db.query(func.extract("year", Transaction.date))
-        .join(Account, Account.id == Transaction.account_id)
-        .filter(Account.user_id == user_id)
-        .distinct()
-        .all()
-    )
-    years = {int(r[0]) for r in rows if r[0] is not None}
-    years.add(current_year_num)
-    return sorted(years, reverse=True)
+    """Unieke jaren waarin de gebruiker transacties heeft + huidig jaar, nieuwste eerst."""
+    return sorted(transaction_years(db, user_id, current_year_num), reverse=True)
 
 
 def _build_tx_query(db, user, account_id, category_id, tag_id, search,
@@ -1361,12 +1257,7 @@ async def import_confirm(request: Request, db: Session = Depends(get_db)):
     db.commit()
 
     # Auto-link new transactions to recurring items, then clean up projections
-    auto_link_recurring_after_import(db, user.id)
-    from app.recurring_service import cleanup_matched_projected, sync_projected_transactions
-    cleanup_matched_projected(user.id, db)
-    # Re-sync projected transactions for current month to reflect new imports
-    _today = clock.today_nl()
-    sync_projected_transactions(user.id, _today.year, _today.month, db)
+    resync_after_import(db, user.id)
     db.commit()
 
     return templates.TemplateResponse(

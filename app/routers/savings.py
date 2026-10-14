@@ -19,7 +19,10 @@ from app.models import (
 from app.auth import require_login
 from app.template_config import templates
 from app.rules_engine import apply_single_rule
-from app.savings_calc import FREQUENCY_LABELS, months_for_frequency, parse_custom_amounts, determine_color_status
+from app.savings_calc import (
+    FREQUENCY_LABELS, determine_color_status, months_for_frequency, parse_custom_amounts, running_balances,
+)
+from app.savings_service import transaction_totals_by_category
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/savings")
@@ -38,27 +41,16 @@ def _compute_december_balance(db: Session, plan: SavingsPlan) -> Decimal:
     die categorie gebruikt wanneer die er zijn; voor regels zonder categorie
     gebruiken we het entry-bedrag zoals het opgeslagen is.
     """
-    balance = plan.starting_balance or Decimal("0")
-    for m in range(1, 13):
-        month_total = Decimal("0")
-        for line in plan.lines:
-            entry = next((e for e in line.entries if e.month == m), None)
-            amount = entry.amount if entry else None
-            if line.category_id:
-                tx_totals = _get_transaction_totals_by_month(
-                    db, plan.account_id, plan.year, line.category_id
-                )
-                actual = tx_totals.get(m)
-                if actual is not None:
-                    amount = actual
-            if amount is None:
-                continue
-            if line.is_income:
-                month_total += abs(amount)
-            else:
-                month_total -= abs(amount)
-        balance += month_total
-    return balance
+    actuals = _line_actuals(db, plan)
+    return running_balances(plan.starting_balance or Decimal("0"), plan.lines, actuals)[12]
+
+
+def _line_actuals(db: Session, plan: SavingsPlan) -> dict[int, dict[int, Decimal]]:
+    """{line.id: {month: actual total}} for the category-linked lines, with one query for all of them."""
+    by_category = transaction_totals_by_category(
+        db, plan.account_id, plan.year, {line.category_id for line in plan.lines if line.category_id},
+    )
+    return {line.id: by_category[line.category_id] for line in plan.lines if line.category_id}
 
 
 def _copy_lines_to_plan(db: Session, source_plan: SavingsPlan, new_plan: SavingsPlan) -> None:
@@ -256,6 +248,19 @@ def _build_category_suggestions(
 
 # ── Routes ──────────────────────────────────────────────────────────────
 
+def monthly_amounts_form(
+    amount_1: str = Form(""), amount_2: str = Form(""), amount_3: str = Form(""),
+    amount_4: str = Form(""), amount_5: str = Form(""), amount_6: str = Form(""),
+    amount_7: str = Form(""), amount_8: str = Form(""), amount_9: str = Form(""),
+    amount_10: str = Form(""), amount_11: str = Form(""), amount_12: str = Form(""),
+) -> dict[int, Decimal | None]:
+    """The twelve per-month amount fields of the line forms (add, edit, quick add) as {1..12: amount|None}."""
+    return parse_custom_amounts(
+        amount_1, amount_2, amount_3, amount_4, amount_5, amount_6,
+        amount_7, amount_8, amount_9, amount_10, amount_11, amount_12,
+    )
+
+
 @router.get("")
 def savings_overview(
     request: Request,
@@ -436,14 +441,11 @@ def plan_detail(
     #   into the entry, en kleur op basis van actual vs expected (default_amount).
     # - Lines without a category: status puur op basis van past/current/future + waarde.
     fully_cat_months = _months_fully_categorized(db, plan.account_id, plan.year)
-    category_totals = {}
+    category_totals = _line_actuals(db, plan)
     for line in plan.lines:
         is_inc = bool(line.is_income)
         if line.category_id:
-            tx_totals = _get_transaction_totals_by_month(
-                db, plan.account_id, plan.year, line.category_id
-            )
-            category_totals[line.id] = tx_totals
+            tx_totals = category_totals[line.id]
             for entry in line.entries:
                 actual = tx_totals.get(entry.month)
                 # Een maand telt als "ingepland" wanneer er vóór deze sync al
@@ -489,19 +491,7 @@ def plan_detail(
 
     # Calculate running balance per month
     # Income adds, expense subtracts (amounts stored as positive)
-    running_balance = {}
-    balance = effective_starting_balance
-    for m in range(1, 13):
-        month_total = Decimal("0")
-        for line in plan.lines:
-            entry = next((e for e in line.entries if e.month == m), None)
-            if entry and entry.amount is not None:
-                if line.is_income:
-                    month_total += abs(entry.amount)
-                else:
-                    month_total -= abs(entry.amount)
-        balance += month_total
-        running_balance[m] = balance
+    running_balance = running_balances(effective_starting_balance, plan.lines)
 
     # Calculate planned annual total per line (always positive display)
     line_totals = {}
@@ -610,10 +600,7 @@ def add_line(
     frequency: str = Form("monthly"),
     default_amount: str = Form("0"),
     target_month: int = Form(0),
-    amount_1: str = Form(""), amount_2: str = Form(""), amount_3: str = Form(""),
-    amount_4: str = Form(""), amount_5: str = Form(""), amount_6: str = Form(""),
-    amount_7: str = Form(""), amount_8: str = Form(""), amount_9: str = Form(""),
-    amount_10: str = Form(""), amount_11: str = Form(""), amount_12: str = Form(""),
+    monthly_amounts: dict[int, Decimal | None] = Depends(monthly_amounts_form),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
@@ -663,10 +650,7 @@ def add_line(
     # default_amount wordt dan op 0 gezet en annual_budget = som van de maanden.
     custom_amounts: dict[int, Decimal | None] | None = None
     if frequency == "custom":
-        custom_amounts = parse_custom_amounts(
-            amount_1, amount_2, amount_3, amount_4, amount_5, amount_6,
-            amount_7, amount_8, amount_9, amount_10, amount_11, amount_12,
-        )
+        custom_amounts = monthly_amounts
         amount = Decimal("0")
         annual_budget = sum(
             (v for v in custom_amounts.values() if v is not None),
@@ -731,15 +715,7 @@ def _plan_balances(db: Session, plan: SavingsPlan) -> tuple[Decimal, dict[int, D
         ).first()
         if source:
             start = _compute_december_balance(db, source)
-    balance = start
-    balances = {}
-    for m in range(1, 13):
-        for line in plan.lines:
-            entry = next((e for e in line.entries if e.month == m), None)
-            if entry and entry.amount is not None:
-                balance += abs(entry.amount) if line.is_income else -abs(entry.amount)
-        balances[m] = balance
-    return start, balances
+    return start, running_balances(start, plan.lines)
 
 
 @router.post("/entries/update")
@@ -819,10 +795,7 @@ def edit_line(
     default_amount: str = Form("0"),
     target_month: int = Form(0),
     is_income: str = Form(""),
-    amount_1: str = Form(""), amount_2: str = Form(""), amount_3: str = Form(""),
-    amount_4: str = Form(""), amount_5: str = Form(""), amount_6: str = Form(""),
-    amount_7: str = Form(""), amount_8: str = Form(""), amount_9: str = Form(""),
-    amount_10: str = Form(""), amount_11: str = Form(""), amount_12: str = Form(""),
+    monthly_amounts: dict[int, Decimal | None] = Depends(monthly_amounts_form),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
@@ -865,10 +838,7 @@ def edit_line(
     # Voor 'onregelmatig' komt het schema uit de 12 per-maand-velden.
     custom_amounts: dict[int, Decimal | None] | None = None
     if frequency == "custom":
-        custom_amounts = parse_custom_amounts(
-            amount_1, amount_2, amount_3, amount_4, amount_5, amount_6,
-            amount_7, amount_8, amount_9, amount_10, amount_11, amount_12,
-        )
+        custom_amounts = monthly_amounts
         months_set = {m for m, v in custom_amounts.items() if v is not None}
         amount = Decimal("0")
         annual_budget = sum(
@@ -1068,10 +1038,7 @@ def quick_add_line(
     frequency: str = Form("monthly"),
     default_amount: str = Form("0"),
     target_month: int = Form(0),
-    amount_1: str = Form(""), amount_2: str = Form(""), amount_3: str = Form(""),
-    amount_4: str = Form(""), amount_5: str = Form(""), amount_6: str = Form(""),
-    amount_7: str = Form(""), amount_8: str = Form(""), amount_9: str = Form(""),
-    amount_10: str = Form(""), amount_11: str = Form(""), amount_12: str = Form(""),
+    monthly_amounts: dict[int, Decimal | None] = Depends(monthly_amounts_form),
     # Als we vanuit een AI-voorstel komen, geven we de gehele suggesties-lijst
     # (base64) door zodat de resterende voorstellen na redirect blijven staan.
     # `accepted_suggestion_idx` is de 0-based index van het voorstel dat zojuist
@@ -1195,10 +1162,7 @@ def quick_add_line(
     # Voor 'onregelmatig' (custom) komt het schema uit de 12 per-maand-velden.
     custom_amounts: dict[int, Decimal | None] | None = None
     if frequency == "custom":
-        custom_amounts = parse_custom_amounts(
-            amount_1, amount_2, amount_3, amount_4, amount_5, amount_6,
-            amount_7, amount_8, amount_9, amount_10, amount_11, amount_12,
-        )
+        custom_amounts = monthly_amounts
         amount = Decimal("0")
         annual_budget = sum(
             (v for v in custom_amounts.values() if v is not None),
@@ -1309,24 +1273,12 @@ def update_starting_balance(
     db.commit()
 
     # Recalculate running balances for all 12 months
-    balance = plan.starting_balance or Decimal("0")
-    running_balances = {}
-    for m in range(1, 13):
-        month_total = Decimal("0")
-        for line in plan.lines:
-            entry = next((e for e in line.entries if e.month == m), None)
-            if entry and entry.amount is not None:
-                if line.is_income:
-                    month_total += abs(entry.amount)
-                else:
-                    month_total -= abs(entry.amount)
-        balance += month_total
-        running_balances[m] = float(balance)
+    running = {m: float(v) for m, v in running_balances(plan.starting_balance or Decimal("0"), plan.lines).items()}
 
     return JSONResponse({
         "ok": True,
         "starting_balance": float(plan.starting_balance),
-        "running_balances": running_balances,
+        "running_balances": running,
     })
 
 
@@ -1351,90 +1303,6 @@ def delete_plan(
     db.commit()
 
     return RedirectResponse(f"/savings?year={year}", status_code=302)
-
-
-@router.post("/{plan_id}/accept-suggestion")
-def accept_ai_suggestion(
-    plan_id: int,
-    request: Request,
-    name: str = Form(...),
-    amount: str = Form(...),
-    frequency: str = Form("monthly"),
-    is_income: str = Form("0"),
-    remaining_suggestions: str = Form(""),
-    db: Session = Depends(get_db),
-):
-    """Accept an AI suggestion and create a savings line with auto-filled entries."""
-    user = require_login(request, db)
-    plan = db.query(SavingsPlan).filter(
-        SavingsPlan.id == plan_id, SavingsPlan.user_id == user.id
-    ).first()
-    if not plan:
-        return RedirectResponse("/savings", status_code=302)
-
-    try:
-        parsed_amount = Decimal(amount.strip().replace(",", "."))
-    except (InvalidOperation, ValueError):
-        return RedirectResponse(f"/savings/{plan_id}", status_code=302)
-
-    income = is_income == "1" or is_income == "true"
-    freq = frequency if frequency in FREQUENCY_LABELS else "monthly"
-
-    # Create savings line
-    line = SavingsLine(
-        plan_id=plan.id,
-        name=name.strip(),
-        is_income=1 if income else 0,
-        frequency=freq,
-        default_amount=parsed_amount,
-    )
-    db.add(line)
-    db.flush()
-
-    # Create entries based on frequency
-    entries = _smart_fill_entries(line)
-    for entry in entries:
-        db.add(entry)
-    db.flush()
-
-    # Try to fill with actual transaction data
-    # For this line, match by searching transactions with the line name in counterparty
-    search_name = name.strip().lower()
-    all_txs = (
-        db.query(Transaction)
-        .filter(
-            Transaction.account_id == plan.account_id,
-            func.extract("year", Transaction.date) == plan.year,
-            Transaction.is_excluded == 0,
-            Transaction.is_projected == 0,
-        )
-        .all()
-    )
-    monthly_totals = {}
-    for tx in all_txs:
-        cp = (tx.counterparty or "").lower()
-        desc = (tx.description or "").lower()
-        if search_name in cp or search_name in desc:
-            m = tx.date.month
-            if m not in monthly_totals:
-                monthly_totals[m] = Decimal("0")
-            if income:
-                if tx.amount > 0:
-                    monthly_totals[m] += tx.amount
-            else:
-                if tx.amount < 0:
-                    monthly_totals[m] += abs(tx.amount)
-
-    for entry in line.entries:
-        if entry.month in monthly_totals:
-            entry.amount = monthly_totals[entry.month]
-
-    db.commit()
-
-    # Pass remaining suggestions back so they don't disappear
-    if remaining_suggestions.strip():
-        return RedirectResponse(f"/savings/{plan_id}?suggestions={remaining_suggestions}", status_code=302)
-    return RedirectResponse(f"/savings/{plan_id}", status_code=302)
 
 
 @router.post("/{plan_id}/analyze")

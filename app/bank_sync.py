@@ -216,18 +216,13 @@ def post_import(db: Session, user_id: int) -> int:
     Returns how many existing transactions the rules re-run categorised (kept apart from the
     "auto-categorised on import" count).
     """
-    from app.recurring_service import (
-        auto_link_recurring_after_import, cleanup_matched_projected, sync_projected_transactions,
-    )
+    from app.recurring_service import resync_after_import
     from app.rules_engine import apply_rules_to_all
 
     extra = apply_rules_to_all(db, user_id)
     if extra:
         logger.info("Bank sync: %d extra existing transactions categorised via apply_rules_to_all", extra)
-    auto_link_recurring_after_import(db, user_id)
-    cleanup_matched_projected(user_id, db)
-    today = clock.today_nl()
-    sync_projected_transactions(user_id, today.year, today.month, db)
+    resync_after_import(db, user_id)
     return extra
 
 

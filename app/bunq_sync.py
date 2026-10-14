@@ -198,11 +198,6 @@ def sync_connection(db: Session, connection: BunqConnection, client: BunqClient,
 
 def _post_import(db: Session, user_id: int) -> None:
     """Same follow-up as the Enable Banking sync: recurring links and projections."""
-    from app.recurring_service import (
-        auto_link_recurring_after_import, cleanup_matched_projected, sync_projected_transactions,
-    )
-    today = clock.today_nl()
+    from app.recurring_service import resync_after_import
     db.flush()
-    auto_link_recurring_after_import(db, user_id)
-    cleanup_matched_projected(user_id, db)
-    sync_projected_transactions(user_id, today.year, today.month, db)
+    resync_after_import(db, user_id)

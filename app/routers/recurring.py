@@ -16,12 +16,11 @@ from app.recurring_schedule import (
     is_in_active_period, parse_active_months, remove_skipped_month,
 )
 from app.recurring_service import (
-    cleanup_matched_projected, link_transaction_to_recurring,
-    sync_projected_transactions,
+    MatchContext, apply_item_categories, cleanup_matched_projected, link_transaction_to_recurring,
+    resync_after_import, sync_projected_transactions,
 )
 from app.redirects import safe_redirect
 from app.nl_format import MONTHS_NL_FULL
-from app.recurring_service import MatchContext
 from app.template_config import templates
 
 router = APIRouter()
@@ -674,18 +673,7 @@ def relink_all(
     then cleanup and sync projected transactions."""
     user = require_login(request, db)
 
-    from app.recurring_service import auto_link_recurring_after_import
-
-    auto_link_recurring_after_import(db, user.id)
-
-    cleanup_matched_projected(user.id, db)
-
-    today = clock.today_nl()
-    for offset in range(0, 3):
-        m = today.month + offset
-        y = today.year + (m - 1) // 12
-        m = (m - 1) % 12 + 1
-        sync_projected_transactions(user.id, y, m, db)
+    resync_after_import(db, user.id, months_ahead=3)
 
     db.commit()
 
@@ -708,24 +696,7 @@ def apply_all_categories(
         )
         .all()
     )
-
-    updated = 0
-    for item in items:
-        linked_txs = (
-            db.query(Transaction)
-            .join(Account)
-            .filter(
-                Account.user_id == user.id,
-                Transaction.recurring_id == item.id,
-                Transaction.is_projected == 0,
-                Transaction.category_id.is_(None),
-            )
-            .all()
-        )
-        for tx in linked_txs:
-            tx.category_id = item.category_id
-            tx.is_reviewed = 1
-            updated += 1
+    apply_item_categories(db, user.id, items)
 
     db.commit()
     return RedirectResponse("/recurring", status_code=302)
@@ -746,20 +717,7 @@ def apply_category_to_linked(
     if not item or not item.category_id:
         return RedirectResponse("/recurring", status_code=302)
 
-    linked_txs = (
-        db.query(Transaction)
-        .join(Account)
-        .filter(
-            Account.user_id == user.id,
-            Transaction.recurring_id == item.id,
-            Transaction.is_projected == 0,
-            Transaction.category_id.is_(None),
-        )
-        .all()
-    )
-    for tx in linked_txs:
-        tx.category_id = item.category_id
-        tx.is_reviewed = 1
+    apply_item_categories(db, user.id, [item])
 
     db.commit()
     return RedirectResponse("/recurring", status_code=302)
