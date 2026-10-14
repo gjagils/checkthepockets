@@ -168,6 +168,26 @@ def set_account_owners(
     return RedirectResponse("/accounts", status_code=302)
 
 
+@router.post("/accounts/{account_id}/update")
+def update_account(
+    account_id: int,
+    request: Request,
+    name: str = Form(...),
+    kind: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """Rename an account and set whether it is a payment or savings account."""
+    user = require_login(request, db)
+    account = _own_account(db, user.id, account_id)
+    name = " ".join(name.split())
+    if account and name:
+        account.name = name[:255]
+        if kind in ("payment", "savings"):
+            account.kind = kind
+        db.commit()
+    return RedirectResponse("/accounts", status_code=302)
+
+
 @router.post("/accounts/{account_id}/delete")
 def delete_account(account_id: int, request: Request, db: Session = Depends(get_db)):
     user = require_login(request, db)
