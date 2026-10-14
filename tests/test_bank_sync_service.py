@@ -137,7 +137,7 @@ def test_active_rules_categorise_scheduler_imports_like_the_manual_sync(db, worl
 
 def test_manual_sync_page_uses_the_same_service(db, world, monkeypatch):
     user, conn = world
-    monkeypatch.setattr("app.routers.banking.SUPER_ADMIN_USERNAME", user.username)
+    monkeypatch.setattr("app.auth.SUPER_ADMIN_USERNAME", user.username)
     _fake_transactions(monkeypatch, {"uid-a": [_raw(1, "10.00"), _raw(2, "5.00", "Shell", "p2")]})
     client = TestClient(app, follow_redirects=False)
     client.cookies.set("session", create_session_cookie(user.id))

@@ -64,7 +64,7 @@ def banking_client(monkeypatch):
     user = User(username="bunq-user", password_hash="x")
     db.add(user)
     db.commit()
-    monkeypatch.setattr("app.routers.banking.SUPER_ADMIN_USERNAME", user.username)
+    monkeypatch.setattr("app.auth.SUPER_ADMIN_USERNAME", user.username)
     state = {}
 
     def start_authorization(**kwargs):

@@ -6,10 +6,10 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from app import clock
-from app.auth import require_login
+from app.auth import is_super_admin, require_login
 from app.bunq_client import BunqClient, BunqError
 from app.bunq_sync import account_kind_for, iban_taken, refresh_links, resolve_account, sync_connection
-from app.config import BUNQ_API_BASE, SUPER_ADMIN_USERNAME
+from app.config import BUNQ_API_BASE
 from app.crypto import encryption_enabled
 from app.database import get_db
 from app.models import Account, BunqAccountLink, BunqConnection
@@ -21,7 +21,7 @@ router = APIRouter(prefix="/banking/bunq")
 
 def _allowed(user) -> bool:
     """Net als de bankkoppeling: alleen de beheerder zolang dit niet voor iedereen open is."""
-    return bool(SUPER_ADMIN_USERNAME and user.username == SUPER_ADMIN_USERNAME)
+    return is_super_admin(user)
 
 
 def _connection(db: Session, user_id: int) -> BunqConnection | None:

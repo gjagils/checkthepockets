@@ -12,6 +12,7 @@ from app import clock
 from app.database import get_db
 from app.models import User, Transaction, Account, AuthToken
 from app.auth import (
+    is_super_admin,
     hash_password,
     verify_password,
     set_session_cookie,
@@ -25,7 +26,6 @@ from app.auth import (
 from app.config import (
     REGISTRATION_OPEN, REQUIRE_EMAIL_VERIFICATION,
     GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, APP_URL,
-    SUPER_ADMIN_USERNAME,
 )
 from app.email_service import send_verification_email, send_password_reset_email
 from app import rate_limit
@@ -67,7 +67,7 @@ router = APIRouter()
 
 def _enforce_super_admin(user: "User", db: Session) -> None:
     """Ensure the super admin always has is_admin=1 and is_active=1."""
-    if SUPER_ADMIN_USERNAME and user.username == SUPER_ADMIN_USERNAME:
+    if is_super_admin(user):
         changed = False
         if not user.is_admin:
             user.is_admin = 1

@@ -183,7 +183,7 @@ def test_routes_select_accounts_preview_and_import(monkeypatch, db):
     csv_id = csv_account.id
     fake = FakeBunq({1: [[payment(1, "2026-05-01 10:00:00", "-10.00", "AH", "Albert Heijn"),
                           payment(2, "2026-05-02 10:00:00", "-4.00", "Brood", "Bakker")]]})
-    monkeypatch.setattr(bunq_router, "SUPER_ADMIN_USERNAME", user.username)
+    monkeypatch.setattr("app.auth.SUPER_ADMIN_USERNAME", user.username)
     monkeypatch.setattr(bunq_router, "encryption_enabled", lambda: True)
     monkeypatch.setattr(bunq_router, "BunqClient", lambda base: _client(fake))
     client = TestClient(app, follow_redirects=False)
@@ -221,7 +221,7 @@ def test_linking_to_account_without_iban_when_iban_is_taken_does_not_crash(monke
     db.commit()
     csv_id, iban_id = csv_account.id, with_iban.id
 
-    monkeypatch.setattr(bunq_router, "SUPER_ADMIN_USERNAME", user.username)
+    monkeypatch.setattr("app.auth.SUPER_ADMIN_USERNAME", user.username)
     monkeypatch.setattr(bunq_router, "encryption_enabled", lambda: True)
     monkeypatch.setattr(bunq_router, "BunqClient", lambda base: _client(FakeBunq({1: [[]]})))
     client = TestClient(app, follow_redirects=False)

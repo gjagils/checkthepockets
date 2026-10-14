@@ -4,7 +4,7 @@ from starlette.requests import Request
 from starlette.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
-from app.config import COOKIE_SECURE, SECRET_KEY, SESSION_MAX_AGE
+from app.config import COOKIE_SECURE, SECRET_KEY, SESSION_MAX_AGE, SUPER_ADMIN_USERNAME
 from app.models import User
 
 _signer = URLSafeTimedSerializer(SECRET_KEY)
@@ -61,6 +61,22 @@ def require_login(request: Request, db: Session) -> User:
 
 class LoginRequired(Exception):
     pass
+
+
+def is_super_admin(user) -> bool:
+    """The configured super admin (SUPER_ADMIN_USERNAME): cannot be deactivated, de-admin'd or deleted,
+    and the only user with bank connections while those are in restricted mode."""
+    return bool(SUPER_ADMIN_USERNAME and user.username == SUPER_ADMIN_USERNAME)
+
+
+def require_admin(request: Request, db: Session) -> User:
+    """Like require_login, but the user must also be an admin (403 otherwise)."""
+    from fastapi import HTTPException
+
+    user = require_login(request, db)
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Geen toegang")
+    return user
 
 
 def set_session_cookie(response: RedirectResponse, user_id: int, session_version: int = 0) -> RedirectResponse:

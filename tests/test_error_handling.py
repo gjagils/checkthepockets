@@ -29,7 +29,7 @@ def banking_user(db, monkeypatch):
     )
     db.add(conn)
     db.commit()
-    monkeypatch.setattr("app.routers.banking.SUPER_ADMIN_USERNAME", user.username)
+    monkeypatch.setattr("app.auth.SUPER_ADMIN_USERNAME", user.username)
     client = TestClient(app, follow_redirects=False)
     client.cookies.set("session", create_session_cookie(user.id))
     return client, conn

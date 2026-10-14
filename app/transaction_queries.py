@@ -1,4 +1,5 @@
 """Query helpers shared by routers, middleware and the scheduler (kept out of the routers)."""
+from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from app.models import Account, Transaction
@@ -28,3 +29,15 @@ def inbox_query(db: Session, user_id: int):
 
 def inbox_count(db: Session, user_id: int) -> int:
     return inbox_query(db, user_id).count()
+
+
+def transaction_years(db: Session, user_id: int, *extra_years: int) -> list[int]:
+    """Sorted years in which the user has transactions, plus `extra_years` (e.g. the current year)."""
+    rows = (
+        db.query(func.extract("year", Transaction.date).label("yr"))
+        .join(Account)
+        .filter(Account.user_id == user_id)
+        .distinct()
+        .all()
+    )
+    return sorted({int(row.yr) for row in rows} | set(extra_years))

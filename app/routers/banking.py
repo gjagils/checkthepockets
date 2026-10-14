@@ -12,8 +12,8 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from app import bank_sync, clock
-from app.auth import require_login
-from app.config import APP_URL, ENABLE_BANKING_APP_ID, SUPER_ADMIN_USERNAME
+from app.auth import is_super_admin, require_login
+from app.config import APP_URL, ENABLE_BANKING_APP_ID
 from app.database import get_db
 from app.models import Account, BankConnection
 from app.enable_banking import safe_error_message
@@ -28,7 +28,7 @@ def _is_configured() -> bool:
 
 def _is_banking_allowed(user) -> bool:
     """Only super admin can use banking in restricted mode."""
-    return bool(SUPER_ADMIN_USERNAME and user.username == SUPER_ADMIN_USERNAME)
+    return is_super_admin(user)
 
 
 _normalize_iban = bank_sync.normalize_iban  # alias; de logica staat in app/bank_sync.py

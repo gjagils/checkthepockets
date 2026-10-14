@@ -26,6 +26,7 @@ from app.import_service import existing_import_hashes, find_import_account, stor
 from app.recurring_service import auto_link_recurring_after_import, find_recurring_candidates
 from app.rules_engine import apply_rules_to_transaction
 from app.redirects import safe_redirect
+from app.nl_format import MONTHS_NL_FULL
 from app.template_config import templates
 
 router = APIRouter()
@@ -274,8 +275,7 @@ def _build_tx_query(db, user, account_id, category_id, tag_id, search,
     return query
 
 
-_NL_MONTHS = ["", "Januari", "Februari", "Maart", "April", "Mei", "Juni",
-              "Juli", "Augustus", "September", "Oktober", "November", "December"]
+_NL_MONTHS = MONTHS_NL_FULL
 
 
 @router.get("/transactions")
