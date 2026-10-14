@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Rekening samenvoegen - Check Your Pockets{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Rekening samenvoegen</h1>
+</div>
+
+<div class="card">
+    <p>Voeg <strong>{{ source.name or source.bank|upper }}</strong>
+        ({{ source.transactions|length }} transacties) samen met een andere rekening.
+        De gekozen rekening blijft bestaan; <strong>{{ source.name or source.bank|upper }}</strong> wordt daarna verwijderd.</p>
+    <form method="get" action="/accounts/{{ source.id }}/merge" style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
+        <label for="target_id">Behouden rekening:</label>
+        <select name="target_id" id="target_id">
+            <option value="">— kies een rekening —</option>
+            {% for acc in others %}
+            <option value="{{ acc.id }}" {% if target and target.id == acc.id %}selected{% endif %}>
+                {{ acc.name or acc.bank|upper }}{% if acc.iban %} · {{ acc.iban }}{% endif %}
+            </option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-sm">Toon preview</button>
+    </form>
+</div>
+
+{% if target %}
+<div class="card" style="margin-top:1rem;">
+    <h2>Preview</h2>
+    <ul>
+        <li><strong>{{ move_count }}</strong> transacties worden verplaatst naar {{ target.name or target.bank|upper }}.</li>
+        <li><strong>{{ duplicate_count }}</strong> transacties bestaan al op {{ target.name or target.bank|upper }} (zelfde datum en bedrag, en zelfde tegenpartij of omschrijving).
+            Die worden samengevoegd: categorie, controlestatus en koppelingen van jouw versie blijven behouden.</li>
+    </ul>
+    <p class="muted" style="font-size:0.85rem;">
+        Twijfelgevallen (zelfde datum en bedrag, maar andere tegenpartij en omschrijving) worden verplaatst, niet samengevoegd.
+        Eventuele restdubbelen vind je daarna onder <a href="/transactions/duplicates">Duplicaten</a>.
+    </p>
+
+    {% if plan.duplicates %}
+    <details style="margin-bottom:1rem;">
+        <summary>Toon dubbele transacties ({{ duplicate_count }})</summary>
+        <table class="table" style="margin-top:0.5rem; font-size:0.85rem;">
+            <thead><tr><th>Datum</th><th>Bedrag</th><th>Tegenpartij (te verwijderen)</th><th>Tegenpartij (blijft)</th></tr></thead>
+            <tbody>
+            {% for pair in plan.duplicates[:200] %}
+            <tr>
+                <td>{{ pair.source.date.strftime('%d-%m-%Y') }}</td>
+                <td>{{ pair.source.amount }}</td>
+                <td>{{ pair.source.counterparty or pair.source.description or '—' }}</td>
+                <td>{{ pair.target.counterparty or pair.target.description or '—' }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% if duplicate_count > 200 %}<p class="muted">…en {{ duplicate_count - 200 }} meer.</p>{% endif %}
+    </details>
+    {% endif %}
+
+    <form method="post" action="/accounts/{{ source.id }}/merge"
+          onsubmit="return confirm('Rekening {{ (source.name or source.bank)|e }} samenvoegen en verwijderen? Dit kan niet ongedaan worden.')">
+        <input type="hidden" name="target_id" value="{{ target.id }}">
+        <button type="submit" class="btn btn-primary">Samenvoegen</button>
+        <a href="/accounts" class="btn">Annuleren</a>
+    </form>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,152 @@
+"""Merge one account into another (e.g. a CSV account and a bank-sync account of the same IBAN).
+
+The import_hash of a CSV row and a bank-sync row for the same booking often
+differ, so duplicates are recognised on date + amount + counterparty or
+description instead. Matching is one-to-one: two identical payments on one day
+only pair up with two identical payments on the other account.
+"""
+import re
+from dataclasses import dataclass, field
+
+from sqlalchemy.orm import Session
+
+from app.models import (
+    Account, Category, ImportBatch, RecurringTransaction, Rule, SavingsPlan, Transaction,
+)
+
+
+@dataclass
+class MergePair:
+    source: Transaction
+    target: Transaction
+
+
+@dataclass
+class MergePlan:
+    move: list[Transaction] = field(default_factory=list)
+    duplicates: list[MergePair] = field(default_factory=list)
+
+
+@dataclass
+class MergeResult:
+    moved: int = 0
+    merged_duplicates: int = 0
+
+
+def _norm(value: str | None) -> str:
+    return re.sub(r"\s+", " ", (value or "").strip().lower())
+
+
+def _same_booking(source: Transaction, target: Transaction) -> bool:
+    if source.import_hash == target.import_hash:
+        return True
+    counterparty = _norm(source.counterparty)
+    if counterparty and counterparty == _norm(target.counterparty):
+        return True
+    description = _norm(source.description)
+    return bool(description) and description == _norm(target.description)
+
+
+def plan_merge(db: Session, source: Account, target: Account) -> MergePlan:
+    """Decide per source transaction whether it moves or duplicates a target one."""
+    plan = MergePlan()
+    candidates: dict[tuple, list[Transaction]] = {}
+    for tx in db.query(Transaction).filter(Transaction.account_id == target.id).order_by(Transaction.id):
+        candidates.setdefault((tx.date, tx.amount), []).append(tx)
+
+    for tx in db.query(Transaction).filter(Transaction.account_id == source.id).order_by(Transaction.date, Transaction.id):
+        pool = candidates.get((tx.date, tx.amount), [])
+        # An exact hash match wins over a fuzzy one.
+        match = next((t for t in pool if t.import_hash == tx.import_hash), None)
+        if match is None:
+            match = next((t for t in pool if _same_booking(tx, t)), None)
+        if match is None:
+            plan.move.append(tx)
+        else:
+            pool.remove(match)
+            plan.duplicates.append(MergePair(source=tx, target=match))
+    return plan
+
+
+def _absorb(source: Transaction, target: Transaction, db: Session) -> None:
+    """Keep the user's work from the source copy on the target copy, then drop the source."""
+    if target.category_id is None and source.category_id is not None:
+        target.category_id = source.category_id
+        target.assigned_by_rule_id = source.assigned_by_rule_id
+    if not target.is_reviewed and source.is_reviewed:
+        target.is_reviewed = source.is_reviewed
+    if not target.is_excluded and source.is_excluded:
+        target.is_excluded = source.is_excluded
+    if target.recurring_id is None and source.recurring_id is not None:
+        target.recurring_id = source.recurring_id
+    if target.transfer_id is None and source.transfer_id is not None:
+        target.transfer_id = source.transfer_id
+    if target.original_date is None and source.original_date is not None:
+        target.original_date = source.original_date
+
+    db.query(Transaction).filter(Transaction.parent_id == source.id).update(
+        {"parent_id": target.id}, synchronize_session=False)
+    db.query(Transaction).filter(Transaction.transfer_id == source.id).update(
+        {"transfer_id": target.id}, synchronize_session=False)
+    # The source's own links must not point at itself or at the target.
+    if target.transfer_id in (source.id, target.id):
+        target.transfer_id = None
+    source.transfer_id = None
+    db.flush()
+    db.delete(source)
+    db.flush()
+
+
+def merge_accounts(db: Session, source: Account, target: Account) -> MergeResult:
+    """Move source's data into target and delete source. Caller commits."""
+    if source.id == target.id or source.user_id != target.user_id:
+        raise ValueError("Rekeningen moeten verschillend zijn en van dezelfde gebruiker.")
+
+    plan = plan_merge(db, source, target)
+    result = MergeResult()
+
+    for pair in plan.duplicates:
+        _absorb(pair.source, pair.target, db)
+        result.merged_duplicates += 1
+
+    moved_ids = [tx.id for tx in plan.move]
+    for start in range(0, len(moved_ids), 500):
+        db.query(Transaction).filter(Transaction.id.in_(moved_ids[start:start + 500])).update(
+            {"account_id": target.id}, synchronize_session=False)
+    result.moved = len(moved_ids)
+
+    db.query(ImportBatch).filter(ImportBatch.account_id == source.id).update(
+        {"account_id": target.id}, synchronize_session=False)
+    db.query(RecurringTransaction).filter(RecurringTransaction.account_id == source.id).update(
+        {"account_id": target.id}, synchronize_session=False)
+    db.query(Category).filter(Category.account_id == source.id).update(
+        {"account_id": target.id}, synchronize_session=False)
+    db.query(Rule).filter(Rule.condition_account_id == source.id).update(
+        {"condition_account_id": target.id}, synchronize_session=False)
+
+    # A savings plan is unique per account and year in practice; keep the target's
+    # plan when both have one for the same year.
+    target_years = {y for (y,) in db.query(SavingsPlan.year).filter(SavingsPlan.account_id == target.id)}
+    for plan_row in db.query(SavingsPlan).filter(SavingsPlan.account_id == source.id).all():
+        if plan_row.year in target_years:
+            continue
+        plan_row.account_id = target.id
+
+    if not target.owners and source.owners:
+        target.owners = list(source.owners)
+    source_iban, source_uid = source.iban, source.external_uid
+    db.flush()
+    db.expire(source)
+
+    # Remaining savings plans (same year on both) go with the source account.
+    db.query(SavingsPlan).filter(SavingsPlan.account_id == source.id).delete(synchronize_session=False)
+    db.expire(source, ["transactions"])
+    db.delete(source)
+    db.flush()
+
+    if not target.iban and source_iban:
+        target.iban = source_iban
+    if not target.external_uid and source_uid:
+        target.external_uid = source_uid
+    db.flush()
+    return result
