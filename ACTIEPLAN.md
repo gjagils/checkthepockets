@@ -82,11 +82,11 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-33 | P1 | Afgerond | — | [Auth-fixes: uitnodiging, e-mailverificatie, rate limiting, proxy](#act-33) |
 | ACT-34 | P1 | Afgerond | — | [Crash- en datafouten in routes](#act-34) |
 | ACT-35 | P1 | Afgerond | — | [XSS in templates](#act-35) |
-| ACT-36 | P2 | Gepland | — | [Repo-hygiëne, configuratie en deploy-trigger](#act-36) |
-| ACT-37 | P3 | Gepland | — | [Tooling: ruff, pyproject, coverage, dependabot](#act-37) |
-| ACT-38 | P2 | Gepland | — | [Verouderde API's: TemplateResponse, lifespan, tijd](#act-38) |
-| ACT-39 | P2 | Gepland | — | [Testfundament met conftest](#act-39) |
-| ACT-40 | P2 | Gepland | ACT-38 | [Dependency-upgrade](#act-40) |
+| ACT-36 | P2 | Afgerond | — | [Repo-hygiëne, configuratie en deploy-trigger](#act-36) |
+| ACT-37 | P3 | Afgerond | — | [Tooling: ruff, pyproject, coverage, dependabot](#act-37) |
+| ACT-38 | P2 | Afgerond | — | [Verouderde API's: TemplateResponse, lifespan, tijd](#act-38) |
+| ACT-39 | P2 | Afgerond | — | [Testfundament met conftest](#act-39) |
+| ACT-40 | P2 | Afgerond | ACT-38 | [Dependency-upgrade](#act-40) |
 | ACT-41 | P2 | Gepland | ACT-39 | [Schema-hygiëne en migratie](#act-41) |
 | ACT-42 | P2 | Gepland | ACT-39 | [Transactiegrenzen, banksync-service en scheduler-lock](#act-42) |
 | ACT-43 | P3 | Gepland | ACT-37 | [Gedeelde helpers en foutafhandelingsconventie](#act-43) |
@@ -628,6 +628,10 @@ commit `339a4d8`; controleer ze bij het oppakken.
 
 Alle vijf PR's gemerged en gedeployed (Build and Deploy geslaagd): ACT-32 [#215](https://github.com/gjagils/checkthepockets/pull/215), ACT-33 [#216](https://github.com/gjagils/checkthepockets/pull/216), ACT-34a [#217](https://github.com/gjagils/checkthepockets/pull/217), ACT-34b [#218](https://github.com/gjagils/checkthepockets/pull/218), ACT-35 [#219](https://github.com/gjagils/checkthepockets/pull/219). A12 was al opgelost in #211. ACT-34 is gesplitst in 34a (A4, A6–A11, A14) en 34b (A13, A15, B9). Gevonden bovenop de review: de instellingen-import was niet atomair (nu wel), en inline `confirm('…{{ naam }}…')` in elf templates was een stored-XSS-route (gebruikersnaam op `admin/users.html`); beide opgelost. Productievalidatie open: uitloggen via POST-knop, IP-gedrag van de inlogbegrenzing achter Cloudflare/nginx, de duplicatenpagina met echte versleutelde data, en de AI-modelnaam (`ANTHROPIC_MODEL`, standaard `claude-sonnet-5-5`, niet tegen de echte API getest).
 
+### Fase 2 (ACT-36 t/m ACT-40) — uitkomst, 2026-10-14, Claude Code
+
+Gemerged en gedeployed: ACT-36 [#221](https://github.com/gjagils/checkthepockets/pull/221), ACT-37 [#222](https://github.com/gjagils/checkthepockets/pull/222), ACT-38a [#223](https://github.com/gjagils/checkthepockets/pull/223), ACT-38b [#224](https://github.com/gjagils/checkthepockets/pull/224), ACT-40 [#225](https://github.com/gjagils/checkthepockets/pull/225), ACT-39 [#226](https://github.com/gjagils/checkthepockets/pull/226). Bijzonderheden: `app/clock.py` (`today_nl()` verandert gedrag tussen 00:00 en 02:00 NL-tijd); dependency-upgrade gevalideerd op een echte Python 3.12 uit het lock, met oude→nieuwe leesbaarheid van Fernet/bcrypt/sessiecookies; `apscheduler` 3.11 had `pytz` niet meer (nu `zoneinfo`); SQLAlchemy 2.1 en bcrypt 5 bewust niet meegenomen (eigen actie nodig); de testbasis dwingt nu foreign keys af en isoleert per test. Productievalidatie: pagina's laden (bevestigd door gebruiker); scheduler-pagina `/admin/scheduler` nog te bevestigen; bunq-voorbeeld en CSV-import door gebruiker later.
+
 ## Besluitenlog
 
 | Datum | Besluit | Reden / gevolgen |
@@ -683,3 +687,4 @@ Voeg per afgeronde actie of overdracht een regel toe. Git bevat de volledige his
 | 2026-10-14 | Codereview | Volledige scan vóór het UI-redesign; ACT-32 t/m ACT-52 als Gepland toegevoegd | Claude Code; docs/CODE-REVIEW-2026-10-14.md; 512 passed, 3 skipped (Python 3.12 via uv); branch `claude/check-pockets-suite-review-fd0da6` |
 | 2026-10-14 | ACT-32 | Encryptie-bugs uit de review (A1, A2, A3, B11) opgelost met tests die met versleuteling draaien | Claude Code; 529 passed, 3 skipped; PR-CI open |
 | 2026-10-14 | ACT-32 t/m ACT-35 | Fase 1 van de codereview afgerond: encryptie-bugs, auth-hardening, crash- en datafouten (a en b), XSS | #215, #216, #217, #218, #219 gemerged; CI groen; productievalidatie deels open (zie fase 1 — uitkomst) |
+| 2026-10-14 | ACT-36 t/m ACT-40 | Fase 2 van de codereview afgerond (hygiëne, tooling, verouderde API's, testbasis, dependency-upgrade) | #221–#226 gemerged; CI groen; 586 passed, 3 skipped op Python 3.12 |
