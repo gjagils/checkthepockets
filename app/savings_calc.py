@@ -93,3 +93,31 @@ def determine_color_status(
     if is_income:
         return "above" if actual_abs > expected_abs else "below"
     return "above" if actual_abs < expected_abs else "below"
+
+
+def running_balances(start: Decimal, lines, actuals: dict | None = None) -> dict[int, Decimal]:
+    """Running balance per month 1..12 for a savings plan.
+
+    `lines` carry `.id`, `.is_income` and `.entries` (each with `.month` and `.amount`; amounts are
+    stored positive: income adds, expense subtracts). `actuals` optionally maps `line.id -> {month:
+    actual_amount}`; an actual replaces the planned entry amount for that month (category-linked lines
+    follow their transactions). Replaces four copies of the same nested loop in the savings router.
+    """
+    planned = {
+        line.id: {entry.month: entry.amount for entry in line.entries if entry.amount is not None}
+        for line in lines
+    }
+    balance = start
+    balances: dict[int, Decimal] = {}
+    for month in range(1, 13):
+        for line in lines:
+            amount = planned[line.id].get(month)
+            if actuals:
+                actual = actuals.get(line.id, {}).get(month)
+                if actual is not None:
+                    amount = actual
+            if amount is None:
+                continue
+            balance += abs(amount) if line.is_income else -abs(amount)
+        balances[month] = balance
+    return balances
