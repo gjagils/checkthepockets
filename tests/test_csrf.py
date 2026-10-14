@@ -1,4 +1,3 @@
-import importlib
 
 
 def test_csrf_origin_check_rejects_cross_origin_authenticated_request(monkeypatch):

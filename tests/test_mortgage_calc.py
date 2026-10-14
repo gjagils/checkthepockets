@@ -3,7 +3,6 @@ import datetime
 from decimal import Decimal
 from types import SimpleNamespace
 
-import pytest
 
 from app.mortgage_calc import (
     amortization_schedule,

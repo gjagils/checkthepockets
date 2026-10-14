@@ -4,7 +4,7 @@ import json
 import logging
 import urllib.request
 import urllib.error
-from datetime import date, timedelta
+from datetime import date
 from decimal import Decimal
 
 logger = logging.getLogger(__name__)

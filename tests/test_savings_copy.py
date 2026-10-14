@@ -1,5 +1,4 @@
 """Tests for "kopieer van vorig jaar" op spaarplannen (GJA-13)."""
-import datetime
 import os
 import tempfile
 from decimal import Decimal

@@ -198,7 +198,6 @@ def _sync_all_bank_connections():
     """
     from app.database import SessionLocal
     from app.models import Account, BankConnection, Rule
-    from app.parsers.base import ParsedTransaction
     from app.import_service import store_parsed_transactions
 
     total_imported = 0

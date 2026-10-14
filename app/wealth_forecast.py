@@ -114,7 +114,6 @@ def build_wealth_forecast(
         .filter(SavingsPlan.user_id == user_id, SavingsPlan.year == year).all()
     )
     plans_by_account = {plan.account_id: plan for plan in plans}
-    assets_by_id = {asset.id: asset for asset in assets}
     prices = _asset_prices_by_month(db, assets, year)
     adjustments = {
         (row.asset_id, row.person_id, row.month): row.amount

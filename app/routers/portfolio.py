@@ -153,11 +153,9 @@ def portfolio_overview(
             if month <= current_month:
                 # Past/current: use historical prices from snapshots
                 month_total = Decimal("0")
-                has_data = False
                 for asset in assets:
                     price = snapshot_map.get((asset.id, month))
                     if price is not None:
-                        has_data = True
                         month_total += asset_quantities[asset.id] * price
                     else:
                         # Fallback: use current price
