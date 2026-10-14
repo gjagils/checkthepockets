@@ -10,6 +10,7 @@ from decimal import Decimal
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app import clock
 from app.models import Account, RecurringTransaction, Transaction
 from app.recurring_schedule import get_period_range, is_active_in_month, projected_hash
 
@@ -532,3 +533,42 @@ def auto_link_recurring_after_import(db: Session, user_id: int):
                 continue
 
             link_transaction_to_recurring(candidate, item)
+
+
+def resync_after_import(db: Session, user_id: int, months_ahead: int = 1) -> None:
+    """The follow-up of every import: link matching transactions to recurring items, drop projections that
+    now have a real match, and refresh the projections for the current month (and `months_ahead - 1` more).
+
+    Was written out four times (CSV import, bank sync, bunq sync, "relink all").
+    """
+    auto_link_recurring_after_import(db, user_id)
+    cleanup_matched_projected(user_id, db)
+    today = clock.today_nl()
+    for offset in range(months_ahead):
+        month_index = today.month - 1 + offset
+        sync_projected_transactions(user_id, today.year + month_index // 12, month_index % 12 + 1, db)
+
+
+def apply_item_categories(db: Session, user_id: int, items) -> int:
+    """Give the linked, uncategorised real transactions the category of their recurring item.
+
+    One query for all items (the "apply to all" route used to run one per item). Returns how many
+    transactions were categorised; the caller commits.
+    """
+    by_id = {item.id: item for item in items if item.category_id}
+    if not by_id:
+        return 0
+    transactions = (
+        db.query(Transaction).join(Account)
+        .filter(
+            Account.user_id == user_id,
+            Transaction.recurring_id.in_(list(by_id)),
+            Transaction.is_projected == 0,
+            Transaction.category_id.is_(None),
+        )
+        .all()
+    )
+    for transaction in transactions:
+        transaction.category_id = by_id[transaction.recurring_id].category_id
+        transaction.is_reviewed = 1
+    return len(transactions)
