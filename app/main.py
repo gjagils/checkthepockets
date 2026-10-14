@@ -25,14 +25,19 @@ from app.auth import COOKIE_NAME, LoginRequired, get_current_user
 from app.routers import auth, transactions, accounts, categories, rules, budgets, recurring, dashboard, savings, analytics, portfolio, networth, settings, admin, banking, bunq, inbox, persons, mortgage, info
 from app.scheduler import scheduler as background_scheduler, start_scheduler
 
-from app.config import APP_URL, COOKIE_SECURE, CSRF_ENFORCE, SECRET_KEY, validate_production_config
+from app.config import (
+    APP_URL, COOKIE_SECURE, CSRF_ENFORCE, SCHEDULER_ENABLED, SECRET_KEY, validate_production_config,
+)
 
 validate_production_config()
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     """Startup: start the background scheduler. Shutdown: stop it without waiting for running jobs."""
-    start_scheduler()
+    if SCHEDULER_ENABLED:
+        start_scheduler()
+    else:
+        logger.info("SCHEDULER_ENABLED=false: scheduler niet gestart in dit proces")
     try:
         yield
     finally:

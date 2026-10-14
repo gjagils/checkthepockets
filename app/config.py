@@ -62,5 +62,13 @@ def validate_production_config() -> None:
     if errors:
         raise RuntimeError("Unsafe production configuration: " + "; ".join(errors))
 
+# Background scheduler (jobs: bank sync, digests, ...). Zet op false in alle processen behalve één als
+# er meerdere workers/containers draaien; de advisory lock in logged_job voorkomt dubbel draaien ook zo.
+SCHEDULER_ENABLED = (os.getenv("SCHEDULER_ENABLED") or "true").lower() != "false"
+# PostgreSQL advisory lock per job (voorkomt dubbel draaien). Standaard uit: sessie-locks zijn onbetrouwbaar
+# achter een transaction-pooler (bijv. een Neon "-pooler"-verbinding) en kunnen daar een job blijven blokkeren.
+# Zet alleen aan met een directe (niet-gepoolde) databaseverbinding.
+SCHEDULER_LOCK = (os.getenv("SCHEDULER_LOCK") or "false").lower() == "true"
+
 # bunq API (ACT-31). Zet op https://public-api.sandbox.bunq.com/v1 om te testen met nepgeld.
 BUNQ_API_BASE = os.getenv("BUNQ_API_BASE") or "https://api.bunq.com/v1"
