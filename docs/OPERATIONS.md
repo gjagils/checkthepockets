@@ -56,3 +56,14 @@ De huidige [backupinstructie](../app/docs/admin/backup-restore.nl.md) is een
 uitgangspunt. De [restoreproef](BACKUP-RESTORE-DRILL.md) beschrijft de vaste
 controlepunten en het beheerlog; een proef moet door een bevoegde beheerder
 worden uitgevoerd en geregistreerd.
+
+## Banksynchronisatie
+
+De Enable Banking-sync staat op één plek: `app/bank_sync.py`. De handmatige pagina (`/banking/sync/…`)
+en de geplande job (`bank_sync`, 01:00 en 17:00 Amsterdam) gebruiken dezelfde functies, dus hetzelfde
+gedrag: rekeningen worden gevonden op `external_uid` en anders op het genormaliseerde IBAN, elke sync
+maakt een `ImportBatch`, en de koppeling krijgt `last_synced_at`, `last_sync_status` (`success`/`error`)
+en `last_sync_error`. Elke rekening draait in een eigen savepoint: een rekening die faalt laat de andere
+rekeningen van dezelfde koppeling (en andere koppelingen) onaangetast; de koppeling krijgt dan status
+`error` met de foutmelding (zonder account-id's). Controleer na een uitrol de scheduler-log
+(`/admin/scheduler`, "Recente runs") en de status van de koppeling op `/banking/connect`.

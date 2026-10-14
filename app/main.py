@@ -93,7 +93,7 @@ async def add_inbox_count(request: Request, call_next):
     ):
         try:
             from app.database import SessionLocal
-            from app.routers.inbox import inbox_count
+            from app.transaction_queries import inbox_count
             db = SessionLocal()
             try:
                 user = get_current_user(request, db)
