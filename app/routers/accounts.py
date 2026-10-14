@@ -126,6 +126,7 @@ def accounts_list(request: Request, merged: str | None = None, db: Session = Dep
             latest_tx_by_account_id[acc_id] = max_date
 
     return templates.TemplateResponse(
+        request,
         "accounts/list.html",
         {
             "request": request,
@@ -238,6 +239,7 @@ def merge_account_page(
         target = None
     plan = plan_merge(db, source, target) if target else None
     return templates.TemplateResponse(
+        request,
         "accounts/merge.html",
         {
             "request": request, "user": user, "source": source, "others": others,

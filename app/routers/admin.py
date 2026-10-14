@@ -59,6 +59,7 @@ def admin_users(request: Request, db: Session = Depends(get_db)):
     users = db.query(User).order_by(User.created_at).all()
     stats = _user_stats(db, users)
     return templates.TemplateResponse(
+        request,
         "admin/users.html",
         {"request": request, "user": admin, "users": users,
          "user_stats": stats, "encryption_enabled": encryption_enabled()},
@@ -168,6 +169,7 @@ def create_invite(
 
     users = db.query(User).order_by(User.created_at).all()
     return templates.TemplateResponse(
+        request,
         "admin/users.html",
         {
             "request": request, "user": admin, "users": users,
@@ -188,6 +190,7 @@ def encrypt_data(request: Request, db: Session = Depends(get_db)):
     count = encrypt_existing_transactions(db)
     users = db.query(User).order_by(User.created_at).all()
     return templates.TemplateResponse(
+        request,
         "admin/users.html",
         {
             "request": request, "user": admin, "users": users,
@@ -212,6 +215,7 @@ def seed_demo(request: Request, db: Session = Depends(get_db)):
     result = seed_demo_user(db=db)
     users = db.query(User).order_by(User.created_at).all()
     return templates.TemplateResponse(
+        request,
         "admin/users.html",
         {
             "request": request, "user": admin, "users": users,
@@ -277,6 +281,7 @@ def admin_imports(request: Request, db: Session = Depends(get_db)):
     admin = _require_admin(request, db)
     batches = _list_import_batches(db)
     return templates.TemplateResponse(
+        request,
         "admin/imports.html",
         {"request": request, "user": admin, "batches": batches},
     )
@@ -442,6 +447,7 @@ def admin_orphan_transactions(request: Request, db: Session = Depends(get_db)):
         })
 
     return templates.TemplateResponse(
+        request,
         "admin/orphan_transactions.html",
         {
             "request": request,
@@ -489,6 +495,7 @@ def admin_scheduler(request: Request, db: Session = Depends(get_db)):
         .all()
     )
     return templates.TemplateResponse(
+        request,
         "admin/scheduler.html",
         {
             "request": request,

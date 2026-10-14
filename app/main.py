@@ -2,6 +2,7 @@ import hashlib
 import logging
 import os
 import time
+from contextlib import asynccontextmanager
 from urllib.parse import urlsplit
 
 from fastapi import FastAPI, Request
@@ -22,13 +23,24 @@ logger = logging.getLogger(__name__)
 
 from app.auth import COOKIE_NAME, LoginRequired, get_current_user
 from app.routers import auth, transactions, accounts, categories, rules, budgets, recurring, dashboard, savings, analytics, portfolio, networth, settings, admin, banking, bunq, inbox, persons, mortgage, info
-from app.scheduler import start_scheduler
+from app.scheduler import scheduler as background_scheduler, start_scheduler
 
 from app.config import APP_URL, COOKIE_SECURE, CSRF_ENFORCE, SECRET_KEY, validate_production_config
 
 validate_production_config()
 
-app = FastAPI(title="Check Your Pockets", docs_url=None, redoc_url=None)
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Startup: start the background scheduler. Shutdown: stop it without waiting for running jobs."""
+    start_scheduler()
+    try:
+        yield
+    finally:
+        if background_scheduler.running:
+            background_scheduler.shutdown(wait=False)
+
+
+app = FastAPI(title="Check Your Pockets", docs_url=None, redoc_url=None, lifespan=lifespan)
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY, session_cookie="oauth_state", https_only=COOKIE_SECURE)
 
 
@@ -108,17 +120,17 @@ def landing(request: Request):
         db.close()
     if user:
         return RedirectResponse(user_start_page(user), status_code=302)
-    return _landing_templates.TemplateResponse("landing.html", {"request": request})
+    return _landing_templates.TemplateResponse(request, "landing.html", {"request": request})
 
 
 @app.get("/privacy")
 def privacy(request: Request):
-    return _landing_templates.TemplateResponse("privacy.html", {"request": request})
+    return _landing_templates.TemplateResponse(request, "privacy.html", {"request": request})
 
 
 @app.get("/terms")
 def terms(request: Request):
-    return _landing_templates.TemplateResponse("terms.html", {"request": request})
+    return _landing_templates.TemplateResponse(request, "terms.html", {"request": request})
 
 
 @app.get("/healthz")
@@ -160,11 +172,6 @@ app.include_router(bunq.router)
 app.include_router(inbox.router)
 app.include_router(mortgage.router)
 app.include_router(info.router)
-
-
-@app.on_event("startup")
-def on_startup():
-    start_scheduler()
 
 
 @app.exception_handler(LoginRequired)

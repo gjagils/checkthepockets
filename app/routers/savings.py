@@ -303,6 +303,7 @@ def savings_overview(
         )
 
     return templates.TemplateResponse(
+        request,
         "savings/overview.html",
         {
             "request": request,
@@ -540,6 +541,7 @@ def plan_detail(
     analyze_status = request.query_params.get("analyze", "")
 
     return templates.TemplateResponse(
+        request,
         "savings/detail.html",
         {
             "request": request,

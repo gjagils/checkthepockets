@@ -45,7 +45,7 @@ def _render(request, user, db, **extra):
         "reports": None, "dry_run": False, "error": None, "success": None, "warnings": [],
     }
     context.update(extra)
-    return templates.TemplateResponse("banking/bunq.html", context)
+    return templates.TemplateResponse(request, "banking/bunq.html", context)
 
 
 def _guard(request, db):

@@ -158,7 +158,7 @@ def login_page(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
     if user:
         return RedirectResponse(user_start_page(user), status_code=302)
-    return templates.TemplateResponse("auth/login.html", {
+    return templates.TemplateResponse(request, "auth/login.html", {
         "request": request,
         "google_login_enabled": google_login_enabled(),
     })
@@ -175,6 +175,7 @@ def login(
 
     if is_rate_limited(ip):
         return templates.TemplateResponse(
+            request,
             "auth/login.html",
             {"request": request, "error": "Te veel mislukte pogingen. Probeer het over een minuut opnieuw."},
             status_code=429,
@@ -185,6 +186,7 @@ def login(
     if not user or not verify_password(password, user.password_hash):
         record_failed_attempt(ip)
         return templates.TemplateResponse(
+            request,
             "auth/login.html",
             {"request": request, "error": "Ongeldige gebruikersnaam of wachtwoord"},
             status_code=401,
@@ -192,6 +194,7 @@ def login(
 
     if not user.is_active:
         return templates.TemplateResponse(
+            request,
             "auth/login.html",
             {"request": request, "error": "Je account is gedeactiveerd. Neem contact op met de beheerder."},
             status_code=403,
@@ -199,6 +202,7 @@ def login(
 
     if REQUIRE_EMAIL_VERIFICATION and not user.is_verified:
         return templates.TemplateResponse(
+            request,
             "auth/login.html",
             {"request": request, "error": "Bevestig je e-mailadres eerst via de link in de verificatiemail."},
             status_code=403,
@@ -234,16 +238,18 @@ def register_page(request: Request, invite: str = "", db: Session = Depends(get_
             ).first()
             if not t:
                 return templates.TemplateResponse(
+                    request,
                     "auth/login.html",
                     {"request": request, "error": "Ongeldige of verlopen uitnodigingslink."},
                 )
         else:
             return templates.TemplateResponse(
+                request,
                 "auth/login.html",
                 {"request": request, "error": "Registratie is gesloten. Je hebt een uitnodigingslink nodig."},
             )
 
-    return templates.TemplateResponse("auth/register.html", {"request": request, "invite": invite})
+    return templates.TemplateResponse(request, "auth/register.html", {"request": request, "invite": invite})
 
 
 @router.post("/register")
@@ -258,6 +264,7 @@ def register(
 ):
     if _too_many("register", request, max_attempts=5):
         return templates.TemplateResponse(
+            request,
             "auth/register.html",
             {"request": request, "errors": ["Te veel pogingen. Probeer het over een paar minuten opnieuw."],
              "username": username, "email": email, "invite": invite},
@@ -292,6 +299,7 @@ def register(
 
     if errors:
         return templates.TemplateResponse(
+            request,
             "auth/register.html",
             {"request": request, "errors": errors, "username": username,
              "email": email, "invite": invite},
@@ -318,6 +326,7 @@ def register(
         if claimed != 1:
             db.rollback()
             return templates.TemplateResponse(
+                request,
                 "auth/register.html",
                 {"request": request, "errors": ["Ongeldige of verlopen uitnodigingslink."],
                  "username": username, "email": email, "invite": invite},
@@ -331,6 +340,7 @@ def register(
         token = _create_token(db, user.id, "verify_email", hours=24)
         send_verification_email(user.email, token)
         return templates.TemplateResponse(
+            request,
             "auth/verify_email.html",
             {"request": request, "email": user.email, "mode": "sent"},
         )
@@ -348,6 +358,7 @@ def verify_email(request: Request, token: str = "", db: Session = Depends(get_db
     t = _consume_token(db, token, "verify_email")
     if not t or not t.user_id:
         return templates.TemplateResponse(
+            request,
             "auth/verify_email.html",
             {"request": request, "mode": "invalid"},
         )
@@ -356,6 +367,7 @@ def verify_email(request: Request, token: str = "", db: Session = Depends(get_db
         user.is_verified = 1
         db.commit()
     return templates.TemplateResponse(
+        request,
         "auth/verify_email.html",
         {"request": request, "mode": "confirmed"},
     )
@@ -367,7 +379,7 @@ def verify_email(request: Request, token: str = "", db: Session = Depends(get_db
 
 @router.get("/forgot-password")
 def forgot_password_page(request: Request):
-    return templates.TemplateResponse("auth/forgot_password.html", {"request": request})
+    return templates.TemplateResponse(request, "auth/forgot_password.html", {"request": request})
 
 
 @router.post("/forgot-password")
@@ -388,6 +400,7 @@ def forgot_password(
         send_password_reset_email(user.email, token)
 
     return templates.TemplateResponse(
+        request,
         "auth/forgot_password.html",
         {"request": request, "sent": True},
     )
@@ -403,10 +416,12 @@ def reset_password_page(request: Request, token: str = "", db: Session = Depends
     ).first()
     if not t:
         return templates.TemplateResponse(
+            request,
             "auth/reset_password.html",
             {"request": request, "token": token, "invalid": True},
         )
     return templates.TemplateResponse(
+        request,
         "auth/reset_password.html",
         {"request": request, "token": token},
     )
@@ -422,6 +437,7 @@ def reset_password(
 ):
     if _too_many("reset", request, max_attempts=10):
         return templates.TemplateResponse(
+            request,
             "auth/reset_password.html",
             {"request": request, "token": token,
              "errors": ["Te veel pogingen. Probeer het over een paar minuten opnieuw."]},
@@ -435,6 +451,7 @@ def reset_password(
 
     if errors:
         return templates.TemplateResponse(
+            request,
             "auth/reset_password.html",
             {"request": request, "token": token, "errors": errors},
             status_code=400,
@@ -443,6 +460,7 @@ def reset_password(
     t = _consume_token(db, token, "reset_password")
     if not t or not t.user_id:
         return templates.TemplateResponse(
+            request,
             "auth/reset_password.html",
             {"request": request, "token": token, "invalid": True},
         )
@@ -454,6 +472,7 @@ def reset_password(
         db.commit()
 
     return templates.TemplateResponse(
+        request,
         "auth/reset_password.html",
         {"request": request, "token": token, "success": True},
     )
@@ -479,6 +498,7 @@ def _settings_ctx(request: Request, user: User, **extra) -> dict:
 def settings_page(request: Request, db: Session = Depends(get_db)):
     user = require_login(request, db)
     return templates.TemplateResponse(
+        request,
         "auth/settings.html", _settings_ctx(request, user),
     )
 
@@ -493,6 +513,7 @@ def update_start_page(
     options = allowed_start_pages(user)
     if not any(opt["path"] == start_page for opt in options):
         return templates.TemplateResponse(
+            request,
             "auth/settings.html",
             _settings_ctx(
                 request, user,
@@ -503,6 +524,7 @@ def update_start_page(
     user.start_page = start_page
     db.commit()
     return templates.TemplateResponse(
+        request,
         "auth/settings.html",
         _settings_ctx(request, user, start_page_success="Startpagina opgeslagen."),
     )
@@ -528,6 +550,7 @@ def change_password(
 
     if errors:
         return templates.TemplateResponse(
+            request,
             "auth/settings.html",
             _settings_ctx(request, user, errors=errors),
             status_code=400,
@@ -538,6 +561,7 @@ def change_password(
     db.commit()
 
     return templates.TemplateResponse(
+        request,
         "auth/settings.html",
         _settings_ctx(request, user, success="Wachtwoord succesvol gewijzigd"),
     )
@@ -573,12 +597,14 @@ def update_email(
     cleaned = _clean_email(email)
     if cleaned is None:
         return templates.TemplateResponse(
+            request,
             "auth/settings.html",
             _settings_ctx(request, user, email_error="Geen geldig e-mailadres."),
         )
     user.email = cleaned or None
     db.commit()
     return templates.TemplateResponse(
+        request,
         "auth/settings.html",
         _settings_ctx(
             request, user,
@@ -605,6 +631,7 @@ def update_digest_preferences(
     db.commit()
 
     return templates.TemplateResponse(
+        request,
         "auth/settings.html",
         _settings_ctx(request, user, digest_success="Digest-voorkeuren opgeslagen"),
     )
@@ -625,6 +652,7 @@ def send_test_digest(request: Request, db: Session = Depends(get_db)):
 
     if not user.email:
         return templates.TemplateResponse(
+            request,
             "auth/settings.html",
             _settings_ctx(request, user, digest_test_error="Geen e-mailadres gevonden voor je account."),
         )
@@ -639,6 +667,7 @@ def send_test_digest(request: Request, db: Session = Depends(get_db)):
             user.username,
         )
         return templates.TemplateResponse(
+            request,
             "auth/settings.html",
             _settings_ctx(
                 request, user,
@@ -667,6 +696,7 @@ def send_test_digest(request: Request, db: Session = Depends(get_db)):
     if sent:
         log.info("Testdigest succesvol verzonden naar %s", user.email)
         return templates.TemplateResponse(
+            request,
             "auth/settings.html",
             _settings_ctx(
                 request, user,
@@ -679,6 +709,7 @@ def send_test_digest(request: Request, db: Session = Depends(get_db)):
         user.email,
     )
     return templates.TemplateResponse(
+        request,
         "auth/settings.html",
         _settings_ctx(
             request, user,
@@ -702,6 +733,7 @@ def delete_account(
 
     if not verify_password(confirm_password, user.password_hash):
         return templates.TemplateResponse(
+            request,
             "auth/settings.html",
             _settings_ctx(request, user, delete_error="Wachtwoord is onjuist"),
             status_code=400,
@@ -725,6 +757,7 @@ def delete_all_transactions(
 
     if not verify_password(confirm_password, user.password_hash):
         return templates.TemplateResponse(
+            request,
             "auth/settings.html",
             _settings_ctx(request, user, tx_delete_error="Wachtwoord is onjuist"),
             status_code=400,
@@ -735,6 +768,7 @@ def delete_all_transactions(
     db.commit()
 
     return templates.TemplateResponse(
+        request,
         "auth/settings.html",
         _settings_ctx(request, user, success=f"{deleted} transactie(s) verwijderd."),
     )
@@ -762,7 +796,7 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
     except Exception as exc:
         # Cancelled logins land here too; log the type only, never tokens or codes.
         logger.warning("Google OAuth callback failed: %s", type(exc).__name__)
-        return templates.TemplateResponse("auth/login.html", {
+        return templates.TemplateResponse(request, "auth/login.html", {
             "request": request,
             "error": "Google login mislukt. Probeer het opnieuw.",
             "google_login_enabled": True,
@@ -770,7 +804,7 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
 
     userinfo = token.get("userinfo")
     if not userinfo or not userinfo.get("email"):
-        return templates.TemplateResponse("auth/login.html", {
+        return templates.TemplateResponse(request, "auth/login.html", {
             "request": request,
             "error": "Kon geen e-mailadres ophalen van Google.",
             "google_login_enabled": True,
@@ -779,7 +813,7 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
     # Without a verified address anyone could claim a local account by registering that
     # address at Google; never link or create on an unverified email.
     if not userinfo.get("email_verified"):
-        return templates.TemplateResponse("auth/login.html", {
+        return templates.TemplateResponse(request, "auth/login.html", {
             "request": request,
             "error": "Je Google-e-mailadres is niet geverifieerd, dus we kunnen je niet inloggen.",
             "google_login_enabled": True,
@@ -793,7 +827,7 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
 
     if not user:
         if not REGISTRATION_OPEN:
-            return templates.TemplateResponse("auth/login.html", {
+            return templates.TemplateResponse(request, "auth/login.html", {
                 "request": request,
                 "error": "Registratie is gesloten. Vraag een uitnodigingslink aan.",
                 "google_login_enabled": True,
@@ -820,7 +854,7 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
         db.refresh(user)
 
     if not user.is_active:
-        return templates.TemplateResponse("auth/login.html", {
+        return templates.TemplateResponse(request, "auth/login.html", {
             "request": request,
             "error": "Je account is gedeactiveerd. Neem contact op met de beheerder.",
             "google_login_enabled": True,

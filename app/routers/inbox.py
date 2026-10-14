@@ -101,6 +101,7 @@ def inbox_page(
         redirect_back = f"/inbox?account_id={current_account_id}"
 
     return templates.TemplateResponse(
+        request,
         "inbox/index.html",
         {
             "request": request,

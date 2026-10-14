@@ -34,6 +34,7 @@ def list_persons(request: Request, db: Session = Depends(get_db)):
         .all()
     )
     return templates.TemplateResponse(
+        request,
         "persons/list.html",
         {
             "request": request,

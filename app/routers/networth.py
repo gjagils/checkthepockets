@@ -76,6 +76,7 @@ def networth_overview(
     history = _get_networth_history(db, user.id)
 
     return templates.TemplateResponse(
+        request,
         "networth/index.html",
         {
             "request": request,
