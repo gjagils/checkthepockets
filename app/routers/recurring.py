@@ -7,6 +7,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
+from app import clock
 from app.database import get_db
 from app.models import Account, Transaction, Category, RecurringTransaction, RecurringSuggestion
 from app.auth import require_login
@@ -115,7 +116,7 @@ def analyze_recurring(request: Request, db: Session = Depends(get_db)):
     user = require_login(request, db)
 
     # Fetch all non-excluded, non-projected transactions from last 18 months
-    cutoff = date.today() - timedelta(days=548)
+    cutoff = clock.today_nl() - timedelta(days=548)
     transactions = (
         db.query(Transaction)
         .join(Account)
@@ -223,7 +224,7 @@ def _render_recurring_page(
     analyze_status: str = "",
 ):
     """Shared rendering logic for the recurring page (used by GET and POST analyze)."""
-    today = date.today()
+    today = clock.today_nl()
 
     recurring_items = (
         db.query(RecurringTransaction)
@@ -366,7 +367,7 @@ def _render_recurring_page(
             # Note: ILIKE doesn't work on encrypted fields, so we filter in Python
             if suggestion.counterparty_match:
                 search_term = suggestion.counterparty_match.lower()
-                cutoff = date.today() - timedelta(days=548)
+                cutoff = clock.today_nl() - timedelta(days=548)
                 all_txs = (
                     db.query(Transaction)
                     .join(Account)
@@ -674,13 +675,12 @@ def relink_all(
     user = require_login(request, db)
 
     from app.recurring_service import auto_link_recurring_after_import
-    from datetime import date
 
     auto_link_recurring_after_import(db, user.id)
 
     cleanup_matched_projected(user.id, db)
 
-    today = date.today()
+    today = clock.today_nl()
     for offset in range(0, 3):
         m = today.month + offset
         y = today.year + (m - 1) // 12
@@ -856,7 +856,7 @@ def edit_recurring(
     db.commit()
 
     # Re-sync projected for current month with new settings
-    today = date.today()
+    today = clock.today_nl()
     sync_projected_transactions(user.id, today.year, today.month, db)
 
     return RedirectResponse("/recurring", status_code=302)

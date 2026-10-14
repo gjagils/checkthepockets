@@ -1,4 +1,3 @@
-import datetime
 from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Depends, Request, Form
@@ -6,6 +5,7 @@ from fastapi.responses import RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
+from app import clock
 from app.database import get_db
 from app.models import NetWorthAccount, NetWorthSnapshot
 from app.auth import require_login
@@ -43,7 +43,7 @@ def networth_overview(
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
-    today = datetime.date.today()
+    today = clock.today_nl()
 
     accounts = (
         db.query(NetWorthAccount)
@@ -200,7 +200,7 @@ def edit_account(
     if category in CATEGORIES:
         account.category = category
     account.notes = notes.strip() or None
-    account.updated_at = datetime.datetime.utcnow()
+    account.updated_at = clock.now_utc()
     db.commit()
 
     return RedirectResponse("/networth", status_code=302)
@@ -258,7 +258,7 @@ def update_balance_ajax(
     except (InvalidOperation, ValueError):
         return JSONResponse({"ok": False}, status_code=400)
 
-    account.updated_at = datetime.datetime.utcnow()
+    account.updated_at = clock.now_utc()
     db.commit()
     return JSONResponse({"ok": True, "balance": float(account.balance)})
 
@@ -270,7 +270,7 @@ def take_snapshot(
 ):
     """Save current balances as a monthly snapshot."""
     user = require_login(request, db)
-    today = datetime.date.today()
+    today = clock.today_nl()
     year, month = today.year, today.month
 
     accounts = (

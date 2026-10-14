@@ -1,10 +1,10 @@
-import datetime
 from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Depends, Request, Form, Query
 from fastapi.responses import RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 
+from app import clock
 from app.database import get_db
 from app.models import PortfolioAsset, Person, PortfolioHolding, PortfolioPriceSnapshot, WealthAdjustment
 from app.auth import require_login
@@ -68,7 +68,7 @@ def portfolio_overview(
 
     # Age (in days) of the last price update per asset — used in template for
     # een "laatst bijgewerkt X dagen geleden" indicator met warning bij > 30 dagen.
-    now_dt = datetime.datetime.utcnow()
+    now_dt = clock.now_utc()
     price_age_days = {}
     for asset in assets:
         if asset.price_updated_at:
@@ -120,7 +120,7 @@ def portfolio_overview(
                     person_cash_totals[person.id] += cash * share
 
     # Build chart data for portfolio value over time
-    now = datetime.date.today()
+    now = clock.today_nl()
     current_year = now.year
     current_month = now.month
     chart_data = {"labels": MONTH_LABELS, "past": [], "future": []}
@@ -257,7 +257,7 @@ def wealth_forecast_page(
 ):
     """Forecast, frozen 1/1 plan and variance in one monthly view."""
     user = require_login(request, db)
-    current_year = datetime.date.today().year
+    current_year = clock.today_nl().year
     selected_year = year if year and 2000 <= year <= 2200 else current_year
     forecast = build_wealth_forecast(db, user.id, selected_year)
     persons = forecast["persons"]
@@ -294,7 +294,7 @@ def wealth_forecast_page(
             "status": "above" if difference and difference > 0 else "below" if difference and difference < 0 else "match",
         })
 
-    now_month = datetime.date.today().month if selected_year == current_year else 1
+    now_month = clock.today_nl().month if selected_year == current_year else 1
     now_row = rows[now_month - 1]
     holdings = (
         db.query(PortfolioHolding)
@@ -486,7 +486,7 @@ def add_asset(
     if manual:
         try:
             asset.current_price_eur = Decimal(manual)
-            asset.price_updated_at = datetime.datetime.utcnow()
+            asset.price_updated_at = clock.now_utc()
         except (InvalidOperation, ValueError):
             pass
 
@@ -533,7 +533,7 @@ def edit_asset(
     if manual:
         try:
             asset.current_price_eur = Decimal(manual)
-            asset.price_updated_at = datetime.datetime.utcnow()
+            asset.price_updated_at = clock.now_utc()
         except (InvalidOperation, ValueError):
             pass
 
@@ -715,7 +715,7 @@ def refresh_prices(
         price = apply_spread(raw_price, spread)
         if price is not None:
             asset.current_price_eur = price
-            asset.price_updated_at = datetime.datetime.utcnow()
+            asset.price_updated_at = clock.now_utc()
             updated += 1
 
         # Fetch and store historical prices (zelfde spread toegepast zodat de

@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Request, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import case, func, or_
 
+from app import clock
 from app.database import get_db
 from app.models import Account, Transaction, Category, Budget, BankConnection
 from app.auth import require_login
@@ -39,7 +40,7 @@ def dashboard(
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
-    today = datetime.date.today()
+    today = clock.today_nl()
     current_year = year if year else today.year
 
     # Years for selector

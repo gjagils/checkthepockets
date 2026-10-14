@@ -6,6 +6,7 @@ import urllib.request
 import urllib.error
 from datetime import date
 from decimal import Decimal
+from app import clock
 
 logger = logging.getLogger(__name__)
 
@@ -112,7 +113,7 @@ def _fetch_metal_history(symbol: str, months: int) -> dict:
     """
     sym = symbol.lower()
     monthly = {}
-    today = date.today()
+    today = clock.today_nl()
 
     for i in range(months):
         # Calculate 1st of each past month

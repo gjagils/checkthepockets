@@ -13,6 +13,7 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session, joinedload
 
+from app import clock
 from app.capital_dashboard import _plan_effective_start, _plan_monthly_deltas
 from app.models import (
     Account,
@@ -92,7 +93,7 @@ def build_wealth_forecast(
     Savings use imported balances for past months when they exist, otherwise
     the savings-plan balance; shared accounts are split equally among owners.
     """
-    today = today or datetime.date.today()
+    today = today or clock.today_nl()
     persons = (
         db.query(Person).filter(Person.user_id == user_id)
         .order_by(Person.sort_order, Person.name).all()

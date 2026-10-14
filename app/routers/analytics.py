@@ -1,5 +1,4 @@
 import csv
-import datetime
 import io
 from decimal import Decimal
 
@@ -8,6 +7,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import case, func, or_
 
+from app import clock
 from app.database import get_db
 from app.models import Account, Transaction, Category
 from app.auth import require_login
@@ -29,7 +29,7 @@ def analytics(
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
-    today = datetime.date.today()
+    today = clock.today_nl()
     current_year = year if year else today.year
 
     accounts = (
@@ -174,7 +174,7 @@ def analytics_stats(
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
-    today = datetime.date.today()
+    today = clock.today_nl()
     current_year = year if year else today.year
     current_month = month  # 0 = full year
 

@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case
 
+from app import clock
 from app.budget_stats import category_spending_average
 from app.forms import parse_amount
 from app.database import get_db
@@ -31,7 +32,7 @@ def budget_overview(
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
-    today = datetime.date.today()
+    today = clock.today_nl()
     current_year = year if year else today.year
     current_month = month if month else today.month
 

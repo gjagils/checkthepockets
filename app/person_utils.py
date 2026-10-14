@@ -7,6 +7,7 @@ SQLAlchemy-object (fixture-gedoe met sessies).
 from __future__ import annotations
 
 import datetime
+from app import clock
 
 
 def age_years(birthdate: datetime.date | None, today: datetime.date | None = None) -> int | None:
@@ -19,7 +20,7 @@ def age_years(birthdate: datetime.date | None, today: datetime.date | None = Non
     if birthdate is None:
         return None
     if today is None:
-        today = datetime.date.today()
+        today = clock.today_nl()
     years = today.year - birthdate.year
     # Verjaardag nog niet bereikt dit jaar → 1 minder.
     if (today.month, today.day) < (birthdate.month, birthdate.day):
@@ -54,7 +55,7 @@ def months_until_18(
     if birthdate is None:
         return None
     if today is None:
-        today = datetime.date.today()
+        today = clock.today_nl()
     if age_years(birthdate, today) >= 18:
         return None
     months = (birthdate.year + 18 - today.year) * 12 + (birthdate.month - today.month)
@@ -66,6 +67,6 @@ def eighteenth_month_label_nl(
 ) -> str:
     """Weergave zoals 'mei 2036' voor kaart-tekst 'wordt 18 in …'."""
     if today is None:
-        today = datetime.date.today()
+        today = clock.today_nl()
     year = birthdate.year + 18
     return f"{MONTH_NAMES_NL_FULL[birthdate.month]} {year}"

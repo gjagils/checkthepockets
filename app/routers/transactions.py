@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 
+from app import clock
 from app.database import get_db
 from app.models import Account, Transaction, Category, Rule, RecurringTransaction, ImportBatch
 from app.auth import require_login
@@ -304,7 +305,7 @@ def transaction_list(
     # Resolve month/year → date_from / date_to
     current_month = month.strip()
     current_year = year.strip()
-    today = date_type.today()
+    today = clock.today_nl()
     this_month = today.strftime("%Y-%m")
 
     if current_month and not date_from and not date_to:
@@ -901,7 +902,7 @@ def create_transaction_page(
             "user": user,
             "accounts": accounts,
             "categories": categories,
-            "today": date_type.today().isoformat(),
+            "today": clock.today_nl().isoformat(),
         },
     )
 
@@ -1364,8 +1365,7 @@ async def import_confirm(request: Request, db: Session = Depends(get_db)):
     from app.recurring_service import cleanup_matched_projected, sync_projected_transactions
     cleanup_matched_projected(user.id, db)
     # Re-sync projected transactions for current month to reflect new imports
-    import datetime as _dt
-    _today = _dt.date.today()
+    _today = clock.today_nl()
     sync_projected_transactions(user.id, _today.year, _today.month, db)
     db.commit()
 

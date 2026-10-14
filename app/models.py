@@ -1,4 +1,3 @@
-import datetime
 from decimal import Decimal
 
 from sqlalchemy import (
@@ -16,6 +15,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 
+from app import clock
 from app.database import Base
 from app.crypto import EncryptedText
 
@@ -45,7 +45,7 @@ class User(Base):
     # hypotheek-toegang een persoonlijke-finance keuze is, niet systeembeheer.
     can_access_mortgage = Column(Integer, nullable=False, default=0)
     last_login_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=clock.now_utc)
 
     # Weekly digest voorkeuren — opt-in, jouw eigen ritme.
     weekly_digest_enabled = Column(Integer, default=0)        # 1 = abonneer, 0 = uit
@@ -83,7 +83,7 @@ class AuthToken(Base):
     email = Column(String(255), nullable=True)        # stored on invite tokens
     expires_at = Column(DateTime, nullable=False)
     used_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=clock.now_utc)
 
     user = relationship("User", back_populates="auth_tokens")
 
@@ -98,7 +98,7 @@ class Account(Base):
     bank = Column(String(50), nullable=False)  # "abn_amro", "bunq", "ics"
     external_uid = Column(String(255), nullable=True, index=True)  # Enable Banking account_uid
     kind = Column(String(20), nullable=False, default="payment", server_default="payment")  # "payment" of "savings"
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=clock.now_utc)
 
     user = relationship("User", back_populates="accounts")
     transactions = relationship(
@@ -129,7 +129,7 @@ class Category(Base):
     name = Column(String(100), nullable=False)
     parent_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
     color = Column(String(7), nullable=True)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=clock.now_utc)
     is_income = Column(Integer, default=0)
     sort_order = Column(Integer, default=0)
     exclude_from_budget = Column(Integer, default=0)
@@ -172,7 +172,7 @@ class Rule(Base):
     action_rename_counterparty = Column(String(255), nullable=True)
     action_set_reviewed = Column(Integer, default=0)
 
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=clock.now_utc)
 
     user = relationship("User", back_populates="rules")
     assign_category = relationship("Category")
@@ -196,7 +196,7 @@ class RecurringTransaction(Base):
     end_date = Column(Date, nullable=True)
     active_months = Column(String(50), nullable=True)  # comma-separated month numbers, NULL = all
     skipped_months = Column(String(2000), nullable=True)  # comma-separated "YYYY-MM" — maanden waarin deze verwachting NIET plaatsvindt
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=clock.now_utc)
 
     user = relationship("User", back_populates="recurring_transactions")
     account = relationship("Account")
@@ -216,7 +216,7 @@ class RuleSuggestion(Base):
     reasoning = Column(Text, nullable=True)
     uncat_count = Column(Integer, default=0)
     cat_count = Column(Integer, default=0)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=clock.now_utc)
 
     user = relationship("User")
     category = relationship("Category")
@@ -234,7 +234,7 @@ class RecurringSuggestion(Base):
     category_id = Column(Integer, ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)
     category_name = Column(String(100), nullable=True)
     reasoning = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=clock.now_utc)
 
     user = relationship("User")
     category = relationship("Category")
@@ -266,7 +266,7 @@ class Transaction(Base):
     transfer_id = Column(Integer, ForeignKey("transactions.id", ondelete="SET NULL"), nullable=True)
     assigned_by_rule_id = Column(Integer, ForeignKey("rules.id", ondelete="SET NULL"), nullable=True, index=True)
     import_batch_id = Column(Integer, ForeignKey("import_batches.id", ondelete="SET NULL"), nullable=True, index=True)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=clock.now_utc)
 
     __table_args__ = (
         UniqueConstraint("account_id", "import_hash", name="uq_transaction_account_import_hash"),
@@ -290,7 +290,7 @@ class ImportBatch(Base):
     imported_count = Column(Integer, nullable=False, default=0)
     skipped_count = Column(Integer, nullable=False, default=0)
     rejected_count = Column(Integer, nullable=False, default=0)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=clock.now_utc, nullable=False)
 
     user = relationship("User")
     account = relationship("Account")
@@ -308,7 +308,7 @@ class SavingsPlan(Base):
     source_plan_id = Column(
         Integer, ForeignKey("savings_plans.id", ondelete="SET NULL"), nullable=True,
     )
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=clock.now_utc)
 
     user = relationship("User", back_populates="savings_plans")
     account = relationship("Account", back_populates="savings_plans")
@@ -382,7 +382,7 @@ class PortfolioAsset(Base):
     # auto-fetch. Voor edelmetalen via Goldrepublic-achtige bronnen ligt dit
     # rond 0,6% onder spot. 0 = geen aanpassing (raw spot price).
     spread_pct = Column(Numeric(6, 2), default=0)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=clock.now_utc)
 
     user = relationship("User", back_populates="portfolio_assets")
     holdings = relationship("PortfolioHolding", back_populates="asset", cascade="all, delete-orphan")
@@ -396,7 +396,7 @@ class Person(Base):
     name = Column(String(100), nullable=False)
     birthdate = Column(Date, nullable=True)
     sort_order = Column(Integer, default=0)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=clock.now_utc)
 
     user = relationship("User", back_populates="persons")
     holdings = relationship("PortfolioHolding", back_populates="person", cascade="all, delete-orphan")
@@ -448,7 +448,7 @@ class BudgetPreset(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     name = Column(String(100), nullable=False)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=clock.now_utc)
 
     user = relationship("User", back_populates="budget_presets")
     lines = relationship("BudgetPresetLine", back_populates="preset", cascade="all, delete-orphan")
@@ -481,8 +481,8 @@ class NetWorthAccount(Base):
     balance = Column(Numeric(14, 2), default=0)
     notes = Column(Text, nullable=True)
     is_active = Column(Integer, default=1)
-    updated_at = Column(DateTime, default=datetime.datetime.utcnow)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=clock.now_utc)
+    created_at = Column(DateTime, default=clock.now_utc)
 
     user = relationship("User", back_populates="networth_accounts")
     snapshots = relationship("NetWorthSnapshot", back_populates="account", cascade="all, delete-orphan")
@@ -497,7 +497,7 @@ class NetWorthSnapshot(Base):
     year = Column(Integer, nullable=False)
     month = Column(Integer, nullable=False)
     balance = Column(Numeric(14, 2), nullable=False, default=0)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=clock.now_utc)
 
     user = relationship("User", back_populates="networth_snapshots")
     account = relationship("NetWorthAccount", back_populates="snapshots")
@@ -523,7 +523,7 @@ class BankConnection(Base):
     last_synced_at = Column(DateTime, nullable=True)
     last_sync_status = Column(String(20), nullable=False, default="never")
     last_sync_error = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=clock.now_utc)
 
     user = relationship("User")
 
@@ -583,8 +583,8 @@ class HouseholdFinance(Base):
     # op 4,65%. Geldt voor alle scenarios — aanpasbaar op de huishouden-pagina.
     bridge_rate_pct = Column(Numeric(6, 4), nullable=False, default=Decimal("0.0420"))
 
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=clock.now_utc)
+    updated_at = Column(DateTime, default=clock.now_utc, onupdate=clock.now_utc)
 
     user = relationship("User")
 
@@ -598,7 +598,7 @@ class MortgageRateTable(Base):
     fixed_years = Column(Integer, nullable=False)
     ltv_max_pct = Column(Numeric(6, 4), nullable=False)
     interest_rate = Column(Numeric(6, 4), nullable=False)
-    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=clock.now_utc, onupdate=clock.now_utc)
 
     user = relationship("User")
 
@@ -645,8 +645,8 @@ class MortgageScenario(Base):
     funda_url = Column(String(500), nullable=True)
     photo_url = Column(String(500), nullable=True)
     is_archived = Column(Integer, default=0)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=clock.now_utc)
+    updated_at = Column(DateTime, default=clock.now_utc, onupdate=clock.now_utc)
 
     user = relationship("User")
     variants = relationship(
@@ -769,7 +769,7 @@ class PortfolioPriceSnapshot(Base):
     year = Column(Integer, nullable=False)
     month = Column(Integer, nullable=False)
     price_eur = Column(Numeric(16, 4), nullable=False)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=clock.now_utc)
 
     asset = relationship("PortfolioAsset")
 
@@ -786,7 +786,7 @@ class WealthPlan(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     year = Column(Integer, nullable=False)
-    captured_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    captured_at = Column(DateTime, default=clock.now_utc, nullable=False)
     captured_automatically = Column(Integer, default=0, nullable=False)
 
     user = relationship("User", back_populates="wealth_plans")
@@ -841,7 +841,7 @@ class SchedulerRunLog(Base):
 
     id = Column(Integer, primary_key=True)
     job_id = Column(String(64), nullable=False, index=True)
-    started_at = Column(DateTime, default=datetime.datetime.utcnow, index=True, nullable=False)
+    started_at = Column(DateTime, default=clock.now_utc, index=True, nullable=False)
     finished_at = Column(DateTime, nullable=True)
     status = Column(String(16), nullable=False, default="running")  # running|ok|error
     summary = Column(Text, nullable=True)
@@ -859,7 +859,7 @@ class BunqConnection(Base):
     last_checked_at = Column(DateTime, nullable=True)
     last_status = Column(String(20), nullable=False, default="never")  # never, ok, error
     last_error = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=clock.now_utc)
 
     user = relationship("User")
 
