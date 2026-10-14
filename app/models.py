@@ -2,6 +2,7 @@ import datetime
 from decimal import Decimal
 
 from sqlalchemy import (
+    BigInteger,
     Column,
     Integer,
     String,
@@ -869,7 +870,7 @@ class BunqAccountLink(Base):
 
     id = Column(Integer, primary_key=True)
     connection_id = Column(Integer, ForeignKey("bunq_connections.id", ondelete="CASCADE"), nullable=False, index=True)
-    bunq_account_id = Column(Integer, nullable=False)
+    bunq_account_id = Column(BigInteger, nullable=False)
     description = Column(String(255), nullable=True)
     iban = Column(String(34), nullable=True)
     bunq_kind = Column(String(60), nullable=True)        # bv. MonetaryAccountSavings
@@ -877,7 +878,7 @@ class BunqAccountLink(Base):
     balance = Column(Numeric(14, 2), nullable=True)
     enabled = Column(Integer, nullable=False, default=0, server_default="0")
     account_id = Column(Integer, ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True)
-    last_payment_id = Column(Integer, nullable=True)     # hoogste betaling-id die verwerkt is
+    last_payment_id = Column(BigInteger, nullable=True)  # hoogste betaling-id die verwerkt is (bunq-id's > 2^31)
     last_synced_at = Column(DateTime, nullable=True)
 
     account = relationship("Account")

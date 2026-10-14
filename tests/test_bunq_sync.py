@@ -261,3 +261,19 @@ def test_linking_to_account_without_iban_when_iban_is_taken_does_not_crash(monke
     assert db.get(BunqAccountLink, link.id).account_id == csv_id
     assert db.get(Account, csv_id).iban is None          # IBAN blijft op de andere rekening
     assert db.get(Account, iban_id).iban == "NL01BUNQ0000000001"
+
+
+def test_bunq_ids_use_64_bit_columns_and_large_payment_ids_sync(db):
+    """bunq-betaling-id's passen niet in 32 bits (productie: 2932017837); SQLite ziet dat niet, PostgreSQL wel."""
+    from sqlalchemy import BigInteger
+
+    columns = BunqAccountLink.__table__.c
+    assert isinstance(columns.last_payment_id.type, BigInteger)
+    assert isinstance(columns.bunq_account_id.type, BigInteger)
+
+    user, account, connection, link = _world(db)
+    big = 2_932_017_837
+    pages = {1: [[payment(big, "2026-05-01 10:00:00", "-10.00", "AH", "Albert Heijn")]]}
+    sync_connection(db, connection, _client(FakeBunq(pages)), dry_run=False)
+    db.commit()
+    assert db.get(BunqAccountLink, link.id).last_payment_id == big
