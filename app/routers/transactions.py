@@ -25,6 +25,7 @@ from app.parsers.ics_pdf import parse_ics_pdf
 from app.import_service import existing_import_hashes, find_import_account, store_confirmed_csv_rows
 from app.recurring_service import auto_link_recurring_after_import, find_recurring_candidates
 from app.rules_engine import apply_rules_to_transaction
+from app.redirects import safe_redirect
 from app.template_config import templates
 
 router = APIRouter()
@@ -553,7 +554,7 @@ def set_category(
         .first()
     )
     if not tx:
-        return RedirectResponse(redirect_to, status_code=302)
+        return safe_redirect(redirect_to, "/transactions", status_code=302)
 
     tx.category_id = category_id if category_id else None
     tx.assigned_by_rule_id = None  # handmatig
@@ -565,7 +566,7 @@ def set_category(
         sep = "&" if "?" in redirect_to else "?"
         redirect_to = f"{redirect_to}{sep}suggest_rule_tx={transaction_id}"
 
-    return RedirectResponse(redirect_to, status_code=302)
+    return safe_redirect(redirect_to, "/transactions", status_code=302)
 
 
 @router.post("/transactions/exclude-old-uncategorized")
@@ -596,7 +597,7 @@ def exclude_old_uncategorized(
         tx.is_excluded = 1
     db.commit()
 
-    return RedirectResponse(redirect_to, status_code=302)
+    return safe_redirect(redirect_to, "/transactions", status_code=302)
 
 
 @router.post("/transactions/{transaction_id}/move-account")
@@ -621,7 +622,7 @@ def move_transaction_to_account(
         .first()
     )
     if not tx:
-        return RedirectResponse(redirect_to, status_code=302)
+        return safe_redirect(redirect_to, "/transactions", status_code=302)
 
     target = (
         db.query(Account)
@@ -629,9 +630,21 @@ def move_transaction_to_account(
         .first()
     )
     if target and target.id != tx.account_id:
+        if tx.parent_id:
+            # A split part cannot leave its parent; move the parent instead.
+            return safe_redirect(redirect_to, "/transactions", status_code=302)
+        if tx.transfer_id:
+            # The transfer pair spans two accounts; after the move it no longer does.
+            partner = db.query(Transaction).filter(Transaction.id == tx.transfer_id).first()
+            if partner and partner.transfer_id == tx.id:
+                partner.transfer_id = None
+            tx.transfer_id = None
         tx.account_id = target.id
+        # Split children follow their parent.
+        db.query(Transaction).filter(Transaction.parent_id == tx.id).update(
+            {"account_id": target.id}, synchronize_session=False)
         db.commit()
-    return RedirectResponse(redirect_to, status_code=302)
+    return safe_redirect(redirect_to, "/transactions", status_code=302)
 
 
 @router.post("/transactions/{transaction_id}/exclude")
@@ -650,12 +663,12 @@ def exclude_transaction(
         .first()
     )
     if not tx:
-        return RedirectResponse(redirect_to, status_code=302)
+        return safe_redirect(redirect_to, "/transactions", status_code=302)
 
     tx.is_excluded = 1 if not tx.is_excluded else 0
     db.commit()
 
-    return RedirectResponse(redirect_to, status_code=302)
+    return safe_redirect(redirect_to, "/transactions", status_code=302)
 
 
 @router.post("/transactions/{transaction_id}/link-recurring")
@@ -679,7 +692,7 @@ def link_recurring(
         .first()
     )
     if not tx:
-        return RedirectResponse(redirect_to, status_code=302)
+        return safe_redirect(redirect_to, "/transactions", status_code=302)
 
     if recurring_id:
         # Verify recurring item belongs to user
@@ -699,7 +712,7 @@ def link_recurring(
                 # Redirect back with proposal banner
                 candidate_ids = ",".join(str(c.id) for c in candidates)
                 sep = "&" if "?" in redirect_to else "?"
-                return RedirectResponse(
+                return safe_redirect(
                     f"{redirect_to}{sep}recurring_proposals={candidate_ids}&recurring_item={item.id}&recurring_name={item.name}",
                     status_code=302,
                 )
@@ -708,7 +721,7 @@ def link_recurring(
         tx.recurring_id = None
 
     db.commit()
-    return RedirectResponse(redirect_to, status_code=302)
+    return safe_redirect(redirect_to, "/transactions", status_code=302)
 
 
 @router.post("/transactions/accept-recurring-proposals")
@@ -723,14 +736,14 @@ def accept_recurring_proposals(
     user = require_login(request, db)
 
     if not transaction_ids or not recurring_id:
-        return RedirectResponse(redirect_to, status_code=302)
+        return safe_redirect(redirect_to, "/transactions", status_code=302)
 
     item = db.query(RecurringTransaction).filter(
         RecurringTransaction.id == recurring_id,
         RecurringTransaction.user_id == user.id,
     ).first()
     if not item:
-        return RedirectResponse(redirect_to, status_code=302)
+        return safe_redirect(redirect_to, "/transactions", status_code=302)
 
     tx_ids = [int(tid) for tid in transaction_ids.split(",") if tid.strip().isdigit()]
     txs = (
@@ -748,7 +761,7 @@ def accept_recurring_proposals(
         link_transaction_to_recurring(tx, item)
 
     db.commit()
-    return RedirectResponse(redirect_to, status_code=302)
+    return safe_redirect(redirect_to, "/transactions", status_code=302)
 
 
 @router.post("/transactions/{transaction_id}/reviewed")
@@ -767,12 +780,12 @@ def toggle_reviewed(
         .first()
     )
     if not tx:
-        return RedirectResponse(redirect_to, status_code=302)
+        return safe_redirect(redirect_to, "/transactions", status_code=302)
 
     tx.is_reviewed = 0 if tx.is_reviewed else 1
     db.commit()
 
-    return RedirectResponse(redirect_to, status_code=302)
+    return safe_redirect(redirect_to, "/transactions", status_code=302)
 
 
 @router.get("/transactions/{transaction_id}/edit")
@@ -856,7 +869,7 @@ async def edit_transaction(
 
     redirect_to = (form.get("redirect_to") or "").strip()
     if redirect_to.startswith("/"):
-        return RedirectResponse(redirect_to, status_code=302)
+        return safe_redirect(redirect_to, "/transactions", status_code=302)
     referer = request.headers.get("referer") or ""
     if "/transactions" in referer:
         return RedirectResponse("/transactions", status_code=302)
@@ -1007,7 +1020,7 @@ async def bulk_action(request: Request, db: Session = Depends(get_db)):
     category_id_raw = form.get("bulk_category_id", "")
 
     if not tx_ids_raw:
-        return RedirectResponse(redirect_to, status_code=302)
+        return safe_redirect(redirect_to, "/transactions", status_code=302)
 
     # Validate and fetch transactions belonging to this user
     tx_ids = []
@@ -1018,7 +1031,7 @@ async def bulk_action(request: Request, db: Session = Depends(get_db)):
             pass
 
     if not tx_ids:
-        return RedirectResponse(redirect_to, status_code=302)
+        return safe_redirect(redirect_to, "/transactions", status_code=302)
 
     transactions = (
         db.query(Transaction)
@@ -1047,7 +1060,7 @@ async def bulk_action(request: Request, db: Session = Depends(get_db)):
             tx.is_excluded = 1
 
     db.commit()
-    return RedirectResponse(redirect_to, status_code=302)
+    return safe_redirect(redirect_to, "/transactions", status_code=302)
 
 
 # ===== Deduplicatie =====
@@ -1573,11 +1586,18 @@ def link_transfer(
     )
 
     if tx_a and tx_b and tx_a.id != tx_b.id:
+        # A booking that was already paired with something else leaves that partner
+        # pointing at it; release those partners before re-pairing.
+        stale = [t for t in db.query(Transaction).filter(
+            Transaction.id.in_([i for i in (tx_a.transfer_id, tx_b.transfer_id) if i])
+        ) if t.id not in (tx_a.id, tx_b.id)]
+        for partner in stale:
+            partner.transfer_id = None
         tx_a.transfer_id = tx_b.id
         tx_b.transfer_id = tx_a.id
         db.commit()
 
-    return RedirectResponse(redirect_to, status_code=302)
+    return safe_redirect(redirect_to, "/transactions", status_code=302)
 
 
 @router.post("/transactions/{transaction_id}/unlink-transfer")
@@ -1607,7 +1627,7 @@ def unlink_transfer(
         tx.transfer_id = None
         db.commit()
 
-    return RedirectResponse(redirect_to, status_code=302)
+    return safe_redirect(redirect_to, "/transactions", status_code=302)
 
 
 @router.post("/transactions/{transaction_id}/unsplit")

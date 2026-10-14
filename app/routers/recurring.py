@@ -19,6 +19,7 @@ from app.recurring_service import (
     cleanup_matched_projected, find_matching_transaction, link_transaction_to_recurring,
     sync_projected_transactions,
 )
+from app.redirects import safe_redirect
 from app.template_config import templates
 
 router = APIRouter()
@@ -64,7 +65,7 @@ def skip_projected_transaction(
         .first()
     )
     if not ptx:
-        return RedirectResponse(redirect_to or "/transactions", status_code=302)
+        return safe_redirect(redirect_to, "/recurring", status_code=302)
 
     item = None
     if ptx.recurring_id:
@@ -81,7 +82,7 @@ def skip_projected_transaction(
 
     db.delete(ptx)
     db.commit()
-    return RedirectResponse(redirect_to or "/transactions", status_code=302)
+    return safe_redirect(redirect_to, "/recurring", status_code=302)
 
 
 @router.post("/recurring/{item_id}/unskip-month")
@@ -106,7 +107,7 @@ def unskip_month(
     if item:
         remove_skipped_month(item, year, month)
         db.commit()
-    return RedirectResponse(redirect_to or "/recurring", status_code=302)
+    return safe_redirect(redirect_to, "/recurring", status_code=302)
 
 
 @router.post("/recurring/analyze")
@@ -914,8 +915,7 @@ def link_transaction(
         cleanup_matched_projected(user.id, db)
         db.commit()
 
-    target = redirect_to if redirect_to.startswith("/") else "/recurring"
-    return RedirectResponse(target, status_code=302)
+    return safe_redirect(redirect_to, "/recurring", status_code=302)
 
 
 @router.post("/recurring/{item_id}/unlink")

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, case
 
 from app.budget_stats import category_spending_average
+from app.forms import parse_amount
 from app.database import get_db
 from app.models import Account, Budget, BudgetPreset, BudgetPresetLine, Category, RecurringTransaction, Transaction
 from app.auth import require_login
@@ -442,7 +443,9 @@ def save_budget(
     if not cat:
         return JSONResponse({"ok": False}, status_code=400)
 
-    parsed = Decimal(amount.replace(",", ".").strip() or "0")
+    parsed = parse_amount(amount, Decimal("0")) if not amount.strip() else parse_amount(amount)
+    if parsed is None:
+        return JSONResponse({"ok": False, "error": "invalid_amount"}, status_code=400)
 
     budget = (
         db.query(Budget)

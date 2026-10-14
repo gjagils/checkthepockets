@@ -14,6 +14,7 @@ from app.database import get_db
 from app.models import Rule, Category, Transaction, Account, RuleSuggestion
 from app.auth import require_login
 from app.rules_engine import apply_rules_to_all, apply_single_rule, preview_single_rule, suggest_rules
+from app.forms import parse_amount, parse_int
 from app.template_config import templates
 
 router = APIRouter()
@@ -269,9 +270,9 @@ async def accept_rule_suggestion(
     match_value = (form.get("match_value") or s.match_value).strip()
     counterparty_clean = (form.get("counterparty_clean") or s.counterparty_clean or "").strip()
     category_id_raw = (form.get("category_id") or "").strip()
-    category_id = int(category_id_raw) if category_id_raw else s.category_id
+    category_id = parse_int(category_id_raw, s.category_id) if category_id_raw else s.category_id
     condition_account_id_raw = (form.get("condition_account_id") or "").strip()
-    condition_account_id = int(condition_account_id_raw) if condition_account_id_raw else None
+    condition_account_id = parse_int(condition_account_id_raw)
     apply_existing = form.get("apply_existing") == "1"
 
     # Validate category ownership
@@ -414,7 +415,7 @@ async def suggest_rule_endpoint(request: Request, db: Session = Depends(get_db))
         tx = (
             db.query(Transaction)
             .join(Account)
-            .filter(Transaction.id == int(transaction_id), Account.user_id == user.id)
+            .filter(Transaction.id == parse_int(transaction_id, 0), Account.user_id == user.id)
             .first()
         )
         if tx:
@@ -487,8 +488,8 @@ def create_rule(
         return RedirectResponse("/rules", status_code=302)
 
     # Parse optional IDs
-    cat_id = int(assign_category_id) if assign_category_id.strip() else None
-    acc_id = int(condition_account_id) if condition_account_id.strip() else None
+    cat_id = parse_int(assign_category_id)
+    acc_id = parse_int(condition_account_id)
 
     # Validate ownership
     if cat_id:
@@ -501,18 +502,8 @@ def create_rule(
             acc_id = None
 
     # Parse amounts
-    parsed_min = None
-    parsed_max = None
-    if amount_min.strip():
-        try:
-            parsed_min = Decimal(amount_min.strip())
-        except InvalidOperation:
-            pass
-    if amount_max.strip():
-        try:
-            parsed_max = Decimal(amount_max.strip())
-        except InvalidOperation:
-            pass
+    parsed_min = parse_amount(amount_min)
+    parsed_max = parse_amount(amount_max)
 
     rule = Rule(
         user_id=user.id,
@@ -568,25 +559,12 @@ def edit_rule(
     rule.match_type = match_type if match_type in MATCH_TYPES else rule.match_type
     rule.match_value = match_value
 
-    if amount_min.strip():
-        try:
-            rule.amount_min = Decimal(amount_min.strip())
-        except InvalidOperation:
-            pass
-    else:
-        rule.amount_min = None
-
-    if amount_max.strip():
-        try:
-            rule.amount_max = Decimal(amount_max.strip())
-        except InvalidOperation:
-            pass
-    else:
-        rule.amount_max = None
+    rule.amount_min = parse_amount(amount_min)
+    rule.amount_max = parse_amount(amount_max)
 
     # Parse optional IDs
-    cat_id = int(assign_category_id) if assign_category_id.strip() else None
-    acc_id = int(condition_account_id) if condition_account_id.strip() else None
+    cat_id = parse_int(assign_category_id)
+    acc_id = parse_int(condition_account_id)
 
     if cat_id:
         cat = db.query(Category).filter(Category.id == cat_id, Category.user_id == user.id).first()

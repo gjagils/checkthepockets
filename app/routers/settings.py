@@ -1,5 +1,6 @@
 import json
-from decimal import Decimal
+import logging
+from decimal import Decimal, InvalidOperation
 from datetime import date
 
 from fastapi import APIRouter, Depends, Request, Form, UploadFile, File
@@ -11,6 +12,8 @@ from app.database import get_db
 from app.models import Category, Rule, RecurringTransaction, Budget
 from app.auth import require_login
 from app.template_config import templates
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/settings")
 
@@ -173,202 +176,213 @@ async def import_confirm(
 
     stats = {"categories": 0, "rules": 0, "recurring": 0, "budgets": 0, "skipped": 0}
 
-    # --- Categories ---
-    # Build local name→id map as we upsert (parents first)
-    cat_name_to_id = {
-        c.name: c.id
-        for c in db.query(Category).filter(Category.user_id == user.id).all()
-    }
+    try:
 
-    for cat in data.get("categories", []):
-        name = cat.get("name", "").strip()
-        if not name:
-            continue
-        parent_id = None
-        if cat.get("parent_name"):
-            parent_id = cat_name_to_id.get(cat["parent_name"])
+        # --- Categories ---
+        # Build local name→id map as we upsert (parents first)
+        cat_name_to_id = {
+            c.name: c.id
+            for c in db.query(Category).filter(Category.user_id == user.id).all()
+        }
 
-        existing = db.query(Category).filter(
-            Category.user_id == user.id, Category.name == name
-        ).first()
-        if existing:
-            if skip_existing:
+        for cat in data.get("categories", []):
+            name = cat.get("name", "").strip()
+            if not name:
+                continue
+            parent_id = None
+            if cat.get("parent_name"):
+                parent_id = cat_name_to_id.get(cat["parent_name"])
+
+            existing = db.query(Category).filter(
+                Category.user_id == user.id, Category.name == name
+            ).first()
+            if existing:
+                if skip_existing:
+                    cat_name_to_id[name] = existing.id
+                    stats["skipped"] += 1
+                    continue
+                existing.color = cat.get("color") or existing.color
+                existing.is_income = cat.get("is_income", existing.is_income)
+                existing.sort_order = cat.get("sort_order", existing.sort_order)
+                existing.exclude_from_budget = cat.get("exclude_from_budget", existing.exclude_from_budget)
+                existing.exclude_from_totals = cat.get("exclude_from_totals", existing.exclude_from_totals)
+                existing.is_archived = cat.get("is_archived", existing.is_archived)
+                if parent_id is not None:
+                    existing.parent_id = parent_id
+                db.flush()
                 cat_name_to_id[name] = existing.id
-                stats["skipped"] += 1
+            else:
+                new_cat = Category(
+                    user_id=user.id,
+                    name=name,
+                    parent_id=parent_id,
+                    color=cat.get("color"),
+                    is_income=cat.get("is_income", 0),
+                    sort_order=cat.get("sort_order", 0),
+                    exclude_from_budget=cat.get("exclude_from_budget", 0),
+                    exclude_from_totals=cat.get("exclude_from_totals", 0),
+                    is_archived=cat.get("is_archived", 0),
+                )
+                db.add(new_cat)
+                db.flush()
+                cat_name_to_id[name] = new_cat.id
+                stats["categories"] += 1
+
+        db.flush()  # one transaction for the whole import; committed at the end
+
+        # Rebuild full cat_name_to_id after commit
+        cat_name_to_id = {
+            c.name: c.id
+            for c in db.query(Category).filter(Category.user_id == user.id).all()
+        }
+
+        # --- Rules ---
+        for rule in data.get("rules", []):
+            name = rule.get("name", "").strip()
+            if not name:
                 continue
-            existing.color = cat.get("color") or existing.color
-            existing.is_income = cat.get("is_income", existing.is_income)
-            existing.sort_order = cat.get("sort_order", existing.sort_order)
-            existing.exclude_from_budget = cat.get("exclude_from_budget", existing.exclude_from_budget)
-            existing.exclude_from_totals = cat.get("exclude_from_totals", existing.exclude_from_totals)
-            existing.is_archived = cat.get("is_archived", existing.is_archived)
-            if parent_id is not None:
-                existing.parent_id = parent_id
-            db.flush()
-            cat_name_to_id[name] = existing.id
-        else:
-            new_cat = Category(
-                user_id=user.id,
-                name=name,
-                parent_id=parent_id,
-                color=cat.get("color"),
-                is_income=cat.get("is_income", 0),
-                sort_order=cat.get("sort_order", 0),
-                exclude_from_budget=cat.get("exclude_from_budget", 0),
-                exclude_from_totals=cat.get("exclude_from_totals", 0),
-                is_archived=cat.get("is_archived", 0),
-            )
-            db.add(new_cat)
-            db.flush()
-            cat_name_to_id[name] = new_cat.id
-            stats["categories"] += 1
+            cat_id = cat_name_to_id.get(rule.get("assign_category_name")) if rule.get("assign_category_name") else None
 
-    db.commit()
+            existing = db.query(Rule).filter(
+                Rule.user_id == user.id,
+                Rule.name == name,
+                Rule.match_field == rule.get("match_field", ""),
+                Rule.match_value == rule.get("match_value", ""),
+            ).first()
 
-    # Rebuild full cat_name_to_id after commit
-    cat_name_to_id = {
-        c.name: c.id
-        for c in db.query(Category).filter(Category.user_id == user.id).all()
-    }
+            if existing:
+                if skip_existing:
+                    stats["skipped"] += 1
+                    continue
+                existing.match_type = rule.get("match_type", existing.match_type)
+                existing.is_active = rule.get("is_active", existing.is_active)
+                existing.assign_category_id = cat_id
+                amount_min = rule.get("amount_min")
+                amount_max = rule.get("amount_max")
+                existing.amount_min = Decimal(str(amount_min)) if amount_min is not None else None
+                existing.amount_max = Decimal(str(amount_max)) if amount_max is not None else None
+            else:
+                amount_min = rule.get("amount_min")
+                amount_max = rule.get("amount_max")
+                new_rule = Rule(
+                    user_id=user.id,
+                    name=name,
+                    is_active=rule.get("is_active", 1),
+                    match_field=rule.get("match_field", "description"),
+                    match_type=rule.get("match_type", "contains"),
+                    match_value=rule.get("match_value", ""),
+                    amount_min=Decimal(str(amount_min)) if amount_min is not None else None,
+                    amount_max=Decimal(str(amount_max)) if amount_max is not None else None,
+                    assign_category_id=cat_id,
+                )
+                db.add(new_rule)
+                stats["rules"] += 1
 
-    # --- Rules ---
-    for rule in data.get("rules", []):
-        name = rule.get("name", "").strip()
-        if not name:
-            continue
-        cat_id = cat_name_to_id.get(rule.get("assign_category_name")) if rule.get("assign_category_name") else None
+        db.flush()  # one transaction for the whole import; committed at the end
 
-        existing = db.query(Rule).filter(
-            Rule.user_id == user.id,
-            Rule.name == name,
-            Rule.match_field == rule.get("match_field", ""),
-            Rule.match_value == rule.get("match_value", ""),
-        ).first()
-
-        if existing:
-            if skip_existing:
-                stats["skipped"] += 1
+        # --- Recurring transactions ---
+        for rt in data.get("recurring", []):
+            name = rt.get("name", "").strip()
+            if not name:
                 continue
-            existing.match_type = rule.get("match_type", existing.match_type)
-            existing.is_active = rule.get("is_active", existing.is_active)
-            existing.assign_category_id = cat_id
-            amount_min = rule.get("amount_min")
-            amount_max = rule.get("amount_max")
-            existing.amount_min = Decimal(str(amount_min)) if amount_min is not None else None
-            existing.amount_max = Decimal(str(amount_max)) if amount_max is not None else None
-        else:
-            amount_min = rule.get("amount_min")
-            amount_max = rule.get("amount_max")
-            new_rule = Rule(
-                user_id=user.id,
-                name=name,
-                is_active=rule.get("is_active", 1),
-                match_field=rule.get("match_field", "description"),
-                match_type=rule.get("match_type", "contains"),
-                match_value=rule.get("match_value", ""),
-                amount_min=Decimal(str(amount_min)) if amount_min is not None else None,
-                amount_max=Decimal(str(amount_max)) if amount_max is not None else None,
-                assign_category_id=cat_id,
-            )
-            db.add(new_rule)
-            stats["rules"] += 1
+            cat_id = cat_name_to_id.get(rt.get("category_name")) if rt.get("category_name") else None
 
-    db.commit()
+            existing = db.query(RecurringTransaction).filter(
+                RecurringTransaction.user_id == user.id,
+                RecurringTransaction.name == name,
+            ).first()
 
-    # --- Recurring transactions ---
-    for rt in data.get("recurring", []):
-        name = rt.get("name", "").strip()
-        if not name:
-            continue
-        cat_id = cat_name_to_id.get(rt.get("category_name")) if rt.get("category_name") else None
+            start_date = None
+            end_date = None
+            if rt.get("start_date"):
+                try:
+                    start_date = date.fromisoformat(rt["start_date"])
+                except (TypeError, ValueError):
+                    pass  # Invalid date in an uploaded settings file: keep the default.
+            if rt.get("end_date"):
+                try:
+                    end_date = date.fromisoformat(rt["end_date"])
+                except (TypeError, ValueError):
+                    pass  # Invalid date in an uploaded settings file: leave open-ended.
 
-        existing = db.query(RecurringTransaction).filter(
-            RecurringTransaction.user_id == user.id,
-            RecurringTransaction.name == name,
-        ).first()
+            if existing:
+                if skip_existing:
+                    stats["skipped"] += 1
+                    continue
+                existing.amount_expected = Decimal(str(rt.get("amount_expected", existing.amount_expected)))
+                existing.frequency = rt.get("frequency", existing.frequency)
+                existing.category_id = cat_id
+                existing.counterparty = rt.get("counterparty", existing.counterparty)
+                existing.description_match = rt.get("description_match", existing.description_match)
+                existing.is_active = rt.get("is_active", existing.is_active)
+                existing.start_date = start_date
+                existing.end_date = end_date
+                existing.active_months = rt.get("active_months", existing.active_months)
+            else:
+                new_rt = RecurringTransaction(
+                    user_id=user.id,
+                    name=name,
+                    amount_expected=Decimal(str(rt.get("amount_expected", "0"))),
+                    frequency=rt.get("frequency", "monthly"),
+                    category_id=cat_id,
+                    counterparty=rt.get("counterparty"),
+                    description_match=rt.get("description_match"),
+                    is_active=rt.get("is_active", 1),
+                    start_date=start_date,
+                    end_date=end_date,
+                    active_months=rt.get("active_months"),
+                )
+                db.add(new_rt)
+                stats["recurring"] += 1
 
-        start_date = None
-        end_date = None
-        if rt.get("start_date"):
-            try:
-                start_date = date.fromisoformat(rt["start_date"])
-            except (TypeError, ValueError):
-                pass  # Invalid date in an uploaded settings file: keep the default.
-        if rt.get("end_date"):
-            try:
-                end_date = date.fromisoformat(rt["end_date"])
-            except (TypeError, ValueError):
-                pass  # Invalid date in an uploaded settings file: leave open-ended.
+        db.flush()  # one transaction for the whole import; committed at the end
 
-        if existing:
-            if skip_existing:
-                stats["skipped"] += 1
+        # --- Budgets ---
+        for b in data.get("budgets", []):
+            cat_name = b.get("category_name")
+            if not cat_name:
                 continue
-            existing.amount_expected = Decimal(str(rt.get("amount_expected", existing.amount_expected)))
-            existing.frequency = rt.get("frequency", existing.frequency)
-            existing.category_id = cat_id
-            existing.counterparty = rt.get("counterparty", existing.counterparty)
-            existing.description_match = rt.get("description_match", existing.description_match)
-            existing.is_active = rt.get("is_active", existing.is_active)
-            existing.start_date = start_date
-            existing.end_date = end_date
-            existing.active_months = rt.get("active_months", existing.active_months)
-        else:
-            new_rt = RecurringTransaction(
-                user_id=user.id,
-                name=name,
-                amount_expected=Decimal(str(rt.get("amount_expected", "0"))),
-                frequency=rt.get("frequency", "monthly"),
-                category_id=cat_id,
-                counterparty=rt.get("counterparty"),
-                description_match=rt.get("description_match"),
-                is_active=rt.get("is_active", 1),
-                start_date=start_date,
-                end_date=end_date,
-                active_months=rt.get("active_months"),
-            )
-            db.add(new_rt)
-            stats["recurring"] += 1
-
-    db.commit()
-
-    # --- Budgets ---
-    for b in data.get("budgets", []):
-        cat_name = b.get("category_name")
-        if not cat_name:
-            continue
-        cat_id = cat_name_to_id.get(cat_name)
-        if not cat_id:
-            continue
-        year = b.get("year")
-        month = b.get("month")
-        if not year or not month:
-            continue
-
-        existing = db.query(Budget).filter(
-            Budget.user_id == user.id,
-            Budget.category_id == cat_id,
-            Budget.year == year,
-            Budget.month == month,
-        ).first()
-
-        amount = Decimal(str(b.get("amount", "0")))
-        if existing:
-            if skip_existing:
-                stats["skipped"] += 1
+            cat_id = cat_name_to_id.get(cat_name)
+            if not cat_id:
                 continue
-            existing.amount = amount
-        else:
-            db.add(Budget(
-                user_id=user.id,
-                category_id=cat_id,
-                year=year,
-                month=month,
-                amount=amount,
-            ))
-            stats["budgets"] += 1
+            year = b.get("year")
+            month = b.get("month")
+            if not year or not month:
+                continue
 
-    db.commit()
+            existing = db.query(Budget).filter(
+                Budget.user_id == user.id,
+                Budget.category_id == cat_id,
+                Budget.year == year,
+                Budget.month == month,
+            ).first()
+
+            amount = Decimal(str(b.get("amount", "0")))
+            if existing:
+                if skip_existing:
+                    stats["skipped"] += 1
+                    continue
+                existing.amount = amount
+            else:
+                db.add(Budget(
+                    user_id=user.id,
+                    category_id=cat_id,
+                    year=year,
+                    month=month,
+                    amount=amount,
+                ))
+                stats["budgets"] += 1
+
+        db.commit()
+    except (InvalidOperation, ValueError, TypeError, KeyError, AttributeError) as exc:
+        # A hand-edited or damaged export file: nothing is saved.
+        db.rollback()
+        logger.warning("Instellingen-import mislukt: %s", type(exc).__name__)
+        return templates.TemplateResponse(
+            "auth/settings.html",
+            {"request": request, "user": user,
+             "import_error": "Het bestand bevat ongeldige waarden; er is niets geïmporteerd."},
+        )
 
     msg = (
         f"Import voltooid: {stats['categories']} categorie(ën), "

@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.auth import require_login
 from app.database import get_db
 from app.models import Account, Category, RecurringTransaction, Transaction
+from app.redirects import safe_redirect
 from app.template_config import templates
 
 router = APIRouter()
@@ -134,7 +135,7 @@ def set_category(
         .first()
     )
     if not tx:
-        return RedirectResponse(redirect_to, status_code=303)
+        return safe_redirect(redirect_to, "/inbox", status_code=303)
 
     # Verifieer dat de categorie van deze gebruiker is
     cat = (
@@ -143,11 +144,11 @@ def set_category(
         .first()
     )
     if not cat:
-        return RedirectResponse(redirect_to, status_code=303)
+        return safe_redirect(redirect_to, "/inbox", status_code=303)
 
     tx.category_id = cat.id
     tx.assigned_by_rule_id = None
     tx.is_reviewed = 1
     db.commit()
 
-    return RedirectResponse(redirect_to, status_code=303)
+    return safe_redirect(redirect_to, "/inbox", status_code=303)
