@@ -11,7 +11,7 @@
             <input type="hidden" name="to_year" value="{{ current_year }}">
             <input type="hidden" name="to_month" value="{{ current_month }}">
             <button type="submit" class="btn btn-sm"
-                    onclick="return confirm('Budgetten van {{ months[prev_month] }} {{ prev_year }} kopiëren naar huidige maand? Bestaande waarden worden overschreven.')">
+                    onclick='return confirm({{ ('Budgetten van ' ~ (months[prev_month]) ~ ' ' ~ (prev_year) ~ ' kopiëren naar huidige maand? Bestaande waarden worden overschreven.')|tojson }})'>
                 ↩ Kopieer {{ months[prev_month] }}
             </button>
         </form>
@@ -467,7 +467,7 @@
                     <input type="hidden" name="year" value="{{ current_year }}">
                     <input type="hidden" name="month" value="{{ current_month }}">
                     <button type="submit" class="btn btn-sm btn-danger" style="padding:0.1rem 0.45rem; font-size:0.75rem;"
-                            onclick="return confirm('Preset &quot;{{ p.name }}&quot; verwijderen?')">✕</button>
+                            onclick='return confirm({{ ('Preset "' ~ (p.name) ~ '" verwijderen?')|tojson }})'>✕</button>
                 </form>
             </div>
             {% endfor %}
@@ -544,8 +544,8 @@ function saveBudget(input) {
 
     var formData = new FormData();
     formData.append('category_id', catId);
-    formData.append('year', '{{ current_year }}');
-    formData.append('month', '{{ current_month }}');
+    formData.append('year', {{ current_year|tojson }});
+    formData.append('month', {{ current_month|tojson }});
     formData.append('amount', value);
 
     fetch('/budgets/save', {

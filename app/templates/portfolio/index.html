@@ -38,7 +38,7 @@
         <div style="display:flex; justify-content:space-between; align-items:center; padding:0.4rem 0; border-bottom:1px solid var(--ctp-border);">
             <span>{{ person.name }}</span>
             <form method="post" action="/portfolio/persons/{{ person.id }}/delete" style="display:inline;">
-                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('{{ person.name }} verwijderen?')">x</button>
+                <button type="submit" class="btn btn-sm btn-danger" onclick='return confirm({{ ((person.name) ~ ' verwijderen?')|tojson }})'>x</button>
             </form>
         </div>
         {% endfor %}
@@ -307,7 +307,7 @@
                     </form>
                     <td>
                         <form method="post" action="/portfolio/assets/{{ asset.id }}/delete" style="display:inline;">
-                            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('{{ asset.name }} verwijderen?')">x</button>
+                            <button type="submit" class="btn btn-sm btn-danger" onclick='return confirm({{ ((asset.name) ~ ' verwijderen?')|tojson }})'>x</button>
                         </form>
                     </td>
                 </tr>

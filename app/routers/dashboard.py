@@ -238,7 +238,7 @@ def _level1_yearly(request, db, user, current_year, years, base_tx_filter, today
         })
 
     # JSON for Chart.js
-    overview_json = json.dumps([
+    overview_data = ([
         {
             "label": r["label"],
             "income_budget": _decimal_to_float(r["income_budget"]),
@@ -306,7 +306,7 @@ def _level1_yearly(request, db, user, current_year, years, base_tx_filter, today
             "title": f"Jaaroverzicht {current_year}",
             "breadcrumbs": [],
             "overview_rows": overview_rows,
-            "overview_json": overview_json,
+            "overview_data": overview_data,
             "open_actions": open_actions,
             "source_summary": {"account_count": account_count, "as_of": latest_transaction_date},
         },
@@ -455,7 +455,7 @@ def _level2_categories(request, db, user, current_year, month, years, base_tx_fi
         })
 
     # JSON for Chart.js
-    overview_json = json.dumps([
+    overview_data = ([
         {
             "label": r["label"],
             "income_budget": _decimal_to_float(r["income_budget"]),
@@ -489,7 +489,7 @@ def _level2_categories(request, db, user, current_year, month, years, base_tx_fi
                 {"label": f"Jaaroverzicht {current_year}", "url": f"/dashboard?year={current_year}"},
             ],
             "overview_rows": overview_rows,
-            "overview_json": overview_json,
+            "overview_data": overview_data,
         },
     )
 
@@ -592,7 +592,7 @@ def _level3_subcategories(request, db, user, current_year, month, category_id,
         })
 
     # JSON for Chart.js
-    overview_json = json.dumps([
+    overview_data = ([
         {
             "label": r["label"],
             "income_budget": _decimal_to_float(r["income_budget"]),
@@ -627,6 +627,6 @@ def _level3_subcategories(request, db, user, current_year, month, category_id,
                 {"label": f"{month_name} {current_year}", "url": f"/dashboard?year={current_year}&month={month}"},
             ],
             "overview_rows": overview_rows,
-            "overview_json": overview_json,
+            "overview_data": overview_data,
         },
     )

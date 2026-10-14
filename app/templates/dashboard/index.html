@@ -168,7 +168,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script>
 // ===== SHARED DATA & HELPERS =====
-var overviewData = {{ overview_json | safe }};
+var overviewData = {{ overview_data | tojson }};
 var labels = overviewData.map(function(r) { return r.label; });
 
 function getCSS(v) {
@@ -210,11 +210,9 @@ function fmtEuro(val) {
 }
 
 // Drill-down links (for navigating to month/category views)
-var drillLinks = {
-    {% for row in overview_rows %}
-    {% if row.link %}"{{ row.label }}": "{{ row.link }}",{% endif %}
-    {% endfor %}
-};
+{% set drill = {} %}
+{% for row in overview_rows %}{% if row.link %}{% set _ = drill.update({row.label: row.link}) %}{% endif %}{% endfor %}
+var drillLinks = {{ drill | tojson }};
 
 // Handle chart click: label area = drill-down, bar area = transactions
 function handleChartClick(chart, evt, isHorizontal) {

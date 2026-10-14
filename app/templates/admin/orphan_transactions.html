@@ -71,7 +71,7 @@
                             <input type="hidden" name="redirect_to" value="/admin/orphan-transactions">
                             <input type="hidden" name="target_account_id" value="{{ item.suggested_account.id }}">
                             <button type="submit" class="btn btn-sm btn-accent"
-                                    onclick="return confirm('Verplaats naar {{ item.suggested_account.name }}?')">
+                                    onclick='return confirm({{ ('Verplaats naar ' ~ (item.suggested_account.name) ~ '?')|tojson }})'>
                                 ↪ Verplaats
                             </button>
                         </form>

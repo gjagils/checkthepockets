@@ -44,7 +44,7 @@
                 </td>
                 <td style="text-align:right;">
                     <form method="post" action="/admin/imports/delete" style="display:inline;"
-                          onsubmit="return confirm('Verwijder {{ b.tx_count }} transacties uit deze import?');">
+                          onsubmit='return confirm({{ ('Verwijder ' ~ (b.tx_count) ~ ' transacties uit deze import?')|tojson }});'>
                         <input type="hidden" name="account_id" value="{{ b.account_id }}">
                         <input type="hidden" name="created_from" value="{{ b.created_from.isoformat() }}">
                         <input type="hidden" name="created_to" value="{{ b.created_to.isoformat() }}">

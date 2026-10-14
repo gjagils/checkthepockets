@@ -27,7 +27,7 @@
 <div style="display:flex; justify-content:flex-end; margin-bottom:1rem;">
     <form method="post" action="/networth/snapshot">
         <button type="submit" class="btn btn-primary btn-sm"
-                onclick="return confirm('Huidige balansen opslaan als snapshot voor {{ month_names[today.month] }} {{ today.year }}?')">
+                onclick='return confirm({{ ('Huidige balansen opslaan als snapshot voor ' ~ (month_names[today.month]) ~ ' ' ~ (today.year) ~ '?')|tojson }})'>
             Snapshot opslaan ({{ month_names[today.month] }} {{ today.year }})
         </button>
     </form>

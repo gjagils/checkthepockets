@@ -43,7 +43,7 @@
                     </td>
                     <td>
                         <form method="post" action="/admin/scheduler/run" style="display:inline;"
-                              onsubmit="return confirm('Job {{ job.id }} nu uitvoeren?')">
+                              onsubmit='return confirm({{ ('Job ' ~ (job.id) ~ ' nu uitvoeren?')|tojson }})'>
                             <input type="hidden" name="job_id" value="{{ job.id }}">
                             <button type="submit" class="btn btn-sm btn-primary">Run nu</button>
                         </form>
