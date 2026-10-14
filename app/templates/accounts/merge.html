@@ -31,6 +31,11 @@
         <li><strong>{{ move_count }}</strong> transacties worden verplaatst naar {{ target.name or target.bank|upper }}.</li>
         <li><strong>{{ duplicate_count }}</strong> transacties bestaan al op {{ target.name or target.bank|upper }} (zelfde datum en bedrag, en zelfde tegenpartij of omschrijving).
             Die worden samengevoegd: categorie, controlestatus en koppelingen van jouw versie blijven behouden.</li>
+        {% if plan.category_merges %}
+        <li><strong>{{ plan.category_merges|length }}</strong> categorieën hebben op beide rekeningen dezelfde naam
+            ({% for c, _t in plan.category_merges[:8] %}{{ c.name }}{% if not loop.last %}, {% endif %}{% endfor %}{% if plan.category_merges|length > 8 %}, …{% endif %}).
+            Die worden samengevoegd: transacties, budgetten en regels gaan naar de categorie van {{ target.name or target.bank|upper }}.</li>
+        {% endif %}
     </ul>
     <p class="muted" style="font-size:0.85rem;">
         Twijfelgevallen (zelfde datum en bedrag, maar andere tegenpartij en omschrijving) worden verplaatst, niet samengevoegd.

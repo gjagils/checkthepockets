@@ -11,7 +11,9 @@ from dataclasses import dataclass, field
 from sqlalchemy.orm import Session
 
 from app.models import (
-    Account, Category, ImportBatch, RecurringTransaction, Rule, SavingsPlan, Transaction,
+    Account, Budget, BudgetPresetLine, Category, ImportBatch, MortgageScenarioBudget,
+    RecurringSuggestion, RecurringTransaction, Rule, RuleSuggestion, SavingsLine, SavingsPlan,
+    Transaction,
 )
 
 
@@ -25,12 +27,15 @@ class MergePair:
 class MergePlan:
     move: list[Transaction] = field(default_factory=list)
     duplicates: list[MergePair] = field(default_factory=list)
+    # Categories of the source account whose name already exists on the target account.
+    category_merges: list[tuple[Category, Category]] = field(default_factory=list)
 
 
 @dataclass
 class MergeResult:
     moved: int = 0
     merged_duplicates: int = 0
+    merged_categories: int = 0
 
 
 def _norm(value: str | None) -> str:
@@ -88,7 +93,39 @@ def plan_merge(db: Session, source: Account, target: Account) -> MergePlan:
             plan.duplicates.append(MergePair(source=tx, target=matches[tx.id]))
         else:
             plan.move.append(tx)
+
+    # uq_user_account_category: a category name is unique per account, so a source category
+    # with the name of a target category cannot just move along; it is folded into it.
+    target_categories = {c.name: c for c in db.query(Category).filter(Category.account_id == target.id)}
+    for category in db.query(Category).filter(Category.account_id == source.id).order_by(Category.id):
+        if category.name in target_categories:
+            plan.category_merges.append((category, target_categories[category.name]))
     return plan
+
+
+def _fold_category(db: Session, source_id: int, target_id: int) -> None:
+    """Point everything that uses category `source_id` at `target_id`, then delete the source."""
+    # Rows with a unique key that includes the category: keep the target's row on a clash.
+    for model, key_columns in (
+        (Budget, ("user_id", "year", "month")),
+        (MortgageScenarioBudget, ("scenario_id",)),
+    ):
+        kept = {tuple(getattr(r, c) for c in key_columns)
+                for r in db.query(model).filter(model.category_id == target_id)}
+        for row in db.query(model).filter(model.category_id == source_id).all():
+            if tuple(getattr(row, c) for c in key_columns) in kept:
+                db.delete(row)
+    db.flush()
+    for model, column in (
+        (Budget, "category_id"), (MortgageScenarioBudget, "category_id"),
+        (BudgetPresetLine, "category_id"), (Transaction, "category_id"),
+        (SavingsLine, "category_id"), (RecurringTransaction, "category_id"),
+        (RuleSuggestion, "category_id"), (RecurringSuggestion, "category_id"),
+        (Rule, "assign_category_id"), (Category, "parent_id"),
+    ):
+        db.query(model).filter(getattr(model, column) == source_id).update(
+            {column: target_id}, synchronize_session=False)
+    db.query(Category).filter(Category.id == source_id).delete(synchronize_session=False)
 
 
 def _absorb(source: Transaction, target: Transaction, db: Session) -> None:
@@ -142,8 +179,13 @@ def merge_accounts(db: Session, source: Account, target: Account) -> MergeResult
         {"account_id": target.id}, synchronize_session=False)
     db.query(RecurringTransaction).filter(RecurringTransaction.account_id == source.id).update(
         {"account_id": target.id}, synchronize_session=False)
+    for source_category, target_category in plan.category_merges:
+        _fold_category(db, source_category.id, target_category.id)
+        result.merged_categories += 1
     db.query(Category).filter(Category.account_id == source.id).update(
         {"account_id": target.id}, synchronize_session=False)
+    db.flush()
+    db.expire_all()  # bulk updates above bypassed the session; reload before deleting the source
     db.query(Rule).filter(Rule.condition_account_id == source.id).update(
         {"condition_account_id": target.id}, synchronize_session=False)
 
