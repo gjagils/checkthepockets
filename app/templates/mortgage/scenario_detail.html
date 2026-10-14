@@ -34,21 +34,21 @@
 {% endif %}
 
 {% if flash == 'created' %}
-<div class="card" style="margin-bottom:1rem; background:#e7f5e7; border:1px solid #4caf50;"><strong>✓</strong> Scenario aangemaakt.</div>
+<div class="card card-success"><strong>✓</strong> Scenario aangemaakt.</div>
 {% elif flash == 'updated' %}
-<div class="card" style="margin-bottom:1rem; background:#e7f5e7; border:1px solid #4caf50;"><strong>✓</strong> Scenario bijgewerkt.</div>
+<div class="card card-success"><strong>✓</strong> Scenario bijgewerkt.</div>
 {% elif flash == 'variant_added' %}
-<div class="card" style="margin-bottom:1rem; background:#e7f5e7; border:1px solid #4caf50;"><strong>✓</strong> Variant toegevoegd.</div>
+<div class="card card-success"><strong>✓</strong> Variant toegevoegd.</div>
 {% elif flash == 'variant_deleted' %}
-<div class="card" style="margin-bottom:1rem; background:#e7f5e7; border:1px solid #4caf50;"><strong>✓</strong> Variant verwijderd.</div>
+<div class="card card-success"><strong>✓</strong> Variant verwijderd.</div>
 {% elif flash == 'variant_duplicate' %}
-<div class="card" style="margin-bottom:1rem; background:#fde7e7; border:1px solid #e53935;"><strong>✗</strong> Deze rentevast-periode bestaat al als variant.</div>
+<div class="card card-danger"><strong>✗</strong> Deze rentevast-periode bestaat al als variant.</div>
 {% elif flash == 'variant_invalid' %}
-<div class="card" style="margin-bottom:1rem; background:#fde7e7; border:1px solid #e53935;"><strong>✗</strong> Ongeldige variant-invoer.</div>
+<div class="card card-danger"><strong>✗</strong> Ongeldige variant-invoer.</div>
 {% elif flash == 'budget_saved' %}
-<div class="card" style="margin-bottom:1rem; background:#e7f5e7; border:1px solid #4caf50;"><strong>✓</strong> Scenario-budget opgeslagen.</div>
+<div class="card card-success"><strong>✓</strong> Scenario-budget opgeslagen.</div>
 {% elif flash == 'budget_reset' %}
-<div class="card" style="margin-bottom:1rem; background:#e7f5e7; border:1px solid #4caf50;"><strong>✓</strong> Scenario-override verwijderd.</div>
+<div class="card card-success"><strong>✓</strong> Scenario-override verwijderd.</div>
 {% endif %}
 
 <div class="card" style="margin-bottom:1.5rem;">
@@ -397,7 +397,7 @@
                     {% endfor %}
                 </tr>
                 {% endif %}
-                <tr style="border-top:1px solid #bbb;">
+                <tr style="border-top:1px solid var(--border);">
                     <td><strong>Totaal kosten</strong></td>
                     {% for vs in active_variants %}
                     <td class="text-right"><strong>€ {{ vs.total_costs | euro }}</strong></td>
@@ -421,17 +421,17 @@
                     <td class="text-right">€ {{ vs.used_monthly_refund | euro }}</td>
                     {% endfor %}
                 </tr>
-                <tr style="border-top:1px solid #bbb;">
+                <tr style="border-top:1px solid var(--border);">
                     <td><strong>Totaal inkomsten</strong></td>
                     {% for vs in active_variants %}
                     <td class="text-right"><strong>€ {{ vs.total_income | euro }}</strong></td>
                     {% endfor %}
                 </tr>
 
-                <tr style="border-top:2px solid #333;">
+                <tr style="border-top:2px solid var(--text);">
                     <td><strong>Resultaat</strong></td>
                     {% for vs in active_variants %}
-                    <td class="text-right" style="{% if vs.resultaat < 0 %}color:#b31919;{% endif %}">
+                    <td class="text-right" style="{% if vs.resultaat < 0 %}color:var(--red);{% endif %}">
                         <strong>€ {{ vs.resultaat | euro }}</strong>
                     </td>
                     {% endfor %}
@@ -519,7 +519,7 @@
                     <td class="text-right">€ {{ vs.annual_savings | euro }}</td>
                     {% endfor %}
                 </tr>
-                <tr style="border-top:1px solid #999;">
+                <tr style="border-top:1px solid var(--border);">
                     <td><strong>Totaal inkomsten</strong></td>
                     {% for vs in _active_for_savings %}
                     <td class="text-right"><strong>€ {{ vs.savings_income_yr | euro }}</strong></td>
@@ -543,7 +543,7 @@
                     {% endfor %}
                 </tr>
                 {% endif %}
-                <tr style="border-top:1px solid #999;">
+                <tr style="border-top:1px solid var(--border);">
                     <td><strong>Totaal uitgaven</strong></td>
                     {% for vs in _active_for_savings %}
                     <td class="text-right"><strong>€ {{ vs.savings_expense_yr | euro }}</strong></td>
@@ -561,21 +561,21 @@
                 </tr>
                 {% endif %}
 
-                <tr style="border-top:2px solid #333;">
+                <tr style="border-top:2px solid var(--text);">
                     <td><strong>Netto spaarsaldo / jaar</strong></td>
                     {% for vs in _active_for_savings %}
-                    <td class="text-right" style="{% if vs.net_annual_savings < 0 %}color:#b31919;{% else %}color:#1f7a1f;{% endif %}">
+                    <td class="text-right" style="{% if vs.net_annual_savings < 0 %}color:var(--red);{% else %}color:var(--green);{% endif %}">
                         <strong>€ {{ vs.net_annual_savings | euro }}</strong>
                     </td>
                     {% endfor %}
                 </tr>
 
-                <tr style="border-top:1px dashed #aaa;">
+                <tr style="border-top:1px dashed var(--border);">
                     <td class="muted" title="Gemiddeld principal-deel in de eerste 60 maanden van de nieuwe annuïteit">
                         Aflossing nieuwe hypotheek (gem. 5j / jaar)
                     </td>
                     {% for vs in _active_for_savings %}
-                    <td class="text-right" style="color:#1f7a1f;">€ {{ vs.avg_annual_amortization_5y | euro }}</td>
+                    <td class="text-right" style="color:var(--green);">€ {{ vs.avg_annual_amortization_5y | euro }}</td>
                     {% endfor %}
                 </tr>
             </tbody>
@@ -733,7 +733,7 @@
 
 {# ─── Aflossingstabel ───────────────────────────────────────────────────── #}
 {% if rate_missing %}
-<div class="card" style="margin-bottom:1.5rem; background:#fde7e7; border:1px solid #e53935;">
+<div class="card card-danger" style="margin-bottom:1.5rem;">
     <strong>Geen rente gevonden</strong> voor {{ fixed_years }} jaar rentevast bij LTV {{ "%.1f" | format(ltv_fraction * 100) }}%.
     Voeg een rij toe in de <a href="/hypotheek/rentes">rente-tabel</a> die deze LTV-bucket dekt.
 </div>
@@ -773,7 +773,7 @@
 
 <style>
 .kv-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(10rem, 1fr)); gap:0.75rem; }
-.kv-grid > div { background:#f7f7f7; padding:0.5rem 0.75rem; border-radius:4px; }
+.kv-grid > div { background:var(--surface-2); padding:0.5rem 0.75rem; border-radius:4px; }
 </style>
 
 {% if chart_series %}

@@ -6,45 +6,45 @@
 </div>
 
 {% if flash == 'added' %}
-<div class="card" style="margin-bottom:1rem; background:#e7f5e7; border:1px solid #4caf50;">
+<div class="card card-success">
     <strong>✓</strong> Rente toegevoegd.
 </div>
 {% elif flash == 'updated' %}
-<div class="card" style="margin-bottom:1rem; background:#e7f5e7; border:1px solid #4caf50;">
+<div class="card card-success">
     <strong>✓</strong> Rente bijgewerkt.
 </div>
 {% elif flash == 'deleted' %}
-<div class="card" style="margin-bottom:1rem; background:#e7f5e7; border:1px solid #4caf50;">
+<div class="card card-success">
     <strong>✓</strong> Rente verwijderd.
 </div>
 {% elif flash == 'seeded' %}
-<div class="card" style="margin-bottom:1rem; background:#e7f5e7; border:1px solid #4caf50;">
+<div class="card card-success">
     <strong>✓</strong> Voorbeeld-tabel geïmporteerd. Pas indien nodig aan.
 </div>
 {% endif %}
 
 {% if flash == 'bulk_imported' %}
-<div class="card" style="margin-bottom:1rem; background:#e7f5e7; border:1px solid #4caf50;">
+<div class="card card-success">
     <strong>✓</strong> Bulk-import klaar — {{ bulk_new_count }} nieuwe, {{ bulk_updated_count }} bijgewerkt.
 </div>
 {% endif %}
 
 {% if error == 'duplicate' %}
-<div class="card" style="margin-bottom:1rem; background:#fde7e7; border:1px solid #e53935;">
+<div class="card card-danger">
     <strong>✗</strong> Er bestaat al een rij met dezelfde rentevast-periode en LTV-bucket.
 </div>
 {% elif error == 'invalid' %}
-<div class="card" style="margin-bottom:1rem; background:#fde7e7; border:1px solid #e53935;">
+<div class="card card-danger">
     <strong>✗</strong> Ongeldige invoer. Controleer de waardes.
 </div>
 {% elif error == 'not_empty' %}
-<div class="card" style="margin-bottom:1rem; background:#fde7e7; border:1px solid #e53935;">
+<div class="card card-danger">
     <strong>✗</strong> Seed alleen mogelijk op een lege tabel.
 </div>
 {% endif %}
 
 {% if bulk_error %}
-<div class="card" style="margin-bottom:1rem; background:#fde7e7; border:1px solid #e53935;">
+<div class="card card-danger">
     <strong>✗</strong> {{ bulk_error }}
 </div>
 {% endif %}
@@ -100,7 +100,7 @@
     <h3 style="margin:0 0 0.5rem 0; font-size:1rem;">Voorvertoning</h3>
 
     {% if bulk_parsed.errors %}
-    <div style="background:#fde7e7; border:1px solid #e53935; padding:0.5rem 0.75rem; margin-bottom:0.75rem; border-radius:4px;">
+    <div class="alert alert-danger">
         <strong>{{ bulk_parsed.errors | length }} foutmelding(en):</strong>
         <ul style="margin:0.25rem 0 0 1.25rem;">
             {% for err in bulk_parsed.errors %}<li>{{ err }}</li>{% endfor %}
@@ -109,7 +109,7 @@
     {% endif %}
 
     {% if bulk_parsed.skipped %}
-    <div style="background:#fff8e1; border:1px solid #ffc107; padding:0.5rem 0.75rem; margin-bottom:0.75rem; border-radius:4px;">
+    <div class="alert alert-warning">
         <strong>{{ bulk_parsed.skipped | length }} overgeslagen:</strong>
         <ul style="margin:0.25rem 0 0 1.25rem;">
             {% for s in bulk_parsed.skipped %}<li>{{ s }}</li>{% endfor %}
@@ -139,7 +139,7 @@
                     <td>{{ row.fixed_years }}j</td>
                     <td class="text-right">{{ "%.2f" | format(row.ltv_max_pct * 100) }}%</td>
                     <td class="text-right">{{ "%.2f" | format(row.interest_rate * 100) }}%</td>
-                    <td><span style="color:#2e7d32;">nieuw</span></td>
+                    <td><span style="color:var(--green);">nieuw</span></td>
                 </tr>
                 {% endfor %}
                 {% for row, current_rate in bulk_update_rows %}
@@ -150,7 +150,7 @@
                         {{ "%.2f" | format(row.interest_rate * 100) }}%
                         <span class="muted">({{ "%.2f" | format(current_rate * 100) }}% → {{ "%.2f" | format(row.interest_rate * 100) }}%)</span>
                     </td>
-                    <td><span style="color:#ef6c00;">update</span></td>
+                    <td><span style="color:var(--orange);">update</span></td>
                 </tr>
                 {% endfor %}
             </tbody>
