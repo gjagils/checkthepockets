@@ -1,15 +1,9 @@
 """Tests for ACT-28d one-off wealth bookings."""
 import datetime
-import os
-import tempfile
 from decimal import Decimal
 
 import pytest
 
-_DB_FILE = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-_DB_FILE.close()
-os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
-os.environ["SECRET_KEY"] = "test-secret-key"
 
 from fastapi.testclient import TestClient
 from app.auth import create_session_cookie, hash_password

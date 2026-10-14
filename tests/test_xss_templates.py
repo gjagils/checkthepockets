@@ -1,40 +1,18 @@
 """ACT-35: bankdata en categorienamen mogen nooit als HTML of script in pagina's terechtkomen (B4, B5)."""
-import os
 import pathlib
 import re
-import tempfile
 from decimal import Decimal
 
-import pytest
 
-_DB_FILE = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-_DB_FILE.close()
-os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
-os.environ["SECRET_KEY"] = "test-secret-key"
 
 from fastapi.testclient import TestClient
 
 from app import clock
 from app.auth import create_session_cookie, hash_password
-from app.database import Base, SessionLocal, engine
 from app.main import app
 from app.models import Account, Category, Transaction, User
 
 PAYLOAD = "</script><script>alert('xss')</script>"
-
-
-@pytest.fixture(autouse=True)
-def _schema():
-    Base.metadata.create_all(bind=engine)
-    yield
-    Base.metadata.drop_all(bind=engine)
-
-
-@pytest.fixture
-def db():
-    session = SessionLocal()
-    yield session
-    session.close()
 
 
 def _client(user):

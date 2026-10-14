@@ -1,15 +1,9 @@
 """ACT-32: met FIELD_ENCRYPTION_KEY aan (productie) mogen queries niet op versleutelde kolommen groeperen."""
-import os
-import tempfile
 from datetime import date
 from decimal import Decimal
 
 import pytest
 
-_DB_FILE = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-_DB_FILE.close()
-os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
-os.environ["SECRET_KEY"] = "test-secret-key"
 
 from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
@@ -18,24 +12,9 @@ from sqlalchemy import Text, select, type_coerce
 import app.crypto as crypto
 from app.auth import create_session_cookie
 from app.crypto import encrypt_existing_transactions
-from app.database import Base, SessionLocal, engine
 from app.main import app
 from app.models import Account, Category, Transaction, User
 from app.rules_engine import suggest_rules
-
-
-@pytest.fixture(autouse=True)
-def _schema():
-    Base.metadata.create_all(bind=engine)
-    yield
-    Base.metadata.drop_all(bind=engine)
-
-
-@pytest.fixture
-def db():
-    session = SessionLocal()
-    yield session
-    session.close()
 
 
 @pytest.fixture

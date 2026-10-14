@@ -1,57 +1,23 @@
 """Tests voor factor-engine, hypotheek-som en person contributions (LIN-45)."""
-import os
-import tempfile
 from decimal import Decimal
 
-import pytest
 
-_DB_FILE = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-_DB_FILE.close()
-os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
-os.environ["SECRET_KEY"] = "test-secret-key"
 
 from fastapi.testclient import TestClient
 
 from app.auth import create_session_cookie, hash_password
-from app.database import Base, SessionLocal, engine
 from app.main import app
 from app.mortgage_calc import (
     build_scenario_budget_rows,
     compute_scenario_coverage,
 )
 from app.models import (
-    Budget,
     Category,
     MortgageScenario,
-    MortgageScenarioBudget,
     Person,
     ScenarioPersonContribution,
     User,
 )
-
-
-@pytest.fixture(scope="module", autouse=True)
-def _schema():
-    Base.metadata.create_all(bind=engine)
-    yield
-    Base.metadata.drop_all(bind=engine)
-
-
-@pytest.fixture
-def db_session():
-    db = SessionLocal()
-    try:
-        db.query(ScenarioPersonContribution).delete()
-        db.query(MortgageScenarioBudget).delete()
-        db.query(MortgageScenario).delete()
-        db.query(Budget).delete()
-        db.query(Category).delete()
-        db.query(Person).delete()
-        db.query(User).delete()
-        db.commit()
-        yield db
-    finally:
-        db.close()
 
 
 def _admin(db, username="admin"):

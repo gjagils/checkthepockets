@@ -1,16 +1,10 @@
 """Compact savings planner: one line per row and a movement row (ACT-27)."""
 import html as html_lib
-import os
 import re
-import tempfile
 from decimal import Decimal
 
 import pytest
 
-_DB_FILE = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-_DB_FILE.close()
-os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
-os.environ["SECRET_KEY"] = "test-secret-key"
 
 from fastapi.testclient import TestClient
 

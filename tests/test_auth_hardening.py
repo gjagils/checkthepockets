@@ -1,14 +1,8 @@
 """ACT-33: auth-fixes uit de codereview (A5, B1, B2, B3, B6, B7, B8, B10)."""
 import datetime
-import os
-import tempfile
 
 import pytest
 
-_DB_FILE = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-_DB_FILE.close()
-os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
-os.environ["SECRET_KEY"] = "test-secret-key"
 
 from fastapi.testclient import TestClient
 from starlette.requests import Request
@@ -18,7 +12,7 @@ import app.routers.auth as auth_router
 from app import clock
 from app import rate_limit
 from app.auth import create_session_cookie, hash_password
-from app.database import Base, SessionLocal, engine
+from app.database import Base, engine
 from app.main import app
 from app.models import AuthToken, User
 
@@ -30,13 +24,6 @@ def _schema():
     rate_limit._login_failures.clear()
     yield
     Base.metadata.drop_all(bind=engine)
-
-
-@pytest.fixture
-def db():
-    session = SessionLocal()
-    yield session
-    session.close()
 
 
 def _request(peer, xff=None):

@@ -1,19 +1,13 @@
 """Acceptance tests for frozen yearly wealth plans (ACT-28b)."""
 import datetime
-import os
-import tempfile
 from decimal import Decimal
 
 import pytest
 
-_DB_FILE = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-_DB_FILE.close()
-os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
-os.environ["SECRET_KEY"] = "test-secret-key"
 
 from app.auth import hash_password
-from app.database import Base, SessionLocal, engine
-from app.models import Person, PortfolioAsset, PortfolioHolding, User, WealthPlan, WealthPlanEntry
+from app.database import Base, engine
+from app.models import Person, PortfolioAsset, PortfolioHolding, User, WealthPlan
 from app.wealth_plan_service import (
     WealthPlanConfirmationRequired,
     capture_january_wealth_plans,
@@ -27,18 +21,6 @@ def schema():
     Base.metadata.create_all(bind=engine)
     yield
     Base.metadata.drop_all(bind=engine)
-
-
-@pytest.fixture
-def db():
-    session = SessionLocal()
-    try:
-        for model in (WealthPlanEntry, WealthPlan, PortfolioHolding, PortfolioAsset, Person, User):
-            session.query(model).delete()
-        session.commit()
-        yield session
-    finally:
-        session.close()
 
 
 def setup_user_with_holding(db, username="alice"):

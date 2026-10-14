@@ -1,10 +1,3 @@
-import os
-import tempfile
-
-db_file = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-db_file.close()
-os.environ["DATABASE_URL"] = f"sqlite:///{db_file.name}"
-
 from app.database import Base, SessionLocal, engine
 from app.models import Account, ImportBatch, User
 

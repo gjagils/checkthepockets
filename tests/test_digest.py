@@ -1,42 +1,13 @@
 """Tests voor de weekly digest stats-berekening (scheduler.compute_digest_stats)."""
 import hashlib
-import os
-import tempfile
 from datetime import timedelta
 from decimal import Decimal
 
-import pytest
-
-_DB_FILE = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-_DB_FILE.close()
-os.environ.setdefault("DATABASE_URL", f"sqlite:///{_DB_FILE.name}")
-os.environ.setdefault("SECRET_KEY", "test-secret-key")
 
 from app import clock
 from app.auth import hash_password
-from app.database import Base, SessionLocal, engine
 from app.models import Account, Transaction, User
 from app.scheduler import compute_digest_stats
-
-
-@pytest.fixture(scope="module", autouse=True)
-def _schema():
-    Base.metadata.create_all(bind=engine)
-    yield
-    Base.metadata.drop_all(bind=engine)
-
-
-@pytest.fixture
-def db():
-    s = SessionLocal()
-    try:
-        s.query(Transaction).delete()
-        s.query(Account).delete()
-        s.query(User).delete()
-        s.commit()
-        yield s
-    finally:
-        s.close()
 
 
 def _user(db, name="gj"):

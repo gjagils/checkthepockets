@@ -1,37 +1,18 @@
 """Regression tests for the shared import service (ACT-21)."""
 import base64
 import json
-import os
-import tempfile
 from datetime import date
 from decimal import Decimal
 
-import pytest
 
-_DB_FILE = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-_DB_FILE.close()
-os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
-os.environ["SECRET_KEY"] = "test-secret-key"
 
 from fastapi.testclient import TestClient
 
 from app.auth import create_session_cookie
-from app.database import Base, SessionLocal, engine
 from app.import_service import store_confirmed_csv_rows, store_parsed_transactions
 from app.main import app
 from app.models import Account, Category, ImportBatch, Rule, Transaction, User
 from app.parsers.base import ParsedTransaction
-
-
-@pytest.fixture
-def db():
-    Base.metadata.create_all(bind=engine)
-    session = SessionLocal()
-    try:
-        yield session
-    finally:
-        session.close()
-        Base.metadata.drop_all(bind=engine)
 
 
 def _user_with_accounts(db, username="import-user"):

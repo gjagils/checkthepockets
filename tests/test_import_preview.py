@@ -1,22 +1,14 @@
 """Import previews only count duplicates on the user's own target account (ACT-26)."""
 import base64
 import json
-import os
-import tempfile
 from datetime import date
 from decimal import Decimal
 
-import pytest
 
-_DB_FILE = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-_DB_FILE.close()
-os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
-os.environ["SECRET_KEY"] = "test-secret-key"
 
 from fastapi.testclient import TestClient
 
 from app.auth import create_session_cookie
-from app.database import Base, SessionLocal, engine
 from app.main import app
 from app.models import Account, ImportBatch, Transaction, User
 from app.parsers import bunq
@@ -36,17 +28,6 @@ BUNQ_CSV = (BUNQ_HEADER + _bunq_row(1, "-1.00", "Andere gebruiker") + _bunq_row(
 HASHES = {p.counterparty: p.import_hash for p in bunq.parse(BUNQ_CSV)[1]}
 
 CUSTOM_CSV = b"Datum,Bedrag,Omschrijving\n2026-09-01,-1.00,Andere gebruiker\n2026-09-02,-2.00,Al op doelrekening\n"
-
-
-@pytest.fixture
-def db():
-    Base.metadata.create_all(bind=engine)
-    session = SessionLocal()
-    try:
-        yield session
-    finally:
-        session.close()
-        Base.metadata.drop_all(bind=engine)
 
 
 def _client(user):

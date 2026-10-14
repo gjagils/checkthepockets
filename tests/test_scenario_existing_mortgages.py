@@ -1,19 +1,11 @@
 """Tests voor scenario existing mortgages + compute_scenario_financials (LIN-44)."""
-import os
-import tempfile
 from decimal import Decimal
 
-import pytest
 
-_DB_FILE = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-_DB_FILE.close()
-os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
-os.environ["SECRET_KEY"] = "test-secret-key"
 
 from fastapi.testclient import TestClient
 
 from app.auth import create_session_cookie, hash_password
-from app.database import Base, SessionLocal, engine
 from app.main import app
 from app.mortgage_calc import compute_scenario_financials, existing_mortgage_monthly
 from app.models import (
@@ -21,26 +13,6 @@ from app.models import (
     ScenarioExistingMortgage,
     User,
 )
-
-
-@pytest.fixture(scope="module", autouse=True)
-def _schema():
-    Base.metadata.create_all(bind=engine)
-    yield
-    Base.metadata.drop_all(bind=engine)
-
-
-@pytest.fixture
-def db_session():
-    db = SessionLocal()
-    try:
-        db.query(ScenarioExistingMortgage).delete()
-        db.query(MortgageScenario).delete()
-        db.query(User).delete()
-        db.commit()
-        yield db
-    finally:
-        db.close()
 
 
 def _make_admin(db, username="admin"):

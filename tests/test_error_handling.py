@@ -1,39 +1,21 @@
 """Fault injection for operational errors and log content (ACT-24)."""
 import json
 import logging
-import os
-import tempfile
 
 import pytest
 import requests
 
-_DB_FILE = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-_DB_FILE.close()
-os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
-os.environ["SECRET_KEY"] = "test-secret-key"
 
 from fastapi.testclient import TestClient
 
 from app import enable_banking
 from app.auth import create_session_cookie
-from app.database import Base, SessionLocal, engine
 from app.enable_banking import EnableBankingError, _check, safe_error_message
 from app.main import app
 from app.models import BankConnection, User
 
 SESSION_ID = "sess-8f3a-secret"
 ACCOUNT_UID = "acc-77c1-secret"
-
-
-@pytest.fixture
-def db():
-    Base.metadata.create_all(bind=engine)
-    session = SessionLocal()
-    try:
-        yield session
-    finally:
-        session.close()
-        Base.metadata.drop_all(bind=engine)
 
 
 @pytest.fixture

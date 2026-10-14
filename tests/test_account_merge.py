@@ -1,37 +1,16 @@
 """Rekeningen samenvoegen: preview, dubbelen herkennen en gegevens behouden."""
-import os
-import tempfile
 from datetime import date
 from decimal import Decimal
 
 import pytest
 
-_DB_FILE = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-_DB_FILE.close()
-os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
-os.environ["SECRET_KEY"] = "test-secret-key"
 
 from fastapi.testclient import TestClient
 
 from app.account_merge import merge_accounts, plan_merge
 from app.auth import create_session_cookie
-from app.database import Base, SessionLocal, engine
 from app.main import app
 from app.models import Account, Category, ImportBatch, Transaction, User
-
-
-@pytest.fixture(autouse=True)
-def _schema():
-    Base.metadata.create_all(bind=engine)
-    yield
-    Base.metadata.drop_all(bind=engine)
-
-
-@pytest.fixture
-def db():
-    session = SessionLocal()
-    yield session
-    session.close()
 
 
 def _setup(db, username="merge-user"):

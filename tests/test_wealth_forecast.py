@@ -1,18 +1,12 @@
 """Acceptance tests for ACT-28a yearly wealth calculations."""
 import datetime
-import os
-import tempfile
 from decimal import Decimal
 
 import pytest
 
-_DB_FILE = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-_DB_FILE.close()
-os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
-os.environ["SECRET_KEY"] = "test-secret-key"
 
 from app.auth import hash_password
-from app.database import Base, SessionLocal, engine
+from app.database import Base, engine
 from app.models import (
     Account, Person, PortfolioAsset, PortfolioHolding, PortfolioPriceSnapshot,
     SavingsEntry, SavingsLine, SavingsPlan, Transaction, User,
@@ -25,20 +19,6 @@ def schema():
     Base.metadata.create_all(bind=engine)
     yield
     Base.metadata.drop_all(bind=engine)
-
-
-@pytest.fixture
-def db():
-    session = SessionLocal()
-    try:
-        for model in (Transaction, SavingsEntry, SavingsLine, SavingsPlan,
-                      PortfolioPriceSnapshot, PortfolioHolding, PortfolioAsset,
-                      Account, Person, User):
-            session.query(model).delete()
-        session.commit()
-        yield session
-    finally:
-        session.close()
 
 
 def make_user(session):
