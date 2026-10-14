@@ -16,11 +16,12 @@ from app.recurring_schedule import (
     is_in_active_period, parse_active_months, remove_skipped_month,
 )
 from app.recurring_service import (
-    cleanup_matched_projected, find_matching_transaction, link_transaction_to_recurring,
+    cleanup_matched_projected, link_transaction_to_recurring,
     sync_projected_transactions,
 )
 from app.redirects import safe_redirect
 from app.nl_format import MONTHS_NL_FULL
+from app.recurring_service import MatchContext
 from app.template_config import templates
 
 router = APIRouter()
@@ -273,13 +274,14 @@ def _render_recurring_page(
     items_due = []
     items_missed = []
     items_inactive = []
+    ctx = MatchContext(db, user.id)
 
     for item in recurring_items:
         in_period = is_in_active_period(item, today)
 
         if not item.is_active or not in_period:
             cur_start, cur_end = get_period_range(item.frequency, today)
-            match = find_matching_transaction(db, user.id, item, cur_start, cur_end)
+            match = ctx.find(item, cur_start, cur_end)
             items_inactive.append({
                 "item": item, "period_start": cur_start, "period_end": cur_end,
                 "matched_transaction": match, "is_due": False, "in_active_period": in_period,
@@ -288,9 +290,9 @@ def _render_recurring_page(
             continue
 
         cur_start, cur_end = get_period_range(item.frequency, today)
-        cur_match = find_matching_transaction(db, user.id, item, cur_start, cur_end)
+        cur_match = ctx.find(item, cur_start, cur_end)
         prev_start, prev_end = get_previous_period_range(item.frequency, today)
-        prev_match = find_matching_transaction(db, user.id, item, prev_start, prev_end)
+        prev_match = ctx.find(item, prev_start, prev_end)
 
         # If previous period is before first transaction, treat as "not missed"
         prev_before_data = first_tx_date and prev_end < first_tx_date

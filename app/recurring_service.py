@@ -22,59 +22,71 @@ def link_transaction_to_recurring(tx: Transaction, item: RecurringTransaction):
         tx.is_reviewed = 1
 
 
-def find_matching_transaction(
-    db: Session, user_id: int, recurring: RecurringTransaction, start: date, end: date
-) -> Transaction | None:
-    """Find a transaction matching this recurring item in the given period.
-    Checks both auto-matching (counterparty/description) and manual links (recurring_id).
-    """
-    # First: check manually linked transactions
-    linked = (
-        db.query(Transaction)
-        .join(Account)
-        .filter(
-            Account.user_id == user_id,
-            Transaction.recurring_id == recurring.id,
-            Transaction.date >= start,
-            Transaction.date <= end,
-            Transaction.is_excluded == 0,
-            Transaction.is_projected == 0,
-        )
-        .first()
-    )
-    if linked:
-        return linked
+class MatchContext:
+    """Loads a user's real transactions once per period, for matching many recurring items.
 
-    # Fall back to auto-matching by counterparty/description
-    # Note: these fields are encrypted, so ILIKE won't work — filter in Python
-    search_cp = (recurring.counterparty or "").lower()
-    search_desc = (recurring.description_match or "").lower()
-    if not search_cp and not search_desc:
+    `find_matching_transaction` used to run two queries per item (the manual links, then every
+    transaction of the period to match on counterparty/description in Python: those columns are encrypted,
+    so SQL cannot compare them) and decrypt the same rows again for every item. A recurring page with 30
+    monthly items did ~90 queries. Create one context per operation (not across writes that change links).
+    """
+
+    def __init__(self, db: Session, user_id: int):
+        self.db = db
+        self.user_id = user_id
+        self._periods: dict[tuple[date, date], list[Transaction]] = {}
+
+    def period(self, start: date, end: date) -> list[Transaction]:
+        """Real (not excluded, not projected) transactions in [start, end], newest first."""
+        key = (start, end)
+        if key not in self._periods:
+            self._periods[key] = (
+                self.db.query(Transaction)
+                .join(Account)
+                .filter(
+                    Account.user_id == self.user_id,
+                    Transaction.date >= start,
+                    Transaction.date <= end,
+                    Transaction.is_excluded == 0,
+                    Transaction.is_projected == 0,
+                )
+                .order_by(Transaction.date.desc(), Transaction.id.desc())
+                .all()
+            )
+        return self._periods[key]
+
+    def find(self, recurring: RecurringTransaction, start: date, end: date) -> Transaction | None:
+        transactions = self.period(start, end)
+        # First: manually linked transactions
+        for tx in transactions:
+            if tx.recurring_id == recurring.id:
+                return tx
+        # Fall back to auto-matching by counterparty/description (encrypted fields: filtered in Python)
+        search_cp = (recurring.counterparty or "").lower()
+        search_desc = (recurring.description_match or "").lower()
+        if not search_cp and not search_desc:
+            return None
+        for tx in transactions:
+            cp = (tx.counterparty or "").lower()
+            desc = (tx.description or "").lower()
+            if search_cp and search_cp in cp:
+                return tx
+            if search_cp and search_cp in desc:
+                return tx
+            if search_desc and search_desc in desc:
+                return tx
         return None
 
-    candidates = (
-        db.query(Transaction)
-        .join(Account)
-        .filter(
-            Account.user_id == user_id,
-            Transaction.date >= start,
-            Transaction.date <= end,
-            Transaction.is_excluded == 0,
-            Transaction.is_projected == 0,
-        )
-        .order_by(Transaction.date.desc())
-        .all()
-    )
-    for tx in candidates:
-        cp = (tx.counterparty or "").lower()
-        desc = (tx.description or "").lower()
-        if search_cp and search_cp in cp:
-            return tx
-        if search_cp and search_cp in desc:
-            return tx
-        if search_desc and search_desc in desc:
-            return tx
-    return None
+
+def find_matching_transaction(
+    db: Session, user_id: int, recurring: RecurringTransaction, start: date, end: date,
+    ctx: MatchContext | None = None,
+) -> Transaction | None:
+    """Find a transaction matching this recurring item in the given period.
+    Checks manual links (recurring_id) first, then auto-matching (counterparty/description).
+    Pass a shared `MatchContext` when matching many items to avoid reloading the period each time.
+    """
+    return (ctx or MatchContext(db, user_id)).find(recurring, start, end)
 
 
 def find_candidates_for_projected(
@@ -241,6 +253,7 @@ def sync_projected_transactions(user_id: int, year: int, month: int, db: Session
         return
 
     changed = False
+    ctx = MatchContext(db, user_id)
     with db.no_autoflush:
         for item in recurring_items:
             # Always clean up legacy hash format first
@@ -281,7 +294,7 @@ def sync_projected_transactions(user_id: int, year: int, month: int, db: Session
             proj_hash = projected_hash(item.id, year, month)
 
             # Check if a real (non-projected) transaction already matches
-            real_tx = find_matching_transaction(db, user_id, item, period_start, period_end)
+            real_tx = ctx.find(item, period_start, period_end)
 
             if real_tx:
                 # Real match exists — delete projected placeholder if present
@@ -341,6 +354,7 @@ def cleanup_matched_projected(user_id: int, db: Session) -> None:
         .all()
     )
     changed = False
+    ctx = MatchContext(db, user_id)
     with db.no_autoflush:
         for proj in projected:
             if not proj.recurring_id:
@@ -367,7 +381,7 @@ def cleanup_matched_projected(user_id: int, db: Session) -> None:
                 changed = True
                 continue
             period_start, period_end = get_period_range(item.frequency, proj.date)
-            real_tx = find_matching_transaction(db, user_id, item, period_start, period_end)
+            real_tx = ctx.find(item, period_start, period_end)
             if real_tx:
                 db.delete(proj)
                 changed = True
