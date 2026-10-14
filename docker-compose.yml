@@ -23,6 +23,7 @@ services:
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
       # AI suggesties (Claude)
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-}
       # Encryptie at-rest
       - FIELD_ENCRYPTION_KEY=${FIELD_ENCRYPTION_KEY:-}
       # Super admin (kan niet worden gedeactiveerd/verwijderd)

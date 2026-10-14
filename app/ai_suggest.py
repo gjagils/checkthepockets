@@ -9,7 +9,7 @@ import json
 import logging
 import re
 
-from app.config import ANTHROPIC_API_KEY
+from app.config import ANTHROPIC_API_KEY, ANTHROPIC_MODEL
 
 logger = logging.getLogger(__name__)
 
@@ -117,7 +117,7 @@ def suggest_rule(
 
         client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
         resp = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model=ANTHROPIC_MODEL,
             max_tokens=300,
             messages=[
                 {
@@ -209,7 +209,7 @@ def suggest_rules_bulk(
 
         client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
         resp = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model=ANTHROPIC_MODEL,
             max_tokens=4000,
             messages=[
                 {
@@ -421,7 +421,7 @@ def enrich_recurring_with_ai(
 
         client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
         resp = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model=ANTHROPIC_MODEL,
             max_tokens=1000,
             messages=[
                 {
@@ -535,7 +535,7 @@ def analyze_savings_with_ai(
 
         client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
         resp = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model=ANTHROPIC_MODEL,
             max_tokens=1500,
             messages=[
                 {
