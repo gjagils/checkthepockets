@@ -1,15 +1,9 @@
 """Accounts from an Enable Banking session stay visible (ACT-25a/b)."""
 import json
 import logging
-import os
-import tempfile
 
 import pytest
 
-_DB_FILE = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-_DB_FILE.close()
-os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
-os.environ["SECRET_KEY"] = "test-secret-key"
 
 from fastapi.testclient import TestClient
 

@@ -1,46 +1,15 @@
 """Tests for the /inbox page (GJA-6)."""
 import hashlib
-import os
-import tempfile
 from datetime import date
 from decimal import Decimal
 
-import pytest
 
-# Use an on-disk sqlite DB so the app + test share the same store.
-_DB_FILE = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-_DB_FILE.close()
-os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
-os.environ["SECRET_KEY"] = "test-secret-key"
 
 from fastapi.testclient import TestClient
 
 from app.auth import create_session_cookie, hash_password
-from app.database import Base, SessionLocal, engine
 from app.main import app
 from app.models import Account, Category, Transaction, User
-
-
-@pytest.fixture(scope="module", autouse=True)
-def _schema():
-    Base.metadata.create_all(bind=engine)
-    yield
-    Base.metadata.drop_all(bind=engine)
-
-
-@pytest.fixture
-def db_session():
-    db = SessionLocal()
-    try:
-        # Clean tables that tests touch
-        db.query(Transaction).delete()
-        db.query(Category).delete()
-        db.query(Account).delete()
-        db.query(User).delete()
-        db.commit()
-        yield db
-    finally:
-        db.close()
 
 
 def _make_user(db, username="alice", email="alice@example.com"):

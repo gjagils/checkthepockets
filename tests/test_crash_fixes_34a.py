@@ -1,7 +1,6 @@
 """ACT-34a: crash- en datafouten uit de codereview (A4, A6, A7, A8, A10, A11, A14)."""
 import ast
 import logging
-import os
 import pathlib
 import tempfile
 from datetime import date, datetime
@@ -9,37 +8,19 @@ from decimal import Decimal
 
 import pytest
 
-_DB_FILE = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-_DB_FILE.close()
-os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
-os.environ["SECRET_KEY"] = "test-secret-key"
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 import app.scheduler as scheduler
 from app.auth import create_session_cookie, hash_password
-from app.database import Base, SessionLocal, engine
+from app.database import Base
 from app.main import app
 from app.models import (
     Account, Budget, Category, Rule, RuleSuggestion, SavingsLine, SavingsPlan, Transaction, User,
 )
 from app.routers.categories import delete_category_tree
 from app.routers.savings import _get_transaction_totals_by_month, _has_transactions_in_month
-
-
-@pytest.fixture(autouse=True)
-def _schema():
-    Base.metadata.create_all(bind=engine)
-    yield
-    Base.metadata.drop_all(bind=engine)
-
-
-@pytest.fixture
-def db():
-    session = SessionLocal()
-    yield session
-    session.close()
 
 
 def _world(db, name="crash-user"):

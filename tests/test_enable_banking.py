@@ -25,8 +25,6 @@ os.environ.setdefault(
     "ENABLE_BANKING_PRIVATE_KEY_PATH",
     os.path.join(os.path.dirname(__file__), "..", "05336855-b073-4033-96be-5455f7196a5a.pem"),
 )
-# Use SQLite for tests so we don't need psycopg2
-os.environ["DATABASE_URL"] = "sqlite:///test_enable_banking.db"
 
 
 # ── JWT token generation ────────────────────────────────────────────────────

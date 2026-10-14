@@ -1,22 +1,14 @@
 """Tests voor scripts/seed_demo_user.py + POST /admin/demo/seed (GJA-46)."""
 from __future__ import annotations
 
-import os
-import tempfile
 from datetime import date
 
-import pytest
 
 # Vóór de app-imports: tijdelijke sqlite-DB en dummy-secret.
-_DB_FILE = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-_DB_FILE.close()
-os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
-os.environ["SECRET_KEY"] = "test-secret-key"
 
 from fastapi.testclient import TestClient
 
 from app.auth import create_session_cookie, hash_password, verify_password
-from app.database import Base, SessionLocal, engine
 from app.main import app
 from app.models import (
     Account,
@@ -34,32 +26,6 @@ from scripts.seed_demo_user import (
     MONTHLY_TX,
     seed_demo_user,
 )
-
-
-@pytest.fixture(scope="module", autouse=True)
-def _schema():
-    Base.metadata.create_all(bind=engine)
-    yield
-    Base.metadata.drop_all(bind=engine)
-
-
-@pytest.fixture
-def db_session():
-    db = SessionLocal()
-    try:
-        db.query(Budget).delete()
-        db.query(Transaction).delete()
-        db.query(Category).delete()
-        for acc in db.query(Account).all():
-            acc.owners = []
-        db.commit()
-        db.query(Account).delete()
-        db.query(Person).delete()
-        db.query(User).delete()
-        db.commit()
-        yield db
-    finally:
-        db.close()
 
 
 def _login_client(user_id: int) -> TestClient:

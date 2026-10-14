@@ -1,42 +1,12 @@
 """Tests voor app.budget_stats.category_spending_average."""
 import datetime
-import os
-import tempfile
 from decimal import Decimal
 
-import pytest
 
-_DB_FILE = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-_DB_FILE.close()
-os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
-os.environ["SECRET_KEY"] = "test-secret-key"
 
 from app.auth import hash_password
 from app.budget_stats import _previous_months, category_spending_average
-from app.database import Base, SessionLocal, engine
 from app.models import Account, Category, Transaction, User
-
-
-@pytest.fixture(scope="module", autouse=True)
-def _schema():
-    Base.metadata.create_all(bind=engine)
-    yield
-    Base.metadata.drop_all(bind=engine)
-
-
-@pytest.fixture
-def db():
-    s = SessionLocal()
-    try:
-        # Leeg alles tussen tests (FK-ordering).
-        s.query(Transaction).delete()
-        s.query(Category).delete()
-        s.query(Account).delete()
-        s.query(User).delete()
-        s.commit()
-        yield s
-    finally:
-        s.close()
 
 
 def test_previous_months_basic():

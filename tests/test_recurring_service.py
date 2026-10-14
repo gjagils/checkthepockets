@@ -1,14 +1,9 @@
 """Regression tests for projections and linking in the recurring service (ACT-22)."""
-import os
-import tempfile
 from datetime import date
 from decimal import Decimal
 
 import pytest
 
-_DB_FILE = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-_DB_FILE.close()
-os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
 
 from app.database import Base, SessionLocal, engine
 from app.models import Account, Category, RecurringTransaction, Transaction, User

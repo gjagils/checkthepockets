@@ -1,42 +1,13 @@
 """Tests voor maandelijkse storting/onttrekking op portfolio-holdings (GJA-15)."""
-import os
-import tempfile
 from decimal import Decimal
 
-import pytest
 
-_DB_FILE = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-_DB_FILE.close()
-os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
-os.environ["SECRET_KEY"] = "test-secret-key"
 
 from fastapi.testclient import TestClient
 
 from app.auth import create_session_cookie, hash_password
-from app.database import Base, SessionLocal, engine
 from app.main import app
 from app.models import Person, PortfolioAsset, PortfolioHolding, User
-
-
-@pytest.fixture(scope="module", autouse=True)
-def _schema():
-    Base.metadata.create_all(bind=engine)
-    yield
-    Base.metadata.drop_all(bind=engine)
-
-
-@pytest.fixture
-def db_session():
-    db = SessionLocal()
-    try:
-        db.query(PortfolioHolding).delete()
-        db.query(PortfolioAsset).delete()
-        db.query(Person).delete()
-        db.query(User).delete()
-        db.commit()
-        yield db
-    finally:
-        db.close()
 
 
 def _make_user(db, username="alice"):

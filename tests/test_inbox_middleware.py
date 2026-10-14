@@ -1,28 +1,14 @@
 """ACT-38b (review B12): de inbox-badge-middleware doet alleen werk voor ingelogde paginaverzoeken."""
-import os
-import tempfile
 
-import pytest
 
-_DB_FILE = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-_DB_FILE.close()
-os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
-os.environ["SECRET_KEY"] = "test-secret-key"
 
 from fastapi.testclient import TestClient
 
 from app import clock
 from app.auth import create_session_cookie, hash_password
-from app.database import Base, SessionLocal, engine
+from app.database import SessionLocal
 from app.main import app
 from app.models import Account, Transaction, User
-
-
-@pytest.fixture(autouse=True)
-def _schema():
-    Base.metadata.create_all(bind=engine)
-    yield
-    Base.metadata.drop_all(bind=engine)
 
 
 def _user_with_inbox_item():

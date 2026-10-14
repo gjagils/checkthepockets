@@ -28,7 +28,10 @@ Windows: gebruik `py -3.12 -m venv .venv` en activeer via
 De lockbestanden bevatten platformmarkers voor platformgebonden packages.
 macOS en Linux worden gecontroleerd; Windows is hiermee niet afzonderlijk getest.
 
-De huidige tests maken SQLite-testdatabases aan en simuleren externe diensten.
+De tests draaien op één tijdelijke SQLite-database (zie `tests/conftest.py`): elke test begint met
+lege tabellen en alle verbindingen dwingen foreign keys af, zoals PostgreSQL in productie. Gebruik de
+fixtures `db` (of `db_session`) en zet geen eigen `DATABASE_URL` of schema-opruiming in een testmodule.
+Externe diensten worden gesimuleerd.
 Gebruik een schone shell zonder productievariabelen of een productie-`.env`.
 Voeg nooit echte banktokens of productie-dumps toe voor tests. SQLite-tests bewijzen
 PostgreSQL-gedrag niet (bijvoorbeeld foreign keys en 32-bit-integers); de CI-job

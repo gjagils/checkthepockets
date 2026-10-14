@@ -1,47 +1,12 @@
 """Tests voor Person-model, /persons CRUD en Account-eigenaarschap (GJA-14)."""
-import os
-import tempfile
 
-import pytest
 
-# Use an on-disk sqlite DB so the app + test share the same store.
-_DB_FILE = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-_DB_FILE.close()
-os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
-os.environ["SECRET_KEY"] = "test-secret-key"
 
 from fastapi.testclient import TestClient
 
 from app.auth import create_session_cookie, hash_password
-from app.database import Base, SessionLocal, engine
 from app.main import app
-from app.models import Account, Person, PortfolioAsset, PortfolioHolding, User
-
-
-@pytest.fixture(scope="module", autouse=True)
-def _schema():
-    Base.metadata.create_all(bind=engine)
-    yield
-    Base.metadata.drop_all(bind=engine)
-
-
-@pytest.fixture
-def db_session():
-    db = SessionLocal()
-    try:
-        db.query(PortfolioHolding).delete()
-        db.query(PortfolioAsset).delete()
-        # Verbreek M2M-koppelingen voor we personen verwijderen
-        for acc in db.query(Account).all():
-            acc.owners = []
-        db.commit()
-        db.query(Person).delete()
-        db.query(Account).delete()
-        db.query(User).delete()
-        db.commit()
-        yield db
-    finally:
-        db.close()
+from app.models import Account, Person, User
 
 
 def _make_user(db, username="alice"):

@@ -1,41 +1,14 @@
 """Tests voor rentetabel bulk-invoer (GJA-31)."""
-import os
-import tempfile
 from decimal import Decimal
 
-import pytest
 
-_DB_FILE = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-_DB_FILE.close()
-os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
-os.environ["SECRET_KEY"] = "test-secret-key"
 
 from fastapi.testclient import TestClient
 
 from app.auth import create_session_cookie, hash_password
-from app.database import Base, SessionLocal, engine
 from app.main import app
 from app.models import MortgageRateTable, User
 from app.mortgage_rate_parser import ParsedRate, parse_bulk_rates
-
-
-@pytest.fixture(scope="module", autouse=True)
-def _schema():
-    Base.metadata.create_all(bind=engine)
-    yield
-    Base.metadata.drop_all(bind=engine)
-
-
-@pytest.fixture
-def db_session():
-    db = SessionLocal()
-    try:
-        db.query(MortgageRateTable).delete()
-        db.query(User).delete()
-        db.commit()
-        yield db
-    finally:
-        db.close()
 
 
 def _make_user(db, username="admin", is_admin=1):

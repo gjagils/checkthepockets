@@ -1,19 +1,11 @@
 """Tests for "kopieer van vorig jaar" op spaarplannen (GJA-13)."""
-import os
-import tempfile
 from decimal import Decimal
 
-import pytest
 
-_DB_FILE = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-_DB_FILE.close()
-os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
-os.environ["SECRET_KEY"] = "test-secret-key"
 
 from fastapi.testclient import TestClient
 
 from app.auth import create_session_cookie, hash_password
-from app.database import Base, SessionLocal, engine
 from app.main import app
 from app.models import (
     Account,
@@ -21,33 +13,8 @@ from app.models import (
     SavingsEntry,
     SavingsLine,
     SavingsPlan,
-    Transaction,
     User,
 )
-
-
-@pytest.fixture(scope="module", autouse=True)
-def _schema():
-    Base.metadata.create_all(bind=engine)
-    yield
-    Base.metadata.drop_all(bind=engine)
-
-
-@pytest.fixture
-def db_session():
-    db = SessionLocal()
-    try:
-        db.query(SavingsEntry).delete()
-        db.query(SavingsLine).delete()
-        db.query(SavingsPlan).delete()
-        db.query(Transaction).delete()
-        db.query(Category).delete()
-        db.query(Account).delete()
-        db.query(User).delete()
-        db.commit()
-        yield db
-    finally:
-        db.close()
 
 
 def _make_user(db, username="alice"):

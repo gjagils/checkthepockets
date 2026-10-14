@@ -1,12 +1,6 @@
 """The same bank transaction may exist on separate user accounts."""
-import os
-import tempfile
 from datetime import date
 from decimal import Decimal
-
-db_file = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-db_file.close()
-os.environ["DATABASE_URL"] = f"sqlite:///{db_file.name}"
 
 from sqlalchemy.exc import IntegrityError
 from app.database import Base, SessionLocal, engine

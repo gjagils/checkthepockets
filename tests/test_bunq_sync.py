@@ -1,15 +1,8 @@
 """bunq-synchronisatie (ACT-31b): betalingen, dubbelcheck tegen CSV, overboekingen en routes."""
-import os
-import tempfile
 from datetime import date
 from decimal import Decimal
 
-import pytest
 
-_DB_FILE = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-_DB_FILE.close()
-os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
-os.environ["SECRET_KEY"] = "test-secret-key"
 
 from fastapi.testclient import TestClient
 
@@ -17,7 +10,6 @@ import app.routers.bunq as bunq_router
 from app.auth import create_session_cookie
 from app.bunq_client import BunqClient, parse_payment
 from app.bunq_sync import sync_connection
-from app.database import Base, SessionLocal, engine
 from app.main import app
 from app.models import (
     Account, BunqAccountLink, BunqConnection, ImportBatch, Transaction, User,
@@ -68,20 +60,6 @@ class FakeBunq:
                 "balance": {"value": "1.00", "currency": "EUR"},
                 "alias": [{"type": "IBAN", "value": "NL01BUNQ0000000001"}]}}]})
         raise AssertionError(path)
-
-
-@pytest.fixture(autouse=True)
-def _schema():
-    Base.metadata.create_all(bind=engine)
-    yield
-    Base.metadata.drop_all(bind=engine)
-
-
-@pytest.fixture
-def db():
-    session = SessionLocal()
-    yield session
-    session.close()
 
 
 def _world(db, enabled=True):

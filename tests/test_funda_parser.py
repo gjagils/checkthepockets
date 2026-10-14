@@ -3,22 +3,15 @@
 We testen `parse_funda_html` pure met gemockte HTML — geen netwerk. De
 endpoint-integratie testen we via TestClient + monkeypatch op `fetch_funda`.
 """
-import os
 import pathlib
-import tempfile
 
 import pytest
 
-_DB_FILE = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-_DB_FILE.close()
-os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
-os.environ["SECRET_KEY"] = "test-secret-key"
 
 from fastapi.testclient import TestClient
 
 from app import funda_parser
 from app.auth import create_session_cookie, hash_password
-from app.database import Base, SessionLocal, engine
 from app.funda_parser import (
     FundaParseError,
     is_funda_url,
@@ -300,24 +293,6 @@ def test_parse_beemdgrassingel_fixture():
 
 
 # ── Endpoint integratie ──────────────────────────────────────────────────
-
-@pytest.fixture(scope="module", autouse=True)
-def _schema():
-    Base.metadata.create_all(bind=engine)
-    yield
-    Base.metadata.drop_all(bind=engine)
-
-
-@pytest.fixture
-def db_session():
-    db = SessionLocal()
-    try:
-        db.query(User).delete()
-        db.commit()
-        yield db
-    finally:
-        db.close()
-
 
 def _make_user(db, username="admin", is_admin=1):
     u = User(

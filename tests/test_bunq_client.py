@@ -1,15 +1,9 @@
 """bunq API-koppeling (ACT-31a): client, opslag en routes met een nagebootste bunq."""
 import base64
 import json
-import os
-import tempfile
 
 import pytest
 
-_DB_FILE = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-_DB_FILE.close()
-os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
-os.environ["SECRET_KEY"] = "test-secret-key"
 
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
@@ -18,7 +12,7 @@ from fastapi.testclient import TestClient
 import app.routers.bunq as bunq_router
 from app.auth import create_session_cookie
 from app.bunq_client import BunqClient, BunqError, generate_private_key_pem
-from app.database import Base, SessionLocal, engine
+from app.database import SessionLocal
 from app.main import app
 from app.models import BunqConnection, User
 
@@ -70,13 +64,6 @@ class FakeBunq:
         if path.startswith("/user/77/monetary-account"):
             return FakeResponse(200, ACCOUNTS)
         return FakeResponse(404, {"Error": [{"error_description": "nope"}]})
-
-
-@pytest.fixture(autouse=True)
-def _schema():
-    Base.metadata.create_all(bind=engine)
-    yield
-    Base.metadata.drop_all(bind=engine)
 
 
 def test_connect_lists_all_account_kinds_and_signs_posts():
