@@ -10,6 +10,7 @@ Bijwerken gebeurt in Git; een externe tracker of chatgeschiedenis is niet nodig.
 - De gebruiker heeft alle verbeteracties vrijgegeven op 2026-09-23, onder de budgetvoorwaarde uit docs/WORKFLOW.md.
 - ACT-01 t/m ACT-14, ACT-16 t/m ACT-24 en ACT-26 t/m ACT-28 zijn afgerond; ACT-08 zonder rotatie (gelekte geheimen niet meer in gebruik).
 - Open: ACT-15 (restoreproef NAS, later), ACT-25b (bunq geeft de tweede spaarrekening niet door; wacht op test met alleen die rekening) en ACT-29 (verkoopfactor per bezit).
+- 2026-10-14: codereview vóór het UI-redesign vastgelegd in [docs/CODE-REVIEW-2026-10-14.md](docs/CODE-REVIEW-2026-10-14.md); ACT-32 t/m ACT-52 toegevoegd als `Gepland` (vier fasen, zie [opschoning](#act-32)). Nog niet vrijgegeven; de gebruiker pakt dit in een volgende sessie op. Baseline in Python 3.12: 512 geslaagd, 3 overgeslagen.
 - Bestaande Linear-issues zijn niet geïmporteerd of gecontroleerd op overlap.
 - Testsuite in de vastgelegde Python 3.12-omgeving: 496 geslaagd, 2 bewust
   overgeslagen live-tests (controle 2026-09-23 na ACT-28). Productievalidatie na uitrol is per actie vermeld.
@@ -77,7 +78,28 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-29 | P2 | Gepland | ACT-28 | [Verkoopfactor per bezit in de vermogensprognose](#act-29) |
 | ACT-30 | P2 | Review | — | [Rekeningen samenvoegen met preview](#act-30) |
 | ACT-31 | P2 | Review | ACT-25 | [bunq API-koppeling met eigen sleutel](#act-31) |
-| ACT-32 | P2 | Gepland | ACT-31, ACT-28 | [Persoonspagina: verwachting betaalrekeningen en vermogen](#act-32) |
+| ACT-32 | P1 | Gepland | — | [Encryptie-bugs: duplicaten, regelsuggesties, herversleutelen](#act-32) |
+| ACT-33 | P1 | Gepland | — | [Auth-fixes: uitnodiging, e-mailverificatie, rate limiting, proxy](#act-33) |
+| ACT-34 | P1 | Gepland | — | [Crash- en datafouten in routes](#act-34) |
+| ACT-35 | P1 | Gepland | — | [XSS in templates](#act-35) |
+| ACT-36 | P2 | Gepland | — | [Repo-hygiëne, configuratie en deploy-trigger](#act-36) |
+| ACT-37 | P3 | Gepland | — | [Tooling: ruff, pyproject, coverage, dependabot](#act-37) |
+| ACT-38 | P2 | Gepland | — | [Verouderde API's: TemplateResponse, lifespan, tijd](#act-38) |
+| ACT-39 | P2 | Gepland | — | [Testfundament met conftest](#act-39) |
+| ACT-40 | P2 | Gepland | ACT-38 | [Dependency-upgrade](#act-40) |
+| ACT-41 | P2 | Gepland | ACT-39 | [Schema-hygiëne en migratie](#act-41) |
+| ACT-42 | P2 | Gepland | ACT-39 | [Transactiegrenzen, banksync-service en scheduler-lock](#act-42) |
+| ACT-43 | P3 | Gepland | ACT-37 | [Gedeelde helpers en foutafhandelingsconventie](#act-43) |
+| ACT-44 | P3 | Gepland | ACT-39 | [Savings-service en N+1](#act-44) |
+| ACT-45 | P3 | Gepland | ACT-39 | [Recurring en transactions: batching en custom-CSV-parser](#act-45) |
+| ACT-46 | P3 | Gepland | ACT-39 | [Mortgage-formulieren en lange functies opknippen](#act-46) |
+| ACT-47 | P2 | Gepland | — | [CSS-tokens en dode CSS](#act-47) |
+| ACT-48 | P2 | Gepland | — | [Gedeeld JavaScript en gepinde Chart.js](#act-48) |
+| ACT-49 | P2 | Gepland | ACT-48 | [Jinja-macro's en filters](#act-49) |
+| ACT-50 | P3 | Gepland | ACT-47, ACT-49 | [Inline styles naar utility-classes](#act-50) |
+| ACT-51 | P2 | Gepland | ACT-39 | [HTTP-vangnet voor redesign-schermen en parsers](#act-51) |
+| ACT-52 | P3 | Gepland | ACT-41 | [Model-typing: Boolean, enums, Mapped](#act-52) |
+| ACT-53 | P2 | Gepland | ACT-31, ACT-28 | [Persoonspagina: verwachting betaalrekeningen en vermogen](#act-53) |
 
 ## Beschrijving en acceptatiecriteria
 
@@ -389,11 +411,209 @@ belemmeringen en één eerstvolgende stap. Bewaar de afgeronde samenvatting hier
 - **ACT-31b (Review):** rekeningen aanvinken om te importeren, soort (betaal/spaar; standaard uit bunq, `accounts.kind`) en doelrekening kiezen (bestaande rekening, IBAN-match of nieuw); voorbeeld zonder opslaan en daarna importeren; betalingen via de `payment`-endpoint met paginering en incrementele sync (`last_payment_id`); identiteit via het bunq-id (twee identieke betalingen blijven beide bestaan); betalingen die al via CSV op dezelfde rekening staan worden overgeslagen (datum + bedrag + tegenpartij/omschrijving, één-op-één, alleen tegen niet-bunq-boekingen); overboekingen tussen eigen rekeningen worden automatisch gekoppeld (`transfer_id`) bij tegenrekening-IBAN, omgekeerd bedrag, ≤3 dagen verschil en precies één kandidaat; geplande sync om 01:30 en 17:30 (`bunq_sync`). Op de rekeningenpagina zijn naam en soort (betaal/spaar) aanpasbaar (`POST /accounts/{id}/update`); IBAN en eigenaar(s) zijn zichtbaar, het IBAN is alleen-lezen. Migratie 067. Bunq kent geen endpoint voor aandelen (bunq Stocks) in de documentatie; die blijven handmatig in Portfolio.
 - **Validatie ACT-31b:** lokaal Python 3.14 zonder psycopg2, nagebootste bunq: 519 passed, 3 skipped. PostgreSQL-migratie en Python 3.12 via CI. Niet getest tegen echte bunq-betalingen.
 
-### ACT-32 — Persoonspagina: verwachting betaalrekeningen en vermogen
+### ACT-53 — Persoonspagina: verwachting betaalrekeningen en vermogen
 
 - **Doel (gebruiker, 2026-10-14):** een pagina per persoon met een overzicht van wat je verwacht op de betaalrekeningen en een vermogensdeel.
 - **Basis die er al is:** eigenaren per rekening, soort rekening (ACT-31b), terugkerende posten en projecties, vermogensprognose per persoon (ACT-28).
 - **Nog te beslissen vóór start:** welke periode de verwachting beslaat, hoe gedeelde rekeningen over personen verdeeld worden (zoals ACT-28: gelijk), en of spaarrekeningen in het vermogensdeel meetellen.
+
+## Opschoning vóór het UI-redesign (ACT-32 t/m ACT-52)
+
+Bron: [codereview van 2026-10-14](docs/CODE-REVIEW-2026-10-14.md). Daar staan
+per actie de bevindingen met bestand en regelnummer (verwijzingen A1–A15, B1–B13,
+C1–C14, D1–D10, E1–E8, F1–F9). Vier fasen: bugs en beveiliging (ACT-32–35),
+hygiëne en tooling (ACT-36–40), backend-structuur (ACT-41–46), front-end-fundament
+(ACT-47–52). Iedere actie is één PR. Regelnummers in de review gelden voor
+commit `339a4d8`; controleer ze bij het oppakken.
+
+<a id="act-32"></a>
+
+### ACT-32 — Encryptie-bugs: duplicaten, regelsuggesties, herversleutelen
+
+- **Aanleiding:** Review A1, A2, A3, B11. `duplicates_page` en `suggest_rules` groeperen in SQL op `counterparty`, een `EncryptedText`-kolom met random IV; in productie (sleutel verplicht) zijn beide altijd leeg. `encrypt_existing_transactions` leest de ontsleutelde waarde en schrijft niets. Lezen met een geconfigureerde maar ongeldige sleutel geeft ciphertext aan de UI.
+- **Acties:** Duplicaten en regelsuggesties in Python groeperen na laden van de eigen transacties (lost ook de N+1 per groep op). Herversleutelen via ruwe kolomwaarden en `flag_modified` of directe `update()`. Read-path fail-closed in `app/crypto.py`.
+- **Klaar wanneer:** Met `FIELD_ENCRYPTION_KEY` gezet toont de duplicatenpagina echte duplicaten en geeft `suggest_rules` suggesties; herversleutelen verandert de ruwe DB-waarde aantoonbaar; ongeldige sleutel geeft een fout, geen ciphertext.
+- **Validatie:** Tests die met een testsleutel draaien en de ruwe kolomwaarde controleren; bestaande tests zonder sleutel blijven groen.
+
+<a id="act-33"></a>
+
+### ACT-33 — Auth-fixes: uitnodiging, e-mailverificatie, rate limiting, proxy
+
+- **Aanleiding:** Review A5, B1, B2, B3, B6, B7, B8, B10.
+- **Acties:** Uitnodigingstoken pas consumeren in dezelfde commit als het aanmaken van de gebruiker. Google-callback weigert zonder `email_verified`. Rate limiting generaliseren naar `is_rate_limited(bucket, key)` en toepassen op register, forgot-password en reset; lege entries opruimen. Uvicorn starten met `--proxy-headers --forwarded-allow-ips` en `_client_ip` op `request.client.host`. Logout via POST. E-mail normaliseren en gebruikersnaam strippen/begrenzen bij registratie. `html.escape` in `email_service.py`. Route `/accounts/delete-all-transactions` en bijbehorend formulier verwijderen.
+- **Klaar wanneer:** Een tikfout bij registreren verbrandt de uitnodiging niet; een ongeverifieerd Google-adres kan geen bestaand account overnemen; alle vier auth-formulieren zijn begrensd; `X-Forwarded-For` uit een niet-vertrouwde bron wordt genegeerd; `GET /logout` logt niet uit.
+- **Validatie:** Regressietests per punt, inclusief oude-cookie- en XFF-gevallen; handmatige login/OAuth-smokecheck na uitrol.
+
+<a id="act-34"></a>
+
+### ACT-34 — Crash- en datafouten in routes
+
+- **Aanleiding:** Review A4, A6–A15, B9.
+- **Acties:** `delete_category` FK-veilig (transacties op NULL, budgets en preset-lines verwijderen, kinderen via ORM) en `PRAGMA foreign_keys=ON` in de SQLite-testengine. Onbereikbare `return` in `app/scheduler.py` naar `_run_weekly_digests`. Timeouts en één `requests.Session` in `app/enable_banking.py`; `coalesce`/`misfire_grace_time` op de jobs. Savings-helpers filteren op `is_excluded`/`is_projected`. `budget_from_average` via `category_spending_average`. `Rule.name[:100]`. URL-encoding in `link_recurring`. Transfer-partner loskoppelen en split-kinderen meeverhuizen. Categorie-naamconflict in de merge-preview. `app/forms.py` met `parse_amount`, `parse_percent`, `parse_int`, `parse_iso_date` op alle formulierparsing. `safe_redirect(target, fallback)` voor alle `redirect_to`. Handmatige scheduler-run via `modify_job` met logging.
+- **Klaar wanneer:** Geen van de genoemde invoer geeft nog een 500; spaartotalen tellen verwachte en uitgesloten transacties niet mee; digest-summary is gevuld; een hangende bankverbinding blokkeert de scheduler niet langer dan de timeout.
+- **Validatie:** Foutinjectietests per punt; bestaande suite groen op SQLite met FK's aan en in de PostgreSQL-CI-job.
+
+<a id="act-35"></a>
+
+### ACT-35 — XSS in templates
+
+- **Aanleiding:** Review B4, B5. `savings/detail.html` zet tegenpartijnamen uit bankdata ongeëscaped in `innerHTML`; `dashboard/index.html` gebruikt `json.dumps` met `|safe`; Jinja-waarden staan direct in JS-literals (dashboard, budgets, wealth_forecast).
+- **Acties:** `textContent`/`createElement` of gedeelde `escapeHtml`; `|tojson` i.p.v. `|safe`; JS-data via `tojson` of `data-*`-attributen.
+- **Klaar wanneer:** Een tegenpartij of categorienaam met `<script>` of `&` wordt letterlijk getoond en breekt geen lookup.
+- **Validatie:** Routetests met zulke namen die de HTML-uitvoer controleren.
+
+<a id="act-36"></a>
+
+### ACT-36 — Repo-hygiëne, configuratie en deploy-trigger
+
+- **Aanleiding:** Review F3–F7, B13.
+- **Acties:** `git rm --cached` voor `Wissellijst` (kapotte submodule-verwijzing), `.DS_Store`, `app/.DS_Store`. `deploy.sh`, `scripts/deploy-to-synology.sh` en `make init-env` verwijderen. `.gitignore` inkorten en `*.db`, `.DS_Store` toevoegen; `.dockerignore` aanvullen (`docs/`, `*.db`, `.DS_Store`, dubbele `stack.env` weg, comment bij `*.md`). `.env.example` volledig met alle twintig sleutels en markering "verplicht in productie"; `POSTGRES_*` eruit; compose aanvullen met `BUNQ_API_BASE`, `SESSION_MAX_AGE`, `CSRF_ENFORCE`, `LOG_LEVEL` en zonder `SECRET_KEY`-default. `deploy.yml`: `paths-ignore` naar `'*.md'`, `'docs/**'`, `'.claude/**'` zodat `app/docs` wél deployt; `concurrency: deploy-main`. `ci.yml`: ook op push naar `main`, `permissions`, `timeout-minutes`. Verouderde zinnen in OPERATIONS/DEVELOPMENT/WORKFLOW over ACT-01/03/08/14 corrigeren. `BACKLOG.md` naar `docs/archive/`.
+- **Klaar wanneer:** `git submodule status` faalt niet meer; een wijziging aan alleen `app/docs` triggert een deployment; twee snelle pushes deployen na elkaar; `.env.example` en `app/config.py` noemen dezelfde sleutels. Daarna branch protection op `main` instellen met required checks `test` en `postgres-migrations` (handmatig in GitHub, door de gebruiker).
+- **Validatie:** Linkcontrole, `git diff --check`, één deploy-verificatie na merge.
+
+<a id="act-37"></a>
+
+### ACT-37 — Tooling: ruff, pyproject, coverage, dependabot
+
+- **Aanleiding:** Review F9, C14. Geen linter, formatter of coverage; 27 ongebruikte imports, 8 ongebruikte variabelen, dode condities en uitgecommentarieerde code.
+- **Acties:** `pyproject.toml` met `[tool.ruff]` (`E,F,I,B,UP`, py312, line-length 120, `alembic/versions` uitgesloten, `per-file-ignores` voor `tests/*` E402 tot ACT-39) en `[tool.pytest.ini_options]`. `ruff` en `pytest-cov` in `requirements-dev.in`, locks regenereren volgens DEVELOPMENT.md. CI-stap `ruff check` en `ruff format --check`; tests met `--cov=app` zonder drempel. `Makefile` met `test/lint/fmt/check`. `.github/dependabot.yml` voor `github-actions` (pip-updates lopen via de lockprocedure). Eerste `ruff --fix` voor `F401/I/UP` en de dode code uit review C14 als aparte commit in dezelfde PR.
+- **Klaar wanneer:** `make check` is groen en CI faalt op nieuwe lintfouten; geen gedragswijziging.
+- **Validatie:** Volledige suite groen; diff van de fix-commit handmatig nagelopen.
+
+<a id="act-38"></a>
+
+### ACT-38 — Verouderde API's: TemplateResponse, lifespan, tijd
+
+- **Aanleiding:** Review C1, C2, B12. 118× `TemplateResponse("naam", {...})` (verwijderd in Starlette 1.0, ~2.900 testwaarschuwingen); `@app.on_event`; 29× `utcnow()` en 41× `date.today()` in een UTC-container met Nederlandse gebruikers; inbox-middleware per request met eigen sessie zonder sessie-intrekkingscontrole.
+- **Acties:** Alle aanroepen naar `TemplateResponse(request, "naam", ctx)`. `lifespan` i.p.v. `on_event`, inclusief scheduler-shutdown. `app/clock.py` met `now_utc()` en `today_nl()` (Europe/Amsterdam); alle `utcnow`/`today`-plekken omzetten; rekenfuncties krijgen `today` als parameter. Inbox-telling alleen na `get_current_user` en alleen voor HTML-routes.
+- **Klaar wanneer:** De suite geeft geen `TemplateResponse`- of `utcnow`-waarschuwingen meer; een test met vaste datum rond middernacht NL-tijd geeft de juiste dag en maand; een ingetrokken cookie vult de inbox-badge niet.
+- **Validatie:** Volledige suite; waarschuwingentelling in de overdracht.
+
+<a id="act-39"></a>
+
+### ACT-39 — Testfundament met conftest
+
+- **Aanleiding:** Review F1. 41 testbestanden zetten elk `DATABASE_URL` op moduleniveau, maar de engine wordt één keer gemaakt; alle tests delen stil één SQLite-bestand. 23 varianten van `db_session` met handmatige delete-volgorde, 21× `_make_user`, 41 tempfiles zonder opruiming, geen `conftest.py`.
+- **Acties:** `tests/conftest.py` die de omgeving vóór de app-import zet, één engine, per test een transactie met rollback, `PRAGMA foreign_keys=ON`, fixtures `db_session`, `user`, `admin`, `account`, `client`, `auth_client`, scheduler-start gemonkeypatcht. Module-headers en helpers mechanisch vervangen; dubbele testnamen uniek; `*.db` in `.gitignore`. Mag in twee stappen.
+- **Klaar wanneer:** Dezelfde tests slagen zonder module-level env-toewijzingen; een los testbestand draait identiek aan de volledige run; geen tempfiles achter.
+- **Validatie:** Volledige suite, zelfde aantal tests als vóór de wijziging; `pytest -p no:randomly` niet nodig maar een willekeurige volgorde van twee bestanden slaagt.
+
+<a id="act-40"></a>
+
+### ACT-40 — Dependency-upgrade
+
+- **Aanleiding:** Review F8. Directe pins uit december 2024/januari 2025 (FastAPI 0.115, Starlette 0.41, SQLAlchemy 2.0.36, requests 2.32.3, Jinja2 3.1.5, cryptography 43, pdfminer-six 2023) naast transitieve packages van september 2026. Starlette 0.41 mist de multipart-fix uit 0.47.2. Starlette ≥1.0 vereist ACT-38.
+- **Acties:** Eén geplande `uv pip compile --upgrade`-ronde volgens DEVELOPMENT.md voor beide locks; let op bcrypt 5 (fout bij wachtwoorden >72 bytes) en apscheduler 3.11.
+- **Klaar wanneer:** Beide locks bijgewerkt, suite groen op 3.12, upload/login/PDF-import handmatig gecontroleerd, deployment geslaagd.
+- **Validatie:** Volledige suite, PostgreSQL-CI, smokecheck na uitrol.
+
+<a id="act-41"></a>
+
+### ACT-41 — Schema-hygiëne en migratie
+
+- **Aanleiding:** Review D1–D4, D6, D8. Migraties maken indexes die het model niet kent (autogenerate wil ze droppen); `transactions.recurring_id`, `transfer_id`, `import_hash` en `accounts/categories/persons.user_id` missen een index; `uq_user_account_category` staat dubbele globale categorienamen toe (NULL ≠ NULL); `Transaction.children` zonder cascade maakt splits tot wezen; downgrades met `try/except: pass`; ongebruikte `HouseholdFinance`-kolommen.
+- **Acties:** `index=True` in het model; één migratie (eerstvolgende vrije nummer; 067 en 068 zijn bezet door bunq) met ontbrekende indexes, partiële unique `WHERE account_id IS NULL`, `ondelete` en `passive_deletes` op kind-relaties, `server_default=func.now()` gelijktrekken, dode kolommen droppen. `compare_type`/`compare_server_default` in `alembic/env.py`. Test die `compare_metadata` leeg eist. CI-stap `upgrade head && downgrade base && upgrade head` op PostgreSQL. Migraties expliciet PostgreSQL-only verklaren.
+- **Klaar wanneer:** Autogenerate geeft een lege diff; up/down/up slaagt in CI; verwijderen van een gesplitste transactie verwijdert de kinderen.
+- **Validatie:** PostgreSQL-CI-job en regressietests; geen productiegegevens.
+
+<a id="act-42"></a>
+
+### ACT-42 — Transactiegrenzen, banksync-service en scheduler-lock
+
+- **Aanleiding:** Review C5–C7, D7. Scheduler en banking-router hebben twee banksync-implementaties (scheduler zonder `ImportBatch`, zonder statusvelden, zonder IBAN-normalisatie, één fout rolt alles terug); services committen zelf en worden uit GET-routes aangeroepen; `scheduler.py` importeert uit routers; geen lock bij meerdere workers.
+- **Acties:** `app/bank_sync.py` met `sync_bank_connection(db, conn) -> SyncResult`, gebruikt door router en scheduler, per koppeling `begin_nested()` en status op de connection. Conventie "service flusht, caller commit"; projectie-sync weg uit GET-routes naar import, koppelen, recurring-wijziging en scheduler. `inbox_count` en `_map_eb_transactions` uit de routers. `SCHEDULER_ENABLED`-env en PostgreSQL advisory lock in `logged_job`; `coalesce`, `max_instances`, `misfire_grace_time`. Vastleggen in OPERATIONS.md.
+- **Klaar wanneer:** Scheduler-sync maakt batches en zet statusvelden zoals de handmatige sync; één mislukte koppeling laat de andere intact; GET-routes schrijven niet; twee processen draaien een job één keer.
+- **Validatie:** Integratietest voor het scheduler-pad met nagebootste Enable Banking; regressietests voor banking, dashboard, budgets en transactions. Dit is de actie met het meeste gedragsrisico; productievalidatie van de nachtelijke sync vastleggen.
+
+<a id="act-43"></a>
+
+### ACT-43 — Gedeelde helpers en foutafhandelingsconventie
+
+- **Aanleiding:** Review C3, C4, C13. Superadmin-check 4×, maandnamen 9×, jaar-selector-query 4×, bedrag-parsing in drie varianten, vier stijlen foutafhandeling en statuscodes door elkaar, `/settings/*` verdeeld over twee routers, vier identieke AI-aanroepblokken met hardcoded modelnamen.
+- **Acties:** `is_super_admin`, `require_admin`, `require_feature` in `app/auth.py`; `app/nl_format.py` (maandnamen, `format_euro`) als Jinja-globals; `transaction_years()`; `_clean_email` naar `app/validation.py`. Conventie in WORKFLOW.md: niet-gevonden → 404 via `get_owned_or_404`, validatiefout → redirect met `?error=code`, AJAX → JSON, 303 na POST; per router toepassen. `/settings/*` uit `auth.py` naar `settings.py` met `_settings_ctx`. `app/ai_client.py` met één client, `call_json()`, `AIUnavailable`, modelnamen in config. Personen-CRUD uit `portfolio.py`.
+- **Klaar wanneer:** Elke helper bestaat één keer; alle routers volgen de conventie; de instellingenpagina toont het startpagina-blok ook na een import.
+- **Validatie:** Routetests voor de conventie (404/redirect/JSON) en bestaande suite.
+
+<a id="act-44"></a>
+
+### ACT-44 — Savings-service en N+1
+
+- **Aanleiding:** Review C9, C12. Lopend-saldo-lus 4× in de router; `_compute_december_balance` doet 12×N queries bij elke celupdate; tweede "legacy" statusmodel; dode route `accept_ai_suggestion`; categorie-aanmaak gedupliceerd met `categories.py`; drie keer dezelfde formulierblokken voor twaalf maandbedragen.
+- **Acties:** `savings_calc.running_balances()` en `schedule_from_form()`; `_determine_entry_status` en `_has_transactions_in_month` verwijderen; dode route weg; `category_service.get_or_create_subcategory()` gedeeld; `_apply_transaction_totals()` voor de vier "vul vanuit transacties"-blokken; `plan_detail` schrijft niet meer op GET.
+- **Klaar wanneer:** Spaarbedragen en kleurstatus blijven gelijk; een celupdate doet een begrensd aantal queries; `savings.py` bevat geen rekenlussen meer.
+- **Validatie:** Bestaande savings-tests plus een querytelling-test voor de celupdate.
+
+<a id="act-45"></a>
+
+### ACT-45 — Recurring en transactions: batching en custom-CSV-parser
+
+- **Aanleiding:** Review C10, C12. `_render_recurring_page` doet ~90 queries bij 30 items en ontsleutelt per item alle transacties; `apply_all_categories` en `apply_category_to_linked` zijn identiek; na-import-sequentie 2×; custom-CSV-parsing (datumformaten, EU/US-bedragen) in de router met een privé-attribuut op `ParsedTransaction`; `transaction_list` 258 regels met dubbele categoriequery; `exclude_duplicates` en `find_candidates_for_projected` per rij.
+- **Acties:** Transacties per unieke periode één keer laden en in memory matchen; `recurring_service.resync_after_import()`, `classify_items()`, batchvariant voor kandidaten, `apply_item_categories()`; `app/parsers/custom_csv.py` en `import_service.build_preview()`; `_resolve_period()` en `categories_by_account()`; `tag_id`-parameter weg; `float()` in amount-filter naar Decimal.
+- **Klaar wanneer:** `transaction_list` en `_render_recurring_page` zijn elk korter dan 100 regels; querytelling op de recurring-pagina is onafhankelijk van het aantal items; importvoorbeeld en bevestiging geven dezelfde aantallen.
+- **Validatie:** Bestaande import-, recurring- en transactietests plus querytelling-tests.
+
+<a id="act-46"></a>
+
+### ACT-46 — Mortgage-formulieren en lange functies opknippen
+
+- **Aanleiding:** Review C8, C11. 19 identieke `Form(...)`-parameters in create en edit; rates-context 5× uitgeschreven; `rates_bulk_import` herhaalt `compare_with_existing`; `scenarios_detail` bouwt 35 template-sleutels; `budget_overview` 400 regels, `import_confirm` 224, `sync_transactions` 221, `portfolio_overview` 180, `analytics_stats` 198.
+- **Acties:** `ScenarioForm` als FastAPI-dependency; `_render_rates()`; `mortgage_calc.scenario_view_model()`; `budget_overview` naar `_expense_budget_rows`/`_income_budget_rows`/`_expected_income`; `import_confirm` per onderdeel; `sync_transactions` naar `_resolve_account_for_sync` en `_post_import_hooks` (of ACT-42); `portfolio_overview` naar `_portfolio_totals`/`_portfolio_chart`; `analytics_stats` naar `_top_merchants`/`_new_counterparties`. `date.today()` uit `mortgage_calc` als parameter.
+- **Klaar wanneer:** Geen routefunctie langer dan 100 regels; templatecontext voor een representatief scenario en budgetoverzicht identiek (golden master).
+- **Validatie:** Golden-master-tests op de context vóór en na; bestaande mortgage- en budgettests.
+
+<a id="act-47"></a>
+
+### ACT-47 — CSS-tokens en dode CSS
+
+- **Aanleiding:** Review E1, E2, E6, E7. `--gold`, `--navy`, `--navy-mid`, `--muted-border`, `--card-bg` worden gebruikt maar zijn nergens gedefinieerd; `alert-danger`, `alert-info`, `btn-secondary` en andere klassen bestaan niet; twee tokenfamilies; 48 inline hex-kleuren die dark mode negeren; 42 dode selectors en 9 `!important` daarin; 8 breakpoints; landing/terms/privacy met gekopieerde nav-CSS.
+- **Acties:** Ontbrekende tokens en klassen definiëren; één tokenfamilie kiezen en de andere tijdelijk aliassen; hex naar tokens; dode selectors en ongebruikte variabelen weg; `base_public.html` voor landing/terms/privacy; Google Fonts via `<link rel="preconnect">`; drie vaste breakpoints.
+- **Klaar wanneer:** Geen `var(--x)` zonder definitie; geen klasse in templates zonder CSS-regel; light en dark mode zonder hardcoded kleuren in templates; terms en privacy zonder eigen `<style>`.
+- **Validatie:** Grep-controle op tokens en klassen; schermcontrole desktop/mobiel in beide thema's.
+
+<a id="act-48"></a>
+
+### ACT-48 — Gedeeld JavaScript en gepinde Chart.js
+
+- **Aanleiding:** Review E3. 29 inline scriptblokken (~2.100 regels), zes implementaties van bedragformattering, `toggleEdit` 3×, modal-sluiten 2×, tien `fetch()`-aanroepen met eigen foutafhandeling, Chart.js 4× met drie versies en zonder `integrity`, thema/drawer-script inline in `base.html`.
+- **Acties:** `app/static/js/app.js` (thema, drawer, `formatEuro`, `escapeHtml`, `fetchJson` met uniforme foutmelding, modal, `toggleEdit`) geladen met `asset_version`; paginascripts alleen nog pagina-specifiek en in `{% block scripts %}`; Chart.js één gepinde URL met SRI in `{% block vendor %}`.
+- **Klaar wanneer:** Geen gedupliceerde JS-functie over templates; één Chart.js-versie; `formatEuro` geeft dezelfde uitvoer als de Jinja-filter `euro`.
+- **Validatie:** Bestaande `response.text`-asserts; handmatige check van celbewerking (spaarplanner, vermogensprognose), grafieken en modals.
+
+<a id="act-49"></a>
+
+### ACT-49 — Jinja-macro's en filters
+
+- **Aanleiding:** Review E4, E8. Lege staat 18× uitgeschreven, flash-kaart met hex 23×, inline delete-form met `confirm()` 53×, sectiekop 11×, jaar/maand-select 14×, `"%.2f"|format|replace` 31× naast `|euro`; datums met 9 `strftime`-varianten; `&euro;` naast `€`; 0× `scope` op 295 `<th>`, ~19 inputs zonder label, modals zonder `role="dialog"`.
+- **Acties:** `templates/_macros.html` met `empty_state`, `flash`, `inline_action_form`, `section_title`, `year_month_select`, `page_header`, `tx_table_head`; filters `date`, `datetime`, `euro_sign` in `template_config.py`; `_fmt_amount` in `savings.py` verwijderen; de herhaalde fragmenten vervangen; labels, `scope`, `<button>` i.p.v. `<a href="#">` en `role="dialog"` in de macro's.
+- **Klaar wanneer:** Elk genoemd patroon bestaat op één plek; bedragen en datums overal via filters; kernformulieren met toetsenbord bedienbaar.
+- **Validatie:** Bestaande routetests; handmatige toetsenbord- en schermcontrole op de aangepaste pagina's.
+
+<a id="act-50"></a>
+
+### ACT-50 — Inline styles naar utility-classes
+
+- **Aanleiding:** Review E5. 1.149 inline `style=""`; top-20 declaraties dekken 60–70%; zwaarste templates mortgage/scenario_detail (99), rules/list (93), recurring/list (83), savings/detail (81), portfolio/index (80).
+- **Acties:** ~15 utility-classes in `style.css`; per map omzetten (mortgage, rules, recurring, savings, portfolio, budgets, transactions), eventueel als sub-PR's ACT-50a t/m ACT-50g; de 27 dynamische styles als CSS custom properties laten staan; inline hex-kleuren naar tokens.
+- **Klaar wanneer:** Per map minder dan tien resterende inline styles, allemaal dynamisch; geen visuele regressie in beide thema's.
+- **Validatie:** Schermcontrole per map desktop/mobiel; bestaande routetests.
+
+<a id="act-51"></a>
+
+### ACT-51 — HTTP-vangnet voor redesign-schermen en parsers
+
+- **Aanleiding:** Review F2. `rules_engine.py`, `ai_suggest.py`, `email_service.py`, `rate_limit.py`, `parsers/ing.py`, `parsers/rabobank.py`, `parsers/ics_pdf.py` hebben geen test; routers transactions (2 hits), analytics (0), rules (0), dashboard (1), budgets (2), categories (2) nauwelijks. Precies de schermen die een redesign raakt.
+- **Acties:** Happy-path HTTP-tests (200, kernelementen in de HTML, eigenaarscheiding) voor `/transactions`, `/analytics`, `/rules`, `/budgets`, `/categories`, `/dashboard`; unit-tests voor `rules_engine`, `rate_limit`, parsers ING/Rabobank/ICS-PDF met synthetische bestanden.
+- **Klaar wanneer:** Elke router heeft minstens één rendertest per hoofdpagina; de genoemde modules hebben unit-tests; coverage-rapport toont geen router onder de drempel die het team kiest.
+- **Validatie:** Coverage-uitvoer in de overdracht; geen productiegegevens in fixtures.
+
+<a id="act-52"></a>
+
+### ACT-52 — Model-typing: Boolean, enums, Mapped
+
+- **Aanleiding:** Review D5, D9, D10. 22 boolean-kolommen als `Integer` met `== 1` tot in de templates; vrije strings als enums (`bank`, `frequency`, `status`, `mortgage_type`); `accounts_json` als Text-blob; kommastrings voor maanden; volledig legacy SQLAlchemy-stijl; losse `os.getenv`-regels in `config.py`.
+- **Acties:** Migratie naar `Boolean` met `NOT NULL DEFAULT false`; `StrEnum` met `CheckConstraint` (`native_enum=False`); `JSON`-kolom voor `accounts_json`; `active_months_set`/`skipped_months_set` als properties; `Mapped[]`/`mapped_column()` en `back_populates` i.p.v. `backref`; `pydantic-settings` voor configuratie. Mechanisch, zonder gedragswijziging; mag in subacties.
+- **Klaar wanneer:** Templates vergelijken booleans niet meer met `1`; nieuwe code heeft typed modellen; autogenerate blijft leeg na de migratie.
+- **Validatie:** Volledige suite, PostgreSQL-CI met up/down/up, productievalidatie na uitrol.
 
 ## Besluitenlog
 
@@ -446,3 +666,4 @@ Voeg per afgeronde actie of overdracht een regel toe. Git bevat de volledige his
 | 2026-10-14 | ACT-31b fix | bunq-selectie gaf 500 (UniqueViolation `uq_user_account`) als de gekozen rekening geen IBAN had en het IBAN al op een andere eigen rekening stond: IBAN wordt dan niet overgenomen, melding om eerst samen te voegen, rollback bij fouten | Claude Code; 521 passed, 3 skipped (Python 3.14); productielog bevestigde de oorzaak; PR-CI open |
 | 2026-10-14 | ACT-31b fix | bunq-sync gaf 500 (`integer out of range`): bunq-id's (bv. 2932017837) passen niet in 32 bits; `bunq_account_links.bunq_account_id` en `last_payment_id` zijn nu BIGINT (migratie 068). Productielog bevestigde de oorzaak; samenvoegen van de twee spaarrekeningen werkte (271 dubbel samengevoegd) | Claude Code; PR-CI (PostgreSQL) open |
 | 2026-10-14 | AI-model | AI-regelsuggesties gaven 404 (`claude-sonnet-4-20250514` bestaat niet meer): model nu via `ANTHROPIC_MODEL` (standaard `claude-sonnet-5-5`), 4 plekken in ai_suggest.py; review C13 deels | Claude Code; 525 passed, 3 skipped (Python 3.14, nagebootste client); niet getest tegen de echte API |
+| 2026-10-14 | Codereview | Volledige scan vóór het UI-redesign; ACT-32 t/m ACT-52 als Gepland toegevoegd | Claude Code; docs/CODE-REVIEW-2026-10-14.md; 512 passed, 3 skipped (Python 3.12 via uv); branch `claude/check-pockets-suite-review-fd0da6` |
