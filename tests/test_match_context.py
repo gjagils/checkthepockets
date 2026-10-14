@@ -97,16 +97,16 @@ def test_matching_many_items_loads_the_period_once(db):
     assert len(queries) == 1                                         # was 2 per item = 30
 
 
-def test_projection_sync_query_count_does_not_grow_with_the_number_of_items(db):
-    user_small, _a, _items, today = _world(db, 4)
-    with transaction_selects() as small:
-        sync_projected_transactions(user_small.id, today.year, today.month, db)
-    user_big, _b, _items2, _t = _world(db, 20)
-    with transaction_selects() as big:
-        sync_projected_transactions(user_big.id, today.year, today.month, db)
-    # De sync zoekt per item nog naar de eigen projectie (op hash), maar het matchen zelf kost 1 query.
-    match_queries = [q for q in big if "transactions.is_projected = ?" in q and "transactions.date >=" in q]
-    assert len(match_queries) == 1
+def test_projection_sync_matches_with_one_query_regardless_of_the_number_of_items(db):
+    def match_queries(items):
+        user, _account, _items, today = _world(db, items)
+        with transaction_selects() as queries:
+            sync_projected_transactions(user.id, today.year, today.month, db)
+        # De sync zoekt per item nog naar de eigen projectie (op hash), maar het matchen zelf kost 1 query.
+        return [q for q in queries if "transactions.is_projected = ?" in q and "transactions.date >=" in q]
+
+    assert len(match_queries(4)) == 1
+    assert len(match_queries(20)) == 1
 
 
 def test_recurring_page_renders_with_a_bounded_number_of_transaction_queries(db):
