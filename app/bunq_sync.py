@@ -5,13 +5,13 @@ identieke betalingen op één dag allebei bewaard worden. Betalingen die al uit 
 CSV-import op dezelfde rekening staan worden herkend op datum, bedrag en tegenpartij of
 omschrijving (één-op-één) en overgeslagen, zodat een eerdere CSV-historie niet dubbel komt.
 """
-import datetime
 import logging
 from dataclasses import dataclass
 
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
+from app import clock
 from app.account_merge import _same_booking
 from app.bunq_client import BunqAccount, BunqClient, BunqError, BunqPayment, BunqSession
 from app.import_service import existing_import_hashes, store_parsed_transactions
@@ -168,7 +168,7 @@ def sync_link(db: Session, client: BunqClient, session: BunqSession, link: BunqA
     batch.skipped_count = report.fetched - result.imported
     if payments:
         link.last_payment_id = max(p.id for p in payments)
-    link.last_synced_at = datetime.datetime.utcnow()
+    link.last_synced_at = clock.now_utc()
     db.flush()
 
     new_ids = [t.id for t in db.query(Transaction.id).filter(Transaction.import_batch_id == batch.id)]
@@ -190,7 +190,7 @@ def sync_connection(db: Session, connection: BunqConnection, client: BunqClient,
     reports = [sync_link(db, client, session, link, connection.user_id, dry_run) for link in links]
     if not dry_run and any(r.new or r.transfers_linked for r in reports):
         _post_import(db, connection.user_id)
-    connection.last_checked_at = datetime.datetime.utcnow()
+    connection.last_checked_at = clock.now_utc()
     connection.last_status = "error" if any(r.error for r in reports) else "ok"
     connection.last_error = "; ".join(r.error for r in reports if r.error) or None
     return reports
@@ -201,7 +201,7 @@ def _post_import(db: Session, user_id: int) -> None:
     from app.recurring_service import (
         auto_link_recurring_after_import, cleanup_matched_projected, sync_projected_transactions,
     )
-    today = datetime.date.today()
+    today = clock.today_nl()
     db.flush()
     auto_link_recurring_after_import(db, user_id)
     cleanup_matched_projected(user_id, db)

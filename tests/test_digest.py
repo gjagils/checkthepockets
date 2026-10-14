@@ -2,7 +2,7 @@
 import hashlib
 import os
 import tempfile
-from datetime import date, timedelta
+from datetime import timedelta
 from decimal import Decimal
 
 import pytest
@@ -12,6 +12,7 @@ _DB_FILE.close()
 os.environ.setdefault("DATABASE_URL", f"sqlite:///{_DB_FILE.name}")
 os.environ.setdefault("SECRET_KEY", "test-secret-key")
 
+from app import clock
 from app.auth import hash_password
 from app.database import Base, SessionLocal, engine
 from app.models import Account, Transaction, User
@@ -65,7 +66,7 @@ def test_digest_stats_counts_per_account_and_inbox(db):
     a1 = _acc(db, user, "Samen")
     a2 = _acc(db, user, "Privé")
 
-    today = date.today()
+    today = clock.today_nl()
     # Binnen 7 dagen, tellen mee
     _tx(db, a1, today, suffix="a")
     _tx(db, a1, today - timedelta(days=3), suffix="b")

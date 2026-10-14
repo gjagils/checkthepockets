@@ -3,7 +3,6 @@ import os
 import pathlib
 import re
 import tempfile
-from datetime import date
 from decimal import Decimal
 
 import pytest
@@ -15,6 +14,7 @@ os.environ["SECRET_KEY"] = "test-secret-key"
 
 from fastapi.testclient import TestClient
 
+from app import clock
 from app.auth import create_session_cookie, hash_password
 from app.database import Base, SessionLocal, engine
 from app.main import app
@@ -44,7 +44,7 @@ def _client(user):
 
 
 def test_dashboard_category_names_cannot_break_out_of_the_script_block(db):
-    today = date.today()
+    today = clock.today_nl()
     user = User(username="xss-user", password_hash=hash_password("x" * 10))
     db.add(user)
     db.flush()

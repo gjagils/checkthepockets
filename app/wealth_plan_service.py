@@ -6,6 +6,7 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session, joinedload
 
+from app import clock
 from app.models import User, WealthPlan, WealthPlanEntry
 from app.wealth_forecast import build_wealth_forecast
 
@@ -46,7 +47,7 @@ def capture_wealth_plan(
         db.flush()
     else:
         plan.entries.clear()
-        plan.captured_at = datetime.datetime.utcnow()
+        plan.captured_at = clock.now_utc()
         plan.captured_automatically = int(automatic)
         db.flush()
 
@@ -79,7 +80,7 @@ def get_wealth_plan_entries(db: Session, user_id: int, year: int) -> dict[tuple[
 
 def capture_january_wealth_plans(db: Session, today: datetime.date | None = None) -> int:
     """Create missing baselines on 1 January; safe to call more than once."""
-    today = today or datetime.date.today()
+    today = today or clock.today_nl()
     if (today.month, today.day) != (1, 1):
         return 0
     captured = 0

@@ -8,6 +8,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app import clock
 from app.database import get_db
 from app.models import User, Transaction, Account, AuthToken
 from app.auth import (
@@ -106,7 +107,7 @@ def _client_ip(request: Request) -> str:
 def _create_token(db: Session, user_id: int | None, token_type: str,
                   hours: int = 24, email: str | None = None) -> str:
     token = secrets.token_urlsafe(32)
-    expires = datetime.datetime.utcnow() + datetime.timedelta(hours=hours)
+    expires = clock.now_utc() + datetime.timedelta(hours=hours)
     db.add(AuthToken(
         user_id=user_id,
         token=token,
@@ -126,7 +127,7 @@ def _find_valid_token(db: Session, token: str, token_type: str) -> AuthToken | N
         AuthToken.token == token,
         AuthToken.token_type == token_type,
         AuthToken.used_at.is_(None),
-        AuthToken.expires_at > datetime.datetime.utcnow(),
+        AuthToken.expires_at > clock.now_utc(),
     ).first()
 
 
@@ -140,10 +141,10 @@ def _consume_token(db: Session, token: str, token_type: str) -> AuthToken | None
         AuthToken.token == token,
         AuthToken.token_type == token_type,
         AuthToken.used_at.is_(None),
-        AuthToken.expires_at > datetime.datetime.utcnow(),
+        AuthToken.expires_at > clock.now_utc(),
     ).first()
     if t:
-        t.used_at = datetime.datetime.utcnow()
+        t.used_at = clock.now_utc()
         db.commit()
     return t
 
@@ -205,7 +206,7 @@ def login(
 
     clear_attempts(ip)
     _enforce_super_admin(user, db)
-    user.last_login_at = datetime.datetime.utcnow()
+    user.last_login_at = clock.now_utc()
     db.commit()
 
     response = RedirectResponse(user_start_page(user), status_code=302)
@@ -229,7 +230,7 @@ def register_page(request: Request, invite: str = "", db: Session = Depends(get_
                 AuthToken.token == invite,
                 AuthToken.token_type == "invite",
                 AuthToken.used_at.is_(None),
-                AuthToken.expires_at > datetime.datetime.utcnow(),
+                AuthToken.expires_at > clock.now_utc(),
             ).first()
             if not t:
                 return templates.TemplateResponse(
@@ -313,7 +314,7 @@ def register(
         # Atomic claim: of two concurrent registrations with one invite only one wins.
         claimed = db.query(AuthToken).filter(
             AuthToken.id == invite_token.id, AuthToken.used_at.is_(None),
-        ).update({"used_at": datetime.datetime.utcnow()}, synchronize_session=False)
+        ).update({"used_at": clock.now_utc()}, synchronize_session=False)
         if claimed != 1:
             db.rollback()
             return templates.TemplateResponse(
@@ -398,7 +399,7 @@ def reset_password_page(request: Request, token: str = "", db: Session = Depends
         AuthToken.token == token,
         AuthToken.token_type == "reset_password",
         AuthToken.used_at.is_(None),
-        AuthToken.expires_at > datetime.datetime.utcnow(),
+        AuthToken.expires_at > clock.now_utc(),
     ).first()
     if not t:
         return templates.TemplateResponse(
@@ -826,7 +827,7 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
         })
 
     _enforce_super_admin(user, db)
-    user.last_login_at = datetime.datetime.utcnow()
+    user.last_login_at = clock.now_utc()
     db.commit()
 
     response = RedirectResponse(user_start_page(user), status_code=302)

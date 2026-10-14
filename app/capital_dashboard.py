@@ -12,6 +12,7 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session, joinedload
 
+from app import clock
 from app.models import (
     Account,
     Person,
@@ -246,7 +247,7 @@ def build_capital_dashboard(
         }
     """
     if today is None:
-        today = datetime.date.today()
+        today = clock.today_nl()
 
     persons = (
         db.query(Person)

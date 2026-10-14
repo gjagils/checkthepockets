@@ -20,7 +20,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-from app.auth import LoginRequired, get_current_user
+from app.auth import COOKIE_NAME, LoginRequired, get_current_user
 from app.routers import auth, transactions, accounts, categories, rules, budgets, recurring, dashboard, savings, analytics, portfolio, networth, settings, admin, banking, bunq, inbox, persons, mortgage, info
 from app.scheduler import start_scheduler
 
@@ -61,22 +61,34 @@ async def add_asset_version(request: Request, call_next):
     return await call_next(request)
 
 
+_NO_INBOX_BADGE_PREFIXES = ("/static", "/healthz")
+
+
 @app.middleware("http")
 async def add_inbox_count(request: Request, call_next):
-    """Populate request.state.inbox_count for the nav badge (authenticated users)."""
+    """Populate request.state.inbox_count for the nav badge (authenticated users).
+
+    Only for page loads (GET) of logged-in users: no query for static files, health checks,
+    anonymous visitors or mutations (which redirect). The user is looked up with the full
+    session check (active account, session version), so a revoked cookie gets no badge.
+    """
     request.state.inbox_count = 0
-    if not request.url.path.startswith("/static"):
+    path = request.url.path
+    if (
+        request.method == "GET"
+        and not path.startswith(_NO_INBOX_BADGE_PREFIXES)
+        and request.cookies.get(COOKIE_NAME)
+    ):
         try:
-            from app.auth import get_session_user_id
             from app.database import SessionLocal
             from app.routers.inbox import inbox_count
-            uid = get_session_user_id(request)
-            if uid:
-                db = SessionLocal()
-                try:
-                    request.state.inbox_count = inbox_count(db, uid)
-                finally:
-                    db.close()
+            db = SessionLocal()
+            try:
+                user = get_current_user(request, db)
+                if user:
+                    request.state.inbox_count = inbox_count(db, user.id)
+            finally:
+                db.close()
         except Exception:
             logger.warning("Inbox count unavailable for this request", exc_info=True)
     return await call_next(request)

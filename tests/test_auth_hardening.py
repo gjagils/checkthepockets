@@ -15,6 +15,7 @@ from starlette.requests import Request
 
 import app.email_service as email_service
 import app.routers.auth as auth_router
+from app import clock
 from app import rate_limit
 from app.auth import create_session_cookie, hash_password
 from app.database import Base, SessionLocal, engine
@@ -45,7 +46,7 @@ def _request(peer, xff=None):
 
 def _invite(db, token="invite-1"):
     db.add(AuthToken(user_id=None, token=token, token_type="invite",
-                     expires_at=datetime.datetime.utcnow() + datetime.timedelta(days=1)))
+                     expires_at=clock.now_utc() + datetime.timedelta(days=1)))
     db.commit()
     return token
 

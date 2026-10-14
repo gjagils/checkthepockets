@@ -11,6 +11,8 @@ from datetime import date
 from decimal import Decimal
 from unittest.mock import patch
 
+from app import clock
+
 import pytest
 
 LIVE_TESTS = os.getenv("ENABLE_BANKING_LIVE_TESTS", "false").lower() == "true"
@@ -365,9 +367,9 @@ def test_consent_valid_until_from_session_response():
     dt = _consent_valid_until({"access": {"valid_until": "2026-12-01T10:30:00Z"}}, fallback_days=180)
     assert dt == datetime(2026, 12, 1, 10, 30, 0)
 
-    before = datetime.utcnow()
+    before = clock.now_utc()
     dt = _consent_valid_until({}, fallback_days=90)
     assert timedelta(days=89, hours=23) < dt - before < timedelta(days=90, minutes=1)
 
     dt = _consent_valid_until({"access": {"valid_until": "garbage"}}, fallback_days=10)
-    assert timedelta(days=9, hours=23) < dt - datetime.utcnow() < timedelta(days=10, minutes=1)
+    assert timedelta(days=9, hours=23) < dt - clock.now_utc() < timedelta(days=10, minutes=1)

@@ -4,7 +4,6 @@ Expected values were produced by the route implementation before it moved to
 app.mortgage_calc; today is fixed so rate changes land in a known year.
 """
 import datetime as real_datetime
-import types
 from decimal import Decimal as D
 from types import SimpleNamespace as NS
 
@@ -21,7 +20,8 @@ class _FixedDate(real_datetime.date):
 
 @pytest.fixture(autouse=True)
 def fixed_today(monkeypatch):
-    monkeypatch.setattr(mortgage_calc, "datetime", types.SimpleNamespace(date=_FixedDate))
+    from app import clock
+    monkeypatch.setattr(clock, "today_nl", lambda: _FixedDate.today())
 
 
 def _interest_only():

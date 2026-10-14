@@ -6,6 +6,7 @@ import datetime
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 from typing import TYPE_CHECKING, Iterator
+from app import clock
 
 if TYPE_CHECKING:
     from app.models import HouseholdFinance, MortgageScenario, MortgageVariant, ScenarioExistingMortgage
@@ -184,11 +185,10 @@ def effective_rate_pct_today(em) -> Decimal | None:
     voor een bestaand leningdeel. Respecteert een eventuele rentesprong via
     ``rate_change_date`` + ``rate_pct_after``.
     """
-    import datetime as _dt
     rate_after = getattr(em, "rate_pct_after", None)
     change_date = getattr(em, "rate_change_date", None)
     if rate_after is not None and change_date is not None:
-        if _dt.date.today() >= change_date:
+        if clock.today_nl() >= change_date:
             return Decimal(str(rate_after))
     return em.rate_pct if em.rate_pct is not None else None
 
@@ -574,7 +574,7 @@ def existing_mortgage_yearly_gross(
     if bal <= 0:
         return Decimal("0")
 
-    today = datetime.date.today()
+    today = clock.today_nl()
     year_start = datetime.date(today.year + year_offset, 1, 1)
     year_end = datetime.date(today.year + year_offset, 12, 31)
     mtype = em.mortgage_type or "annuity"
@@ -631,7 +631,7 @@ def existing_mortgage_yearly_interest(
     if bal <= 0:
         return Decimal("0")
 
-    today = datetime.date.today()
+    today = clock.today_nl()
     year_start = datetime.date(today.year + year_offset, 1, 1)
     year_end = datetime.date(today.year + year_offset, 12, 31)
 
@@ -764,7 +764,7 @@ def variant_stats(
         if ann_principal > 0 else []
     )
 
-    today = datetime.date.today()
+    today = clock.today_nl()
     fixed_years = variant.fixed_years or 5
     refunds_over_fixed: list[Decimal] = []
 

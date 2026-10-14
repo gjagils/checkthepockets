@@ -1,11 +1,11 @@
 """bunq API-koppeling met een eigen persoonlijke API-sleutel (ACT-31): rekeningen kiezen en importeren."""
-import datetime
 import logging
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
+from app import clock
 from app.auth import require_login
 from app.bunq_client import BunqClient, BunqError
 from app.bunq_sync import account_kind_for, iban_taken, refresh_links, resolve_account, sync_connection
@@ -110,7 +110,7 @@ def bunq_check(request: Request, db: Session = Depends(get_db)):
         connection.last_status = "error"
         connection.last_error = error
         logger.warning("bunq: controle mislukt (%s, HTTP %s)", exc.kind, exc.status)
-    connection.last_checked_at = datetime.datetime.utcnow()
+    connection.last_checked_at = clock.now_utc()
     db.commit()
     return _render(request, user, db, error=error)
 

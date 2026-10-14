@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from sqlalchemy import func
 
+from app import clock
 from app.database import get_db
 from app.models import User, AuthToken, Account, Transaction, SchedulerRunLog
 from app.auth import require_login
@@ -152,7 +153,7 @@ def create_invite(
     admin = _require_admin(request, db)
 
     token = secrets.token_urlsafe(32)
-    expires = datetime.datetime.utcnow() + datetime.timedelta(days=7)
+    expires = clock.now_utc() + datetime.timedelta(days=7)
     db.add(AuthToken(
         user_id=None,
         token=token,

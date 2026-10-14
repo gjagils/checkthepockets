@@ -13,6 +13,7 @@ os.environ["SECRET_KEY"] = "test-secret-key"
 
 from fastapi.testclient import TestClient
 
+from app import clock
 from app.auth import create_session_cookie, hash_password
 from app.database import Base, SessionLocal, engine
 from app.main import app
@@ -201,7 +202,7 @@ def test_stale_price_indicator_shown_for_old_price(db_session):
     p = Person(user_id=alice.id, name="Gerd")
     db_session.add(p)
     # price updated 45 days ago → stale
-    old_date = datetime.datetime.utcnow() - datetime.timedelta(days=45)
+    old_date = clock.now_utc() - datetime.timedelta(days=45)
     asset = PortfolioAsset(
         user_id=alice.id,
         name="ASML",
@@ -235,7 +236,7 @@ def test_fresh_price_no_warning(db_session):
         asset_class="metal",
         unit="oz",
         current_price_eur=Decimal("1800"),
-        price_updated_at=datetime.datetime.utcnow(),
+        price_updated_at=clock.now_utc(),
     )
     db_session.add(asset)
     db_session.commit()

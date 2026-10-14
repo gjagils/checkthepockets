@@ -20,6 +20,7 @@ from decimal import Decimal
 import pdfplumber
 
 from app.parsers.base import ParseError
+from app import clock
 
 
 MONTH_MAP = {
@@ -99,8 +100,7 @@ def _extract_statement_date(text: str) -> tuple[int, int]:
     # Fallback: try to find any 4-digit year
     m = re.search(r"20\d{2}", text)
     if m:
-        from datetime import date as d
-        return int(m.group()), d.today().month
+        return int(m.group()), clock.today_nl().month
 
     raise ParseError("Kan geen afschriftdatum vinden in de PDF")
 

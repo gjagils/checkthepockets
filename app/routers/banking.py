@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
+from app import clock
 from app.auth import require_login
 from app.config import APP_URL, ENABLE_BANKING_APP_ID, SUPER_ADMIN_USERNAME
 from app.database import get_db
@@ -170,7 +171,7 @@ async def start_connect(request: Request, db: Session = Depends(get_db)):
 def _consent_valid_until(session_data: dict, fallback_days: int) -> datetime:
     """Werkelijke consent-vervaldatum uit de sessie-response (access.valid_until,
     ISO-8601 met tijdzone) als naïeve UTC — de kolom is timezone-loos en de
-    rest van de app gebruikt utcnow(). Valt terug op nu + fallback_days."""
+    rest van de app gebruikt clock.now_utc(). Valt terug op nu + fallback_days."""
     raw = (session_data.get("access") or {}).get("valid_until")
     if raw:
         try:
@@ -180,7 +181,7 @@ def _consent_valid_until(session_data: dict, fallback_days: int) -> datetime:
             return parsed
         except ValueError:
             logger.warning("Onbegrijpelijke valid_until van Enable Banking: %r", raw)
-    return datetime.utcnow() + timedelta(days=fallback_days)
+    return clock.now_utc() + timedelta(days=fallback_days)
 
 
 ACCOUNT_TYPE_LABELS = {
@@ -571,7 +572,7 @@ async def sync_transactions(connection_id: int, request: Request, db: Session = 
     result = store_parsed_transactions(db, account, parsed, active_rules, batch.id)
     imported, skipped, auto_categorized = result.imported, result.skipped, result.auto_categorized
 
-    conn.last_synced_at = datetime.utcnow()
+    conn.last_synced_at = clock.now_utc()
     conn.last_sync_status = "success"
     conn.last_sync_error = None
     batch.imported_count = imported
@@ -593,7 +594,7 @@ async def sync_transactions(connection_id: int, request: Request, db: Session = 
     auto_link_recurring_after_import(db, user.id)
     cleanup_matched_projected(user.id, db)
     # Re-sync projected transactions for current month to reflect new imports
-    _today = date_type.today()
+    _today = clock.today_nl()
     sync_projected_transactions(user.id, _today.year, _today.month, db)
     db.commit()
 

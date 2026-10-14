@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 from pytz import timezone as pytz_timezone
 
+from app import clock
 from app.config import ENABLE_BANKING_APP_ID
 
 logger = logging.getLogger(__name__)
@@ -42,7 +43,7 @@ def logged_job(job_id: str):
             log = SchedulerRunLog(
                 job_id=job_id,
                 status="running",
-                started_at=datetime.utcnow(),
+                started_at=clock.now_utc(),
             )
             db.add(log)
             db.commit()
@@ -59,7 +60,7 @@ def logged_job(job_id: str):
                 logger.exception("Scheduler job %s faalde", job_id)
                 raise
             finally:
-                log.finished_at = datetime.utcnow()
+                log.finished_at = clock.now_utc()
                 try:
                     db.commit()
                 finally:
@@ -84,7 +85,7 @@ def compute_digest_stats(db, user_id: int, now_utc: datetime | None = None):
     from app.models import Account, Transaction
     from app.routers.inbox import inbox_count
 
-    today = (now_utc or datetime.utcnow()).date()
+    today = (now_utc or clock.now_utc()).date()
     since = today - timedelta(days=7)
 
     rows = (
@@ -121,7 +122,7 @@ def _run_weekly_digests():
     now_nl = datetime.now(NL_TZ)
     now_weekday = now_nl.weekday()
     now_hour = now_nl.hour
-    threshold = datetime.utcnow() - timedelta(days=6)
+    threshold = clock.now_utc() - timedelta(days=6)
 
     sent_count = 0
     failed_count = 0
@@ -159,7 +160,7 @@ def _run_weekly_digests():
                 new_total=new_total,
             )
             if sent:
-                user.weekly_digest_last_sent_at = datetime.utcnow()
+                user.weekly_digest_last_sent_at = clock.now_utc()
                 db.commit()
                 sent_count += 1
                 logger.info("Weekly digest verzonden naar %s (new=%d, uncat=%d)",
@@ -261,7 +262,7 @@ def _sync_all_bank_connections():
                                 imported, conn.bank_name, iban)
                     total_imported += imported
 
-            conn.last_synced_at = datetime.utcnow()
+            conn.last_synced_at = clock.now_utc()
 
         db.commit()
 
@@ -276,7 +277,7 @@ def _sync_all_bank_connections():
         # Auto-link recurring, then sync projections
         from app.recurring_service import auto_link_recurring_after_import
         from app.recurring_service import cleanup_matched_projected, sync_projected_transactions
-        today = datetime.utcnow().date()
+        today = clock.now_utc().date()
         for user_id in synced_user_ids:
             auto_link_recurring_after_import(db, user_id)
             cleanup_matched_projected(user_id, db)

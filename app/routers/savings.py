@@ -10,6 +10,7 @@ from fastapi.responses import RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 
+from app import clock
 from app.database import get_db
 from app.models import (
     Account, Transaction, Category, Rule,
@@ -262,7 +263,7 @@ def savings_overview(
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
-    current_year = year or datetime.date.today().year
+    current_year = year or clock.today_nl().year
 
     plans = (
         db.query(SavingsPlan)
@@ -395,7 +396,7 @@ def plan_detail(
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
-    today = datetime.date.today()
+    today = clock.today_nl()
 
     plan = (
         db.query(SavingsPlan)
@@ -693,7 +694,7 @@ def add_line(
 
     # If category is set, try to fill from existing transactions
     if cat_id:
-        today = datetime.date.today()
+        today = clock.today_nl()
         tx_totals = _get_transaction_totals_by_month(
             db, plan.account_id, plan.year, cat_id
         )
@@ -765,7 +766,7 @@ def update_entry(
 
     line = entry.line
     plan = line.plan
-    today = datetime.date.today()
+    today = clock.today_nl()
     if (plan.year, entry.month) <= (today.year, today.month):
         return JSONResponse(
             {"error": "Alleen toekomstige maanden zijn aan te passen; eerdere maanden volgen de transacties."},
@@ -894,7 +895,7 @@ def edit_line(
     else:
         tx_totals = {}
 
-    today = datetime.date.today()
+    today = clock.today_nl()
     for entry in line.entries:
         if entry.month in tx_totals:
             # Er zijn werkelijke transactie(s) — niet overschrijven.
@@ -1230,7 +1231,7 @@ def quick_add_line(
 
     # Vul entries vanuit transacties als er een categorie is
     if cat:
-        today = datetime.date.today()
+        today = clock.today_nl()
         tx_totals = _get_transaction_totals_by_month(
             db, plan.account_id, plan.year, cat.id
         )
@@ -1547,7 +1548,7 @@ def fill_from_transactions(
         return RedirectResponse("/savings", status_code=302)
 
     plan = line.plan
-    today = datetime.date.today()
+    today = clock.today_nl()
 
     tx_totals = _get_transaction_totals_by_month(
         db, plan.account_id, plan.year, line.category_id
