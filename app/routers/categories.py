@@ -80,6 +80,7 @@ def categories_list(
     )
 
     return templates.TemplateResponse(
+        request,
         "categories/list.html",
         {
             "request": request,

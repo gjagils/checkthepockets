@@ -72,6 +72,7 @@ def _render_connect(request: Request, user, db: Session, country: str = "NL", er
         error = error or "Enable Banking is niet geconfigureerd."
 
     return templates.TemplateResponse(
+        request,
         "banking/connect.html",
         {
             "request": request, "user": user,
@@ -91,6 +92,7 @@ def connect_page(request: Request, country: str = "NL", db: Session = Depends(ge
 
     if not _is_banking_allowed(user):
         return templates.TemplateResponse(
+            request,
             "banking/connect.html",
             {"request": request, "user": user, "banks": [], "connections": [], "restricted": True},
         )
@@ -285,12 +287,14 @@ def callback(request: Request, code: str = "", state: str = "", db: Session = De
     expected_state = request.session.get("eb_state")
     if not state or state != expected_state:
         return templates.TemplateResponse(
+            request,
             "banking/result.html",
             {"request": request, "user": user, "success": False, "error": "Ongeldige state parameter. Probeer opnieuw."},
         )
 
     if not code:
         return templates.TemplateResponse(
+            request,
             "banking/result.html",
             {"request": request, "user": user, "success": False, "error": "Geen autorisatiecode ontvangen. Heb je de koppeling geweigerd?"},
         )
@@ -310,6 +314,7 @@ def callback(request: Request, code: str = "", state: str = "", db: Session = De
             conn.status = "revoked"
             db.commit()
         return templates.TemplateResponse(
+            request,
             "banking/result.html",
             {"request": request, "user": user, "success": False, "error": f"Kan sessie niet aanmaken: {safe_error_message(e)}"},
         )
@@ -355,6 +360,7 @@ def callback(request: Request, code: str = "", state: str = "", db: Session = De
         request.session.pop(key, None)
 
     return templates.TemplateResponse(
+        request,
         "banking/result.html",
         {
             "request": request, "user": user,
@@ -386,6 +392,7 @@ def sync_page(connection_id: int, request: Request, db: Session = Depends(get_db
 
     stored_accounts = json.loads(conn.accounts_json or "[]")
     return templates.TemplateResponse(
+        request,
         "banking/sync.html",
         {
             "request": request, "user": user, "connection": conn,
@@ -438,6 +445,7 @@ async def sync_transactions(connection_id: int, request: Request, db: Session = 
         conn.last_sync_error = safe_error_message(e)[:500]
         db.commit()
         return templates.TemplateResponse(
+            request,
             "banking/sync.html",
             {
                 "request": request, "user": user,
@@ -460,6 +468,7 @@ async def sync_transactions(connection_id: int, request: Request, db: Session = 
 
     if not parsed:
         return templates.TemplateResponse(
+            request,
             "banking/sync.html",
             {
                 "request": request, "user": user,
@@ -598,6 +607,7 @@ async def sync_transactions(connection_id: int, request: Request, db: Session = 
     db.commit()
 
     return templates.TemplateResponse(
+        request,
         "banking/sync_result.html",
         {
             "request": request, "user": user,

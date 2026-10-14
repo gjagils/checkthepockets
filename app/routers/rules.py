@@ -95,6 +95,7 @@ def rules_list(request: Request, from_tx: int = Query(None), db: Session = Depen
             }
 
     return templates.TemplateResponse(
+        request,
         "rules/list.html",
         {
             "request": request,

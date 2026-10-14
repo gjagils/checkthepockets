@@ -128,12 +128,14 @@ async def import_preview(
         data = json.loads(content.decode("utf-8"))
     except Exception:
         return templates.TemplateResponse(
+            request,
             "auth/settings.html",
             {"request": request, "user": user, "import_error": "Ongeldig JSON-bestand."},
         )
 
     if data.get("version") != 1:
         return templates.TemplateResponse(
+            request,
             "auth/settings.html",
             {"request": request, "user": user, "import_error": "Onbekende versie van het exportbestand."},
         )
@@ -149,6 +151,7 @@ async def import_preview(
     raw_json = content.decode("utf-8")
 
     return templates.TemplateResponse(
+        request,
         "settings/import_preview.html",
         {
             "request": request,
@@ -379,6 +382,7 @@ async def import_confirm(
         db.rollback()
         logger.warning("Instellingen-import mislukt: %s", type(exc).__name__)
         return templates.TemplateResponse(
+            request,
             "auth/settings.html",
             {"request": request, "user": user,
              "import_error": "Het bestand bevat ongeldige waarden; er is niets geïmporteerd."},
@@ -393,6 +397,7 @@ async def import_confirm(
         msg += f" {stats['skipped']} bestaande item(s) overgeslagen."
 
     return templates.TemplateResponse(
+        request,
         "auth/settings.html",
         {"request": request, "user": user, "import_success": msg},
     )

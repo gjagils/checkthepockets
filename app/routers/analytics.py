@@ -148,6 +148,7 @@ def analytics(
     years = sorted({int(r.yr) for r in tx_years} | {current_year})
 
     return templates.TemplateResponse(
+        request,
         "analytics/index.html",
         {
             "request": request,
@@ -339,6 +340,7 @@ def analytics_stats(
     }
 
     return templates.TemplateResponse(
+        request,
         "analytics/stats.html",
         {
             "request": request,
@@ -490,6 +492,7 @@ def analytics_query(
         )
 
     return templates.TemplateResponse(
+        request,
         "analytics/query.html",
         {
             "request": request, "user": user,
