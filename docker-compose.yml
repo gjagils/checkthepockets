@@ -9,7 +9,10 @@ services:
       # Database
       - DATABASE_URL=${DATABASE_URL}
       # Auth & sessies
-      - SECRET_KEY=${SECRET_KEY:-verander-dit-in-een-lang-willekeurig-wachtwoord}
+      - SECRET_KEY=${SECRET_KEY}
+      - SESSION_MAX_AGE=${SESSION_MAX_AGE:-86400}
+      - CSRF_ENFORCE=${CSRF_ENFORCE:-false}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - APP_URL=${APP_URL:-http://localhost:8000}
       - ENVIRONMENT=${ENVIRONMENT:-production}
       - COOKIE_SECURE=${COOKIE_SECURE:-}
@@ -31,6 +34,8 @@ services:
       # Enable Banking — PSD2 bankkoppeling
       - ENABLE_BANKING_APP_ID=${ENABLE_BANKING_APP_ID:-}
       - ENABLE_BANKING_PRIVATE_KEY_PATH=${ENABLE_BANKING_PRIVATE_KEY_PATH:-/app/keys/enable-banking.pem}
+      # bunq API (standaard productie; sandbox om te testen)
+      - BUNQ_API_BASE=${BUNQ_API_BASE:-https://api.bunq.com/v1}
     volumes:
       - ${ENABLE_BANKING_KEY_DIR:-./keys}:/app/keys:ro
 

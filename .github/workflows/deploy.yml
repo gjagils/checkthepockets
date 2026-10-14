@@ -3,11 +3,19 @@ name: Build and Deploy
 on:
   push:
     branches: [main]
+    # Alleen Markdown in de root en docs/ slaat de deploy over; app/docs/**/*.md is runtime-inhoud
+    # (kennisbank in het image) en deployt wel.
     paths-ignore:
-      - '**.md'
+      - '*.md'
+      - 'docs/**'
       - '.claude/**'
       - 'LICENSE'
       - '.gitignore'
+
+# Deployments lopen na elkaar; een tweede push wacht tot de eerste klaar is.
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
 
 env:
   REGISTRY: ghcr.io
@@ -16,6 +24,7 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     environment: portainer
     permissions:
       contents: read
