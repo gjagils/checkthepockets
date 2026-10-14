@@ -170,6 +170,11 @@ def _run_weekly_digests():
     finally:
         db.close()
 
+    return (
+        f"{sent_count} verzonden, {failed_count} mislukt, {skipped_count} overgeslagen "
+        f"({len(candidates)} kandidaten)"
+    )
+
 
 @logged_job("wealth_plan_january")
 def _capture_january_wealth_plans():
@@ -183,11 +188,6 @@ def _capture_january_wealth_plans():
         return f"{captured} vermogensplan(nen) vastgelegd"
     finally:
         db.close()
-
-    return (
-        f"{sent_count} verzonden, {failed_count} mislukt, {skipped_count} overgeslagen "
-        f"({len(candidates)} kandidaten)"
-    )
 
 
 @logged_job("bank_sync")

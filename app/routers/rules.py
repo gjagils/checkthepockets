@@ -293,7 +293,7 @@ async def accept_rule_suggestion(
     # Create the rule
     rule = Rule(
         user_id=user.id,
-        name=f"{counterparty_clean or match_value}",
+        name=f"{counterparty_clean or match_value}"[:100],
         match_field="description",
         match_type="contains",
         match_value=match_value,

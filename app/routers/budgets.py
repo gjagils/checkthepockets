@@ -544,47 +544,21 @@ def budget_from_average(
     if not months_to_check:
         return RedirectResponse(f"/budgets?year={to_year}&month={to_month}", status_code=302)
 
-    # Build OR conditions for the month ranges
-    from sqlalchemy import or_, and_, tuple_
-
-    month_conditions = or_(
-        *[
-            and_(
-                func.extract("year", Transaction.date) == yr,
-                func.extract("month", Transaction.date) == mn,
-            )
-            for yr, mn in months_to_check
-        ]
-    )
-
-    # Get average spending per category over those months
-    avg_spending = (
-        db.query(
-            Transaction.category_id,
-            func.sum(Transaction.amount).label("total"),
-        )
-        .join(Account)
-        .filter(
-            Account.user_id == user.id,
-            Transaction.category_id.isnot(None),
-            Transaction.amount < 0,
-            month_conditions,
-        )
-        .group_by(Transaction.category_id)
-        .all()
+    # Same definition as the "gem. 3 mnd" column: expenses only, no excluded/transfer/
+    # projected transactions, no categories excluded from the budget.
+    averages = category_spending_average(
+        db, user_id=user.id, ref_year=to_year, ref_month=to_month, months=num_months,
     )
 
     count = 0
-    for row in avg_spending:
-        avg_amount = abs(row.total) / num_months
-        # Round to nearest euro
-        avg_amount = avg_amount.quantize(Decimal("1"))
+    for category_id, average in averages.items():
+        avg_amount = average.quantize(Decimal("1"))  # round to nearest euro
 
         existing = (
             db.query(Budget)
             .filter(
                 Budget.user_id == user.id,
-                Budget.category_id == row.category_id,
+                Budget.category_id == category_id,
                 Budget.year == to_year,
                 Budget.month == to_month,
             )
@@ -595,7 +569,7 @@ def budget_from_average(
         else:
             db.add(Budget(
                 user_id=user.id,
-                category_id=row.category_id,
+                category_id=category_id,
                 year=to_year,
                 month=to_month,
                 amount=avg_amount,

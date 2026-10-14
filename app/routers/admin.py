@@ -528,8 +528,9 @@ def admin_scheduler_run(
         try:
             fn()
         except Exception:
-            pass
+            logger.exception("Handmatig gestarte job %s faalde", job_id)
     except Exception:
+        logger.exception("Job %s kon niet worden gestart", job_id)
         return RedirectResponse("/admin/scheduler?error=trigger_failed", status_code=302)
 
     return RedirectResponse("/admin/scheduler?flash=triggered", status_code=302)
