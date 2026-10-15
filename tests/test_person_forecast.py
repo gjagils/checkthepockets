@@ -106,3 +106,18 @@ def test_person_page_renders_for_all_periods_and_scopes_to_the_user(db):
     other_client = TestClient(app)
     other_client.cookies.set("session", create_session_cookie(other.id))
     assert other_client.get(f"/persons/{nel.id}").status_code == 404
+
+
+def test_menu_entry_redirects_to_first_person_and_menu_links_it(db):
+    from fastapi.testclient import TestClient
+
+    from app.auth import create_session_cookie
+    from app.main import app
+
+    user, nel, _, _ = _world(db)
+    client = TestClient(app)
+    client.cookies.set("session", create_session_cookie(user.id))
+    redirect = client.get("/persons/verwachting", follow_redirects=False)
+    assert redirect.status_code == 302 and redirect.headers["location"] == f"/persons/{nel.id}?period=12"
+    page = client.get(f"/persons/{nel.id}").text
+    assert 'href="/persons/verwachting"' in page
