@@ -8,7 +8,7 @@ from decimal import Decimal, InvalidOperation
 from fastapi import APIRouter, Depends, Request, Form, Query
 from fastapi.responses import RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func
+from sqlalchemy import func, or_
 
 from app import clock
 from app.database import get_db
@@ -511,7 +511,8 @@ def plan_detail(
         db.query(Category)
         .filter(
             Category.user_id == user.id,
-            Category.account_id == plan.account_id,
+            or_(Category.account_id == plan.account_id, Category.account_id.is_(None)),
+            Category.is_archived == 0,
         )
         .order_by(Category.name)
         .all()

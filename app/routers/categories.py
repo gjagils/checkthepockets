@@ -3,6 +3,7 @@ import logging
 from fastapi import APIRouter, Depends, Request, Form, Query
 from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from typing import List
 
@@ -55,7 +56,7 @@ def categories_list(
 
     query = db.query(Category).filter(Category.user_id == user.id)
     if account_id:
-        query = query.filter(Category.account_id == account_id)
+        query = query.filter(or_(Category.account_id == account_id, Category.account_id.is_(None)))
 
     if not show_archived:
         query = query.filter(Category.is_archived == 0)
@@ -65,7 +66,8 @@ def categories_list(
     # Count archived
     archived_count_q = db.query(Category).filter(Category.user_id == user.id, Category.is_archived == 1)
     if account_id:
-        archived_count_q = archived_count_q.filter(Category.account_id == account_id)
+        archived_count_q = archived_count_q.filter(
+            or_(Category.account_id == account_id, Category.account_id.is_(None)))
     archived_count = archived_count_q.count()
 
     # Build hierarchy: top-level (parent_id=None) with their children
