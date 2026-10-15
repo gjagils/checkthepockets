@@ -39,6 +39,7 @@ def category_spending_average(
     ref_month: int,
     months: int = 3,
     account_id: int | None = None,
+    account_ids: list[int] | None = None,
 ) -> dict[int, Decimal]:
     """Geeft per categorie het gemiddelde uitgegeven bedrag over de laatste
     ``months`` volle maanden vóór (ref_year, ref_month).
@@ -87,6 +88,8 @@ def category_spending_average(
     )
     if account_id:
         q = q.filter(Transaction.account_id == account_id)
+    if account_ids:
+        q = q.filter(Transaction.account_id.in_(account_ids))
 
     rows = q.group_by(Category.id).all()
     divisor = Decimal(str(months))

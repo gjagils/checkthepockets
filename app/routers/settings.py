@@ -10,6 +10,7 @@ import io
 
 from app.database import get_db
 from app.models import Account, Budget, Category, RecurringTransaction, Rule, Transaction, User
+from app.budget_scope import category_group_id, find_budget, put_budget
 from app.auth import (
     COOKIE_NAME, allowed_start_pages, hash_password, require_login, revoke_sessions, verify_password,
 )
@@ -356,12 +357,9 @@ async def import_confirm(
             if not year or not month:
                 continue
 
-            existing = db.query(Budget).filter(
-                Budget.user_id == user.id,
-                Budget.category_id == cat_id,
-                Budget.year == year,
-                Budget.month == month,
-            ).first()
+            # De export kent geen groepen: de groep volgt de rekening van de categorie.
+            group_id = category_group_id(db, db.get(Category, cat_id))
+            existing = find_budget(db, user.id, cat_id, group_id, year, month)
 
             amount = Decimal(str(b.get("amount", "0")))
             if existing:
@@ -370,13 +368,7 @@ async def import_confirm(
                     continue
                 existing.amount = amount
             else:
-                db.add(Budget(
-                    user_id=user.id,
-                    category_id=cat_id,
-                    year=year,
-                    month=month,
-                    amount=amount,
-                ))
+                put_budget(db, user.id, cat_id, group_id, year, month, amount)
                 stats["budgets"] += 1
 
         db.commit()
