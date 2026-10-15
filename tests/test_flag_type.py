@@ -60,3 +60,27 @@ def test_transaction_flags_are_bools_and_filters_keep_working(db):
     db.commit()
     db.expire_all()
     assert db.query(Transaction).filter_by(import_hash="b").one().is_reviewed is True
+
+
+def test_category_flags_are_bools_and_backup_export_keeps_integers(db):
+    from fastapi.testclient import TestClient
+
+    from app.auth import create_session_cookie
+    from app.main import app
+    from app.models import Category
+
+    user = _user(db, username="cat")
+    db.add_all([Category(user_id=user.id, name="Salaris", is_income=1),
+                Category(user_id=user.id, name="Oud", is_archived=1, exclude_from_budget=1)])
+    db.commit()
+    rows = {c.name: c for c in db.query(Category).all()}
+    assert rows["Salaris"].is_income is True and rows["Salaris"].is_archived is False
+    assert rows["Oud"].exclude_from_budget is True and rows["Oud"].exclude_from_totals is False
+    assert db.query(Category).filter(Category.is_income == 1).count() == 1
+    client = TestClient(app)
+    client.cookies.set("session", create_session_cookie(user.id))
+    export = client.get("/settings/export")
+    assert export.status_code == 200
+    cats = {c["name"]: c for c in export.json()["categories"]}
+    assert cats["Salaris"]["is_income"] == 1 and type(cats["Salaris"]["is_income"]) is int
+    assert cats["Oud"]["is_archived"] == 1 and cats["Oud"]["exclude_from_totals"] == 0

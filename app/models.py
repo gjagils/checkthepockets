@@ -152,11 +152,11 @@ class Category(Base):
     parent_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
     color = Column(String(7), nullable=True)
     created_at = Column(DateTime, default=clock.now_utc)
-    is_income = Column(Integer, default=0)
+    is_income = Column(Flag, default=0)
     sort_order = Column(Integer, default=0, nullable=False)
-    exclude_from_budget = Column(Integer, default=0, nullable=False)
-    exclude_from_totals = Column(Integer, default=0, nullable=False)
-    is_archived = Column(Integer, default=0, nullable=False)
+    exclude_from_budget = Column(Flag, default=0, nullable=False)
+    exclude_from_totals = Column(Flag, default=0, nullable=False)
+    is_archived = Column(Flag, default=0, nullable=False)
     # LIN-45: markering waarmee een scenario-factor wordt toegepast.
     # Waardes: "municipal" | "insurance" | "mortgage" | NULL (geen auto-factor).
     cost_scale_type = Column(String(20), nullable=True)
