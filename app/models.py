@@ -185,7 +185,7 @@ class Rule(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     name = Column(String(100), nullable=False)
-    is_active = Column(Integer, default=1)  # 1=active, 0=inactive
+    is_active = Column(Flag, default=1)  # 1=active, 0=inactive
 
     # IF conditions
     match_field = Column(String(20), nullable=False)  # "counterparty", "description", "counterparty_iban"
@@ -198,7 +198,7 @@ class Rule(Base):
     # THEN actions
     assign_category_id = Column(Integer, ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)
     action_rename_counterparty = Column(String(255), nullable=True)
-    action_set_reviewed = Column(Integer, default=0, nullable=False)
+    action_set_reviewed = Column(Flag, default=0, nullable=False)
 
     created_at = Column(DateTime, default=clock.now_utc)
 
@@ -219,7 +219,7 @@ class RecurringTransaction(Base):
     category_id = Column(Integer, ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)
     counterparty = Column(String(255), nullable=True)
     description_match = Column(String(255), nullable=True)  # for auto-detection
-    is_active = Column(Integer, default=1)
+    is_active = Column(Flag, default=1)
     start_date = Column(Date, nullable=True)
     end_date = Column(Date, nullable=True)
     active_months = Column(String(50), nullable=True)  # comma-separated month numbers, NULL = all
@@ -369,7 +369,7 @@ class SavingsLine(Base):
     plan_id = Column(Integer, ForeignKey("savings_plans.id", ondelete="CASCADE"), nullable=False, index=True)
     name = Column(String(255), nullable=False)
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
-    is_income = Column(Integer, default=0, nullable=False)
+    is_income = Column(Flag, default=0, nullable=False)
     annual_budget = Column(Numeric(12, 2), default=0)
     frequency = Column(String(20), nullable=False, default="monthly")
     default_amount = Column(Numeric(12, 2), default=0)
@@ -525,7 +525,7 @@ class NetWorthAccount(Base):
     category = Column(String(50), nullable=False)  # "savings", "investment", "property", "mortgage", "loan", "other"
     balance = Column(Numeric(14, 2), default=0)
     notes = Column(Text, nullable=True)
-    is_active = Column(Integer, default=1)
+    is_active = Column(Flag, default=1)
     updated_at = Column(DateTime, default=clock.now_utc)
     created_at = Column(DateTime, default=clock.now_utc)
 
@@ -689,7 +689,7 @@ class MortgageScenario(Base):
     notes = Column(Text, nullable=True)
     funda_url = Column(String(500), nullable=True)
     photo_url = Column(String(500), nullable=True)
-    is_archived = Column(Integer, default=0)
+    is_archived = Column(Flag, default=0)
     created_at = Column(DateTime, default=clock.now_utc)
     updated_at = Column(DateTime, default=clock.now_utc, onupdate=clock.now_utc)
 
@@ -725,7 +725,7 @@ class ScenarioExistingMortgage(Base):
     # die juridisch geen hypotheek-recht op het nieuwe pand krijgen, terwijl
     # ze wel deel zijn van de dekking (overwaarde-aftrek + nieuwe-annuïteit).
     # Default 1 = meetellen (normaal gedrag voor bank-hypotheken).
-    counts_in_ltv = Column(Integer, nullable=False, default=1)
+    counts_in_ltv = Column(Flag, nullable=False, default=1)
     # Einddatum hypotheekrenteaftrek. Na deze datum telt de rente niet meer
     # mee voor HRA (de schuld loopt door maar verhuist effectief naar box 3).
     # Leeg = altijd aftrekbaar (bv. nieuwe annuïteit 30 jr na afsluiten). Voor
@@ -832,7 +832,7 @@ class WealthPlan(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     year = Column(Integer, nullable=False)
     captured_at = Column(DateTime, default=clock.now_utc, nullable=False)
-    captured_automatically = Column(Integer, default=0, nullable=False)
+    captured_automatically = Column(Flag, default=0, nullable=False)
 
     user = relationship("User", back_populates="wealth_plans")
     entries = relationship("WealthPlanEntry", back_populates="plan", cascade="all, delete-orphan")
@@ -921,7 +921,7 @@ class BunqAccountLink(Base):
     bunq_kind = Column(String(60), nullable=True)        # bv. MonetaryAccountSavings
     bunq_status = Column(String(30), nullable=True)      # ACTIVE, CANCELLED, ...
     balance = Column(Numeric(14, 2), nullable=True)
-    enabled = Column(Integer, nullable=False, default=0, server_default="0")
+    enabled = Column(Flag, nullable=False, default=0, server_default="0")
     account_id = Column(Integer, ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True)
     last_payment_id = Column(BigInteger, nullable=True)  # hoogste betaling-id die verwerkt is (bunq-id's > 2^31)
     last_synced_at = Column(DateTime, nullable=True)
