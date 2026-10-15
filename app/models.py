@@ -17,6 +17,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 
+from app.db_types import Flag
+
 from app import clock
 from app.database import Base
 from app.crypto import EncryptedText
@@ -39,18 +41,18 @@ class User(Base):
     username = Column(String(150), unique=True, nullable=False)
     password_hash = Column(String(255), nullable=False)
     email = Column(String(255), nullable=True)
-    is_verified = Column(Integer, default=1, nullable=False)   # 1 = verified, 0 = pending email verification
-    is_admin = Column(Integer, default=0, nullable=False)       # 1 = admin
-    is_active = Column(Integer, default=1, nullable=False)      # 0 = deactivated by admin
+    is_verified = Column(Flag, default=1, nullable=False)   # 1 = verified, 0 = pending email verification
+    is_admin = Column(Flag, default=0, nullable=False)       # 1 = admin
+    is_active = Column(Flag, default=1, nullable=False)      # 0 = deactivated by admin
     session_version = Column(Integer, nullable=False, default=0)
     # Hypotheek-module feature-flag (GJA-47). Losgekoppeld van is_admin zodat
     # hypotheek-toegang een persoonlijke-finance keuze is, niet systeembeheer.
-    can_access_mortgage = Column(Integer, nullable=False, default=0)
+    can_access_mortgage = Column(Flag, nullable=False, default=0)
     last_login_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=clock.now_utc)
 
     # Weekly digest voorkeuren — opt-in, jouw eigen ritme.
-    weekly_digest_enabled = Column(Integer, default=0, nullable=False)        # 1 = abonneer, 0 = uit
+    weekly_digest_enabled = Column(Flag, default=0, nullable=False)        # 1 = abonneer, 0 = uit
     weekly_digest_weekday = Column(Integer, default=4, nullable=False)        # 0=ma ... 6=zo, default vrijdag
     weekly_digest_hour = Column(Integer, default=8, nullable=False)           # 0..23 in Europe/Amsterdam
     weekly_digest_last_sent_at = Column(DateTime, nullable=True)
