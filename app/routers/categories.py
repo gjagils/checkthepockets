@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, Request, Form, Query
 from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel
@@ -10,8 +12,10 @@ from app.models import (
     RecurringTransaction, Rule, RuleSuggestion, SavingsLine, Transaction,
 )
 from app.auth import require_login
+from app.category_consolidation import apply_consolidation, plan_consolidation
 from app.template_config import templates
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/categories")
 
 
@@ -330,6 +334,49 @@ def archive_category(
         _categories_redirect(redirect_account_id, redirect_show_archived),
         status_code=302,
     )
+
+
+def _manual_choices(form) -> dict[int, int]:
+    """Keuzes uit de preview: velden ``merge_<categorie-id>`` met als waarde het doel-id."""
+    choices: dict[int, int] = {}
+    for name, value in form.items():
+        if name.startswith("merge_") and str(value).isdigit():
+            try:
+                choices[int(name[6:])] = int(value)
+            except ValueError:
+                continue
+    return choices
+
+
+@router.get("/consolidate")
+def consolidate_preview(request: Request, db: Session = Depends(get_db)):
+    """Preview: welke categorieën worden samengevoegd, gedeeld of gearchiveerd."""
+    user = require_login(request, db)
+    choices = {int(k[6:]): int(v) for k, v in request.query_params.items()
+               if k.startswith("merge_") and k[6:].isdigit() and v.isdigit()}
+    plan = plan_consolidation(db, user.id, choices)
+    accounts = {a.id: a.name for a in db.query(Account).filter(Account.user_id == user.id).all()}
+    return templates.TemplateResponse(
+        request, "categories/consolidate.html",
+        {"request": request, "user": user, "plan": plan, "accounts": accounts, "choices": choices,
+         "done": request.query_params.get("done")},
+    )
+
+
+@router.post("/consolidate")
+async def consolidate_apply(request: Request, db: Session = Depends(get_db)):
+    user = require_login(request, db)
+    form = await request.form()
+    choices = _manual_choices(form)
+    try:
+        plan = apply_consolidation(db, user.id, choices)
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.exception("Categorieën consolideren mislukt")
+        return RedirectResponse("/categories/consolidate?done=error", status_code=302)
+    return RedirectResponse(
+        f"/categories/consolidate?done={plan.merges}-{len(plan.archive)}", status_code=302)
 
 
 @router.post("/merge")
