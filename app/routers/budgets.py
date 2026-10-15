@@ -4,13 +4,16 @@ from decimal import Decimal
 from fastapi import APIRouter, Depends, Request, Form, Query
 from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import func, case
+from sqlalchemy import case, func, or_
 
 from app import clock
+from app.budget_scope import (
+    budget_amounts, budgets_in_scope, category_group_id, group_account_ids, put_budget,
+)
 from app.budget_stats import category_spending_average
 from app.forms import parse_amount
 from app.database import get_db
-from app.models import Account, Budget, BudgetPreset, BudgetPresetLine, Category, RecurringTransaction, Transaction
+from app.models import Account, AccountGroup, Budget, BudgetPreset, BudgetPresetLine, Category, RecurringTransaction, Transaction
 from app.auth import require_login
 from app.transaction_queries import transaction_years
 from app.nl_format import month_names_by_number
@@ -27,6 +30,7 @@ def budget_overview(
     year: int = Query(0),
     month: int = Query(0),
     account_id: int = Query(0),
+    group_id: int = Query(0),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
@@ -34,12 +38,19 @@ def budget_overview(
     current_year = year if year else today.year
     current_month = month if month else today.month
 
-    accounts = (
-        db.query(Account)
-        .filter(Account.user_id == user.id)
-        .order_by(Account.name)
+    groups = (
+        db.query(AccountGroup)
+        .filter(AccountGroup.user_id == user.id)
+        .order_by(AccountGroup.name)
         .all()
     )
+    groups = [g for g in groups if g.accounts]
+    if not group_id and account_id:  # oude links met ?account_id=
+        old = db.query(Account.group_id).filter(Account.id == account_id, Account.user_id == user.id).scalar()
+        group_id = old or 0
+    if group_id and group_id not in {g.id for g in groups}:
+        group_id = 0
+    account_ids = group_account_ids(db, user.id, group_id) if group_id else []
 
     # Ensure projected transactions are synced for this month
     from app.recurring_service import sync_projected_transactions
@@ -47,8 +58,10 @@ def budget_overview(
 
     # Get all categories with hierarchy
     cat_query = db.query(Category).filter(Category.user_id == user.id)
-    if account_id:
-        cat_query = cat_query.filter(Category.account_id == account_id)
+    if group_id:
+        cat_query = cat_query.filter(
+            or_(Category.account_id.in_(account_ids), Category.account_id.is_(None))
+        )
     all_categories = cat_query.order_by(Category.sort_order, Category.name).all()
 
     top_level = [c for c in all_categories if c.parent_id is None and not c.is_income and not c.exclude_from_budget]
@@ -59,16 +72,8 @@ def budget_overview(
             children_map.setdefault(c.parent_id, []).append(c)
 
     # Get budgets for this month
-    budgets = (
-        db.query(Budget)
-        .filter(
-            Budget.user_id == user.id,
-            Budget.year == current_year,
-            Budget.month == current_month,
-        )
-        .all()
-    )
-    budget_map = {b.category_id: b.amount for b in budgets}
+    budgets = budgets_in_scope(db, user.id, current_year, current_month, group_id)
+    budget_map = budget_amounts(budgets, group_id)
 
     # Previous month for rollover calculation
     if current_month == 1:
@@ -77,16 +82,8 @@ def budget_overview(
         prev_year, prev_month = current_year, current_month - 1
 
     # Get previous month's budgets
-    prev_budgets = (
-        db.query(Budget)
-        .filter(
-            Budget.user_id == user.id,
-            Budget.year == prev_year,
-            Budget.month == prev_month,
-        )
-        .all()
-    )
-    prev_budget_map = {b.category_id: b.amount for b in prev_budgets}
+    prev_budgets = budgets_in_scope(db, user.id, prev_year, prev_month, group_id)
+    prev_budget_map = budget_amounts(prev_budgets, group_id)
 
     # Get previous month's spending
     prev_spending_query = (
@@ -106,8 +103,8 @@ def budget_overview(
             Category.exclude_from_budget == 0,
         )
     )
-    if account_id:
-        prev_spending_query = prev_spending_query.filter(Transaction.account_id == account_id)
+    if group_id:
+        prev_spending_query = prev_spending_query.filter(Transaction.account_id.in_(account_ids))
     prev_spending = prev_spending_query.group_by(Category.id).all()
     prev_spending_map = {row.id: abs(row.total) for row in prev_spending}
 
@@ -119,7 +116,7 @@ def budget_overview(
         ref_year=current_year,
         ref_month=current_month,
         months=3,
-        account_id=account_id or None,
+        account_ids=account_ids or None,
     )
 
     # Rollover per category: prev_budget - prev_spent (positive = surplus, negative = overspent)
@@ -147,8 +144,8 @@ def budget_overview(
             Category.exclude_from_budget == 0,
         )
     )
-    if account_id:
-        spending_query = spending_query.filter(Transaction.account_id == account_id)
+    if group_id:
+        spending_query = spending_query.filter(Transaction.account_id.in_(account_ids))
 
     spending = spending_query.group_by(Category.id).all()
     spending_map = {row.id: abs(row.total) for row in spending}
@@ -170,8 +167,8 @@ def budget_overview(
             Category.exclude_from_budget == 0,
         )
     )
-    if account_id:
-        projected_query = projected_query.filter(Transaction.account_id == account_id)
+    if group_id:
+        projected_query = projected_query.filter(Transaction.account_id.in_(account_ids))
     projected_rows = projected_query.group_by(Category.id).all()
     projected_map = {row.id: abs(row.total) for row in projected_rows}
 
@@ -267,8 +264,8 @@ def budget_overview(
             Transaction.is_excluded == 0,
         )
     )
-    if account_id:
-        income_spending_query = income_spending_query.filter(Transaction.account_id == account_id)
+    if group_id:
+        income_spending_query = income_spending_query.filter(Transaction.account_id.in_(account_ids))
     income_spending = income_spending_query.group_by(Category.id).all()
     income_actual_map = {row.id: row.total for row in income_spending}
 
@@ -335,8 +332,8 @@ def budget_overview(
             Transaction.transfer_id.is_(None),
         )
     )
-    if account_id:
-        income_query = income_query.filter(Transaction.account_id == account_id)
+    if group_id:
+        income_query = income_query.filter(Transaction.account_id.in_(account_ids))
 
     income_result = income_query.first()
     total_income_received = income_result.income or Decimal("0")
@@ -395,8 +392,8 @@ def budget_overview(
             "current_month": current_month,
             "years": years,
             "months": MONTH_NAMES_NL,
-            "accounts": accounts,
-            "current_account_id": account_id or None,
+            "groups": groups,
+            "current_group_id": group_id or None,
             "budget_data": budget_data,
             "total_budgeted": total_budgeted,
             "total_spent": total_spent,
@@ -423,6 +420,7 @@ def save_budget(
     year: int = Form(...),
     month: int = Form(...),
     amount: str = Form("0"),
+    group_id: int = Form(0),
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
@@ -440,29 +438,8 @@ def save_budget(
     if parsed is None:
         return JSONResponse({"ok": False, "error": "invalid_amount"}, status_code=400)
 
-    budget = (
-        db.query(Budget)
-        .filter(
-            Budget.user_id == user.id,
-            Budget.category_id == category_id,
-            Budget.year == year,
-            Budget.month == month,
-        )
-        .first()
-    )
-
-    if budget:
-        budget.amount = parsed
-    else:
-        budget = Budget(
-            user_id=user.id,
-            category_id=category_id,
-            year=year,
-            month=month,
-            amount=parsed,
-        )
-        db.add(budget)
-
+    scope = group_id or category_group_id(db, cat)
+    put_budget(db, user.id, category_id, scope, year, month, parsed)
     db.commit()
 
     return JSONResponse({"ok": True, "amount": float(parsed)})
@@ -490,26 +467,7 @@ def copy_budgets(
     )
 
     for src in source:
-        existing = (
-            db.query(Budget)
-            .filter(
-                Budget.user_id == user.id,
-                Budget.category_id == src.category_id,
-                Budget.year == to_year,
-                Budget.month == to_month,
-            )
-            .first()
-        )
-        if existing:
-            existing.amount = src.amount
-        else:
-            db.add(Budget(
-                user_id=user.id,
-                category_id=src.category_id,
-                year=to_year,
-                month=to_month,
-                amount=src.amount,
-            ))
+        put_budget(db, user.id, src.category_id, src.group_id, to_year, to_month, src.amount)
 
     db.commit()
 
@@ -522,6 +480,7 @@ def budget_from_average(
     to_year: int = Form(...),
     to_month: int = Form(...),
     num_months: int = Form(3),
+    group_id: int = Form(0),
     db: Session = Depends(get_db),
 ):
     """Set budget per category based on average spending over the last N months."""
@@ -544,32 +503,17 @@ def budget_from_average(
     # projected transactions, no categories excluded from the budget.
     averages = category_spending_average(
         db, user_id=user.id, ref_year=to_year, ref_month=to_month, months=num_months,
+        account_ids=group_account_ids(db, user.id, group_id) if group_id else None,
     )
 
     count = 0
     for category_id, average in averages.items():
         avg_amount = average.quantize(Decimal("1"))  # round to nearest euro
 
-        existing = (
-            db.query(Budget)
-            .filter(
-                Budget.user_id == user.id,
-                Budget.category_id == category_id,
-                Budget.year == to_year,
-                Budget.month == to_month,
-            )
-            .first()
-        )
-        if existing:
-            existing.amount = avg_amount
-        else:
-            db.add(Budget(
-                user_id=user.id,
-                category_id=category_id,
-                year=to_year,
-                month=to_month,
-                amount=avg_amount,
-            ))
+        category = db.query(Category).filter(Category.id == category_id, Category.user_id == user.id).first()
+        if category is None:
+            continue
+        put_budget(db, user.id, category_id, group_id or category_group_id(db, category), to_year, to_month, avg_amount)
         count += 1
 
     db.commit()
@@ -625,6 +569,7 @@ def load_budget_preset(
     preset_id: int = Form(...),
     to_year: int = Form(...),
     to_month: int = Form(...),
+    group_id: int = Form(0),
     db: Session = Depends(get_db),
 ):
     """Apply a preset to the current month (overwrites existing budgets)."""
@@ -639,26 +584,11 @@ def load_budget_preset(
         return RedirectResponse(f"/budgets?year={to_year}&month={to_month}", status_code=302)
 
     for line in preset.lines:
-        existing = (
-            db.query(Budget)
-            .filter(
-                Budget.user_id == user.id,
-                Budget.category_id == line.category_id,
-                Budget.year == to_year,
-                Budget.month == to_month,
-            )
-            .first()
-        )
-        if existing:
-            existing.amount = line.amount
-        else:
-            db.add(Budget(
-                user_id=user.id,
-                category_id=line.category_id,
-                year=to_year,
-                month=to_month,
-                amount=line.amount,
-            ))
+        category = db.query(Category).filter(Category.id == line.category_id, Category.user_id == user.id).first()
+        if category is None:
+            continue
+        put_budget(db, user.id, line.category_id, group_id or category_group_id(db, category),
+                   to_year, to_month, line.amount)
 
     db.commit()
     return RedirectResponse(f"/budgets?year={to_year}&month={to_month}", status_code=302)

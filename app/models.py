@@ -468,12 +468,20 @@ class Budget(Base):
     year = Column(Integer, nullable=False)
     month = Column(Integer, nullable=False)
     amount = Column(Numeric(12, 2), nullable=False, default=0)
+    # ACT-55b: het budget geldt voor een rekeninggroep; NULL = niet aan een groep gebonden (legacy/global).
+    group_id = Column(Integer, ForeignKey("account_groups.id", ondelete="SET NULL"), nullable=True, index=True)
 
     user = relationship("User", back_populates="budgets")
     category = relationship("Category", back_populates="budgets")
+    group = relationship("AccountGroup")
 
     __table_args__ = (
-        UniqueConstraint("user_id", "category_id", "year", "month", name="uq_budget_user_cat_year_month"),
+        UniqueConstraint("user_id", "category_id", "group_id", "year", "month", name="uq_budget_user_cat_group_year_month"),
+        # NULL != NULL: zonder groep houdt deze partiële index de combinatie toch uniek.
+        Index(
+            "uq_budget_user_cat_year_month_nogroup", "user_id", "category_id", "year", "month",
+            unique=True, postgresql_where=text("group_id IS NULL"), sqlite_where=text("group_id IS NULL"),
+        ),
     )
 
 

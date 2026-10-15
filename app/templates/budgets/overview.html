@@ -21,6 +21,7 @@
         <form method="post" action="/budgets/preset/load" style="display:inline-flex; gap:0.35rem; align-items:center;">
             <input type="hidden" name="to_year" value="{{ current_year }}">
             <input type="hidden" name="to_month" value="{{ current_month }}">
+            <input type="hidden" name="group_id" value="{{ current_group_id or 0 }}">
             <select name="preset_id" class="select-sm" style="height:2rem;">
                 <option value="">— preset laden —</option>
                 {% for p in presets %}
@@ -106,12 +107,12 @@
             </select>
         </div>
         <div class="form-group">
-            <label for="account_id">Rekening</label>
-            <select name="account_id" id="account_id">
+            <label for="group_id">Rekening(groep)</label>
+            <select name="group_id" id="group_id">
                 <option value="0">Alle rekeningen</option>
-                {% for acc in accounts %}
-                <option value="{{ acc.id }}" {% if current_account_id == acc.id %}selected{% endif %}>
-                    {{ acc.name }}
+                {% for g in groups %}
+                <option value="{{ g.id }}" {% if current_group_id == g.id %}selected{% endif %}>
+                    {{ g.name }}{% if g.accounts|length > 1 %} ({{ g.accounts|map(attribute='name')|sort|join(' + ') }}){% endif %}
                 </option>
                 {% endfor %}
             </select>
@@ -439,6 +440,7 @@
         <form method="post" action="/budgets/average" class="filter-bar" style="flex-wrap:wrap;">
             <input type="hidden" name="to_year" value="{{ current_year }}">
             <input type="hidden" name="to_month" value="{{ current_month }}">
+            <input type="hidden" name="group_id" value="{{ current_group_id or 0 }}">
             <div class="form-group">
                 <label>Aantal maanden</label>
                 <select name="num_months">
@@ -541,6 +543,7 @@ function saveBudget(input) {
     formData.append('year', {{ current_year|tojson }});
     formData.append('month', {{ current_month|tojson }});
     formData.append('amount', value);
+    formData.append('group_id', {{ (current_group_id or 0)|tojson }});
 
     fetch('/budgets/save', {
         method: 'POST',

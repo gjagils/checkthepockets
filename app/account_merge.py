@@ -107,7 +107,7 @@ def _fold_category(db: Session, source_id: int, target_id: int) -> None:
     """Point everything that uses category `source_id` at `target_id`, then delete the source."""
     # Rows with a unique key that includes the category: keep the target's row on a clash.
     for model, key_columns in (
-        (Budget, ("user_id", "year", "month")),
+        (Budget, ("user_id", "group_id", "year", "month")),
         (MortgageScenarioBudget, ("scenario_id",)),
     ):
         kept = {tuple(getattr(r, c) for c in key_columns)
