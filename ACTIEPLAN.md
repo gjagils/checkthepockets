@@ -95,13 +95,13 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-46 | P3 | Afgerond | ACT-39 | [Mortgage-formulieren en lange functies opknippen](#act-46) |
 | ACT-47 | P2 | Review | — | [CSS-tokens en dode CSS](#act-47) |
 | ACT-48 | P2 | Review | — | [Gedeeld JavaScript en gepinde Chart.js](#act-48) |
-| ACT-49 | P2 | Gepland | ACT-48 | [Jinja-macro's en filters](#act-49) |
-| ACT-50 | P3 | Gepland | ACT-47, ACT-49 | [Inline styles naar utility-classes](#act-50) |
+| ACT-49 | P2 | Review | ACT-48 | [Jinja-macro's en filters](#act-49) |
+| ACT-50 | P3 | Review | ACT-47, ACT-49 | [Inline styles naar utility-classes](#act-50) |
 | ACT-51 | P2 | Afgerond | ACT-39 | [HTTP-vangnet voor redesign-schermen en parsers](#act-51) |
 | ACT-52 | P3 | Gepland | ACT-41 | [Model-typing: Boolean, enums, Mapped](#act-52) |
-| ACT-53 | P2 | Gepland | ACT-31, ACT-28 | [Persoonspagina: verwachting betaalrekeningen en vermogen](#act-53) |
+| ACT-53 | P2 | Review | ACT-31, ACT-28 | [Persoonspagina: verwachting betaalrekeningen en vermogen](#act-53) |
 | ACT-54 | P2 | Review | — | [Regelvoorstellen leesbaar: volledige omschrijving en groepering](#act-54) |
-| ACT-55 | P2 | Gepland | ACT-31 | [Rekeninggroepen, één categorieënset en budget per groep](#act-55) |
+| ACT-55 | P2 | Review | ACT-31 | [Rekeninggroepen, één categorieënset en budget per groep](#act-55) |
 
 ## Beschrijving en acceptatiecriteria
 
@@ -651,6 +651,13 @@ Gemerged en gedeployed: ACT-36 [#221](https://github.com/gjagils/checkthepockets
 - **ACT-48** JavaScript: `app/static/js/app.js` (thema, drawer, `formatEuro`, `escapeHtml`, `toggleEdit`, `fetchJson`), Chart.js 4.4.1 met SRI. De 15 bestaande `fetch()`-aanroepen en de overige inline scriptblokken zijn nog niet omgezet naar `fetchJson`/aparte bestanden.
 - **ACT-54** regelvoorstellen als kaartjes (PR 243).
 - **Nog niet gedaan:** ACT-49, ACT-50, ACT-52, ACT-53 en de gedeelde categorieën met budget per rekening.
+
+### Persoonspagina en rekeninggroepen (ACT-49, ACT-50, ACT-53, ACT-55) — uitkomst, 2026-10-15, Claude Code
+
+- **ACT-49** (deel): filters `date`, `datetime`, `euro_sign`, `euro0_sign` (#245); macro's en a11y-werk nog niet gedaan. **ACT-50** (deel): 21 utility-klassen, ~350 inline styles vervangen (#246); samengestelde en variabele stijlen blijven.
+- **ACT-53**: rekenkern (#247), pagina `/persons/{id}` met periodes 3/6/12 mnd en 2/3/5 jaar, grafiek, maandtabel en blok "Naar 18 jaar" (#248), menu-item Verwachting onder Portfolio (#251). Keuzes: gedeelde rekeningen gelijk verdeeld; spaaropdrachten als aparte regel "Naar sparen" in de verwachting; variabele uitgaven en budgetten zitten er nog niet in.
+- **ACT-55**: rekeninggroepen (#250, migratie 070), budget per groep (#252, migratie 071), categorieën consolideren met preview, samenvoegen en archiveren (#253), pagina's op de gedeelde set (#254). Gebruiker moet de preview in productie doorlopen; er is geen automatische undo.
+- **Bewust niet gedaan:** ACT-52 (Boolean-migratie raakt alle `== 0/1`-vergelijkingen in queries; apart en samen met de gebruiker). De oude route `POST /categories/merge` volgt nog niet de fold-logica.
 
 ## Besluitenlog
 
