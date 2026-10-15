@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block title %}{{ person.name }} - Verwachting - Check Your Pockets{% endblock %}
+{% block container_class %}container-wide{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>{{ person.name }}</h1>
+        <p class="muted">Verwachting betaalrekeningen en vermogen. Gedeelde rekeningen worden gelijk verdeeld over de eigenaren.</p>
+    </div>
+    <a class="btn btn-sm" href="/persons">Personen beheren</a>
+</div>
+
+<div class="portfolio-tabs u-mb-1" style="display:flex; gap:.4rem; flex-wrap:wrap;">
+    {% for item in persons %}
+    <a class="btn btn-sm {% if item.id == person.id %}btn-primary{% endif %}" href="/persons/{{ item.id }}?period={{ period }}">{{ item.name }}</a>
+    {% endfor %}
+</div>
+<div class="portfolio-tabs u-mb-15" style="display:flex; gap:.4rem; flex-wrap:wrap;">
+    {% for value, label in periods %}
+    <a class="btn btn-sm {% if value == period %}btn-primary{% endif %}" href="/persons/{{ person.id }}?period={{ value }}">{{ label }}</a>
+    {% endfor %}
+</div>
+
+{% set last = forecast.rows[-1] %}
+<div class="accounts-grid u-mb-15">
+    <section class="card">
+        <p class="muted u-mb-0">Saldo betaalrekeningen nu</p>
+        <strong style="font-size:1.6rem;">{{ forecast.start_balance|euro_sign }}</strong>
+        {% if not forecast.balance_known %}<p class="muted u-mb-0">Van een rekening is nog geen saldo bekend.</p>{% endif %}
+    </section>
+    <section class="card">
+        <p class="muted u-mb-0">Verwacht saldo over {{ forecast.months }} mnd</p>
+        <strong style="font-size:1.6rem;" class="{% if last.balance < 0 %}status-below{% endif %}">{{ last.balance|euro_sign }}</strong>
+        {% if forecast.min_balance is not none and forecast.min_balance < 0 %}
+        <p class="status-below u-mb-0">Onder nul in {{ forecast.min_month|date }}</p>
+        {% elif forecast.min_balance is not none %}
+        <p class="muted u-mb-0">Laagste stand {{ forecast.min_balance|euro_sign }} ({{ forecast.min_month|date }})</p>
+        {% endif %}
+    </section>
+    <section class="card">
+        <p class="muted u-mb-0">Verwacht vermogen over {{ forecast.months }} mnd</p>
+        <strong style="font-size:1.6rem;">{{ last.wealth.total|euro_sign }}</strong>
+        <p class="muted u-mb-0">Sparen {{ last.wealth.savings|euro_sign }} · beleggen {{ last.wealth.portfolio|euro_sign }}</p>
+    </section>
+</div>
+
+{% set ms = forecast.milestone %}
+{% if ms %}
+<div class="card u-mb-15" style="border-left:4px solid var(--gold);">
+    <strong>Naar {{ ms.age }} jaar</strong>
+    {% if ms.reached %}
+    <span class="muted"> · bereikt op {{ ms.date|date }}</span>
+    {% else %}
+    <span class="muted"> · {{ ms.date|date }}, nog {{ ms.months_left }} maanden</span>
+    {% if ms.wealth %}
+    <p class="u-mb-0">Verwacht vermogen: <strong>{{ ms.wealth.total|euro_sign }}</strong>
+        <span class="muted">(sparen {{ ms.wealth.savings|euro_sign }}, beleggen {{ ms.wealth.portfolio|euro_sign }})</span></p>
+    {% else %}
+    <p class="muted u-mb-0">Te ver vooruit om te berekenen.</p>
+    {% endif %}
+    {% endif %}
+</div>
+{% endif %}
+
+{% if forecast.accounts %}
+<div class="card u-mb-15">
+    <h3 class="u-m-0-0-075">Betaalrekeningen van {{ person.name }}</h3>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Rekening</th><th class="text-right">Aandeel</th><th class="text-right">Saldo</th><th class="text-right">Jouw deel</th></tr></thead>
+            <tbody>
+            {% for a in forecast.accounts %}
+            <tr>
+                <td>{{ a.name }}</td>
+                <td class="text-right">{{ (a.share * 100)|round|int }}%</td>
+                <td class="text-right nowrap">{% if a.balance is not none %}{{ a.balance|euro_sign }}{% else %}<span class="muted">onbekend</span>{% endif %}</td>
+                <td class="text-right nowrap">{{ a.owned_balance|euro_sign }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="alert alert-info">Er zijn nog geen betaalrekeningen aan {{ person.name }} gekoppeld. Stel eigenaren in op de pagina Rekeningen.</div>
+{% endif %}
+
+<div class="card u-mb-15">
+    <h3 class="u-m-0-0-075">Verloop</h3>
+    <div style="position:relative; height:280px;"><canvas id="personChart"></canvas></div>
+</div>
+
+<div class="card" style="padding:0; overflow:hidden;">
+    <div class="table-wrap">
+        <table>
+            <thead><tr>
+                <th>Maand</th><th class="text-right">Inkomsten</th><th class="text-right">Uitgaven</th>
+                <th class="text-right">Naar sparen</th><th class="text-right">Saldo</th><th class="text-right">Vermogen</th>
+            </tr></thead>
+            <tbody>
+            {% for r in forecast.rows %}
+            <tr>
+                <th>{{ r.month.strftime('%m-%Y') }}</th>
+                <td class="text-right nowrap">{{ r.income|euro_sign }}</td>
+                <td class="text-right nowrap">{{ r.expenses|euro_sign }}</td>
+                <td class="text-right nowrap">{{ r.to_savings|euro_sign }}</td>
+                <td class="text-right nowrap {% if r.balance < 0 %}status-below{% endif %}">{{ r.balance|euro_sign }}</td>
+                <td class="text-right nowrap">{{ r.wealth.total|euro_sign }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+<p class="muted u-mt-075">Gebaseerd op je terugkerende posten per rekening; variabele uitgaven en budgetten zitten er nog niet in.
+    {% if forecast.months > 12 %}Voor langere periodes wordt de verwachting onzekerder.{% endif %}</p>
+{% endblock %}
+
+{% block vendor %}{% include "_chartjs.html" %}{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+    var data = {{ chart | tojson }};
+    var el = document.getElementById('personChart');
+    if (!el || typeof Chart === 'undefined') return;
+    new Chart(el, {
+        type: 'line',
+        data: {
+            labels: data.labels,
+            datasets: [
+                {label: 'Saldo betaalrekeningen', data: data.balance, borderColor: '#40C4FF', tension: 0.2, fill: false},
+                {label: 'Vermogen', data: data.wealth, borderColor: '#FF9800', tension: 0.2, fill: false}
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {tooltip: {callbacks: {label: function (c) { return c.dataset.label + ': ' + formatEuro(c.raw, true); }}}},
+            scales: {y: {ticks: {callback: function (v) { return formatEuro(v, true); }}}}
+        }
+    });
+})();
+</script>
+{% endblock %}

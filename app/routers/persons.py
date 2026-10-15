@@ -1,12 +1,13 @@
 import datetime
 
-from fastapi import APIRouter, Depends, Request, Form
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Form
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.auth import require_login
 from app.database import get_db
 from app.models import Person
+from app.person_forecast import build_person_forecast
 from app.person_utils import format_age_nl
 from app.redirects import safe_redirect
 from app.template_config import templates
@@ -42,6 +43,37 @@ def list_persons(request: Request, db: Session = Depends(get_db)):
             "user": user,
             "persons": persons,
             "format_age_nl": format_age_nl,
+        },
+    )
+
+
+PERIODS = [(3, "3 mnd"), (6, "6 mnd"), (12, "12 mnd"), (24, "2 jaar"), (36, "3 jaar"), (60, "5 jaar")]
+
+
+@router.get("/{person_id}")
+def person_page(request: Request, person_id: int, period: int = Query(12), db: Session = Depends(get_db)):
+    """Verwachting per persoon: betaalrekeningen en vermogen (ACT-53)."""
+    user = require_login(request, db)
+    months = period if period in {p for p, _ in PERIODS} else 12
+    forecast = build_person_forecast(db, user.id, person_id, months)
+    if forecast is None:
+        raise HTTPException(status_code=404, detail="Persoon niet gevonden")
+    persons = (
+        db.query(Person).filter(Person.user_id == user.id)
+        .order_by(Person.sort_order, Person.name).all()
+    )
+    rows = forecast["rows"]
+    chart = {
+        "labels": [r["month"].strftime("%m-%Y") for r in rows],
+        "balance": [float(r["balance"]) for r in rows],
+        "wealth": [float(r["wealth"]["total"]) for r in rows],
+    }
+    return templates.TemplateResponse(
+        request,
+        "persons/detail.html",
+        {
+            "request": request, "user": user, "persons": persons, "forecast": forecast,
+            "person": forecast["person"], "period": months, "periods": PERIODS, "chart": chart,
         },
     )
 

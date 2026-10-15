@@ -68,6 +68,7 @@
                         {% if person.birthdate %}{{ format_age_nl(person.birthdate) }}{% else %}—{% endif %}
                     </td>
                     <td class="text-right">
+                        <a class="btn btn-sm" href="/persons/{{ person.id }}">Verwachting</a>
                         <form class="u-inline" method="post" action="/persons/{{ person.id }}/delete"
                               onsubmit='return confirm({{ ((person.name) ~ ' verwijderen? Alle koppelingen met beleggingen en rekeningen gaan verloren.')|tojson }});'>
                             <button type="submit" class="btn btn-sm btn-danger">Verwijderen</button>

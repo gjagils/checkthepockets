@@ -83,3 +83,26 @@ def test_milestone_for_child_and_unknown_person(db):
 def test_month_helpers():
     assert add_months(datetime.date(2026, 11, 20), 3) == datetime.date(2027, 2, 1)
     assert months_until(datetime.date(2028, 12, 5), TODAY) == 26
+
+
+
+def test_person_page_renders_for_all_periods_and_scopes_to_the_user(db):
+    from fastapi.testclient import TestClient
+
+    from app.auth import create_session_cookie
+    from app.main import app
+
+    user, nel, _, kid = _world(db)
+    other = User(username="other", email="o@example.test", password_hash=hash_password("pw"))
+    db.add(other)
+    db.commit()
+    client = TestClient(app)
+    client.cookies.set("session", create_session_cookie(user.id))
+    for period in (3, 6, 12, 24, 36, 60):
+        page = client.get(f"/persons/{nel.id}?period={period}")
+        assert page.status_code == 200 and "Nelleke" in page.text
+    assert "Naar 18 jaar" in client.get(f"/persons/{kid.id}").text
+    assert client.get("/persons/999").status_code == 404
+    other_client = TestClient(app)
+    other_client.cookies.set("session", create_session_cookie(other.id))
+    assert other_client.get(f"/persons/{nel.id}").status_code == 404
