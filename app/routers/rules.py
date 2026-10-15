@@ -64,6 +64,7 @@ def rules_list(request: Request, from_tx: int = Query(None), db: Session = Depen
         .order_by(RuleSuggestion.uncat_count.desc())
         .all()
     )
+    suggestion_cards = _suggestion_cards(db, user.id, rule_suggestions)
     analyze_status = request.query_params.get("analyze", "")
 
     # Build subcategories list for the suggestion dropdowns
@@ -107,6 +108,7 @@ def rules_list(request: Request, from_tx: int = Query(None), db: Session = Depen
             "prefill": prefill,
             "show_ai_suggest": show_ai_suggest,
             "rule_suggestions": rule_suggestions,
+            "suggestion_cards": suggestion_cards,
             "sub_categories": sub_categories,
             "analyze_status": analyze_status,
         },
@@ -350,6 +352,47 @@ def dismiss_rule_suggestion(suggestion_id: int, request: Request, db: Session = 
     return RedirectResponse("/rules", status_code=302)
 
 
+def _suggestion_cards(db: Session, user_id: int, suggestions: list) -> list[dict]:
+    """Per voorstel een voorbeeld (volledige omschrijving van één echte transactie).
+
+    Voorstellen met dezelfde zoekterm staan bij elkaar en krijgen een groepsgrootte,
+    zodat bijna-identieke voorstellen te onderscheiden zijn. Filteren in Python:
+    versleutelde velden ondersteunen geen SQL-vergelijking.
+    """
+    if not suggestions:
+        return []
+    txs = (
+        db.query(Transaction)
+        .join(Account)
+        .filter(Account.user_id == user_id, Transaction.is_excluded == 0, Transaction.is_projected == 0)
+        .order_by(Transaction.date.desc())
+        .all()
+    )
+    haystacks = [((tx.description or "").lower(), (tx.counterparty or "").lower(), tx) for tx in txs]
+    cards = []
+    for s in suggestions:
+        term = s.match_value.lower()
+        example = next((tx for d, c, tx in haystacks if term in d or term in c), None)
+        cards.append({
+            "s": s,
+            "example_description": (example.description or "") if example else "",
+            "example_counterparty": (example.counterparty or "") if example else "",
+            "example_date": example.date if example else None,
+        })
+    cards.sort(key=lambda c: (c["s"].match_value.lower(), -c["s"].uncat_count))
+    sizes: dict[str, int] = {}
+    for c in cards:
+        key = c["s"].match_value.lower()
+        sizes[key] = sizes.get(key, 0) + 1
+    seen: dict[str, int] = {}
+    for c in cards:
+        key = c["s"].match_value.lower()
+        seen[key] = seen.get(key, 0) + 1
+        c["group_size"] = sizes[key]
+        c["group_index"] = seen[key]
+    return cards
+
+
 @router.get("/rules/suggestion/{suggestion_id}/transactions")
 def suggestion_transactions(suggestion_id: int, request: Request, db: Session = Depends(get_db)):
     """Return matching transactions for a rule suggestion as JSON."""
@@ -379,7 +422,7 @@ def suggestion_transactions(suggestion_id: int, request: Request, db: Session = 
                 "id": tx.id,
                 "date": tx.date.isoformat(),
                 "counterparty": tx.counterparty or "",
-                "description": (tx.description or "")[:80],
+                "description": tx.description or "",
                 "amount": float(tx.amount),
                 "category": tx.category.name if tx.category else None,
             })

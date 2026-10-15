@@ -2078,3 +2078,19 @@ button.m-nav-main { border: none; width: 100%; text-align: left; }
 .card-success { margin-bottom: 1rem; background: var(--green-bg); border: 1px solid var(--green); }
 .card-danger { margin-bottom: 1rem; background: var(--red-bg); border: 1px solid var(--red); }
 .alert-warning { background: var(--orange-bg); border: 1px solid var(--orange); color: var(--text); }
+
+/* ===== Regelvoorstellen als kaartjes (ACT-54) ===== */
+.suggestion-cards { display: grid; gap: 0.75rem; }
+.suggestion-card { border: 1px solid var(--border); border-radius: var(--ctp-radius-sm); background: var(--surface-2); padding: 0.75rem 1rem; }
+.suggestion-label { display: block; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0.4rem 0 0.15rem; }
+.suggestion-match { width: 100%; resize: none; overflow: hidden; font-size: 0.85rem; padding: 0.4rem 0.5rem; line-height: 1.4; }
+.suggestion-example { font-size: 0.78rem; margin: 0.35rem 0 0.2rem; word-break: break-word; }
+.suggestion-group { font-size: 0.75rem; }
+.suggestion-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; }
+.suggestion-fields input, .suggestion-fields select { width: 100%; font-size: 0.85rem; padding: 0.3rem 0.5rem; }
+.suggestion-footer { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.6rem; }
+.suggestion-counts { margin-right: auto; font-size: 0.85rem; }
+.suggestion-counts a { text-decoration: none; }
+.suggestion-overwrite { font-size: 0.8rem; cursor: pointer; }
+.suggestion-txs { margin-top: 0.6rem; padding: 0.5rem 0.75rem; background: var(--bg); max-height: 300px; overflow-y: auto; font-size: 0.8rem; border-radius: var(--ctp-radius-sm); }
+@media (max-width: 768px) { .suggestion-fields { grid-template-columns: 1fr; } }

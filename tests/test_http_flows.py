@@ -72,3 +72,22 @@ def test_duplicates_and_split_pages_render(world):  # noqa: F811
     assert client.get("/transactions/duplicates").status_code == 200
     assert client.get(f"/transactions/{ids['tx']}/split").status_code == 200
     assert client.get("/transactions/create").status_code == 200
+
+
+def test_rule_suggestions_show_full_description_example_and_group(world, db):  # noqa: F811
+    from app.models import RuleSuggestion, User
+    client, ids = world
+    user = db.query(User).filter_by(username="smoke-admin").one()
+    long_text = "Omschrijving 7 " + "x" * 120 + " einde-van-de-omschrijving"
+    tx = db.query(Transaction).filter_by(import_hash="smoke-7").one()
+    tx.description = long_text
+    for name in ("Tegenpartij 7", "Tegenpartij 7"):
+        db.add(RuleSuggestion(user_id=user.id, match_value=name, uncat_count=1, cat_count=0))
+    db.commit()
+    html = client.get("/rules").text
+    assert "einde-van-de-omschrijving" in html          # volledige omschrijving zichtbaar als voorbeeld
+    assert "Zelfde zoekterm: voorstel 1 van 2" in html
+    assert "Zelfde zoekterm: voorstel 2 van 2" in html
+    sid = db.query(RuleSuggestion).first().id
+    data = client.get(f"/rules/suggestion/{sid}/transactions").json()
+    assert any(t["description"] == long_text for t in data["transactions"])   # niet afgekapt
