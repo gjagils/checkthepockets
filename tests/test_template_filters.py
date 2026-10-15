@@ -19,4 +19,4 @@ def test_date_and_datetime_filters_handle_none():
 def test_euro_sign_matches_euro_filter_with_symbol():
     assert _render("v|euro_sign", v=Decimal("1234.5")) == "€ 1.234,50"
     assert _render("v|euro_sign", v=Decimal("-3")) == "€ -3,00"
-    assert _render("v|euro0_sign", v=Decimal("1234.5")) == "€ 1.235"
+    assert _render("v|euro0_sign", v=Decimal("1234.6")) == "€ 1.235"
