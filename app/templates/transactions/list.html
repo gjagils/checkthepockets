@@ -3,7 +3,7 @@
 {% block container_class %}container-wide{% endblock %}
 {% block content %}
 {% if back_url %}
-<div style="margin-bottom:0.75rem;">
+<div class="u-mb-075">
     <a href="{{ back_url }}" class="btn btn-sm">&larr; {{ back_label }}</a>
 </div>
 {% endif %}
@@ -24,7 +24,7 @@
 <div class="alert" style="background:var(--green-bg); border:1px solid var(--green); padding:0.75rem 1rem; border-radius:var(--ctp-radius-sm); margin-bottom:1rem;">
     <strong>🔄 {{ _recurring_proposals.split(',')|length }} transactie(s) gevonden</strong> die ook bij <em>{{ _recurring_name }}</em> lijken te horen.
     <div style="margin-top:0.5rem; display:flex; gap:0.5rem;">
-        <form method="post" action="/transactions/accept-recurring-proposals" style="display:inline;">
+        <form class="u-inline" method="post" action="/transactions/accept-recurring-proposals">
             <input type="hidden" name="transaction_ids" value="{{ _recurring_proposals }}">
             <input type="hidden" name="recurring_id" value="{{ _recurring_item_id }}">
             <input type="hidden" name="redirect_to" value="/transactions?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}">
@@ -302,7 +302,7 @@
                                         <td class="muted">{{ cand.description or '-' }}</td>
                                         <td class="text-right nowrap {% if cand.amount < 0 %}amount-negative{% else %}amount-positive{% endif %}">{{ cand.amount|euro_sign }}</td>
                                         <td>
-                                            <form method="post" action="/recurring/{{ tx.recurring_id }}/link" style="margin:0;">
+                                            <form class="u-m0" method="post" action="/recurring/{{ tx.recurring_id }}/link">
                                                 <input type="hidden" name="transaction_id" value="{{ cand.id }}">
                                                 <input type="hidden" name="shift_to_date" value="{{ tx.date.isoformat() }}">
                                                 <input type="hidden" name="redirect_to" value="/transactions?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}">
@@ -321,7 +321,7 @@
                             {% endif %}
                             <div class="tx-panel-footer" style="margin-top:0.6rem;">
                                 {% set _skip_month_label = tx.date.strftime('%m-%Y') %}
-                                <form method="post" action="/recurring/projected/{{ tx.id }}/skip" style="display:inline;"
+                                <form class="u-inline" method="post" action="/recurring/projected/{{ tx.id }}/skip"
                                       onsubmit='return confirm({{ ('Deze verwachte transactie voor ' ~ (_skip_month_label) ~ ' definitief weghalen? De terugkerende post zelf blijft bestaan, alleen deze maand wordt overgeslagen.')|tojson }})'>
                                     <input type="hidden" name="redirect_to" value="/transactions?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}">
                                     <button type="submit" class="tx-panel-footer-btn tx-panel-footer-danger">🗑 Verwachting voor deze maand weghalen</button>
@@ -420,7 +420,7 @@
                                 </span>
                                 <span class="tx-panel-footer-sep">·</span>
                                 {% if tx.transfer_id %}
-                                <form method="post" action="/transactions/{{ tx.id }}/unlink-transfer" style="display:inline;">
+                                <form class="u-inline" method="post" action="/transactions/{{ tx.id }}/unlink-transfer">
                                     <input type="hidden" name="redirect_to" value="/transactions?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}">
                                     <button type="submit" class="tx-panel-footer-btn" onclick="return confirm('Transfer koppeling verwijderen?')">⇄ Transfer ontkoppelen</button>
                                 </form>
@@ -437,7 +437,7 @@
                                 {% endif %}
                                 <span class="tx-panel-footer-sep">·</span>
                                 {% if tx.recurring_id %}
-                                <form method="post" action="/transactions/{{ tx.id }}/link-recurring" style="display:inline;">
+                                <form class="u-inline" method="post" action="/transactions/{{ tx.id }}/link-recurring">
                                     <input type="hidden" name="redirect_to" value="/transactions?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}">
                                     <input type="hidden" name="recurring_id" value="0">
                                     <button type="submit" class="tx-panel-footer-btn">🔄 Ontkoppel terugkerend</button>
@@ -458,7 +458,7 @@
                                 </span>
                                 {% endif %}
                                 <span class="tx-panel-footer-sep">·</span>
-                                <form method="post" action="/transactions/{{ tx.id }}/exclude" style="display:inline;">
+                                <form class="u-inline" method="post" action="/transactions/{{ tx.id }}/exclude">
                                     <input type="hidden" name="redirect_to" value="/transactions?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}">
                                     {% if tx.is_excluded %}
                                     <button type="submit" class="tx-panel-footer-btn" title="Weer tonen in overzichten">Terugzetten</button>
@@ -526,12 +526,12 @@
 {% endif %}
 
 {% else %}
-<div class="card" style="text-align:center; padding:3rem;">
+<div class="card u-empty-lg">
     {% if filter_params %}
-    <p style="margin-bottom:1rem;">Geen transacties gevonden met deze filters.</p>
+    <p class="u-mb-1">Geen transacties gevonden met deze filters.</p>
     <a href="/transactions" class="btn btn-primary">Filters wissen</a>
     {% else %}
-    <p style="margin-bottom:1rem;">Nog geen transacties. Begin met een import of voeg één betaling handmatig toe.</p>
+    <p class="u-mb-1">Nog geen transacties. Begin met een import of voeg één betaling handmatig toe.</p>
     <div style="display:flex; justify-content:center; gap:0.75rem; flex-wrap:wrap;">
         <a href="/import" class="btn btn-primary">Eerste CSV importeren</a>
         <a href="/transactions/create" class="btn">Transactie toevoegen</a>

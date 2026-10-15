@@ -11,7 +11,7 @@
 {% for w in warnings %}<div class="alert alert-error">{{ w }}</div>{% endfor %}
 {% if sandbox %}<div class="alert">Testmodus: verbonden met de bunq-sandbox.</div>{% endif %}
 
-<div class="card" style="margin-bottom:1.5rem;">
+<div class="card u-mb-15">
     {% if connection %}
     <h2>Sleutel opgeslagen</h2>
     <p class="muted">Versleuteld bewaard. Laatste controle:
@@ -28,7 +28,7 @@
     {% if not encryption_ready %}
     <div class="alert alert-error">Veldversleuteling staat niet aan; de sleutel wordt dan niet opgeslagen.</div>
     {% endif %}
-    <p class="muted" style="font-size:0.85rem;">Maak de sleutel aan in de bunq-app (Instellingen → Ontwikkelaars → API-sleutels).
+    <p class="muted u-fs-85">Maak de sleutel aan in de bunq-app (Instellingen → Ontwikkelaars → API-sleutels).
         De sleutel kan betalingen doen: bewaar hem nergens anders en plak hem alleen hier.
         Hij wordt gebonden aan het IP-adres van deze server.</p>
     <form method="post" action="/banking/bunq" autocomplete="off" style="display:flex; gap:0.5rem; flex-wrap:wrap;">
@@ -39,13 +39,13 @@
 </div>
 
 {% if reports is not none %}
-<div class="card" style="margin-bottom:1.5rem;">
+<div class="card u-mb-15">
     <h2>{{ 'Voorbeeld (er is niets opgeslagen)' if dry_run else 'Import afgerond' }}</h2>
     {% if reports %}
     <table class="table" style="font-size:0.9rem;">
-        <thead><tr><th>Rekening</th><th style="text-align:right;">Opgehaald</th><th style="text-align:right;">Nieuw</th>
-            <th style="text-align:right;">Al aanwezig (CSV)</th><th style="text-align:right;">Al eerder geïmporteerd</th>
-            {% if not dry_run %}<th style="text-align:right;">Overboekingen gekoppeld</th>{% endif %}</tr></thead>
+        <thead><tr><th>Rekening</th><th class="u-text-right">Opgehaald</th><th class="u-text-right">Nieuw</th>
+            <th class="u-text-right">Al aanwezig (CSV)</th><th class="u-text-right">Al eerder geïmporteerd</th>
+            {% if not dry_run %}<th class="u-text-right">Overboekingen gekoppeld</th>{% endif %}</tr></thead>
         <tbody>
         {% for r in reports %}
         <tr>
@@ -53,18 +53,18 @@
             {% if r.error %}
             <td colspan="{{ 4 if dry_run else 5 }}" style="color:var(--ctp-danger, #c0392b);">{{ r.error }}</td>
             {% else %}
-            <td style="text-align:right;">{{ r.fetched }}</td>
-            <td style="text-align:right;"><strong>{{ r.new }}</strong></td>
-            <td style="text-align:right;">{{ r.matched_existing }}</td>
-            <td style="text-align:right;">{{ r.already_imported }}</td>
-            {% if not dry_run %}<td style="text-align:right;">{{ r.transfers_linked }}</td>{% endif %}
+            <td class="u-text-right">{{ r.fetched }}</td>
+            <td class="u-text-right"><strong>{{ r.new }}</strong></td>
+            <td class="u-text-right">{{ r.matched_existing }}</td>
+            <td class="u-text-right">{{ r.already_imported }}</td>
+            {% if not dry_run %}<td class="u-text-right">{{ r.transfers_linked }}</td>{% endif %}
             {% endif %}
         </tr>
         {% endfor %}
         </tbody>
     </table>
     {% if dry_run %}
-    <p class="muted" style="font-size:0.85rem;">"Al aanwezig" zijn betalingen die op dezelfde datum, met hetzelfde bedrag en dezelfde tegenpartij of omschrijving al op de rekening staan; die worden overgeslagen.
+    <p class="muted u-fs-85">"Al aanwezig" zijn betalingen die op dezelfde datum, met hetzelfde bedrag en dezelfde tegenpartij of omschrijving al op de rekening staan; die worden overgeslagen.
         Staat bij een rekening met CSV-historie bijna alles onder "Nieuw", controleer dan of je aan de juiste rekening koppelt.</p>
     <form method="post" action="/banking/bunq/sync">
         <input type="hidden" name="mode" value="import">
@@ -82,7 +82,7 @@
     <h2>Rekeningen volgens bunq ({{ links|length }})</h2>
     <form method="post" action="/banking/bunq/accounts">
     <table class="table" style="font-size:0.9rem;">
-        <thead><tr><th>Importeren</th><th>Naam</th><th>IBAN</th><th>Status</th><th style="text-align:right;">Saldo</th><th>Soort</th><th>Importeren naar</th></tr></thead>
+        <thead><tr><th>Importeren</th><th>Naam</th><th>IBAN</th><th>Status</th><th class="u-text-right">Saldo</th><th>Soort</th><th>Importeren naar</th></tr></thead>
         <tbody>
         {% for l in links %}
         {% set kind = (l.account.kind if l.account else ('savings' if l.bunq_kind and 'Savings' in l.bunq_kind else 'payment')) %}
@@ -91,7 +91,7 @@
             <td>{{ l.description or '—' }}</td>
             <td>{{ l.iban or '—' }}</td>
             <td>{{ l.bunq_status }}</td>
-            <td style="text-align:right;">{% if l.balance is not none %}{{ l.balance }}{% else %}—{% endif %}</td>
+            <td class="u-text-right">{% if l.balance is not none %}{{ l.balance }}{% else %}—{% endif %}</td>
             <td>
                 <select name="kind_{{ l.id }}">
                     <option value="payment" {% if kind == 'payment' %}selected{% endif %}>Betaalrekening</option>
@@ -111,7 +111,7 @@
         {% endfor %}
         </tbody>
     </table>
-    <p class="muted" style="font-size:0.85rem;">Heb je een rekening al via CSV geïmporteerd (bijvoorbeeld "Bunq Samen spaar"), kies die dan onder "Importeren naar", zodat de historie niet dubbel komt.
+    <p class="muted u-fs-85">Heb je een rekening al via CSV geïmporteerd (bijvoorbeeld "Bunq Samen spaar"), kies die dan onder "Importeren naar", zodat de historie niet dubbel komt.
         Geannuleerde rekeningen staan standaard uit.</p>
     <button type="submit" class="btn btn-primary">Selectie opslaan</button>
     </form>

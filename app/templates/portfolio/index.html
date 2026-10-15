@@ -4,7 +4,7 @@
 {% block content %}
 <div class="page-header">
     <h1>{% if filter_type_label %}Portfolio · {{ filter_type_label }}{% else %}Portfolio{% endif %}</h1>
-    <form method="post" action="/portfolio/refresh-prices" style="display:inline;">
+    <form class="u-inline" method="post" action="/portfolio/refresh-prices">
         <button type="submit" class="btn btn-primary">Prijzen verversen</button>
     </form>
 </div>
@@ -18,7 +18,7 @@
 
 {% if filter_type == 'stock' %}
 <div class="card" style="border-left:4px solid var(--ctp-coin); margin-bottom:1.5rem;">
-    <p style="margin:0;">
+    <p class="u-m0">
         <strong>Beleggingen (aandelen)</strong> — koers wordt handmatig onderhouden.
         Voeg een asset toe met type <em>Aandeel</em> en vul de ticker (bv. <code>ASML.AS</code>) en handmatige prijs in.
         Automatische koersen volgen in een toekomstige versie.
@@ -27,7 +27,7 @@
 {% endif %}
 
 <!-- Setup: Persons & Assets -->
-<div class="accounts-grid" style="margin-bottom:1.5rem;">
+<div class="accounts-grid u-mb-15">
     <!-- Personen -->
     <div class="card">
         <h2>Personen</h2>
@@ -37,7 +37,7 @@
         {% for person in persons %}
         <div style="display:flex; justify-content:space-between; align-items:center; padding:0.4rem 0; border-bottom:1px solid var(--ctp-border);">
             <span>{{ person.name }}</span>
-            <form method="post" action="/persons/{{ person.id }}/delete" style="display:inline;">
+            <form class="u-inline" method="post" action="/persons/{{ person.id }}/delete">
                 <input type="hidden" name="redirect_to" value="/portfolio">
                 <button type="submit" class="btn btn-sm btn-danger" onclick='return confirm({{ ((person.name) ~ ' verwijderen?')|tojson }})'>x</button>
             </form>
@@ -55,7 +55,7 @@
     <div class="card">
         <h2>Asset toevoegen</h2>
         <form method="post" action="/portfolio/assets" class="form-stack">
-            <div class="form-group" style="margin-bottom:0.5rem;">
+            <div class="form-group u-mb-05">
                 <label>Vooringesteld</label>
                 <select id="preset-select" onchange="fillPreset(this.value)" style="width:100%; padding:0.5rem; border:2px solid var(--ctp-border); border-radius:var(--ctp-radius-sm);">
                     <option value="">-- Kies of vul handmatig in --</option>
@@ -65,15 +65,15 @@
                 </select>
             </div>
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem;">
-                <div class="form-group" style="margin-bottom:0;">
+                <div class="form-group u-mb-0">
                     <label>Naam</label>
                     <input type="text" name="name" id="asset-name" required placeholder="Goud">
                 </div>
-                <div class="form-group" style="margin-bottom:0;">
+                <div class="form-group u-mb-0">
                     <label>Symbol / API-ID</label>
                     <input type="text" name="symbol" id="asset-symbol" required placeholder="XAU of bitcoin">
                 </div>
-                <div class="form-group" style="margin-bottom:0;">
+                <div class="form-group u-mb-0">
                     <label>Type</label>
                     <select name="asset_class" id="asset-class" onchange="toggleStockFields(this.value)">
                         <option value="metal" {{ 'selected' if filter_type == 'metal' }}>Edelmetaal</option>
@@ -81,41 +81,41 @@
                         <option value="stock" {{ 'selected' if filter_type == 'stock' }}>Aandeel</option>
                     </select>
                 </div>
-                <div class="form-group" style="margin-bottom:0;">
+                <div class="form-group u-mb-0">
                     <label>Eenheid</label>
                     <input type="text" name="unit" id="asset-unit" placeholder="troy oz">
                 </div>
             </div>
             <div id="stock-extra-fields" style="display:{{ 'grid' if filter_type == 'stock' else 'none' }}; grid-template-columns:1fr 1fr; gap:0.5rem;">
-                <div class="form-group" style="margin-bottom:0;">
-                    <label>Ticker <span class="muted" style="font-weight:normal;">(optioneel)</span></label>
+                <div class="form-group u-mb-0">
+                    <label>Ticker <span class="muted u-fw-normal">(optioneel)</span></label>
                     <input type="text" name="ticker" id="asset-ticker" placeholder="bv. ASML.AS">
                 </div>
-                <div class="form-group" style="margin-bottom:0;">
-                    <label>Beurs <span class="muted" style="font-weight:normal;">(optioneel)</span></label>
+                <div class="form-group u-mb-0">
+                    <label>Beurs <span class="muted u-fw-normal">(optioneel)</span></label>
                     <input type="text" name="exchange" id="asset-exchange" placeholder="bv. Euronext Amsterdam">
                 </div>
                 <div class="form-group" style="margin-bottom:0; grid-column:1 / -1;">
-                    <label>Startprijs (EUR) <span class="muted" style="font-weight:normal;">(optioneel, handmatig)</span></label>
+                    <label>Startprijs (EUR) <span class="muted u-fw-normal">(optioneel, handmatig)</span></label>
                     <input type="text" name="manual_price" id="asset-manual-price" placeholder="bv. 625,40" inputmode="decimal">
                 </div>
             </div>
-            <div class="form-group" style="margin-bottom:0;">
+            <div class="form-group u-mb-0">
                 <label>Verwachte maandelijkse groei (%)</label>
                 <input type="text" name="monthly_growth_pct" placeholder="0,5" inputmode="decimal">
             </div>
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem;">
-                <div class="form-group" style="margin-bottom:0;">
-                    <label>Opname fee vast (&euro;) <span class="muted" style="font-weight:normal;">(optioneel)</span></label>
+                <div class="form-group u-mb-0">
+                    <label>Opname fee vast (&euro;) <span class="muted u-fw-normal">(optioneel)</span></label>
                     <input type="text" name="cashout_fee_fixed_eur" placeholder="0,00" inputmode="decimal">
                 </div>
-                <div class="form-group" style="margin-bottom:0;">
-                    <label>Opname fee (%) <span class="muted" style="font-weight:normal;">(optioneel)</span></label>
+                <div class="form-group u-mb-0">
+                    <label>Opname fee (%) <span class="muted u-fw-normal">(optioneel)</span></label>
                     <input type="text" name="cashout_fee_pct" placeholder="0,00" inputmode="decimal">
                 </div>
             </div>
-            <div class="form-group" style="margin-bottom:0;">
-                <label>Spread t.o.v. spot (%) <span class="muted" style="font-weight:normal;">(0,6 voor goud/zilver via Goldrepublic; 0 = raw spot)</span></label>
+            <div class="form-group u-mb-0">
+                <label>Spread t.o.v. spot (%) <span class="muted u-fw-normal">(0,6 voor goud/zilver via Goldrepublic; 0 = raw spot)</span></label>
                 <input type="text" name="spread_pct" id="asset-spread-pct" placeholder="0,00" inputmode="decimal">
             </div>
             <button type="submit" class="btn btn-primary">Toevoegen</button>
@@ -135,9 +135,9 @@
                     <th class="text-right">Prijs/eenheid</th>
                     <th class="text-right" style="font-size:0.7rem;">Laatst bijgewerkt</th>
                     {% for person in persons %}
-                    <th class="text-right">{{ person.name }}<br><span class="muted" style="font-weight:400;">Aantal</span></th>
-                    <th class="text-right"><span class="muted" style="font-weight:400;">Waarde</span></th>
-                    <th class="text-right" title="Maandelijkse storting (positief) of onttrekking (negatief) in euro"><span class="muted" style="font-weight:400;">Mnd € ±</span></th>
+                    <th class="text-right">{{ person.name }}<br><span class="muted u-fw-normal">Aantal</span></th>
+                    <th class="text-right"><span class="muted u-fw-normal">Waarde</span></th>
+                    <th class="text-right" title="Maandelijkse storting (positief) of onttrekking (negatief) in euro"><span class="muted u-fw-normal">Mnd € ±</span></th>
                     {% endfor %}
                     <th class="text-right" style="border-left:2px solid var(--ctp-border);">Totaal</th>
                     <th class="text-right">Groei/mnd</th>
@@ -155,7 +155,7 @@
                         {% endif %}
                     </td>
                     <td class="text-right nowrap">{{ asset.current_price_eur|euro_sign }}</td>
-                    <td class="text-right nowrap" style="font-size:0.75rem;">
+                    <td class="text-right nowrap u-fs-75">
                         {% if asset.price_updated_at and stale_days is not none %}
                             {% if stale_days > 30 %}
                             <span style="color:var(--ctp-danger); font-weight:600;" title="{{ asset.price_updated_at|datetime }}">
@@ -223,7 +223,7 @@
 <!-- Opname waarde per asset type -->
 <div class="card">
     <h2>Opnamewaarde per type</h2>
-    <p class="muted" style="margin-bottom:1rem;">Wat elke asset waard is bij opname, per persoon.</p>
+    <p class="muted u-mb-1">Wat elke asset waard is bij opname, per persoon.</p>
     {% for asset in assets %}
     {% set atotal = asset_totals.get(asset.id, 0) %}
     {% set acash = asset_cash_totals.get(asset.id, 0) %}
@@ -254,7 +254,7 @@
         {% if qty > 0 %}
         <div style="display:flex; justify-content:space-between; align-items:center; padding:0.3rem 0;">
             <span>{{ person.name }} ({{ "%.8g"|format(qty) }} {{ asset.unit }})</span>
-            <span class="amount-positive nowrap" style="font-weight:600;">{{ val|euro_sign }}</span>
+            <span class="amount-positive nowrap u-fw-600">{{ val|euro_sign }}</span>
         </div>
         {% endif %}
         {% endfor %}
@@ -308,7 +308,7 @@
                     <td><button type="submit" class="btn btn-sm">Opslaan</button></td>
                     </form>
                     <td>
-                        <form method="post" action="/portfolio/assets/{{ asset.id }}/delete" style="display:inline;">
+                        <form class="u-inline" method="post" action="/portfolio/assets/{{ asset.id }}/delete">
                             <button type="submit" class="btn btn-sm btn-danger" onclick='return confirm({{ ((asset.name) ~ ' verwijderen?')|tojson }})'>x</button>
                         </form>
                     </td>
@@ -323,7 +323,7 @@
 {% if chart_data and chart_data.past|length > 0 and grand_total > 0 %}
 <div class="card">
     <h2>Waardeverloop {{ current_year }}</h2>
-    <p class="muted" style="margin-bottom:1rem;">Verleden op basis van historische prijzen, toekomst op basis van groeipercentage{% set total_contrib = asset_contributions.values()|sum %}{% if total_contrib %} incl. {{ total_contrib|euro_sign }}/mnd storting{% endif %}.</p>
+    <p class="muted u-mb-1">Verleden op basis van historische prijzen, toekomst op basis van groeipercentage{% set total_contrib = asset_contributions.values()|sum %}{% if total_contrib %} incl. {{ total_contrib|euro_sign }}/mnd storting{% endif %}.</p>
     {% set contrib_assets = [] %}
     {% for asset in assets %}{% if asset_contributions.get(asset.id) %}{% set _ = contrib_assets.append(asset) %}{% endif %}{% endfor %}
     {% if contrib_assets %}
@@ -347,9 +347,9 @@
     {% for person in persons %}
     {% set ptotal = person_totals.get(person.id, 0) %}
     {% set ppct = ((ptotal / grand_total) * 100)|round(1) if grand_total > 0 else 0 %}
-    <div style="margin-bottom:0.75rem;">
+    <div class="u-mb-075">
         <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:0.25rem;">
-            <span style="font-weight:600;">{{ person.name }}</span>
+            <span class="u-fw-600">{{ person.name }}</span>
             <span class="nowrap">{{ ptotal|euro_sign }} <span class="muted">({{ ppct }}%)</span></span>
         </div>
         <div style="width:100%; height:10px; background:var(--ctp-border); border-radius:5px; overflow:hidden;">
@@ -361,11 +361,11 @@
 {% endif %}
 
 {% elif not assets %}
-<div class="card" style="text-align:center; padding:3rem;">
+<div class="card u-empty-lg">
     <p class="muted">Voeg hierboven assets toe om te beginnen met het bijhouden van je portfolio.</p>
 </div>
 {% elif not persons %}
-<div class="card" style="text-align:center; padding:3rem;">
+<div class="card u-empty-lg">
     <p class="muted">Voeg hierboven personen toe om bezittingen te verdelen.</p>
 </div>
 {% endif %}

@@ -49,7 +49,7 @@
         <p class="muted">{{ plan.lines|length }} spaarregels</p>
         <div class="account-actions">
             <a href="/savings/{{ plan.id }}" class="btn btn-sm btn-primary">Openen</a>
-            <form method="post" action="/savings/{{ plan.id }}/delete" style="display:inline;"
+            <form class="u-inline" method="post" action="/savings/{{ plan.id }}/delete"
                   onsubmit="return confirm('Weet je zeker dat je dit spaarplan wilt verwijderen?')">
                 <button type="submit" class="btn btn-sm btn-danger">Verwijderen</button>
             </form>

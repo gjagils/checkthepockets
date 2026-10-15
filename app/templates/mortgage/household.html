@@ -2,17 +2,17 @@
 {% block title %}Hypotheek — Huishouden - Check Your Pockets{% endblock %}
 
 {% macro euro_input(name, value, placeholder="0,00") -%}
-<input type="text" name="{{ name }}" class="budget-input"
+<input type="text" name="{{ name }}" class="budget-input u-text-right"
        value="{{ '%.2f' % value if value is not none else '' }}"
        placeholder="{{ placeholder }}"
-       inputmode="decimal" style="text-align:right;">
+       inputmode="decimal">
 {%- endmacro %}
 
 {% macro pct_input(name, value, placeholder="0,00") -%}
-<input type="text" name="{{ name }}" class="budget-input"
+<input type="text" name="{{ name }}" class="budget-input u-text-right"
        value="{{ '%.2f' % (value * 100) if value is not none else '' }}"
        placeholder="{{ placeholder }}"
-       inputmode="decimal" style="text-align:right;">
+       inputmode="decimal">
 {%- endmacro %}
 
 {% block content %}
@@ -26,8 +26,8 @@
 </div>
 {% endif %}
 
-<div class="card" style="margin-bottom:1.5rem;">
-    <p class="muted" style="margin-bottom:0;">
+<div class="card u-mb-15">
+    <p class="muted u-mb-0">
         Deze waardes zijn stabiel en gelden voor alle hypotheek-scenarios. Vul ze
         één keer in; je hoeft ze niet per scenario opnieuw op te geven.
     </p>
@@ -36,8 +36,8 @@
 <form method="post" action="/hypotheek/huishouden" class="card" style="display:grid; gap:1.75rem;">
 
     <section>
-        <h2 style="margin:0 0 0.25rem 0;">Inkomen</h2>
-        <p class="muted" style="margin:0 0 0.75rem 0;">
+        <h2 class="u-m-0-0-025">Inkomen</h2>
+        <p class="muted u-m-0-0-075">
             Netto maandsalarissen van beide huishoudleden. Gebruikt om de maximale
             maandlast te toetsen.
         </p>
@@ -66,8 +66,8 @@
     </section>
 
     <section>
-        <h2 style="margin:0 0 0.25rem 0;">Bestaande hypotheek</h2>
-        <p class="muted" style="margin:0 0 0.75rem 0;">
+        <h2 class="u-m-0-0-025">Bestaande hypotheek</h2>
+        <p class="muted u-m-0-0-075">
             Deel dat meeverhuist bij een nieuwe hypotheek. Pim = annuïtair deel
             met rente-aftrek; aflossingsvrij heeft een vaste maandlast.
         </p>
@@ -98,8 +98,8 @@
     </section>
 
     <section>
-        <h2 style="margin:0 0 0.25rem 0;">Huidige woning</h2>
-        <p class="muted" style="margin:0 0 0.75rem 0;">
+        <h2 class="u-m-0-0-025">Huidige woning</h2>
+        <p class="muted u-m-0-0-075">
             Restschuld op de huidige woning. Wordt verrekend met de verkoopprijs
             om de overwaarde te bepalen.
         </p>
@@ -116,8 +116,8 @@
     </section>
 
     <section>
-        <h2 style="margin:0 0 0.25rem 0;">Belasting & forfait</h2>
-        <p class="muted" style="margin:0 0 0.75rem 0;">
+        <h2 class="u-m-0-0-025">Belasting & forfait</h2>
+        <p class="muted u-m-0-0-075">
             Voor HRA-berekening. 2026: max aftrektarief 37,56% (inclusief tariefs­aanpassing).
             EWF-percentage: 0,35% van WOZ tot € 1.340.000 (hardgecodeerde drempel; daarboven 2,35%).
             <br><strong>Correctiefactor</strong>: werkelijke teruggaaf aangifte / modelmatige teruggaaf.
@@ -137,9 +137,9 @@
                         <td>{{ pct_input("ewf_pct", household.ewf_pct, "0,35") }}</td>
                         <td>HRA-correctiefactor</td>
                         <td>
-                            <input type="text" name="hra_correction_factor" class="budget-input"
+                            <input type="text" name="hra_correction_factor" class="budget-input u-text-right"
                                    value="{{ '%.4f' % household.hra_correction_factor if household.hra_correction_factor is not none else '1.0000' }}"
-                                   placeholder="1,0000" inputmode="decimal" style="text-align:right;">
+                                   placeholder="1,0000" inputmode="decimal">
                         </td>
                     </tr>
                 </tbody>
@@ -148,8 +148,8 @@
     </section>
 
     <section>
-        <h2 style="margin:0 0 0.25rem 0;">Inflatie & bijdrage-groei</h2>
-        <p class="muted" style="margin:0 0 0.75rem 0;">
+        <h2 class="u-m-0-0-025">Inflatie & bijdrage-groei</h2>
+        <p class="muted u-m-0-0-075">
             Jaarlijkse groei die in scenario-projecties (grafiek) op alle
             varianten wordt toegepast. Defaults: 2,5% inflatie (tussen NL-CPI
             10-jr gemiddelde en ECB-doel), 3,0% bijdrage-groei (typische
@@ -171,8 +171,8 @@
     </section>
 
     <section>
-        <h2 style="margin:0 0 0.25rem 0;">Jaarlijks spaarsaldo (posten)</h2>
-        <p class="muted" style="margin:0 0 0.75rem 0;">
+        <h2 class="u-m-0-0-025">Jaarlijks spaarsaldo (posten)</h2>
+        <p class="muted u-m-0-0-075">
             Jaar-inkomsten (links) en jaar-uitgaven (rechts) die bovenop de
             maandelijkse gezamenlijke rekening op de spaarrekening landen.
             Gebruikt in het spaarsaldo-overzicht op elke scenario-detail.
@@ -195,7 +195,7 @@
                     </tr>
                     <tr>
                         <td>Extra stortingen {{ household.salary_primary_name or "persoon 1" }} / jaar
-                            <span class="muted" style="font-size:0.75rem;">(vakantiegeld + 13e mnd)</span>
+                            <span class="muted u-fs-75">(vakantiegeld + 13e mnd)</span>
                         </td>
                         <td>{{ euro_input("annual_extra_primary", household.annual_extra_primary) }}</td>
                         <td></td>
@@ -203,7 +203,7 @@
                     </tr>
                     <tr>
                         <td>Extra stortingen {{ household.salary_secondary_name or "persoon 2" }} / jaar
-                            <span class="muted" style="font-size:0.75rem;">(vakantiegeld + 13e mnd)</span>
+                            <span class="muted u-fs-75">(vakantiegeld + 13e mnd)</span>
                         </td>
                         <td>{{ euro_input("annual_extra_secondary", household.annual_extra_secondary) }}</td>
                         <td></td>
@@ -215,8 +215,8 @@
     </section>
 
     <section>
-        <h2 style="margin:0 0 0.25rem 0;">Kosten-percentages</h2>
-        <p class="muted" style="margin:0 0 0.75rem 0;">
+        <h2 class="u-m-0-0-025">Kosten-percentages</h2>
+        <p class="muted u-m-0-0-075">
             Aankoopkosten (notaris, overdrachtsbelasting) en verkoopkosten (makelaar).
             Defaults: 2,5% aankoop, 1,5% verkoop.
         </p>
@@ -235,8 +235,8 @@
     </section>
 
     <section>
-        <h2 style="margin:0 0 0.25rem 0;">Overbruggingshypotheek</h2>
-        <p class="muted" style="margin:0 0 0.75rem 0;">
+        <h2 class="u-m-0-0-025">Overbruggingshypotheek</h2>
+        <p class="muted u-m-0-0-075">
             Rente voor een tijdelijke overbrugging tussen overdracht nieuwe huis en
             verkoop oude huis. Default 4,20% (ABN variabel, stand 24-04-2026). Geldt
             voor alle scenarios — datums zet je per scenario.

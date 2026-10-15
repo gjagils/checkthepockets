@@ -9,7 +9,7 @@
 {% if restricted %}
 <div class="card" style="text-align:center; padding:3rem 2rem;">
     <div style="font-size:2rem; margin-bottom:1rem;">🔒</div>
-    <h2 style="margin-bottom:0.5rem;">Binnenkort beschikbaar</h2>
+    <h2 class="u-mb-05">Binnenkort beschikbaar</h2>
     <p style="color:var(--muted); max-width:480px; margin:0 auto 1.5rem;">
         Automatisch transacties ophalen via je bank wordt binnenkort beschikbaar voor alle gebruikers.
         Gebruik in de tussentijd de CSV-import om je transacties te importeren.
@@ -18,7 +18,7 @@
 </div>
 {% else %}
 
-<p style="margin-bottom:1rem;"><a href="/banking/bunq" class="btn btn-sm">bunq koppelen met eigen API-sleutel →</a></p>
+<p class="u-mb-1"><a href="/banking/bunq" class="btn btn-sm">bunq koppelen met eigen API-sleutel →</a></p>
 
 {% if error %}
 <div class="alert alert-error">{{ error }}</div>
@@ -29,7 +29,7 @@
 {% endif %}
 
 {% if connections %}
-<div class="card" style="margin-bottom:1.5rem;">
+<div class="card u-mb-15">
     <h2>Gekoppelde banken</h2>
     <table class="table">
         <thead>
@@ -67,7 +67,7 @@
                     <a href="/banking/sync/{{ conn.id }}" class="btn btn-sm btn-primary">Synchroniseren</a>
                     {% endif %}
                     <button type="button" class="btn btn-sm" onclick="toggleRename({{ conn.id }})">Hernoemen</button>
-                    <form method="post" action="/banking/disconnect/{{ conn.id }}" style="margin:0;">
+                    <form class="u-m0" method="post" action="/banking/disconnect/{{ conn.id }}">
                         <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Weet je zeker dat je deze koppeling wilt verwijderen?')">Ontkoppelen</button>
                     </form>
                 </td>
@@ -117,7 +117,7 @@
             <input type="text" id="bank_name" name="bank_name" placeholder="bijv. ABN AMRO, bunq, ING" required>
             {% endif %}
         </div>
-        <button type="submit" class="btn btn-primary" style="margin-bottom:0;">Koppelen</button>
+        <button type="submit" class="btn btn-primary u-mb-0">Koppelen</button>
     </form>
     <p style="margin-top:0.75rem; font-size:0.8rem; color:var(--muted);">
         De banklijst komt rechtstreeks van Enable Banking. Toegang blijft tot 180 dagen geldig (afhankelijk van de bank); daarna koppel je opnieuw.

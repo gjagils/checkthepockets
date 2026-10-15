@@ -39,7 +39,7 @@
     <h2>Bezittingen</h2>
     {% for cat_label, group_accounts in asset_groups.items() %}
     <h3 style="font-size:0.95rem; margin:1rem 0 0.5rem; color:var(--ctp-denim);">{{ cat_label }}</h3>
-    <div class="table-wrap" style="margin-bottom:1rem;">
+    <div class="table-wrap u-mb-1">
         <table>
             <thead>
                 <tr>
@@ -61,12 +61,12 @@
                                onblur="saveBalance(this)"
                                onkeydown="if(event.key==='Enter')this.blur()">
                     </td>
-                    <td class="muted" style="font-size:0.85rem;">{{ acc.notes or '-' }}</td>
-                    <td class="muted" style="font-size:0.85rem;">{{ acc.updated_at.strftime('%d-%m-%Y') if acc.updated_at else '-' }}</td>
+                    <td class="muted u-fs-85">{{ acc.notes or '-' }}</td>
+                    <td class="muted u-fs-85">{{ acc.updated_at.strftime('%d-%m-%Y') if acc.updated_at else '-' }}</td>
                     <td>
                         <div style="display:flex; gap:0.25rem;">
                             <button class="btn btn-sm" onclick="toggleEdit('nw-{{ acc.id }}', 'table-row')">Bewerken</button>
-                            <form method="post" action="/networth/accounts/{{ acc.id }}/toggle" style="display:inline;">
+                            <form class="u-inline" method="post" action="/networth/accounts/{{ acc.id }}/toggle">
                                 <button type="submit" class="btn btn-sm">Deactiveren</button>
                             </form>
                         </div>
@@ -97,7 +97,7 @@
                             </div>
                             <div class="form-group" style="align-self:flex-end; display:flex; gap:0.25rem;">
                                 <button type="submit" class="btn btn-sm btn-primary">Opslaan</button>
-                                <form method="post" action="/networth/accounts/{{ acc.id }}/delete" style="display:inline;"
+                                <form class="u-inline" method="post" action="/networth/accounts/{{ acc.id }}/delete"
                                       onsubmit="return confirm('Verwijderen?')">
                                     <button type="submit" class="btn btn-sm btn-danger">Verwijderen</button>
                                 </form>
@@ -128,7 +128,7 @@
     <h2>Schulden</h2>
     {% for cat_label, group_accounts in liability_groups.items() %}
     <h3 style="font-size:0.95rem; margin:1rem 0 0.5rem; color:var(--ctp-danger);">{{ cat_label }}</h3>
-    <div class="table-wrap" style="margin-bottom:1rem;">
+    <div class="table-wrap u-mb-1">
         <table>
             <thead>
                 <tr>
@@ -150,12 +150,12 @@
                                onblur="saveBalance(this)"
                                onkeydown="if(event.key==='Enter')this.blur()">
                     </td>
-                    <td class="muted" style="font-size:0.85rem;">{{ acc.notes or '-' }}</td>
-                    <td class="muted" style="font-size:0.85rem;">{{ acc.updated_at.strftime('%d-%m-%Y') if acc.updated_at else '-' }}</td>
+                    <td class="muted u-fs-85">{{ acc.notes or '-' }}</td>
+                    <td class="muted u-fs-85">{{ acc.updated_at.strftime('%d-%m-%Y') if acc.updated_at else '-' }}</td>
                     <td>
                         <div style="display:flex; gap:0.25rem;">
                             <button class="btn btn-sm" onclick="toggleEdit('nw-{{ acc.id }}', 'table-row')">Bewerken</button>
-                            <form method="post" action="/networth/accounts/{{ acc.id }}/toggle" style="display:inline;">
+                            <form class="u-inline" method="post" action="/networth/accounts/{{ acc.id }}/toggle">
                                 <button type="submit" class="btn btn-sm">Deactiveren</button>
                             </form>
                         </div>
@@ -186,7 +186,7 @@
                             </div>
                             <div class="form-group" style="align-self:flex-end; display:flex; gap:0.25rem;">
                                 <button type="submit" class="btn btn-sm btn-primary">Opslaan</button>
-                                <form method="post" action="/networth/accounts/{{ acc.id }}/delete" style="display:inline;"
+                                <form class="u-inline" method="post" action="/networth/accounts/{{ acc.id }}/delete"
                                       onsubmit="return confirm('Verwijderen?')">
                                     <button type="submit" class="btn btn-sm btn-danger">Verwijderen</button>
                                 </form>
@@ -218,7 +218,7 @@
 
     <!-- Visual bar chart -->
     {% set max_nw = history|map(attribute='net_worth')|map('abs')|max if history else 1 %}
-    <div style="margin-bottom:1.5rem;">
+    <div class="u-mb-15">
         {% for entry in history %}
         {% set bar_pct = ((entry.net_worth|abs / max_nw) * 100)|int if max_nw else 0 %}
         <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.35rem;">
@@ -286,10 +286,10 @@
                     <td>{{ acc.name }} <span class="muted">({{ account_types[acc.account_type] }})</span></td>
                     <td class="text-right nowrap">{{ acc.balance|euro_sign }}</td>
                     <td>
-                        <form method="post" action="/networth/accounts/{{ acc.id }}/toggle" style="display:inline;">
+                        <form class="u-inline" method="post" action="/networth/accounts/{{ acc.id }}/toggle">
                             <button type="submit" class="btn btn-sm">Activeren</button>
                         </form>
-                        <form method="post" action="/networth/accounts/{{ acc.id }}/delete" style="display:inline;"
+                        <form class="u-inline" method="post" action="/networth/accounts/{{ acc.id }}/delete"
                               onsubmit="return confirm('Definitief verwijderen?')">
                             <button type="submit" class="btn btn-sm btn-danger">Verwijderen</button>
                         </form>
@@ -334,7 +334,7 @@
                 <label for="nw_notes">Notities</label>
                 <input type="text" id="nw_notes" name="notes" placeholder="Optioneel">
             </div>
-            <div class="form-group" style="align-self:flex-end;">
+            <div class="form-group u-self-end">
                 <button type="submit" class="btn btn-primary btn-sm">Toevoegen</button>
             </div>
         </div>

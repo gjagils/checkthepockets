@@ -11,19 +11,19 @@
 </div>
 
 {% if not groups %}
-<div class="card" style="text-align:center; padding:3rem;">
+<div class="card u-empty-lg">
     <p style="font-size:1.1rem; color:var(--green); font-weight:700; margin-bottom:0.5rem;">✓ Geen duplicaten gevonden</p>
     <p class="muted">Alle transacties zijn uniek op datum, bedrag en tegenpartij.</p>
 </div>
 {% else %}
-<div class="alert alert-error" style="margin-bottom:1.5rem;">
+<div class="alert alert-error u-mb-15">
     <strong>{{ groups|length }} groep{{ 'en' if groups|length != 1 }} gevonden</strong> met mogelijke duplicaten.
     Selecteer de transacties die je wilt uitsluiten en klik op "Uitsluiten".
 </div>
 
 <form method="post" action="/transactions/duplicates/exclude">
 {% for group in groups %}
-<div class="card" style="margin-bottom:1rem;">
+<div class="card u-mb-1">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
         <span class="muted" style="font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; font-family:'Syne',sans-serif;">
             {{ group|length }}× duplicaat — {{ group[0].date|date }} · {{ group[0].amount|euro_sign }} · {{ group[0].counterparty or '—' }}

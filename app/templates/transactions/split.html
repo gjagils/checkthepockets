@@ -37,7 +37,7 @@
 {% if existing_children %}
 <div class="card">
     <h2>Huidige specificatie ({{ existing_children|length }} regels)</h2>
-    <p class="muted" style="margin-bottom:0.75rem;">Deze transactie is al gespecificeerd. Upload een nieuwe PDF om te overschrijven.</p>
+    <p class="muted u-mb-075">Deze transactie is al gespecificeerd. Upload een nieuwe PDF om te overschrijven.</p>
     <div class="table-wrap">
         <table>
             <thead>
@@ -70,8 +70,8 @@
             </tbody>
         </table>
     </div>
-    <div style="margin-top:0.75rem;">
-        <form method="post" action="/transactions/{{ transaction.id }}/unsplit" style="display:inline;"
+    <div class="u-mt-075">
+        <form class="u-inline" method="post" action="/transactions/{{ transaction.id }}/unsplit"
               onsubmit="return confirm('Specificatie verwijderen? De originele transactie wordt hersteld.')">
             <button type="submit" class="btn btn-sm btn-danger">Specificatie verwijderen</button>
         </form>
@@ -81,7 +81,7 @@
 
 <div class="card">
     <h2>ICS PDF uploaden</h2>
-    <p class="muted" style="margin-bottom:1rem;">
+    <p class="muted u-mb-1">
         Upload het PDF-afschrift van ICS om de creditcardafschrijving op te splitsen in losse boekingen.
     </p>
     <form method="post" action="/transactions/{{ transaction.id }}/split" enctype="multipart/form-data">

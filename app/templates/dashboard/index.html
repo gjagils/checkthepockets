@@ -22,7 +22,7 @@
             <button class="view-toggle-btn" data-view="spiegel" onclick="switchView('spiegel')">Spiegel</button>
         </div>
         {% if not current_month %}
-        <form method="get" action="/dashboard" style="margin:0;">
+        <form class="u-m0" method="get" action="/dashboard">
             <select name="year" onchange="this.form.submit()" style="padding:0.4rem 0.6rem; border-radius:6px; border:1px solid var(--border); background:var(--card-bg); color:var(--text); font-size:0.85rem;">
                 {% for y in years %}
                 <option value="{{ y }}" {% if y == current_year %}selected{% endif %}>{{ y }}</option>
@@ -42,10 +42,10 @@
 {% endif %}
 
 {% if not current_month %}
-<section class="card" aria-labelledby="actions-title" style="margin-bottom:1rem;">
+<section class="card u-mb-1" aria-labelledby="actions-title">
     <div style="display:flex; align-items:baseline; justify-content:space-between; gap:1rem;">
         <h2 id="actions-title" style="margin:0; font-size:1.1rem;">Nu te doen</h2>
-        {% if not open_actions %}<span class="muted" style="font-size:0.85rem;">Geen open acties</span>{% endif %}
+        {% if not open_actions %}<span class="muted u-fs-85">Geen open acties</span>{% endif %}
     </div>
     {% if open_actions %}
     <ul style="list-style:none; padding:0; margin:0.75rem 0 0; display:grid; gap:0.5rem;">
@@ -79,7 +79,7 @@
                 <tr class="{% if row.is_current %}current-month-row{% endif %}">
                     <td>
                         {% if row.get('color') %}<span class="color-dot" style="background:{{ row.color }};"></span> {% endif %}
-                        {% if row.link %}<a href="{{ row.link }}" style="font-weight:600;">{{ row.label }}</a>{% else %}<span style="font-weight:600;">{{ row.label }}</span>{% endif %}
+                        {% if row.link %}<a class="u-fw-600" href="{{ row.link }}">{{ row.label }}</a>{% else %}<span class="u-fw-600">{{ row.label }}</span>{% endif %}
                         {% if row.is_current %}<span style="color:var(--gold); font-size:0.75rem; margin-left:0.3rem;">&bull;</span>{% endif %}
                     </td>
                     <td class="text-right nowrap">
@@ -97,8 +97,8 @@
                     {% if not current_month %}
                     <td class="text-right nowrap">
                         {% if row.uncat_count %}
-                        <a href="{{ row.tx_link_uncat }}" class="amount-negative" style="font-weight:600;">
-                            {{ row.uncat_amount|euro_sign }} <span class="muted" style="font-weight:400;">({{ row.uncat_count }})</span>
+                        <a href="{{ row.tx_link_uncat }}" class="amount-negative u-fw-600">
+                            {{ row.uncat_amount|euro_sign }} <span class="muted u-fw-normal">({{ row.uncat_count }})</span>
                         </a>
                         {% else %}<span class="muted">&mdash;</span>{% endif %}
                     </td>

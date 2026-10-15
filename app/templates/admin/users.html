@@ -47,7 +47,7 @@
 {% endif %}
 
 <!-- Encryptie status -->
-<div class="card" style="margin-bottom:1.5rem;">
+<div class="card u-mb-15">
     <div class="card-header">
         <h3>Encryptie at-rest</h3>
     </div>
@@ -64,7 +64,7 @@
 </div>
 
 <!-- Demo-user seed (GJA-46) -->
-<div class="card" style="margin-bottom:1.5rem;">
+<div class="card u-mb-15">
     <div class="card-header">
         <h3>Demo-user</h3>
     </div>
@@ -82,7 +82,7 @@
 </div>
 
 <!-- Uitnodigen -->
-<div class="card" style="margin-bottom:1.5rem;">
+<div class="card u-mb-15">
     <div class="card-header">
         <h3>Gebruiker uitnodigen</h3>
     </div>
@@ -171,22 +171,22 @@
                 <td>
                     {% if u.id != user.id %}
                     <div style="display:flex; gap:.4rem; flex-wrap:wrap;">
-                        <form method="post" action="/admin/users/{{ u.id }}/toggle-active" style="display:inline;">
+                        <form class="u-inline" method="post" action="/admin/users/{{ u.id }}/toggle-active">
                             <button type="submit" class="btn btn-sm btn-secondary" title="{{ 'Deactiveren' if u.is_active else 'Activeren' }}">
                                 {{ 'Deactiveer' if u.is_active else 'Activeer' }}
                             </button>
                         </form>
-                        <form method="post" action="/admin/users/{{ u.id }}/toggle-admin" style="display:inline;">
+                        <form class="u-inline" method="post" action="/admin/users/{{ u.id }}/toggle-admin">
                             <button type="submit" class="btn btn-sm btn-secondary">
                                 {{ 'Admin af' if u.is_admin else 'Maak admin' }}
                             </button>
                         </form>
-                        <form method="post" action="/admin/users/{{ u.id }}/toggle-mortgage-access" style="display:inline;">
+                        <form class="u-inline" method="post" action="/admin/users/{{ u.id }}/toggle-mortgage-access">
                             <button type="submit" class="btn btn-sm btn-secondary" title="Toegang tot hypotheek-module">
                                 {{ 'Hypotheek uit' if u.can_access_mortgage else 'Hypotheek aan' }}
                             </button>
                         </form>
-                        <form method="post" action="/admin/users/{{ u.id }}/delete" style="display:inline;"
+                        <form class="u-inline" method="post" action="/admin/users/{{ u.id }}/delete"
                               onsubmit='return confirm({{ ('Gebruiker ' ~ (u.username) ~ ' en alle bijbehorende data permanent verwijderen?')|tojson }})'>
                             <button type="submit" class="btn btn-sm btn-danger">Verwijder</button>
                         </form>

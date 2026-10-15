@@ -1,6 +1,6 @@
 {# Shows candidate transactions that could match this recurring item #}
 {% if entry.candidates %}
-<details style="margin-top:0.5rem;">
+<details class="u-mt-05">
     <summary style="font-size:0.8rem; cursor:pointer; color:var(--gold); font-weight:600;">
         🔍 {{ entry.candidates|length }} mogelijke match{{ 'es' if entry.candidates|length > 1 else '' }} gevonden
     </summary>
