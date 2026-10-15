@@ -62,7 +62,7 @@ def export_settings(request: Request, db: Session = Depends(get_db)):
     for r in db.query(Rule).filter(Rule.user_id == user.id).order_by(Rule.id).all():
         rules_export.append({
             "name": r.name,
-            "is_active": r.is_active,
+            "is_active": int(r.is_active or 0),
             "match_field": r.match_field,
             "match_type": r.match_type,
             "match_value": r.match_value,
@@ -86,7 +86,7 @@ def export_settings(request: Request, db: Session = Depends(get_db)):
             "category_name": rt.category.name if rt.category else None,
             "counterparty": rt.counterparty,
             "description_match": rt.description_match,
-            "is_active": rt.is_active,
+            "is_active": int(rt.is_active or 0),
             "start_date": rt.start_date,
             "end_date": rt.end_date,
             "active_months": rt.active_months,

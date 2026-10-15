@@ -84,3 +84,58 @@ def test_category_flags_are_bools_and_backup_export_keeps_integers(db):
     cats = {c["name"]: c for c in export.json()["categories"]}
     assert cats["Salaris"]["is_income"] == 1 and type(cats["Salaris"]["is_income"]) is int
     assert cats["Oud"]["is_archived"] == 1 and cats["Oud"]["exclude_from_totals"] == 0
+
+
+def test_remaining_flags_are_bools_and_rule_recurring_export_keeps_integers(db):
+    import datetime
+
+    from fastapi.testclient import TestClient
+
+    from app.auth import create_session_cookie
+    from app.main import app
+    from app.models import Category
+
+    user = _user(db, username="cat")
+    db.add_all([Category(user_id=user.id, name="Salaris", is_income=1),
+                Category(user_id=user.id, name="Oud", is_archived=1, exclude_from_budget=1)])
+    db.commit()
+    rows = {c.name: c for c in db.query(Category).all()}
+    assert rows["Salaris"].is_income is True and rows["Salaris"].is_archived is False
+    assert rows["Oud"].exclude_from_budget is True and rows["Oud"].exclude_from_totals is False
+    assert db.query(Category).filter(Category.is_income == 1).count() == 1
+    client = TestClient(app)
+    client.cookies.set("session", create_session_cookie(user.id))
+    export = client.get("/settings/export")
+    assert export.status_code == 200
+    cats = {c["name"]: c for c in export.json()["categories"]}
+    assert cats["Salaris"]["is_income"] == 1 and type(cats["Salaris"]["is_income"]) is int
+    assert cats["Oud"]["is_archived"] == 1 and cats["Oud"]["exclude_from_totals"] == 0
+
+    from app.models import Account, NetWorthAccount, RecurringTransaction, Rule, SavingsLine, SavingsPlan
+
+    user = _user(db, username="rest")
+    account = Account(user_id=user.id, name="A", bank="bunq")
+    db.add(account)
+    db.flush()
+    db.add_all([
+        Rule(user_id=user.id, name="r", match_field="counterparty", match_type="contains", match_value="x",
+             is_active=1, action_set_reviewed=1),
+        RecurringTransaction(user_id=user.id, account_id=account.id, name="Huur", amount_expected=-1,
+                             frequency="monthly", is_active=0),
+        NetWorthAccount(user_id=user.id, name="Spaar", account_type="asset", category="savings"),
+    ])
+    plan = SavingsPlan(user_id=user.id, account_id=account.id, year=datetime.date.today().year)
+    db.add(plan)
+    db.flush()
+    db.add(SavingsLine(plan_id=plan.id, name="Vakantie", is_income=1))
+    db.commit()
+    rule = db.query(Rule).one()
+    assert rule.is_active is True and rule.action_set_reviewed is True
+    assert db.query(RecurringTransaction).one().is_active is False
+    assert db.query(NetWorthAccount).one().is_active is True
+    assert db.query(SavingsLine).one().is_income is True
+    client = TestClient(app)
+    client.cookies.set("session", create_session_cookie(user.id))
+    data = client.get("/settings/export").json()
+    assert data["rules"][0]["is_active"] == 1 and type(data["rules"][0]["is_active"]) is int
+    assert data["recurring"][0]["is_active"] == 0 and type(data["recurring"][0]["is_active"]) is int
