@@ -103,17 +103,24 @@ def plan_merge(db: Session, source: Account, target: Account) -> MergePlan:
     return plan
 
 
-def _fold_category(db: Session, source_id: int, target_id: int) -> None:
-    """Point everything that uses category `source_id` at `target_id`, then delete the source."""
+def _fold_category(db: Session, source_id: int, target_id: int, sum_budgets: bool = False) -> None:
+    """Point everything that uses category `source_id` at `target_id`, then delete the source.
+
+    Budgets with the same (user, group, month) on both categories: the target's budget is kept,
+    or, with ``sum_budgets`` (categories of accounts in one group), the two amounts are added.
+    """
     # Rows with a unique key that includes the category: keep the target's row on a clash.
     for model, key_columns in (
         (Budget, ("user_id", "group_id", "year", "month")),
         (MortgageScenarioBudget, ("scenario_id",)),
     ):
-        kept = {tuple(getattr(r, c) for c in key_columns)
+        kept = {tuple(getattr(r, c) for c in key_columns): r
                 for r in db.query(model).filter(model.category_id == target_id)}
         for row in db.query(model).filter(model.category_id == source_id).all():
-            if tuple(getattr(row, c) for c in key_columns) in kept:
+            existing = kept.get(tuple(getattr(row, c) for c in key_columns))
+            if existing is not None:
+                if sum_budgets and model is Budget:
+                    existing.amount = existing.amount + row.amount
                 db.delete(row)
     db.flush()
     for model, column in (
@@ -215,3 +222,6 @@ def merge_accounts(db: Session, source: Account, target: Account) -> MergeResult
         target.external_uid = source_uid
     db.flush()
     return result
+
+
+fold_category = _fold_category

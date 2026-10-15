@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Categorieën samenvoegen - Check Your Pockets{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Eén categorieënset</h1>
+        <p class="muted">Categorieën met dezelfde naam worden één gedeelde categorie voor alle rekeningen. Controleer eerst; er verandert niets tot je bevestigt.</p>
+    </div>
+    <a class="btn btn-sm" href="/categories">Terug naar categorieën</a>
+</div>
+
+{% if done == 'error' %}
+<div class="alert alert-danger">Samenvoegen is niet gelukt. Er is niets gewijzigd; zie de serverlog.</div>
+{% elif done %}
+{% set parts = done.split('-') %}
+<div class="alert alert-success">Klaar: {{ parts[0] }} categorieën samengevoegd, {{ parts[1] }} gearchiveerd.</div>
+{% endif %}
+
+{% if not plan.steps and not plan.archive and not plan.blocked %}
+<div class="card u-empty-lg">Er is niets samen te voegen: alle categorieën zijn al gedeeld.</div>
+{% else %}
+<form method="get" action="/categories/consolidate" id="preview-form"></form>
+<form method="post" action="/categories/consolidate">
+<div class="accounts-grid u-mb-15">
+    <section class="card"><p class="muted u-mb-0">Samenvoegen</p><strong style="font-size:1.6rem;">{{ plan.merges }}</strong></section>
+    <section class="card"><p class="muted u-mb-0">Gedeeld na afloop</p><strong style="font-size:1.6rem;">{{ plan.shared_after }}</strong></section>
+    <section class="card"><p class="muted u-mb-0">Archiveren (ongebruikt)</p><strong style="font-size:1.6rem;">{{ plan.archive|length }}</strong></section>
+</div>
+
+<div class="card u-mb-15">
+    <h3 class="u-m-0-0-075">Wat er gebeurt</h3>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Categorie</th><th>Rekening</th><th class="text-right">Transacties</th><th>Wordt</th><th>Eventueel samenvoegen met</th></tr></thead>
+            <tbody>
+            {% for s in plan.steps %}
+            <tr>
+                <td>{% if s.category.parent_id %}<span class="muted">› </span>{% endif %}{{ s.category.name }}</td>
+                <td>{{ accounts.get(s.category.account_id, '—') }}</td>
+                <td class="text-right">{{ s.transactions }}</td>
+                <td>
+                    {% if s.action == 'merge' %}<span class="badge badge-warning">Samenvoegen</span> in {{ s.target.name }}{% if s.manual %} (jouw keuze){% endif %}
+                    {% else %}<span class="badge badge-success">Wordt gedeeld</span>{% endif %}
+                </td>
+                <td>
+                    {% if s.category.id in plan.suggestions %}
+                    <select name="merge_{{ s.category.id }}" class="u-fs-85">
+                        <option value="">Niet samenvoegen</option>
+                        {% for o in plan.suggestions[s.category.id] %}
+                        <option value="{{ o.id }}" {% if choices.get(s.category.id) == o.id %}selected{% endif %}>{{ o.name }}</option>
+                        {% endfor %}
+                    </select>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+            {% for c, reason in plan.blocked %}
+            <tr>
+                <td>{{ c.name }}</td><td>{{ accounts.get(c.account_id, '—') }}</td><td class="text-right">—</td>
+                <td><span class="badge badge-flag">Blijft per rekening</span> <span class="muted u-fs-80">{{ reason }}</span></td>
+                <td>
+                    {% if c.id in plan.suggestions %}
+                    <select name="merge_{{ c.id }}" class="u-fs-85">
+                        <option value="">Niet samenvoegen</option>
+                        {% for o in plan.suggestions[c.id] %}<option value="{{ o.id }}">{{ o.name }}</option>{% endfor %}
+                    </select>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if plan.archive %}
+<div class="card u-mb-15">
+    <h3 class="u-m-0-0-075">Wordt gearchiveerd</h3>
+    <p class="muted u-fs-85">Categorieën zonder transacties, budgetten, regels of spaarregels. Ze blijven beschikbaar in oude overzichten en kunnen weer worden geactiveerd.</p>
+    <p class="u-fs-85">{% for c in plan.archive %}{{ c.name }}{% if not loop.last %}, {% endif %}{% endfor %}</p>
+</div>
+{% endif %}
+
+<div class="form-actions">
+    <button type="submit" class="btn btn-primary" onclick="return confirm('Categorieën nu samenvoegen? Dit kan niet automatisch worden teruggedraaid.')">Bevestigen en samenvoegen</button>
+    <button type="submit" class="btn" form="preview-form" onclick="return previewWithChoices(event)">Preview vernieuwen met mijn keuzes</button>
+    <a class="btn" href="/categories">Annuleren</a>
+</div>
+</form>
+<script>
+function previewWithChoices(e) {
+    e.preventDefault();
+    var params = new URLSearchParams();
+    document.querySelectorAll('select[name^="merge_"]').forEach(function (s) { if (s.value) params.append(s.name, s.value); });
+    window.location = '/categories/consolidate' + (params.toString() ? '?' + params.toString() : '');
+    return false;
+}
+</script>
+{% endif %}
+{% endblock %}
