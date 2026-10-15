@@ -101,6 +101,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-52 | P3 | Gepland | ACT-41 | [Model-typing: Boolean, enums, Mapped](#act-52) |
 | ACT-53 | P2 | Gepland | ACT-31, ACT-28 | [Persoonspagina: verwachting betaalrekeningen en vermogen](#act-53) |
 | ACT-54 | P2 | Review | — | [Regelvoorstellen leesbaar: volledige omschrijving en groepering](#act-54) |
+| ACT-55 | P2 | Gepland | ACT-31 | [Rekeninggroepen, één categorieënset en budget per groep](#act-55) |
 
 ## Beschrijving en acceptatiecriteria
 
@@ -616,6 +617,16 @@ commit `339a4d8`; controleer ze bij het oppakken.
 - **Acties:** Migratie naar `Boolean` met `NOT NULL DEFAULT false`; `StrEnum` met `CheckConstraint` (`native_enum=False`); `JSON`-kolom voor `accounts_json`; `active_months_set`/`skipped_months_set` als properties; `Mapped[]`/`mapped_column()` en `back_populates` i.p.v. `backref`; `pydantic-settings` voor configuratie. Mechanisch, zonder gedragswijziging; mag in subacties.
 - **Klaar wanneer:** Templates vergelijken booleans niet meer met `1`; nieuwe code heeft typed modellen; autogenerate blijft leeg na de migratie.
 - **Validatie:** Volledige suite, PostgreSQL-CI met up/down/up, productievalidatie na uitrol.
+
+<a id="act-55"></a>
+
+### ACT-55 — Rekeninggroepen, één categorieënset en budget per groep
+
+- **Aanleiding (gebruiker, 2026-10-15):** "GJ" (betaalrekening) en "On the go" (bunq) zijn functioneel één betaalrekening van één persoon; categorieën staan nu per rekening, waardoor dezelfde categorie dubbel bestaat en budgetten niet over beide rekeningen heen werken.
+- **Besluiten gebruiker:** rekeningen die bij elkaar horen vormen een groep; het budget geldt per groep; alle rekeningen gebruiken één categorieënset; gelijke namen op hetzelfde niveau worden automatisch samengevoegd, bijna-gelijke namen kiest de gebruiker in de preview; lege categorieën worden gearchiveerd (blijven beschikbaar in oude overzichten).
+- **Stappen (elk een PR):** (a) `AccountGroup` + `Account.group_id` met migratie (elke rekening start in een eigen groep) en groepsbeheer op de rekeningenpagina; (b) `Budget.group_id` en budgetpagina per groep; (c) categorieën consolideren met preview, samenvoegen en archiveren; (d) budget- en spaarpagina's op de gedeelde set.
+- **Klaar wanneer:** GJ en On the go als groep één budget en één categorieënset delen, zonder dat transacties, regels, terugkerende posten of spaarregels verloren gaan; de preview toont vooraf elke wijziging.
+- **Validatie:** tests op samenvoegen en groepsbudget, PostgreSQL-migratietest, productiecontrole door de gebruiker na elke stap.
 
 ### ACT-54 — Regelvoorstellen leesbaar: volledige omschrijving en groepering
 
