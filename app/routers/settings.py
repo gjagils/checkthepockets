@@ -50,11 +50,11 @@ def export_settings(request: Request, db: Session = Depends(get_db)):
             "name": c.name,
             "parent_name": cat_id_name.get(c.parent_id) if c.parent_id else None,
             "color": c.color,
-            "is_income": c.is_income,
+            "is_income": int(c.is_income or 0),
             "sort_order": c.sort_order,
-            "exclude_from_budget": c.exclude_from_budget,
-            "exclude_from_totals": c.exclude_from_totals,
-            "is_archived": c.is_archived,
+            "exclude_from_budget": int(c.exclude_from_budget or 0),
+            "exclude_from_totals": int(c.exclude_from_totals or 0),
+            "is_archived": int(c.is_archived or 0),
         })
 
     # Rules (store category by name, not ID)
