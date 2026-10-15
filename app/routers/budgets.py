@@ -172,6 +172,15 @@ def budget_overview(
     projected_rows = projected_query.group_by(Category.id).all()
     projected_map = {row.id: abs(row.total) for row in projected_rows}
 
+    # Gearchiveerde categorieën blijven zichtbaar zolang ze in deze of de vorige maand nog iets hebben.
+    used_ids = set(budget_map) | set(prev_budget_map) | set(spending_map) | set(projected_map) | set(prev_spending_map)
+
+    def visible(category):
+        return not category.is_archived or category.id in used_ids
+
+    top_level = [c for c in top_level if visible(c)]
+    children_map = {pid: [c for c in kids if visible(c)] for pid, kids in children_map.items()}
+
     # Build data for template
     budget_data = []
     total_budgeted = Decimal("0")
@@ -268,6 +277,7 @@ def budget_overview(
         income_spending_query = income_spending_query.filter(Transaction.account_id.in_(account_ids))
     income_spending = income_spending_query.group_by(Category.id).all()
     income_actual_map = {row.id: row.total for row in income_spending}
+    income_top_level = [c for c in income_top_level if not c.is_archived or c.id in used_ids or c.id in income_actual_map]
 
     income_budget_data = []
     total_income_budgeted = Decimal("0")
