@@ -101,6 +101,28 @@
             {% endif %}
         </div>
 
+        <div style="margin-top:0.75rem; padding-top:0.75rem; border-top:1px solid var(--ctp-border);">
+            <div style="font-size:0.8rem; font-weight:600; margin-bottom:0.35rem;">Groep</div>
+            <p class="muted u-fs-80 u-mb-05">Rekeningen die functioneel één rekening vormen delen één budget en categorieënset.</p>
+            <form method="post" action="/accounts/{{ acc.id }}/group" style="display:flex; flex-wrap:wrap; gap:0.4rem;">
+                <select name="group_id" class="u-fs-85">
+                    <option value="" {% if acc.group and acc.group.accounts|length == 1 %}selected{% endif %}>Eigen groep</option>
+                    {% for gid, label in group_choices %}
+                    {% if not (acc.group_id == gid and acc.group.accounts|length == 1) %}
+                    <option value="{{ gid }}" {% if acc.group_id == gid %}selected{% endif %}>{{ label }}</option>
+                    {% endif %}
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-sm">Groep opslaan</button>
+            </form>
+            {% if acc.group and acc.group.accounts|length > 1 %}
+            <form method="post" action="/accounts/groups/{{ acc.group.id }}/rename" style="display:flex; flex-wrap:wrap; gap:0.4rem; margin-top:0.4rem;">
+                <input type="text" name="name" value="{{ acc.group.name }}" class="u-fs-85" aria-label="Groepsnaam" required>
+                <button type="submit" class="btn btn-sm">Groepsnaam wijzigen</button>
+            </form>
+            {% endif %}
+        </div>
+
         <div class="account-actions">
             <a href="/?account_id={{ acc.id }}" class="btn btn-sm">Bekijk transacties</a>
             {% if accounts|length > 1 %}
