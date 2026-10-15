@@ -3,7 +3,7 @@
 {% block content %}
 <div class="page-header">
     <h1>Regels</h1>
-    <form method="post" action="/rules/analyze" style="margin:0;">
+    <form class="u-m0" method="post" action="/rules/analyze">
         <button type="submit" class="btn btn-accent">✨ Analyseer transacties</button>
     </form>
 </div>
@@ -33,7 +33,7 @@
             <span style="font-size:1.2rem;">✨</span>
             <h2 style="margin:0; color:var(--orange);">Regelvoorstellen ({{ rule_suggestions|length }})</h2>
         </div>
-        <form method="post" action="/rules/suggestions/clear" style="margin:0;"
+        <form class="u-m0" method="post" action="/rules/suggestions/clear"
               onsubmit="return confirm('Alle regelvoorstellen verwijderen?')">
             <button type="submit" class="btn btn-sm" style="font-size:.75rem;">Alles wissen</button>
         </form>
@@ -122,7 +122,7 @@
 {% if suggestions %}
 <div class="card">
     <h2>Voorgestelde regels</h2>
-    <p class="muted" style="margin-bottom:0.75rem;">Op basis van je categoriseergedrag:</p>
+    <p class="muted u-mb-075">Op basis van je categoriseergedrag:</p>
     <div class="suggestions-list">
         {% for s in suggestions %}
         <form method="post" action="/rules" class="suggestion-item">
@@ -151,11 +151,11 @@
 <div class="card" id="new-rule-card" style="margin-bottom:1.25rem;">
     <details {% if prefill %}open{% endif %}>
         <summary style="cursor:pointer; display:flex; align-items:center; gap:0.6rem;">
-            <h2 style="margin:0;">Nieuwe regel</h2>
+            <h2 class="u-m0">Nieuwe regel</h2>
         </summary>
-        <div style="margin-top:1rem;">
+        <div class="u-mt-1">
             {% if prefill %}
-            <div class="alert alert-success" style="margin-bottom:1rem;">
+            <div class="alert alert-success u-mb-1">
                 Ingevuld vanuit transactie: <strong>{{ prefill.tx_display }}</strong>
             </div>
             {% endif %}
@@ -248,7 +248,7 @@
                                 </select>
                             </div>
                         </div>
-                        <div class="form-group" style="margin-top:0.5rem;">
+                        <div class="form-group u-mt-05">
                             <label for="action_rename_counterparty">Tegenpartij hernoemen naar <span class="muted">(optioneel)</span></label>
                             <input type="text" id="action_rename_counterparty" name="action_rename_counterparty"
                                    placeholder="bijv. Albert Heijn BV → Albert Heijn">
@@ -265,7 +265,7 @@
 <!-- Rules list + Apply (full width) -->
 <div class="card">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
-                <h2 style="margin-bottom:0;">Actieve regels ({{ rules|length }})</h2>
+                <h2 class="u-mb-0">Actieve regels ({{ rules|length }})</h2>
                 {% if rules %}
                 <div style="display:flex; gap:0.5rem;">
                     <form method="post" action="/rules/apply">
@@ -323,12 +323,12 @@
                             Toepassen
                         </button>
                         <button class="btn btn-sm" onclick="toggleEdit('edit-{{ rule.id }}', 'block')">Bewerken</button>
-                        <form method="post" action="/rules/{{ rule.id }}/toggle" style="display:inline;">
+                        <form class="u-inline" method="post" action="/rules/{{ rule.id }}/toggle">
                             <button type="submit" class="btn btn-sm">
                                 {{ "Deactiveren" if rule.is_active else "Activeren" }}
                             </button>
                         </form>
-                        <form method="post" action="/rules/{{ rule.id }}/delete" style="display:inline;"
+                        <form class="u-inline" method="post" action="/rules/{{ rule.id }}/delete"
                               onsubmit="return confirm('Regel verwijderen?')">
                             <button type="submit" class="btn btn-sm btn-danger">Verwijderen</button>
                         </form>
@@ -338,13 +338,13 @@
                 <!-- Edit form (hidden) -->
                 <div class="rule-edit" id="edit-{{ rule.id }}" style="display:none;">
                     <form method="post" action="/rules/{{ rule.id }}/edit">
-                        <div class="rule-condition" style="margin-bottom:0.75rem;">
+                        <div class="rule-condition u-mb-075">
                             <div class="form-group">
                                 <label>Naam</label>
                                 <input type="text" name="name" value="{{ rule.name }}" required>
                             </div>
                         </div>
-                        <div class="rule-section-header" style="margin-bottom:0.5rem;">
+                        <div class="rule-section-header u-mb-05">
                             <span class="rule-section-badge badge-if">Als</span>
                             <span class="rule-section-line"></span>
                         </div>
@@ -366,12 +366,12 @@
                                 </select>
                             </div>
                         </div>
-                        <div class="form-group" style="margin-bottom:0.75rem;">
+                        <div class="form-group u-mb-075">
                             <label>Waarde</label>
                             <input type="text" name="match_value" value="{{ rule.match_value }}" required>
                         </div>
                         {% if accounts %}
-                        <div class="form-group" style="margin-bottom:0.75rem;">
+                        <div class="form-group u-mb-075">
                             <label>Alleen voor rekening</label>
                             <select name="condition_account_id" class="js-cond-account">
                                 <option value="">Alle rekeningen</option>
@@ -383,7 +383,7 @@
                         {% endif %}
                         <input type="hidden" name="amount_min" value="{{ '%.2f'|format(rule.amount_min) if rule.amount_min is not none else '' }}">
                         <input type="hidden" name="amount_max" value="{{ '%.2f'|format(rule.amount_max) if rule.amount_max is not none else '' }}">
-                        <div class="rule-section-header" style="margin-bottom:0.5rem;">
+                        <div class="rule-section-header u-mb-05">
                             <span class="rule-section-badge badge-then">Dan</span>
                             <span class="rule-section-line"></span>
                         </div>
@@ -408,7 +408,7 @@
                                 </select>
                             </div>
                         </div>
-                        <div class="form-group" style="margin-top:0.5rem;">
+                        <div class="form-group u-mt-05">
                             <label>Tegenpartij hernoemen naar</label>
                             <input type="text" name="action_rename_counterparty"
                                    value="{{ rule.action_rename_counterparty or '' }}"

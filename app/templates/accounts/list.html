@@ -5,7 +5,7 @@
     <h1>Rekeningen</h1>
 </div>
 {% if merged %}
-<div class="card" style="margin-bottom:1rem;">
+<div class="card u-mb-1">
     Rekeningen samengevoegd: {{ merged[0] }} transacties verplaatst, {{ merged[1] }} dubbele samengevoegd.
 </div>
 {% endif %}
@@ -85,7 +85,7 @@
             <form method="post" action="/accounts/{{ acc.id }}/owners">
                 <div style="display:flex; flex-wrap:wrap; gap:0.35rem 0.75rem; margin-bottom:0.5rem;">
                     {% for p in persons %}
-                    <label class="check-row" style="font-size:0.85rem;">
+                    <label class="check-row u-fs-85">
                         <input type="checkbox" name="owner_id" value="{{ p.id }}"
                                {% if p.id in owner_ids %}checked{% endif %}>
                         <span>{{ p.name }}</span>
@@ -106,7 +106,7 @@
             {% if accounts|length > 1 %}
             <a href="/accounts/{{ acc.id }}/merge" class="btn btn-sm">Samenvoegen</a>
             {% endif %}
-            <form method="post" action="/accounts/{{ acc.id }}/delete" style="display:inline;"
+            <form class="u-inline" method="post" action="/accounts/{{ acc.id }}/delete"
                   onsubmit="return confirm('Weet je zeker dat je deze rekening en alle transacties wilt verwijderen?')">
                 <button type="submit" class="btn btn-sm btn-danger">Verwijderen</button>
             </form>
@@ -115,8 +115,8 @@
     {% endfor %}
 </div>
 {% else %}
-<div class="card" style="text-align:center; padding:3rem;">
-    <p style="margin-bottom:1rem;">Nog geen rekeningen. Importeer een bestand of koppel je bank om te beginnen.</p>
+<div class="card u-empty-lg">
+    <p class="u-mb-1">Nog geen rekeningen. Importeer een bestand of koppel je bank om te beginnen.</p>
     <div style="display:flex; justify-content:center; gap:0.75rem; flex-wrap:wrap;">
         <a href="/import" class="btn btn-primary">CSV importeren</a>
         <a href="/banking/connect" class="btn">Bank koppelen</a>

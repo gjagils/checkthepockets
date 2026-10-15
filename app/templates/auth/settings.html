@@ -31,7 +31,7 @@
                    value="{{ user.email or '' }}" placeholder="jij@voorbeeld.nl"
                    autocomplete="email">
         </div>
-        <div class="form-group" style="align-self:flex-end;">
+        <div class="form-group u-self-end">
             <button type="submit" class="btn btn-primary">Opslaan</button>
         </div>
     </form>
@@ -56,7 +56,7 @@
                 {% endfor %}
             </select>
         </div>
-        <div class="form-group" style="align-self:flex-end;">
+        <div class="form-group u-self-end">
             <button type="submit" class="btn btn-primary">Opslaan</button>
         </div>
     </form>
@@ -85,7 +85,7 @@
             <label for="file">JSON-exportbestand</label>
             <input type="file" id="file" name="file" accept=".json" required style="padding:0.45rem;">
         </div>
-        <div class="form-group" style="align-self:flex-end;">
+        <div class="form-group u-self-end">
             <button type="submit" class="btn btn-primary">Voorvertoning →</button>
         </div>
     </form>
@@ -124,11 +124,11 @@
                 {% endfor %}
             </select>
         </div>
-        <div class="form-group" style="align-self:flex-end;">
+        <div class="form-group u-self-end">
             <button type="submit" class="btn btn-primary">Opslaan</button>
         </div>
     </form>
-    <form method="post" action="/settings/digest/test" style="margin-top:0.75rem;">
+    <form class="u-mt-075" method="post" action="/settings/digest/test">
         <button type="submit" class="btn btn-sm" title="Verstuur direct een digest om te testen of e-mail werkt">
             📧 Stuur testdigest nu
         </button>
@@ -168,7 +168,7 @@
 
 <div class="card" style="border-left: 4px solid var(--gold);">
     <h2>Transacties wissen</h2>
-    <p class="muted" style="margin-bottom:1rem;">
+    <p class="muted u-mb-1">
         Verwijdert alle transacties van alle rekeningen. Rekeningen, categorieën, budgetten en regels blijven intact.
         Dit kan <strong>niet</strong> ongedaan worden gemaakt.
     </p>
@@ -187,7 +187,7 @@
 
 <div class="card">
     <h2>Account verwijderen</h2>
-    <p class="muted" style="margin-bottom:1rem;">
+    <p class="muted u-mb-1">
         Let op: dit verwijdert je account en alle bijbehorende data (rekeningen, transacties, categorieën, budgetten, regels en spaarplannen) permanent. Dit kan niet ongedaan worden gemaakt.
     </p>
     {% if delete_error %}

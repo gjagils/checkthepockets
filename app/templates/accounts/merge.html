@@ -25,7 +25,7 @@
 </div>
 
 {% if target %}
-<div class="card" style="margin-top:1rem;">
+<div class="card u-mt-1">
     <h2>Preview</h2>
     <ul>
         <li><strong>{{ move_count }}</strong> transacties worden verplaatst naar {{ target.name or target.bank|upper }}.</li>
@@ -37,13 +37,13 @@
             Die worden samengevoegd: transacties, budgetten en regels gaan naar de categorie van {{ target.name or target.bank|upper }}.</li>
         {% endif %}
     </ul>
-    <p class="muted" style="font-size:0.85rem;">
+    <p class="muted u-fs-85">
         Twijfelgevallen (zelfde datum en bedrag, maar andere tegenpartij en omschrijving) worden verplaatst, niet samengevoegd.
         Eventuele restdubbelen vind je daarna onder <a href="/transactions/duplicates">Duplicaten</a>.
     </p>
 
     {% if plan.duplicates %}
-    <details style="margin-bottom:1rem;">
+    <details class="u-mb-1">
         <summary>Toon dubbele transacties ({{ duplicate_count }})</summary>
         <table class="table" style="margin-top:0.5rem; font-size:0.85rem;">
             <thead><tr><th>Datum</th><th>Bedrag</th><th>Tegenpartij (te verwijderen)</th><th>Tegenpartij (blijft)</th></tr></thead>

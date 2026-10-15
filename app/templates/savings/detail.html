@@ -135,7 +135,7 @@
                     {% endfor %}
                 </div>
             </div>
-            <div class="form-group" style="align-self:flex-end;">
+            <div class="form-group u-self-end">
                 <button type="submit" class="btn btn-primary btn-sm">Opslaan</button>
                 <button type="button" class="btn btn-sm" onclick="toggleEditRow({{ line.id }})">Annuleren</button>
             </div>
@@ -156,8 +156,8 @@
             </span>
             &middot;
             <span title="Gekoppeld aan eindsaldo {{ source_plan.year }}">🔗 Volgt {{ source_plan.year }}</span>
-            <form method="post" action="/savings/{{ plan.id }}/unlink"
-                  style="display:inline;"
+            <form class="u-inline" method="post" action="/savings/{{ plan.id }}/unlink"
+                 
                   onsubmit='return confirm({{ ('Koppeling met ' ~ (source_plan.year) ~ ' verbreken? Het huidige startsaldo wordt vastgelegd.')|tojson }});'>
                 <button type="submit" class="btn btn-sm btn-secondary" style="padding:0.1rem 0.5rem; font-size:0.8rem;">Loskoppelen</button>
             </form>
@@ -179,7 +179,7 @@
     </div>
     <div style="display:flex; gap:0.5rem;">
         <button type="button" class="btn btn-sm btn-primary" onclick="openQuickAdd()">+ Snel toevoegen</button>
-        <form method="post" action="/savings/{{ plan.id }}/analyze" style="margin:0;">
+        <form class="u-m0" method="post" action="/savings/{{ plan.id }}/analyze">
             <button type="submit" class="btn btn-sm btn-accent">✨ Analyseer transacties</button>
         </form>
         <a href="/savings?year={{ plan.year }}" class="btn btn-sm">Terug naar overzicht</a>
@@ -187,21 +187,21 @@
 </div>
 
 {% if analyze_status == 'empty' %}
-<div class="alert alert-info" style="margin-bottom:1rem;">Geen patronen gevonden in de transacties van deze rekening.</div>
+<div class="alert alert-info u-mb-1">Geen patronen gevonden in de transacties van deze rekening.</div>
 {% endif %}
 
 {% if request.query_params.get('error') == 'category_required' %}
-<div class="alert alert-danger" style="margin-bottom:1rem;">Kies een categorie — spaarregels moeten aan een categorie gekoppeld zijn.</div>
+<div class="alert alert-danger u-mb-1">Kies een categorie — spaarregels moeten aan een categorie gekoppeld zijn.</div>
 {% endif %}
 
 {% if request.query_params.get('error') == 'parent_required' %}
-<div class="alert alert-danger" style="margin-bottom:1rem;">Kies een hoofdcategorie — nieuwe categorieën via snel-toevoegen worden altijd subcategorieën.</div>
+<div class="alert alert-danger u-mb-1">Kies een hoofdcategorie — nieuwe categorieën via snel-toevoegen worden altijd subcategorieën.</div>
 {% endif %}
 
 {% if ai_suggestions %}
 <script>window.AI_SUGGESTIONS_B64 = {{ request.query_params.get('suggestions', '')|tojson }};</script>
 <div class="card" style="margin-bottom:1rem; border-left:4px solid var(--gold);">
-    <h3 style="margin-bottom:0.75rem;">✨ AI-voorstellen voor spaarplan</h3>
+    <h3 class="u-mb-075">✨ AI-voorstellen voor spaarplan</h3>
     <p class="muted" style="font-size:0.82rem; margin-bottom:0.75rem;">Op basis van je transacties. Pas aan en voeg toe, of sla over.</p>
     {% for s in ai_suggestions %}
     <div class="ai-suggestion-row" data-idx="{{ loop.index0 }}" style="padding:0.75rem 0; border-bottom:1px solid var(--border);">
@@ -426,7 +426,7 @@
                 </label>
             </div>
 
-            <div id="qa-existing-category" class="form-group" style="margin-bottom:1rem;">
+            <div id="qa-existing-category" class="form-group u-mb-1">
                 <label>Kies categorie</label>
                 <select name="category_id" id="qa-category-select" onchange="qaPrefillName()" required>
                     <option value="" disabled selected>— Kies categorie —</option>
@@ -437,7 +437,7 @@
             </div>
 
             <div id="qa-new-category" style="display:none; margin-bottom:1rem;">
-                <div class="form-group" style="margin-bottom:0.5rem;">
+                <div class="form-group u-mb-05">
                     <label>Ouder-categorie (hoofdcategorie)</label>
                     <select name="new_category_parent_id" id="qa-new-cat-parent">
                         <option value="">— Kies hoofdcategorie —</option>
@@ -446,7 +446,7 @@
                         {% endfor %}
                     </select>
                 </div>
-                <div class="form-group" style="margin-bottom:0.5rem;">
+                <div class="form-group u-mb-05">
                     <label>Naam nieuwe subcategorie</label>
                     <input type="text" name="new_category_name" id="qa-new-cat-name" oninput="qaPrefillName()" placeholder="bv. Spaarbijdrage">
                 </div>
@@ -455,12 +455,12 @@
 
             <!-- ── Stap 2 — Optionele regel ────────────────── -->
             <h4 style="margin:0.5rem 0 0.5rem; font-size:0.85rem; text-transform:uppercase; color:var(--muted);">2. Transacties automatisch koppelen <span class="muted" style="text-transform:none; font-weight:normal;">(optioneel)</span></h4>
-            <label class="check-row" style="margin-bottom:0.5rem;">
+            <label class="check-row u-mb-05">
                 <input type="checkbox" name="create_rule" value="1" id="qa-create-rule" onchange="qaToggleRule(this.checked)">
                 <span>Maak een regel die transacties op deze categorie zet</span>
             </label>
             <div id="qa-rule-fields" style="display:none; margin-bottom:1rem; padding-left:1.5rem; border-left:2px solid var(--border);">
-                <div class="form-group" style="margin-bottom:0.5rem;">
+                <div class="form-group u-mb-05">
                     <label>Zoek in</label>
                     <select name="rule_match_field">
                         <option value="description">Omschrijving</option>

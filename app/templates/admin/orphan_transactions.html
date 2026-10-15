@@ -6,8 +6,8 @@
     <a href="/admin/users" class="btn btn-sm">← Admin</a>
 </div>
 
-<div class="card" style="margin-bottom:1rem;">
-    <p class="muted" style="margin:0;">
+<div class="card u-mb-1">
+    <p class="muted u-m0">
         Transacties waarvan de tegenpartij-IBAN of omschrijving suggereert dat ze bij een
         <strong>andere bank/rekening</strong> horen dan waar ze nu op staan. Detecteert bv. een
         "bunq Payday" op een ABN-rekening terwijl je ook een bunq-rekening hebt.
@@ -51,7 +51,7 @@
                     </td>
                     <td>
                         <span class="pill">{{ item.account.bank|upper }}</span>
-                        <span style="font-size:0.8rem;">{{ item.account.name }}</span>
+                        <span class="u-fs-80">{{ item.account.name }}</span>
                     </td>
                     <td style="font-size:0.78rem;">
                         {% for r in item.reasons %}
@@ -60,14 +60,14 @@
                     </td>
                     <td>
                         {% if item.suggested_account %}
-                        <span class="muted" style="font-size:0.8rem;">→ {{ item.suggested_account.name }}</span>
+                        <span class="muted u-fs-80">→ {{ item.suggested_account.name }}</span>
                         {% else %}
-                        <span class="muted" style="font-size:0.8rem;">geen suggestie</span>
+                        <span class="muted u-fs-80">geen suggestie</span>
                         {% endif %}
                     </td>
                     <td>
                         {% if item.suggested_account %}
-                        <form method="post" action="/transactions/{{ tx.id }}/move-account" style="display:inline;">
+                        <form class="u-inline" method="post" action="/transactions/{{ tx.id }}/move-account">
                             <input type="hidden" name="redirect_to" value="/admin/orphan-transactions">
                             <input type="hidden" name="target_account_id" value="{{ item.suggested_account.id }}">
                             <button type="submit" class="btn btn-sm btn-accent"
@@ -84,8 +84,8 @@
     </div>
 </div>
 {% else %}
-<div class="card" style="text-align:center; padding:2rem;">
-    <p class="muted" style="margin:0;">✓ Geen verdachte transacties gevonden.</p>
+<div class="card u-empty">
+    <p class="muted u-m0">✓ Geen verdachte transacties gevonden.</p>
 </div>
 {% endif %}
 {% endblock %}

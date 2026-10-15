@@ -7,7 +7,7 @@
 
 <form method="post"
       action="{% if mode == 'edit' %}/hypotheek/scenarios/{{ scenario.id }}/edit{% else %}/hypotheek/scenarios{% endif %}">
-    <div class="card" style="margin-bottom:1rem;">
+    <div class="card u-mb-1">
         <h3 style="margin-top:0;">{% if mode == 'edit' %}Listing-link{% else %}Automatisch invullen vanaf Funda of Move.nl{% endif %}</h3>
         {% if mode != 'edit' %}
         <p class="muted" style="margin-top:0.25rem;">
@@ -24,13 +24,13 @@
         {% if mode != 'edit' %}
         <div style="display:flex; gap:0.5rem; align-items:center;">
             <button type="button" id="funda-fetch-btn" class="btn">Ophalen</button>
-            <span id="funda-status" class="muted" style="font-size:0.85rem;"></span>
+            <span id="funda-status" class="muted u-fs-85"></span>
         </div>
         {% endif %}
         <input type="hidden" id="f-photo-url" name="photo_url"
                value="{{ scenario.photo_url or '' if scenario else '' }}">
     </div>
-    <div class="card" style="margin-bottom:1rem;">
+    <div class="card u-mb-1">
         <div class="form-group">
             <label for="f-name">Naam</label>
             <input type="text" id="f-name" name="name" required maxlength="150"
@@ -136,7 +136,7 @@
         </div>
     </div>
 
-    <div class="card" style="margin-bottom:1rem;">
+    <div class="card u-mb-1">
         <h3 style="margin-top:0;">Overbrugging</h3>
         <p class="muted" style="margin-top:0.25rem;">
             Wanneer de overdracht van het nieuwe huis vóór de verkoop van het oude plaatsvindt, financier je de overwaarde tijdelijk met een overbruggingshypotheek. Laat de datums leeg als er geen overbrugging nodig is.

@@ -9,16 +9,16 @@
 </div>
 
 {% if request.query_params.get('flash') == 'triggered' %}
-<div class="alert alert-success" style="margin-bottom:1rem;">Job is gestart. Resultaat verschijnt hieronder bij "Recente runs".</div>
+<div class="alert alert-success u-mb-1">Job is gestart. Resultaat verschijnt hieronder bij "Recente runs".</div>
 {% endif %}
 {% if request.query_params.get('error') == 'unknown_job' %}
-<div class="alert alert-danger" style="margin-bottom:1rem;">Onbekende job.</div>
+<div class="alert alert-danger u-mb-1">Onbekende job.</div>
 {% endif %}
 {% if request.query_params.get('error') == 'trigger_failed' %}
-<div class="alert alert-danger" style="margin-bottom:1rem;">Kon de job niet starten.</div>
+<div class="alert alert-danger u-mb-1">Kon de job niet starten.</div>
 {% endif %}
 
-<div class="card" style="margin-bottom:1.5rem;">
+<div class="card u-mb-15">
     <h2 style="margin:0 0 0.75rem 0; font-size:1.1rem;">Ingeplande jobs</h2>
     {% if not jobs %}
     <p class="muted">Scheduler draait niet, of er zijn geen jobs ingepland (bv. omdat `ENABLE_BANKING_APP_ID` niet gezet is).</p>
@@ -37,12 +37,12 @@
                 {% for job in jobs %}
                 <tr>
                     <td><code>{{ job.id }}</code></td>
-                    <td class="muted" style="font-size:0.85rem;">{{ job.trigger }}</td>
+                    <td class="muted u-fs-85">{{ job.trigger }}</td>
                     <td class="nowrap">
                         {% if job.next_run_time %}{{ job.next_run_time.strftime('%Y-%m-%d %H:%M:%S %Z') }}{% else %}—{% endif %}
                     </td>
                     <td>
-                        <form method="post" action="/admin/scheduler/run" style="display:inline;"
+                        <form class="u-inline" method="post" action="/admin/scheduler/run"
                               onsubmit='return confirm({{ ('Job ' ~ (job.id) ~ ' nu uitvoeren?')|tojson }})'>
                             <input type="hidden" name="job_id" value="{{ job.id }}">
                             <button type="submit" class="btn btn-sm btn-primary">Run nu</button>
@@ -77,7 +77,7 @@
                 {% set duration = ((r.finished_at - r.started_at).total_seconds() | round(1)) if r.finished_at and r.started_at else None %}
                 <tr>
                     <td><code>{{ r.job_id }}</code></td>
-                    <td class="nowrap" style="font-size:0.85rem;">{{ r.started_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                    <td class="nowrap u-fs-85">{{ r.started_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
                     <td class="nowrap">
                         {% if duration is not none %}{{ duration }}s{% else %}<span class="muted">—</span>{% endif %}
                     </td>

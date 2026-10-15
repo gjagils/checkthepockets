@@ -5,7 +5,7 @@
     <h1>Budgetten</h1>
     <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
         <!-- Quick copy previous month -->
-        <form method="post" action="/budgets/copy" style="display:inline;">
+        <form class="u-inline" method="post" action="/budgets/copy">
             <input type="hidden" name="from_year" value="{{ prev_year }}">
             <input type="hidden" name="from_month" value="{{ prev_month }}">
             <input type="hidden" name="to_year" value="{{ current_year }}">
@@ -116,7 +116,7 @@
                 {% endfor %}
             </select>
         </div>
-        <div class="form-group" style="align-self:flex-end;">
+        <div class="form-group u-self-end">
             <button type="submit" class="btn btn-primary btn-sm">Toon</button>
         </div>
     </form>
@@ -286,11 +286,11 @@
                     <td class="text-right nowrap"><strong>{{ group.group_spent|euro_sign }}</strong></td>
                     <td class="text-right nowrap">
                         {% if group.group_projected > 0 %}
-                        <span class="muted" style="font-size:0.85rem;">{{ group.group_projected|euro_sign }}</span>
+                        <span class="muted u-fs-85">{{ group.group_projected|euro_sign }}</span>
                         {% else %}<span class="muted">-</span>{% endif %}
                     </td>
                     <td class="text-right nowrap muted">-</td>
-                    <td class="text-right nowrap muted" style="font-size:0.85rem;">
+                    <td class="text-right nowrap muted u-fs-85">
                         {% if group.group_avg_3m and group.group_avg_3m > 0 %}
                         {{ group.group_avg_3m|euro_sign }}
                         {% else %}-{% endif %}
@@ -352,17 +352,17 @@
                     </td>
                     <td class="text-right nowrap">{{ child.effective_budget|euro_sign }}</td>
                     <td class="text-right nowrap">{{ child.spent|euro_sign }}</td>
-                    <td class="text-right nowrap" style="font-size:0.85rem;">
+                    <td class="text-right nowrap u-fs-85">
                         {% if child.projected > 0 %}
                         <span class="muted">{{ child.projected|euro_sign }}</span>
                         {% else %}-{% endif %}
                     </td>
-                    <td class="text-right nowrap muted" style="font-size:0.85rem;">
+                    <td class="text-right nowrap muted u-fs-85">
                         {% if child.prev_spent > 0 %}
                         {{ child.prev_spent|euro_sign }}
                         {% else %}-{% endif %}
                     </td>
-                    <td class="text-right nowrap muted" style="font-size:0.85rem;">
+                    <td class="text-right nowrap muted u-fs-85">
                         {% if child.avg_3m_spent and child.avg_3m_spent > 0 %}
                         {{ child.avg_3m_spent|euro_sign }}
                         {% else %}-{% endif %}
@@ -389,8 +389,8 @@
     </div>
 </div>
 {% else %}
-<div class="card" style="text-align:center; padding:3rem;">
-    <p style="margin-bottom:1rem;">Geen uitgavecategorieën gevonden. Voeg eerst een categorie toe; daarna kun je hier een budget instellen.</p>
+<div class="card u-empty-lg">
+    <p class="u-mb-1">Geen uitgavecategorieën gevonden. Voeg eerst een categorie toe; daarna kun je hier een budget instellen.</p>
     <a href="/categories" class="btn btn-primary">Categorie toevoegen</a>
 </div>
 {% endif %}
@@ -425,7 +425,7 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="form-group" style="align-self:flex-end;">
+            <div class="form-group u-self-end">
                 <button type="submit" class="btn btn-primary btn-sm"
                         onclick="return confirm('Budgetten kopiëren? Bestaande waarden worden overschreven.')">
                     Kopiëren
@@ -447,7 +447,7 @@
                     <option value="12">12 maanden</option>
                 </select>
             </div>
-            <div class="form-group" style="align-self:flex-end;">
+            <div class="form-group u-self-end">
                 <button type="submit" class="btn btn-primary btn-sm"
                         onclick="return confirm('Budgetten instellen op basis van gemiddelde uitgaven? Bestaande waarden worden overschreven.')">
                     Gemiddelde toepassen
@@ -462,7 +462,7 @@
             {% for p in presets %}
             <div style="display:flex; align-items:center; gap:0.35rem; background:var(--bg); border-radius:6px; padding:0.3rem 0.65rem; font-size:0.83rem;">
                 <span>{{ p.name }}</span>
-                <form method="post" action="/budgets/preset/delete" style="display:inline;">
+                <form class="u-inline" method="post" action="/budgets/preset/delete">
                     <input type="hidden" name="preset_id" value="{{ p.id }}">
                     <input type="hidden" name="year" value="{{ current_year }}">
                     <input type="hidden" name="month" value="{{ current_month }}">
@@ -479,11 +479,11 @@
 <!-- Preset save modal -->
 <div id="presetSaveModal" style="display:none; position:fixed; inset:0; z-index:999; align-items:center; justify-content:center; background:rgba(0,39,82,0.45); backdrop-filter:blur(3px);">
     <div class="card" style="width:min(400px,90vw); padding:1.5rem;">
-        <h3 style="margin-bottom:1rem;">Opslaan als preset</h3>
+        <h3 class="u-mb-1">Opslaan als preset</h3>
         <form method="post" action="/budgets/preset/save">
             <input type="hidden" name="year" value="{{ current_year }}">
             <input type="hidden" name="month" value="{{ current_month }}">
-            <div class="form-group" style="margin-bottom:1rem;">
+            <div class="form-group u-mb-1">
                 <label for="presetName">Naam</label>
                 <input type="text" id="presetName" name="name" placeholder="bijv. Standaard, Zomer…" required autofocus>
             </div>

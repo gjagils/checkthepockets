@@ -12,10 +12,10 @@
 </div>
 
 {% if request.query_params.get('error') == 'invalid_parent' %}
-<div class="alert alert-danger" style="margin-bottom:1rem;">Ongeldige hoofdcategorie gekozen.</div>
+<div class="alert alert-danger u-mb-1">Ongeldige hoofdcategorie gekozen.</div>
 {% endif %}
 {% if request.query_params.get('error') == 'has_children' %}
-<div class="alert alert-danger" style="margin-bottom:1rem;">Kan niet omzetten naar subcategorie: deze categorie heeft zelf al subcategorieën (geen 3-lagen hiërarchie).</div>
+<div class="alert alert-danger u-mb-1">Kan niet omzetten naar subcategorie: deze categorie heeft zelf al subcategorieën (geen 3-lagen hiërarchie).</div>
 {% endif %}
 
 <!-- Add category forms (boven het overzicht) -->
@@ -103,10 +103,10 @@
 {% if top_level %}
 <div class="card">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
-        <p class="muted" style="margin:0;">Sleep categorieën om de volgorde aan te passen.</p>
+        <p class="muted u-m0">Sleep categorieën om de volgorde aan te passen.</p>
         {% if archived_count > 0 or show_archived %}
         <a href="/categories?show_archived={{ 0 if show_archived else 1 }}{% if current_account_id %}&account_id={{ current_account_id }}{% endif %}"
-           class="btn btn-sm" style="font-size:0.75rem;">
+           class="btn btn-sm u-fs-75">
             {% if show_archived %}Verberg gearchiveerd{% else %}Toon gearchiveerd ({{ archived_count }}){% endif %}
         </a>
         {% endif %}
@@ -141,13 +141,13 @@
                     </td>
                     <td class="nowrap">
                         <button type="button" class="btn btn-sm" onclick="toggleEdit('cat-{{ cat.id }}')">Bewerk</button>
-                        <form method="post" action="/categories/{{ cat.id }}/archive" style="display:inline;">
+                        <form class="u-inline" method="post" action="/categories/{{ cat.id }}/archive">
                             {{ filter_state() }}
                             <button type="submit" class="btn btn-sm" title="{{ 'Dearchiveren' if cat.is_archived else 'Archiveren' }}">
                                 {{ '↩' if cat.is_archived else '🗄' }}
                             </button>
                         </form>
-                        <form method="post" action="/categories/{{ cat.id }}/delete" style="display:inline;"
+                        <form class="u-inline" method="post" action="/categories/{{ cat.id }}/delete"
                               onsubmit="return confirm('Hoofdcategorie en alle subcategorieën verwijderen?')">
                             {{ filter_state() }}
                             <button type="submit" class="btn btn-sm btn-danger">X</button>
@@ -204,7 +204,7 @@
                                     <option value="mortgage" {% if cat.cost_scale_type == 'mortgage' %}selected{% endif %}>Hypotheek</option>
                                 </select>
                             </div>
-                            <div class="form-group" style="align-self:flex-end;">
+                            <div class="form-group u-self-end">
                                 <button type="submit" class="btn btn-primary btn-sm">Opslaan</button>
                                 <button type="button" class="btn btn-sm" onclick="toggleEdit('cat-{{ cat.id }}')">Annuleren</button>
                             </div>
@@ -226,13 +226,13 @@
                     </td>
                     <td class="nowrap">
                         <button type="button" class="btn btn-sm" onclick="toggleEdit('cat-{{ sub.id }}')">Bewerk</button>
-                        <form method="post" action="/categories/{{ sub.id }}/archive" style="display:inline;">
+                        <form class="u-inline" method="post" action="/categories/{{ sub.id }}/archive">
                             {{ filter_state() }}
                             <button type="submit" class="btn btn-sm" title="{{ 'Dearchiveren' if sub.is_archived else 'Archiveren' }}">
                                 {{ '↩' if sub.is_archived else '🗄' }}
                             </button>
                         </form>
-                        <form method="post" action="/categories/{{ sub.id }}/delete" style="display:inline;"
+                        <form class="u-inline" method="post" action="/categories/{{ sub.id }}/delete"
                               onsubmit="return confirm('Subcategorie verwijderen?')">
                             {{ filter_state() }}
                             <button type="submit" class="btn btn-sm btn-danger">X</button>
@@ -287,7 +287,7 @@
                                     <option value="mortgage" {% if sub.cost_scale_type == 'mortgage' %}selected{% endif %}>Hypotheek</option>
                                 </select>
                             </div>
-                            <div class="form-group" style="align-self:flex-end;">
+                            <div class="form-group u-self-end">
                                 <button type="submit" class="btn btn-primary btn-sm">Opslaan</button>
                                 <button type="button" class="btn btn-sm" onclick="toggleEdit('cat-{{ sub.id }}')">Annuleren</button>
                             </div>
@@ -301,7 +301,7 @@
     </div>
 </div>
 {% else %}
-<div class="card" style="text-align:center; padding:3rem;">
+<div class="card u-empty-lg">
     <p>Nog geen categorieën aangemaakt.</p>
 </div>
 {% endif %}
@@ -333,7 +333,7 @@
                 {% endfor %}
             </select>
         </div>
-        <div class="form-group" style="align-self:flex-end;">
+        <div class="form-group u-self-end">
             <button type="submit" class="btn btn-primary btn-sm"
                     onclick="return confirm('Categorieën samenvoegen? De broncategorie wordt verwijderd na het verplaatsen van alle transacties.')">
                 Samenvoegen

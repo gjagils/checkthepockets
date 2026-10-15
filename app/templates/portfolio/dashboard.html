@@ -13,7 +13,7 @@
 
 {% set persons = data.persons %}
 {% if not persons %}
-<div class="card" style="text-align:center; padding:3rem;">
+<div class="card u-empty-lg">
     <p class="muted">Voeg eerst <a href="/portfolio">personen</a> toe om het dashboard te vullen.</p>
 </div>
 {% else %}
@@ -27,11 +27,11 @@
 </div>
 
 <!-- Huidige totalen per persoon -->
-<div class="accounts-grid" style="margin-bottom:1.5rem;">
+<div class="accounts-grid u-mb-15">
     {% for p in persons %}
     {% set totals = data.current_totals[p.id] %}
     <div class="card" {% if selected == p.id|string %}style="border-left:4px solid var(--ctp-denim);"{% endif %}>
-        <h2 style="margin-bottom:0.5rem;">{{ p.name }}</h2>
+        <h2 class="u-mb-05">{{ p.name }}</h2>
         <div style="display:grid; grid-template-columns:1fr auto; gap:0.25rem 1rem; font-size:0.95rem;">
             <span class="muted">Sparen</span>
             <span class="text-right nowrap">{{ totals.savings|euro_sign }}</span>
@@ -41,8 +41,8 @@
             <span class="text-right nowrap">{{ totals.portfolio_net|euro_sign }}</span>
             <span style="font-weight:600; border-top:1px solid var(--ctp-border); padding-top:0.4rem;">Totaal (bruto)</span>
             <span class="text-right nowrap" style="font-weight:600; border-top:1px solid var(--ctp-border); padding-top:0.4rem;">{{ totals.total_gross|euro_sign }}</span>
-            <span style="font-weight:600;">Contant totaal</span>
-            <span class="text-right nowrap" style="font-weight:600;">{{ totals.total_net|euro_sign }}</span>
+            <span class="u-fw-600">Contant totaal</span>
+            <span class="text-right nowrap u-fw-600">{{ totals.total_net|euro_sign }}</span>
         </div>
     </div>
     {% endfor %}
@@ -50,7 +50,7 @@
     {% if persons|length > 1 %}
     {% set st = data.samen_totals %}
     <div class="card" {% if selected == 'samen' %}style="border-left:4px solid var(--ctp-denim);"{% endif %}>
-        <h2 style="margin-bottom:0.5rem;">Samen</h2>
+        <h2 class="u-mb-05">Samen</h2>
         <div style="display:grid; grid-template-columns:1fr auto; gap:0.25rem 1rem; font-size:0.95rem;">
             <span class="muted">Sparen</span>
             <span class="text-right nowrap">{{ st.savings|euro_sign }}</span>
@@ -60,8 +60,8 @@
             <span class="text-right nowrap">{{ st.portfolio_net|euro_sign }}</span>
             <span style="font-weight:600; border-top:1px solid var(--ctp-border); padding-top:0.4rem;">Totaal (bruto)</span>
             <span class="text-right nowrap" style="font-weight:600; border-top:1px solid var(--ctp-border); padding-top:0.4rem;">{{ st.total_gross|euro_sign }}</span>
-            <span style="font-weight:600;">Contant totaal</span>
-            <span class="text-right nowrap" style="font-weight:600;">{{ st.total_net|euro_sign }}</span>
+            <span class="u-fw-600">Contant totaal</span>
+            <span class="text-right nowrap u-fw-600">{{ st.total_net|euro_sign }}</span>
         </div>
     </div>
     {% endif %}
@@ -69,7 +69,7 @@
 
 {% if data.children_forecast %}
 <!-- Kind-prognose op 18e -->
-<div class="card" style="margin-bottom:1.5rem;">
+<div class="card u-mb-15">
     <h2 style="margin-bottom:0.25rem;">Kinderen — prognose op 18e</h2>
     <p class="muted" style="margin-bottom:1rem; font-size:0.9rem;">
         Projectie t/m de maand waarin het kind 18 wordt. Portfolio groeit mee met
@@ -81,7 +81,7 @@
         <div class="card" style="background:var(--ctp-card-alt, var(--ctp-bg)); border:1px solid var(--ctp-border);">
             <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:0.25rem;">
                 <h3 style="margin:0; font-size:1.05rem;">{{ c.person_name }}</h3>
-                <span class="muted" style="font-size:0.85rem;">{{ c.age }} jaar</span>
+                <span class="muted u-fs-85">{{ c.age }} jaar</span>
             </div>
             <p class="muted" style="font-size:0.85rem; margin-bottom:0.6rem;">
                 Wordt 18 in {{ c.eighteenth_month_label }}
@@ -114,7 +114,7 @@
 <!-- Projectie-chart -->
 <div class="card">
     <h2>Projectie — komende {{ data.months_ahead }} maanden</h2>
-    <p class="muted" style="margin-bottom:1rem;">
+    <p class="muted u-mb-1">
         {% if selected == 'samen' %}Alle personen gecombineerd.{% else %}Alleen <strong>{{ data.person_name_by_id[selected|int] }}</strong> — klik op een tab hierboven om te wisselen.{% endif %}
     </p>
     <div style="position:relative; height:340px;">
@@ -126,7 +126,7 @@
 {% if data.savings_breakdown %}
 <details class="card" style="margin-top:1.5rem;">
     <summary style="cursor:pointer; font-weight:600; font-size:1.05rem;">Spaarrekeningen ({{ data.savings_breakdown|length }})</summary>
-    <div class="table-wrap" style="margin-top:0.75rem;">
+    <div class="table-wrap u-mt-075">
         <table>
             <thead>
                 <tr>
@@ -141,7 +141,7 @@
                 <tr>
                     <td>
                         {{ acc.name }}
-                        {% if not acc.has_plan %}<br><span class="muted" style="font-size:0.8rem;">geen spaarplan dit jaar</span>{% endif %}
+                        {% if not acc.has_plan %}<br><span class="muted u-fs-80">geen spaarplan dit jaar</span>{% endif %}
                     </td>
                     <td class="text-right nowrap">{{ acc.current_total|euro_sign }}</td>
                     <td class="text-right nowrap">{{ acc.projected_total|euro_sign }}</td>
@@ -162,9 +162,9 @@
 {% endif %}
 
 {% if data.portfolio_breakdown %}
-<details class="card" style="margin-top:1rem;">
+<details class="card u-mt-1">
     <summary style="cursor:pointer; font-weight:600; font-size:1.05rem;">Beleggingen ({{ data.portfolio_breakdown|length }})</summary>
-    <div class="table-wrap" style="margin-top:0.75rem;">
+    <div class="table-wrap u-mt-075">
         <table>
             <thead>
                 <tr>
@@ -178,7 +178,7 @@
             <tbody>
                 {% for asset in data.portfolio_breakdown %}
                 <tr>
-                    <td>{{ asset.name }} <span class="muted" style="font-size:0.8rem;">({{ asset.asset_class }})</span></td>
+                    <td>{{ asset.name }} <span class="muted u-fs-80">({{ asset.asset_class }})</span></td>
                     <td class="text-right nowrap">{{ asset.current_gross|euro_sign }}</td>
                     <td class="text-right nowrap">{{ asset.current_net|euro_sign }}</td>
                     <td class="text-right nowrap">{{ asset.projected_gross|euro_sign }}</td>
@@ -201,7 +201,7 @@
 {% endif %}
 
 {% if not data.savings_breakdown and not data.portfolio_breakdown %}
-<div class="card" style="text-align:center; padding:2rem;">
+<div class="card u-empty">
     <p class="muted">Nog geen spaarrekeningen of beleggingen gekoppeld. Voeg ze toe via <a href="/savings">Sparen</a> of <a href="/portfolio">Portfolio</a>.</p>
 </div>
 {% endif %}

@@ -4,13 +4,13 @@
 <div class="page-header">
     <h1>Terugkerende transacties</h1>
     <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
-        <form method="post" action="/recurring/relink-all" style="margin:0;">
+        <form class="u-m0" method="post" action="/recurring/relink-all">
             <button type="submit" class="btn btn-primary" onclick="return confirm('Alle transacties opnieuw koppelen aan terugkerende items?')">🔗 Opnieuw koppelen</button>
         </form>
-        <form method="post" action="/recurring/apply-all-categories" style="margin:0;">
+        <form class="u-m0" method="post" action="/recurring/apply-all-categories">
             <button type="submit" class="btn" onclick="return confirm('Categorieën toepassen op alle gekoppelde transacties zonder categorie?')">🏷 Categorieën toepassen</button>
         </form>
-        <form method="post" action="/recurring/analyze" style="margin:0;">
+        <form class="u-m0" method="post" action="/recurring/analyze">
             <button type="submit" class="btn btn-accent">✨ Analyseer transacties</button>
         </form>
     </div>
@@ -60,7 +60,7 @@
         </div>
         <div style="display:flex; gap:.4rem;">
             <a href="/recurring?from_suggestion={{ s.id }}" class="btn btn-sm btn-primary">✓ Toevoegen</a>
-            <form method="post" action="/recurring/suggestion/{{ s.id }}/dismiss" style="margin:0;">
+            <form class="u-m0" method="post" action="/recurring/suggestion/{{ s.id }}/dismiss">
                 <button type="submit" class="btn btn-sm" title="Verwijder suggestie">✕</button>
             </form>
         </div>
@@ -131,9 +131,9 @@
         {% include "recurring/_skipped_months.html" %}
         {% include "recurring/_candidate_transactions.html" %}
         {% include "recurring/_linked_transactions.html" %}
-        <div class="recurring-actions" style="margin-top:0.5rem;">
+        <div class="recurring-actions u-mt-05">
             <button class="btn btn-sm" onclick="toggleRecurringEdit({{ item.id }})">Bewerken</button>
-            <form method="post" action="/recurring/{{ item.id }}/toggle" style="display:inline;">
+            <form class="u-inline" method="post" action="/recurring/{{ item.id }}/toggle">
                 <button type="submit" class="btn btn-sm">Deactiveren</button>
             </form>
         </div>
@@ -183,10 +183,10 @@
                 {% include "recurring/_linked_transactions.html" %}
                 <div class="recurring-actions" style="margin-top:0.4rem;">
                     <button class="btn btn-sm" onclick="toggleRecurringEdit({{ item.id }})">Bewerken</button>
-                    <form method="post" action="/recurring/{{ item.id }}/toggle" style="display:inline;">
+                    <form class="u-inline" method="post" action="/recurring/{{ item.id }}/toggle">
                         <button type="submit" class="btn btn-sm">Deactiveren</button>
                     </form>
-                    <form method="post" action="/recurring/{{ item.id }}/delete" style="display:inline;" onsubmit="return confirm('Verwijderen?')">
+                    <form class="u-inline" method="post" action="/recurring/{{ item.id }}/delete" onsubmit="return confirm('Verwijderen?')">
                         <button type="submit" class="btn btn-sm btn-danger">Verwijderen</button>
                     </form>
                 </div>
@@ -200,7 +200,7 @@
 
         <!-- Ontvangen / gevonden -->
         {% if items_active %}
-        <div class="card" style="margin-bottom:1rem;">
+        <div class="card u-mb-1">
             <h3 style="margin-bottom:0.75rem; color:var(--navy);">
                 Ontvangen deze periode
                 <span class="pill" style="background:rgba(34,197,94,0.12); color:var(--green); margin-left:0.4rem;">{{ items_active|length }}</span>
@@ -230,7 +230,7 @@
                         {% if entry.matched_transaction.recurring_id == item.id %}· handmatig{% endif %}
                     </span>
                     {% if entry.matched_transaction.recurring_id == item.id %}
-                    <form method="post" action="/recurring/{{ item.id }}/unlink" style="display:inline;">
+                    <form class="u-inline" method="post" action="/recurring/{{ item.id }}/unlink">
                         <input type="hidden" name="transaction_id" value="{{ entry.matched_transaction.id }}">
                         <button type="submit" class="btn btn-sm" style="font-size:0.7rem; padding:0.1rem 0.4rem;" title="Koppeling verwijderen">✕ ontkoppelen</button>
                     </form>
@@ -240,10 +240,10 @@
                 {% include "recurring/_linked_transactions.html" %}
                 <div class="recurring-actions">
                     <button class="btn btn-sm" onclick="toggleRecurringEdit({{ item.id }})">Bewerken</button>
-                    <form method="post" action="/recurring/{{ item.id }}/toggle" style="display:inline;">
+                    <form class="u-inline" method="post" action="/recurring/{{ item.id }}/toggle">
                         <button type="submit" class="btn btn-sm">Deactiveren</button>
                     </form>
-                    <form method="post" action="/recurring/{{ item.id }}/delete" style="display:inline;" onsubmit="return confirm('Verwijderen?')">
+                    <form class="u-inline" method="post" action="/recurring/{{ item.id }}/delete" onsubmit="return confirm('Verwijderen?')">
                         <button type="submit" class="btn btn-sm btn-danger">Verwijderen</button>
                     </form>
                 </div>
@@ -278,16 +278,16 @@
                     </div>
                     <div class="recurring-meta">
                         <span class="pill">{{ frequencies.get(item.frequency, item.frequency) }}</span>
-                        {% if item.start_date %}<span class="muted" style="font-size:0.75rem;">Vanaf {{ item.start_date|date }}</span>{% endif %}
-                        {% if item.end_date %}<span class="muted" style="font-size:0.75rem;">T/m {{ item.end_date|date }}</span>{% endif %}
+                        {% if item.start_date %}<span class="muted u-fs-75">Vanaf {{ item.start_date|date }}</span>{% endif %}
+                        {% if item.end_date %}<span class="muted u-fs-75">T/m {{ item.end_date|date }}</span>{% endif %}
                     </div>
                     {% include "recurring/_skipped_months.html" %}
                     <div class="recurring-actions">
                         <button class="btn btn-sm" onclick="toggleRecurringEdit({{ item.id }})">Bewerken</button>
-                        <form method="post" action="/recurring/{{ item.id }}/toggle" style="display:inline;">
+                        <form class="u-inline" method="post" action="/recurring/{{ item.id }}/toggle">
                             <button type="submit" class="btn btn-sm">{{ "Activeren" if not item.is_active else "Deactiveren" }}</button>
                         </form>
-                        <form method="post" action="/recurring/{{ item.id }}/delete" style="display:inline;" onsubmit="return confirm('Verwijderen?')">
+                        <form class="u-inline" method="post" action="/recurring/{{ item.id }}/delete" onsubmit="return confirm('Verwijderen?')">
                             <button type="submit" class="btn btn-sm btn-danger">Verwijderen</button>
                         </form>
                     </div>
@@ -312,7 +312,7 @@
         <div class="card" id="new-recurring-card">
             <h2>Toevoegen</h2>
             {% if prefill %}
-            <div class="alert alert-success" style="margin-bottom:1rem;">
+            <div class="alert alert-success u-mb-1">
                 Ingevuld vanuit: <strong>{{ prefill.tx_display }}</strong>
                 {% if prefill.suggestion_id %}
                 <form method="post" action="/recurring/suggestion/{{ prefill.suggestion_id }}/dismiss" style="display:inline; margin-left:.5rem;">
@@ -322,7 +322,7 @@
             </div>
             {% endif %}
             {% if suggestion_transactions %}
-            <details open style="margin-bottom:1rem;">
+            <details class="u-mb-1" open>
                 <summary style="font-size:0.85rem; cursor:pointer; font-weight:600; margin-bottom:0.5rem;">
                     ▼ {{ suggestion_transactions|length }} transacties gevonden — vink aan om te koppelen
                 </summary>
@@ -410,7 +410,7 @@
                     <label for="description_match">Omschrijving (zoekterm)</label>
                     <input type="text" id="description_match" name="description_match" placeholder="bijv. maandhuur">
                 </div>
-                <details style="margin-bottom:0.75rem;">
+                <details class="u-mb-075">
                     <summary style="font-size:0.8rem; cursor:pointer; color:var(--navy-mid); font-weight:600; margin-bottom:0.4rem;">Actieve periode (optioneel)</summary>
                     <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.4rem;">
                         <div class="form-group" style="flex:1; min-width:120px;">

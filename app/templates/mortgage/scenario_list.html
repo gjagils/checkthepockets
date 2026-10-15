@@ -62,13 +62,13 @@
                     <td>{{ s.energy_label or '—' }}</td>
                     <td class="text-right">
                         {% if s.is_archived %}
-                        <form method="post" action="/hypotheek/scenarios/{{ s.id }}/unarchive" style="display:inline;">
+                        <form class="u-inline" method="post" action="/hypotheek/scenarios/{{ s.id }}/unarchive">
                             <button type="submit" class="btn btn-sm">Herstellen</button>
                         </form>
                         {% else %}
                         <a href="/hypotheek/scenarios/{{ s.id }}/edit" class="btn btn-sm">Bewerken</a>
-                        <form method="post" action="/hypotheek/scenarios/{{ s.id }}/delete"
-                              style="display:inline;"
+                        <form class="u-inline" method="post" action="/hypotheek/scenarios/{{ s.id }}/delete"
+                             
                               onsubmit="return confirm('Scenario archiveren?');">
                             <button type="submit" class="btn btn-sm btn-danger">Archiveer</button>
                         </form>
@@ -81,8 +81,8 @@
     </div>
 </div>
 {% else %}
-<div class="card" style="text-align:center; padding:2rem;">
-    <p class="muted" style="margin-bottom:1rem;">
+<div class="card u-empty">
+    <p class="muted u-mb-1">
         {% if show_archived %}
         Geen gearchiveerde scenarios.
         {% else %}
@@ -93,7 +93,7 @@
 </div>
 {% endif %}
 
-<div style="margin-top:1rem;">
+<div class="u-mt-1">
     {% if show_archived %}
     <a href="/hypotheek/scenarios" class="muted">Verberg gearchiveerde</a>
     {% else %}

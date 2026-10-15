@@ -6,8 +6,8 @@
     <a href="/admin/users" class="btn">Terug naar gebruikers</a>
 </div>
 
-<div class="card" style="margin-bottom:1rem;">
-    <p class="muted" style="margin:0;">
+<div class="card u-mb-1">
+    <p class="muted u-m0">
         Elke rij is een groep transacties die binnen dezelfde minuut is
         aangemaakt (CSV-import of bank-sync). Verwijderen haalt alle
         transacties uit die batch — ze kunnen daarna opnieuw geïmporteerd
@@ -23,7 +23,7 @@
                 <th>Import-moment (UTC)</th>
                 <th>Gebruiker</th>
                 <th>Rekening</th>
-                <th style="text-align:right;">Aantal</th>
+                <th class="u-text-right">Aantal</th>
                 <th>Periode transacties</th>
                 <th></th>
             </tr>
@@ -34,7 +34,7 @@
                 <td>{{ b.batch.strftime('%Y-%m-%d %H:%M') }}</td>
                 <td>{{ b.user_name }}</td>
                 <td>{{ b.account_name }}</td>
-                <td style="text-align:right;">{{ b.tx_count }}</td>
+                <td class="u-text-right">{{ b.tx_count }}</td>
                 <td>
                     {% if b.first_date == b.last_date %}
                     {{ b.first_date|date }}
@@ -42,8 +42,8 @@
                     {{ b.first_date|date }} — {{ b.last_date|date }}
                     {% endif %}
                 </td>
-                <td style="text-align:right;">
-                    <form method="post" action="/admin/imports/delete" style="display:inline;"
+                <td class="u-text-right">
+                    <form class="u-inline" method="post" action="/admin/imports/delete"
                           onsubmit='return confirm({{ ('Verwijder ' ~ (b.tx_count) ~ ' transacties uit deze import?')|tojson }});'>
                         <input type="hidden" name="account_id" value="{{ b.account_id }}">
                         <input type="hidden" name="created_from" value="{{ b.created_from.isoformat() }}">
@@ -57,8 +57,8 @@
     </table>
 </div>
 {% else %}
-<div class="card" style="text-align:center; padding:2rem;">
-    <p class="muted" style="margin:0;">Nog geen imports gevonden.</p>
+<div class="card u-empty">
+    <p class="muted u-m0">Nog geen imports gevonden.</p>
 </div>
 {% endif %}
 {% endblock %}

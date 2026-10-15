@@ -10,7 +10,7 @@
 <div class="alert alert-error">{{ error }}</div>
 {% endif %}
 
-<div class="card" style="margin-bottom:1.5rem;">
+<div class="card u-mb-15">
     <div class="card-header"><h3>Uitleg</h3></div>
     <div style="padding:1rem; color:var(--muted); font-size:.9rem;">
         Wijs de kolommen uit je CSV-bestand toe aan de velden van Check Your Pockets.
@@ -21,7 +21,7 @@
 </div>
 
 {% if csv_preview %}
-<div class="card" style="margin-bottom:1.5rem;">
+<div class="card u-mb-15">
     <div class="card-header"><h3>Voorbeeld (eerste {{ csv_preview|length }} rijen)</h3></div>
     <div class="table-wrapper" style="overflow-x:auto;">
         <table class="data-table" style="font-size:.8rem;">
@@ -54,7 +54,7 @@
 
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; max-width:600px;">
             {% for field, label in field_options %}
-            <div class="form-group" style="margin:0;">
+            <div class="form-group u-m0">
                 <label for="col_{{ field }}">{{ label }}</label>
                 <select name="col_{{ field }}" id="col_{{ field }}">
                     <option value="">— Niet gebruiken —</option>

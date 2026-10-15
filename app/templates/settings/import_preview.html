@@ -12,7 +12,7 @@
         Klik op <strong>Importeren</strong> om te bevestigen.
     </p>
 
-    <div class="import-summary" style="margin-bottom:1.5rem;">
+    <div class="import-summary u-mb-15">
         <div class="summary-card">
             <div class="value">{{ counts.categories }}</div>
             <div class="label">Categorieën</div>
@@ -34,7 +34,7 @@
     <form method="post" action="/settings/import/confirm">
         <input type="hidden" name="raw_json" value="{{ raw_json | e }}">
 
-        <div style="margin-bottom:1.5rem;">
+        <div class="u-mb-15">
             <p style="font-weight:600; margin-bottom:0.5rem;">Bij bestaande items:</p>
             <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; margin-bottom:0.4rem;">
                 <input type="radio" name="strategy" value="overwrite" checked>

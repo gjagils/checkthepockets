@@ -2094,3 +2094,26 @@ button.m-nav-main { border: none; width: 100%; text-align: left; }
 .suggestion-overwrite { font-size: 0.8rem; cursor: pointer; }
 .suggestion-txs { margin-top: 0.6rem; padding: 0.5rem 0.75rem; background: var(--bg); max-height: 300px; overflow-y: auto; font-size: 0.8rem; border-radius: var(--ctp-radius-sm); }
 @media (max-width: 768px) { .suggestion-fields { grid-template-columns: 1fr; } }
+
+/* ===== Utility-klassen (ACT-50) ===== */
+.u-empty { text-align:center;padding:2rem !important; }
+.u-empty-lg { text-align:center;padding:3rem !important; }
+.u-fs-75 { font-size:0.75rem !important; }
+.u-fs-80 { font-size:0.8rem !important; }
+.u-fs-85 { font-size:0.85rem !important; }
+.u-fw-600 { font-weight:600 !important; }
+.u-fw-normal { font-weight:normal !important; }
+.u-inline { display: inline; }
+.u-m-0-0-025 { margin:0 0 0.25rem 0 !important; }
+.u-m-0-0-075 { margin:0 0 0.75rem 0 !important; }
+.u-m0 { margin:0 !important; }
+.u-mb-0 { margin-bottom:0 !important; }
+.u-mb-05 { margin-bottom:0.5rem !important; }
+.u-mb-075 { margin-bottom:0.75rem !important; }
+.u-mb-1 { margin-bottom:1rem !important; }
+.u-mb-15 { margin-bottom:1.5rem !important; }
+.u-mt-05 { margin-top:0.5rem !important; }
+.u-mt-075 { margin-top:0.75rem !important; }
+.u-mt-1 { margin-top:1rem !important; }
+.u-self-end { align-self:flex-end !important; }
+.u-text-right { text-align:right !important; }

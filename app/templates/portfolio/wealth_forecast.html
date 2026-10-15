@@ -18,7 +18,7 @@
 </div>
 
 {% if not persons %}
-<div class="card" style="text-align:center; padding:3rem;">Voeg eerst <a href="/portfolio">personen en bezittingen</a> toe.</div>
+<div class="card u-empty-lg">Voeg eerst <a href="/portfolio">personen en bezittingen</a> toe.</div>
 {% else %}
 <div class="accounts-grid" style="margin-bottom:1.25rem;">
     <section class="card">
@@ -64,7 +64,7 @@
         <table class="wealth-adjustments">
             <thead><tr><th>Bezit / persoon</th>{% for row in rows %}<th class="text-right">{{ row.label }}</th>{% endfor %}</tr></thead>
             <tbody>{% for adjustment in adjustment_rows %}<tr>
-                <th>{{ adjustment.asset.name }}<br><span class="muted" style="font-weight:400;">{{ adjustment.person.name }}</span></th>
+                <th>{{ adjustment.asset.name }}<br><span class="muted u-fw-normal">{{ adjustment.person.name }}</span></th>
                 {% for row in rows %}<td class="text-right"><input class="budget-input wealth-adjustment" inputmode="decimal" style="width:82px" data-asset="{{ adjustment.asset.id }}" data-person="{{ adjustment.person.id }}" data-month="{{ row.month }}" value="{% if adjustment.amounts[row.month] %}{{ adjustment.amounts[row.month] }}{% endif %}" aria-label="{{ adjustment.asset.name }} {{ adjustment.person.name }} {{ row.label }}"></td>{% endfor %}
             </tr>{% endfor %}</tbody>
         </table>

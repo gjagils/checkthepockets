@@ -7,7 +7,7 @@
     <span class="inbox-count-label">{{ inbox_total }} te categoriseren</span>
 </div>
 
-<div class="card" style="margin-bottom:0.75rem;">
+<div class="card u-mb-075">
     <div class="tx-filter-bar">
         <form method="get" action="/inbox" class="tx-inline-form">
             <select name="account_id" class="select-sm" onchange="this.form.submit()">
@@ -118,7 +118,7 @@
                                     </form>
                                 </span>
                                 <span class="tx-panel-footer-sep">·</span>
-                                <form method="post" action="/transactions/{{ tx.id }}/exclude" style="display:inline;">
+                                <form class="u-inline" method="post" action="/transactions/{{ tx.id }}/exclude">
                                     <input type="hidden" name="redirect_to" value="{{ redirect_back }}">
                                     {% if tx.is_excluded %}
                                     <button type="submit" class="tx-panel-footer-btn" title="Weer tonen in overzichten">Terugzetten</button>

@@ -8,18 +8,18 @@
     {% endif %}
 </div>
 
-<div class="card" style="margin-bottom:1.5rem;">
+<div class="card u-mb-15">
     <form method="get" action="/analytics/query" style="padding:1rem;">
         <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:1rem; align-items:end;">
-            <div class="form-group" style="margin:0;">
+            <div class="form-group u-m0">
                 <label>Datum van</label>
                 <input type="date" name="date_from" value="{{ date_from }}">
             </div>
-            <div class="form-group" style="margin:0;">
+            <div class="form-group u-m0">
                 <label>Datum t/m</label>
                 <input type="date" name="date_to" value="{{ date_to }}">
             </div>
-            <div class="form-group" style="margin:0;">
+            <div class="form-group u-m0">
                 <label>Groepeer op</label>
                 <select name="group_by">
                     <option value="category"     {% if group_by == 'category'     %}selected{% endif %}>Categorie</option>
@@ -27,7 +27,7 @@
                     <option value="month"        {% if group_by == 'month'        %}selected{% endif %}>Maand</option>
                 </select>
             </div>
-            <div class="form-group" style="margin:0;">
+            <div class="form-group u-m0">
                 <label>Richting</label>
                 <select name="direction">
                     <option value="expense" {% if direction == 'expense' %}selected{% endif %}>Uitgaven</option>
@@ -35,7 +35,7 @@
                     <option value="all"     {% if direction == 'all'     %}selected{% endif %}>Alles</option>
                 </select>
             </div>
-            <div class="form-group" style="margin:0;">
+            <div class="form-group u-m0">
                 <label>Rekening</label>
                 <select name="account_id">
                     <option value="">Alle rekeningen</option>
