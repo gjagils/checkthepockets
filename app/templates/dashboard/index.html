@@ -36,7 +36,7 @@
 {% if not current_month and source_summary %}
 <p class="muted" style="margin:-0.2rem 0 1rem; font-size:0.85rem;">
     Werkelijk komt uit <a href="/transactions">{{ source_summary.account_count }} rekening(en)</a>
-    {% if source_summary.as_of %}t/m {{ source_summary.as_of.strftime('%d-%m-%Y') }}{% else %}zonder geregistreerde transacties{% endif %};
+    {% if source_summary.as_of %}t/m {{ source_summary.as_of|date }}{% else %}zonder geregistreerde transacties{% endif %};
     gestreept in de grafiek is verwacht uit terugkerende posten.
 </p>
 {% endif %}
@@ -83,22 +83,22 @@
                         {% if row.is_current %}<span style="color:var(--gold); font-size:0.75rem; margin-left:0.3rem;">&bull;</span>{% endif %}
                     </td>
                     <td class="text-right nowrap">
-                        {% if row.income_budget %}&euro;&nbsp;{{ row.income_budget|euro }}{% else %}<span class="muted">&mdash;</span>{% endif %}
+                        {% if row.income_budget %}{{ row.income_budget|euro_sign }}{% else %}<span class="muted">&mdash;</span>{% endif %}
                     </td>
                     <td class="text-right nowrap {% if row.income_actual %}amount-positive{% endif %}">
-                        {% if row.income_actual %}&euro;&nbsp;{{ row.income_actual|euro }}{% else %}<span class="muted">&mdash;</span>{% endif %}
+                        {% if row.income_actual %}{{ row.income_actual|euro_sign }}{% else %}<span class="muted">&mdash;</span>{% endif %}
                     </td>
                     <td class="text-right nowrap">
-                        {% if row.expense_budget %}&euro;&nbsp;{{ row.expense_budget|euro }}{% else %}<span class="muted">&mdash;</span>{% endif %}
+                        {% if row.expense_budget %}{{ row.expense_budget|euro_sign }}{% else %}<span class="muted">&mdash;</span>{% endif %}
                     </td>
                     <td class="text-right nowrap {% if row.expense_actual > row.expense_budget and row.expense_budget %}amount-negative{% elif row.expense_actual %}amount-positive{% endif %}">
-                        {% if row.expense_actual %}&euro;&nbsp;{{ row.expense_actual|euro }}{% else %}<span class="muted">&mdash;</span>{% endif %}
+                        {% if row.expense_actual %}{{ row.expense_actual|euro_sign }}{% else %}<span class="muted">&mdash;</span>{% endif %}
                     </td>
                     {% if not current_month %}
                     <td class="text-right nowrap">
                         {% if row.uncat_count %}
                         <a href="{{ row.tx_link_uncat }}" class="amount-negative" style="font-weight:600;">
-                            &euro;&nbsp;{{ row.uncat_amount|euro }} <span class="muted" style="font-weight:400;">({{ row.uncat_count }})</span>
+                            {{ row.uncat_amount|euro_sign }} <span class="muted" style="font-weight:400;">({{ row.uncat_count }})</span>
                         </a>
                         {% else %}<span class="muted">&mdash;</span>{% endif %}
                     </td>

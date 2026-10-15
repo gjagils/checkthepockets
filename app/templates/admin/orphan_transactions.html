@@ -40,14 +40,14 @@
                 {% for item in suspicious %}
                 {% set tx = item.tx %}
                 <tr>
-                    <td class="nowrap">{{ tx.date.strftime('%d-%m-%Y') }}</td>
+                    <td class="nowrap">{{ tx.date|date }}</td>
                     <td style="max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ tx.description or '' }}">
                         {{ tx.description or '—' }}
                     </td>
                     <td>{{ tx.counterparty or '—' }}</td>
                     <td class="muted" style="font-size:0.78rem;">{{ tx.counterparty_iban or '—' }}</td>
                     <td class="text-right nowrap {% if tx.amount >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
-                        &euro;&nbsp;{{ tx.amount|euro }}
+                        {{ tx.amount|euro_sign }}
                     </td>
                     <td>
                         <span class="pill">{{ item.account.bank|upper }}</span>

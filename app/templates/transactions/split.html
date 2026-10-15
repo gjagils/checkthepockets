@@ -11,12 +11,12 @@
     <table class="detail-table">
         <tr>
             <th>Datum</th>
-            <td>{{ transaction.date.strftime('%d-%m-%Y') }}</td>
+            <td>{{ transaction.date|date }}</td>
         </tr>
         <tr>
             <th>Bedrag</th>
             <td class="{% if transaction.amount < 0 %}amount-negative{% else %}amount-positive{% endif %}">
-                &euro;&nbsp;{{ transaction.amount|euro }}
+                {{ transaction.amount|euro_sign }}
             </td>
         </tr>
         <tr>
@@ -51,10 +51,10 @@
             <tbody>
                 {% for child in existing_children|sort(attribute='date') %}
                 <tr>
-                    <td class="nowrap">{{ child.date.strftime('%d-%m-%Y') }}</td>
+                    <td class="nowrap">{{ child.date|date }}</td>
                     <td class="desc-cell">{{ child.description or '-' }}</td>
                     <td class="text-right nowrap {% if child.amount < 0 %}amount-negative{% else %}amount-positive{% endif %}">
-                        &euro;&nbsp;{{ child.amount|euro }}
+                        {{ child.amount|euro_sign }}
                     </td>
                     <td>
                         {% if child.category_rel %}

@@ -54,11 +54,11 @@
 <div class="card" style="margin-bottom:1.5rem;">
     <h2 style="margin:0 0 0.75rem 0; font-size:1.1rem;">Invoer</h2>
     <div class="scenario-grid">
-        <div class="scenario-kpi"><span class="kpi-label">Taxatie</span><span class="kpi-value">€ {{ scenario.valuation | euro0 }}</span></div>
-        <div class="scenario-kpi"><span class="kpi-label">Bod</span><span class="kpi-value">€ {{ scenario.offer | euro0 }}</span></div>
-        <div class="scenario-kpi"><span class="kpi-label">Verbouwing</span><span class="kpi-value">€ {{ scenario.renovation_cost | euro0 }}</span></div>
-        <div class="scenario-kpi"><span class="kpi-label">Eigen inbreng</span><span class="kpi-value">€ {{ scenario.own_contribution | euro0 }}</span></div>
-        <div class="scenario-kpi"><span class="kpi-label">Verkoop oude woning</span><span class="kpi-value">€ {{ scenario.sale_old_home | euro0 }}</span></div>
+        <div class="scenario-kpi"><span class="kpi-label">Taxatie</span><span class="kpi-value">{{ scenario.valuation|euro0_sign }}</span></div>
+        <div class="scenario-kpi"><span class="kpi-label">Bod</span><span class="kpi-value">{{ scenario.offer|euro0_sign }}</span></div>
+        <div class="scenario-kpi"><span class="kpi-label">Verbouwing</span><span class="kpi-value">{{ scenario.renovation_cost|euro0_sign }}</span></div>
+        <div class="scenario-kpi"><span class="kpi-label">Eigen inbreng</span><span class="kpi-value">{{ scenario.own_contribution|euro0_sign }}</span></div>
+        <div class="scenario-kpi"><span class="kpi-label">Verkoop oude woning</span><span class="kpi-value">{{ scenario.sale_old_home|euro0_sign }}</span></div>
         <div class="scenario-kpi"><span class="kpi-label">Energielabel</span><span class="kpi-value">{{ scenario.energy_label or '—' }}</span></div>
     </div>
     {% if scenario.notes %}<p class="muted" style="margin-top:0.75rem; margin-bottom:0;">{{ scenario.notes }}</p>{% endif %}
@@ -69,32 +69,32 @@
     <div class="scenario-grid">
         <div class="scenario-kpi">
             <span class="kpi-label">Aankoopkosten ({{ "%.2f" | format(scenario.purchase_fee_pct) }}%)</span>
-            <span class="kpi-value">€ {{ fin.purchase_fee | euro0 }}</span>
+            <span class="kpi-value">{{ fin.purchase_fee|euro0_sign }}</span>
             <span class="kpi-hint">= bod × {{ "%.2f" | format(scenario.purchase_fee_pct) }}%</span>
         </div>
         <div class="scenario-kpi">
             <span class="kpi-label">Verkoopkosten ({{ "%.2f" | format(scenario.sale_fee_pct) }}%)</span>
-            <span class="kpi-value">€ {{ fin.sale_fee | euro0 }}</span>
+            <span class="kpi-value">{{ fin.sale_fee|euro0_sign }}</span>
             <span class="kpi-hint">= verkoop × {{ "%.2f" | format(scenario.sale_fee_pct) }}%</span>
         </div>
         <div class="scenario-kpi">
             <span class="kpi-label">Overwaarde oude woning</span>
-            <span class="kpi-value">€ {{ fin.overwaarde | euro0 }}</span>
+            <span class="kpi-value">{{ fin.overwaarde|euro0_sign }}</span>
             <span class="kpi-hint">= verkoop − bestaande − verkoopkosten</span>
         </div>
         <div class="scenario-kpi">
             <span class="kpi-label">Som bestaande hypotheken</span>
-            <span class="kpi-value">€ {{ fin.existing_total | euro0 }}</span>
+            <span class="kpi-value">{{ fin.existing_total|euro0_sign }}</span>
             <span class="kpi-hint">loopt door in nieuwe pand</span>
         </div>
         <div class="scenario-kpi">
             <span class="kpi-label">Te financieren</span>
-            <span class="kpi-value"><strong>€ {{ fin.te_financieren | euro0 }}</strong></span>
+            <span class="kpi-value"><strong>{{ fin.te_financieren|euro0_sign }}</strong></span>
             <span class="kpi-hint">= bod + verbouwing + aankoopkosten</span>
         </div>
         <div class="scenario-kpi">
             <span class="kpi-label">Nieuwe annuïteit</span>
-            <span class="kpi-value">€ {{ fin.nieuwe_annuiteit | euro0 }}</span>
+            <span class="kpi-value">{{ fin.nieuwe_annuiteit|euro0_sign }}</span>
             <span class="kpi-hint">= te_financieren − inbreng − overwaarde − bestaand</span>
         </div>
         <div class="scenario-kpi">
@@ -181,7 +181,7 @@
             </tbody>
         </table>
     </div>
-    <p class="muted" style="margin:0.75rem 0 0.5rem 0; font-size:0.85rem;">Totaal: € {{ fin.existing_total | euro0 }} saldo · € {{ fin.existing_monthly_total | euro0 }} per maand.</p>
+    <p class="muted" style="margin:0.75rem 0 0.5rem 0; font-size:0.85rem;">Totaal: {{ fin.existing_total|euro0_sign }} saldo · {{ fin.existing_monthly_total|euro0_sign }} per maand.</p>
     {% else %}
     <p class="muted" style="margin:0 0 0.75rem 0; font-size:0.9rem;">Nog geen bestaande hypotheken aan dit scenario gekoppeld.</p>
     {% endif %}
@@ -213,12 +213,12 @@
     <h2 style="margin:0 0 0.25rem 0; font-size:1.1rem;">Overbrugging</h2>
     {% if fin.bridge_days > 0 and fin.bridge_amount > 0 %}
     <p class="muted" style="margin:0 0 0.75rem 0;">
-        Tussen overdracht nieuwe huis ({{ scenario.transfer_date_new.strftime("%d-%m-%Y") }}) en verkoop oude huis ({{ scenario.sale_date_old.strftime("%d-%m-%Y") }}) loopt een overbruggingshypotheek van {{ fin.bridge_days }} dag{% if fin.bridge_days != 1 %}en{% endif %} tegen {{ "%.2f" | format(household.bridge_rate_pct * 100) }}% (aflossingsvrij).
+        Tussen overdracht nieuwe huis ({{ scenario.transfer_date_new|date }}) en verkoop oude huis ({{ scenario.sale_date_old|date }}) loopt een overbruggingshypotheek van {{ fin.bridge_days }} dag{% if fin.bridge_days != 1 %}en{% endif %} tegen {{ "%.2f" | format(household.bridge_rate_pct * 100) }}% (aflossingsvrij).
     </p>
     <div class="scenario-grid">
         <div class="scenario-kpi">
             <span class="kpi-label">Overbruggingsbedrag</span>
-            <span class="kpi-value">€ {{ fin.bridge_amount | euro0 }}</span>
+            <span class="kpi-value">{{ fin.bridge_amount|euro0_sign }}</span>
             <span class="kpi-hint">
                 {% if scenario.bridge_amount_override is not none and scenario.bridge_amount_override > 0 %}
                 override
@@ -234,14 +234,14 @@
         </div>
         <div class="scenario-kpi">
             <span class="kpi-label">Maandlast overbrugging</span>
-            <span class="kpi-value">€ {{ fin.bridge_monthly_interest | euro0 }}</span>
+            <span class="kpi-value">{{ fin.bridge_monthly_interest|euro0_sign }}</span>
             <span class="kpi-hint">= bedrag × rente / 12 (rente-only)</span>
         </div>
         <div class="scenario-kpi">
             <span class="kpi-label">Dubbele maandlast tijdens periode</span>
             <span class="kpi-value">
                 {% if variant_stats %}
-                € {{ (variant_stats[0].annuity_monthly + fin.existing_monthly_total + fin.bridge_monthly_interest) | euro0 }}
+                {{ (variant_stats[0].annuity_monthly + fin.existing_monthly_total + fin.bridge_monthly_interest)|euro0_sign }}
                 {% else %}
                 —
                 {% endif %}
@@ -250,23 +250,23 @@
         </div>
         <div class="scenario-kpi">
             <span class="kpi-label">Totale rente-kost</span>
-            <span class="kpi-value">€ {{ bridge_gross_interest | euro0 }}</span>
+            <span class="kpi-value">{{ bridge_gross_interest|euro0_sign }}</span>
             <span class="kpi-hint">= bedrag × rente / 365 × {{ fin.bridge_days }} dagen</span>
         </div>
         <div class="scenario-kpi">
             <span class="kpi-label">HRA-teruggaaf op rente</span>
-            <span class="kpi-value">− € {{ bridge_hra_refund | euro0 }}</span>
+            <span class="kpi-value">− {{ bridge_hra_refund|euro0_sign }}</span>
             <span class="kpi-hint">{{ "%.2f" | format(household.tax_rate * 100) }}% × correctie {{ "%.4f" | format(household.hra_correction_factor) }}</span>
         </div>
         <div class="scenario-kpi">
             <span class="kpi-label">Netto eenmalige kost</span>
-            <span class="kpi-value"><strong>€ {{ bridge_net_cost | euro0 }}</strong></span>
+            <span class="kpi-value"><strong>{{ bridge_net_cost|euro0_sign }}</strong></span>
             <span class="kpi-hint">komt van spaarsaldo jaar 1 af</span>
         </div>
     </div>
     {% elif scenario.transfer_date_new and scenario.sale_date_old and scenario.sale_date_old < scenario.transfer_date_new %}
     <p class="muted" style="margin:0;">
-        Verkoop oude huis ({{ scenario.sale_date_old.strftime("%d-%m-%Y") }}) ligt vóór overdracht nieuwe huis ({{ scenario.transfer_date_new.strftime("%d-%m-%Y") }}) — geen overbrugging nodig. Deze situatie (tijdelijk cash-surplus) is nog niet uitgewerkt.
+        Verkoop oude huis ({{ scenario.sale_date_old|date }}) ligt vóór overdracht nieuwe huis ({{ scenario.transfer_date_new|date }}) — geen overbrugging nodig. Deze situatie (tijdelijk cash-surplus) is nog niet uitgewerkt.
     </p>
     {% else %}
     <p class="muted" style="margin:0;">
@@ -306,13 +306,13 @@
                     </td>
                     <td class="muted">{{ vs.rate_source }}</td>
                     <td class="text-right">
-                        {% if vs.rate_missing %}<span class="muted">—</span>{% else %}€ {{ vs.annuity_monthly | euro }}{% endif %}
+                        {% if vs.rate_missing %}<span class="muted">—</span>{% else %}{{ vs.annuity_monthly|euro_sign }}{% endif %}
                     </td>
                     <td class="text-right">
-                        {% if vs.rate_missing %}<span class="muted">—</span>{% else %}€ {{ vs.net_monthly | euro }}{% endif %}
+                        {% if vs.rate_missing %}<span class="muted">—</span>{% else %}{{ vs.net_monthly|euro_sign }}{% endif %}
                     </td>
                     <td class="text-right">
-                        {% if vs.rate_missing %}<span class="muted">—</span>{% else %}€ {{ vs.first_5y_total_cost | euro0 }}{% endif %}
+                        {% if vs.rate_missing %}<span class="muted">—</span>{% else %}{{ vs.first_5y_total_cost|euro0_sign }}{% endif %}
                     </td>
                     <td class="text-right">
                         <form method="post" action="/hypotheek/scenarios/{{ scenario.id }}/variants/{{ vs.variant.id }}/delete"
@@ -380,27 +380,27 @@
                 <tr>
                     <td class="muted">Nieuwe hypotheek</td>
                     {% for vs in active_variants %}
-                    <td class="text-right">€ {{ vs.annuity_monthly | euro }}</td>
+                    <td class="text-right">{{ vs.annuity_monthly|euro_sign }}</td>
                     {% endfor %}
                 </tr>
                 <tr>
                     <td class="muted">Bestaande hypotheeklasten die meegaan</td>
                     {% for vs in active_variants %}
-                    <td class="text-right">€ {{ vs.existing_monthly_total | euro }}</td>
+                    <td class="text-right">{{ vs.existing_monthly_total|euro_sign }}</td>
                     {% endfor %}
                 </tr>
                 {% if budget_rows %}
                 <tr>
                     <td class="muted">Kosten per maand (budget-categorieën)</td>
                     {% for vs in active_variants %}
-                    <td class="text-right">€ {{ vs.other_budget_total | euro }}</td>
+                    <td class="text-right">{{ vs.other_budget_total|euro_sign }}</td>
                     {% endfor %}
                 </tr>
                 {% endif %}
                 <tr style="border-top:1px solid var(--border);">
                     <td><strong>Totaal kosten</strong></td>
                     {% for vs in active_variants %}
-                    <td class="text-right"><strong>€ {{ vs.total_costs | euro }}</strong></td>
+                    <td class="text-right"><strong>{{ vs.total_costs|euro_sign }}</strong></td>
                     {% endfor %}
                 </tr>
 
@@ -410,7 +410,7 @@
                 <tr>
                     <td class="muted">Bijdrage {{ c.person.name }}</td>
                     {% for vs in active_variants %}
-                    <td class="text-right">€ {{ c.amount | euro }}</td>
+                    <td class="text-right">{{ c.amount|euro_sign }}</td>
                     {% endfor %}
                 </tr>
                 {% endif %}
@@ -418,13 +418,13 @@
                 <tr>
                     <td class="muted">Teruggaaf per maand</td>
                     {% for vs in active_variants %}
-                    <td class="text-right">€ {{ vs.used_monthly_refund | euro }}</td>
+                    <td class="text-right">{{ vs.used_monthly_refund|euro_sign }}</td>
                     {% endfor %}
                 </tr>
                 <tr style="border-top:1px solid var(--border);">
                     <td><strong>Totaal inkomsten</strong></td>
                     {% for vs in active_variants %}
-                    <td class="text-right"><strong>€ {{ vs.total_income | euro }}</strong></td>
+                    <td class="text-right"><strong>{{ vs.total_income|euro_sign }}</strong></td>
                     {% endfor %}
                 </tr>
 
@@ -432,7 +432,7 @@
                     <td><strong>Resultaat</strong></td>
                     {% for vs in active_variants %}
                     <td class="text-right" style="{% if vs.resultaat < 0 %}color:var(--red);{% endif %}">
-                        <strong>€ {{ vs.resultaat | euro }}</strong>
+                        <strong>{{ vs.resultaat|euro_sign }}</strong>
                     </td>
                     {% endfor %}
                 </tr>
@@ -478,14 +478,14 @@
                 <tr>
                     <td class="muted">Maand-overschot × 12</td>
                     {% for vs in _active_for_savings %}
-                    <td class="text-right">€ {{ vs.savings_monthly_surplus | euro }}</td>
+                    <td class="text-right">{{ vs.savings_monthly_surplus|euro_sign }}</td>
                     {% endfor %}
                 </tr>
                 {% if household.annual_child_benefit and household.annual_child_benefit > 0 %}
                 <tr>
                     <td class="muted">Kinderbijslag</td>
                     {% for vs in _active_for_savings %}
-                    <td class="text-right">€ {{ household.annual_child_benefit | euro }}</td>
+                    <td class="text-right">{{ household.annual_child_benefit|euro_sign }}</td>
                     {% endfor %}
                 </tr>
                 {% endif %}
@@ -493,7 +493,7 @@
                 <tr>
                     <td class="muted">Rente-restitutie privélening</td>
                     {% for vs in _active_for_savings %}
-                    <td class="text-right">€ {{ household.annual_private_loan_refund | euro }}</td>
+                    <td class="text-right">{{ household.annual_private_loan_refund|euro_sign }}</td>
                     {% endfor %}
                 </tr>
                 {% endif %}
@@ -501,7 +501,7 @@
                 <tr>
                     <td class="muted">Extra stortingen {{ household.salary_primary_name or "persoon 1" }}</td>
                     {% for vs in _active_for_savings %}
-                    <td class="text-right">€ {{ household.annual_extra_primary | euro }}</td>
+                    <td class="text-right">{{ household.annual_extra_primary|euro_sign }}</td>
                     {% endfor %}
                 </tr>
                 {% endif %}
@@ -509,20 +509,20 @@
                 <tr>
                     <td class="muted">Extra stortingen {{ household.salary_secondary_name or "persoon 2" }}</td>
                     {% for vs in _active_for_savings %}
-                    <td class="text-right">€ {{ household.annual_extra_secondary | euro }}</td>
+                    <td class="text-right">{{ household.annual_extra_secondary|euro_sign }}</td>
                     {% endfor %}
                 </tr>
                 {% endif %}
                 <tr>
                     <td class="muted">Rest HRA-teruggaaf / jaar</td>
                     {% for vs in _active_for_savings %}
-                    <td class="text-right">€ {{ vs.annual_savings | euro }}</td>
+                    <td class="text-right">{{ vs.annual_savings|euro_sign }}</td>
                     {% endfor %}
                 </tr>
                 <tr style="border-top:1px solid var(--border);">
                     <td><strong>Totaal inkomsten</strong></td>
                     {% for vs in _active_for_savings %}
-                    <td class="text-right"><strong>€ {{ vs.savings_income_yr | euro }}</strong></td>
+                    <td class="text-right"><strong>{{ vs.savings_income_yr|euro_sign }}</strong></td>
                     {% endfor %}
                 </tr>
 
@@ -531,7 +531,7 @@
                 <tr>
                     <td class="muted">Vakantie</td>
                     {% for vs in _active_for_savings %}
-                    <td class="text-right">€ {{ household.annual_vacation_budget | euro }}</td>
+                    <td class="text-right">{{ household.annual_vacation_budget|euro_sign }}</td>
                     {% endfor %}
                 </tr>
                 {% endif %}
@@ -539,14 +539,14 @@
                 <tr>
                     <td class="muted">Huis onderhoud</td>
                     {% for vs in _active_for_savings %}
-                    <td class="text-right">€ {{ household.annual_house_budget | euro }}</td>
+                    <td class="text-right">{{ household.annual_house_budget|euro_sign }}</td>
                     {% endfor %}
                 </tr>
                 {% endif %}
                 <tr style="border-top:1px solid var(--border);">
                     <td><strong>Totaal uitgaven</strong></td>
                     {% for vs in _active_for_savings %}
-                    <td class="text-right"><strong>€ {{ vs.savings_expense_yr | euro }}</strong></td>
+                    <td class="text-right"><strong>{{ vs.savings_expense_yr|euro_sign }}</strong></td>
                     {% endfor %}
                 </tr>
 
@@ -556,7 +556,7 @@
                         Overbrugging (jaar 1, eenmalig)
                     </td>
                     {% for vs in _active_for_savings %}
-                    <td class="text-right">− € {{ bridge_net_cost | euro }}</td>
+                    <td class="text-right">− {{ bridge_net_cost|euro_sign }}</td>
                     {% endfor %}
                 </tr>
                 {% endif %}
@@ -565,7 +565,7 @@
                     <td><strong>Netto spaarsaldo / jaar</strong></td>
                     {% for vs in _active_for_savings %}
                     <td class="text-right" style="{% if vs.net_annual_savings < 0 %}color:var(--red);{% else %}color:var(--green);{% endif %}">
-                        <strong>€ {{ vs.net_annual_savings | euro }}</strong>
+                        <strong>{{ vs.net_annual_savings|euro_sign }}</strong>
                     </td>
                     {% endfor %}
                 </tr>
@@ -575,7 +575,7 @@
                         Aflossing nieuwe hypotheek (gem. 5j / jaar)
                     </td>
                     {% for vs in _active_for_savings %}
-                    <td class="text-right" style="color:var(--green);">€ {{ vs.avg_annual_amortization_5y | euro }}</td>
+                    <td class="text-right" style="color:var(--green);">{{ vs.avg_annual_amortization_5y|euro_sign }}</td>
                     {% endfor %}
                 </tr>
             </tbody>
@@ -615,11 +615,11 @@
                             <span class="pill" style="background:var(--border); color:var(--muted); margin-left:0.35rem; font-size:0.7rem;" title="Handmatig vastgezet">manual</span>
                         {% endif %}
                     </td>
-                    <td class="text-right">€ {{ row.current_amount | euro }}</td>
+                    <td class="text-right">{{ row.current_amount|euro_sign }}</td>
                     <td class="text-right muted" style="font-size:0.85rem;"
                         title="Gemiddelde werkelijke uitgave over de 3 volle maanden vóór {{ budget_year }}-{{ '%02d' | format(budget_month) }}">
                         {% set _avg3 = avg_3m_by_cat.get(row.category_id) %}
-                        {% if _avg3 and _avg3 > 0 %}€ {{ _avg3 | euro }}{% else %}—{% endif %}
+                        {% if _avg3 and _avg3 > 0 %}{{ _avg3|euro_sign }}{% else %}—{% endif %}
                     </td>
                     <td class="text-right">
                         <form method="post" action="/hypotheek/scenarios/{{ scenario.id }}/budgets"
@@ -653,20 +653,20 @@
                 {% endfor %}
                 <tr class="scenario-budget-total">
                     <td>Totaal</td>
-                    <td class="text-right">€ {{ _current_sum.value | euro }}</td>
+                    <td class="text-right">{{ _current_sum.value|euro_sign }}</td>
                     <td class="text-right muted" style="font-size:0.85rem;">
-                        {% if _avg3_sum.value > 0 %}€ {{ _avg3_sum.value | euro }}{% else %}—{% endif %}
+                        {% if _avg3_sum.value > 0 %}{{ _avg3_sum.value|euro_sign }}{% else %}—{% endif %}
                     </td>
-                    <td class="text-right">€ {{ budget_total | euro }}</td>
+                    <td class="text-right">{{ budget_total|euro_sign }}</td>
                     <td class="scenario-budget-delta {% if _delta > 0 %}neg{% elif _delta < 0 %}pos{% endif %}"
                         style="text-align:right; padding-right:0.6rem;"
                         title="Verschil scenario − huidig (positief = duurder bij dit scenario)">
-                        {% if _delta > 0 %}+{% endif %}€ {{ _delta | euro }}
+                        {% if _delta > 0 %}+{% endif %}{{ _delta|euro_sign }}
                     </td>
                 </tr>
                 <tr>
                     <td class="muted">Totaal salaris / maand</td>
-                    <td class="text-right">€ {{ salary_sum | euro }}</td>
+                    <td class="text-right">{{ salary_sum|euro_sign }}</td>
                     <td></td><td></td><td></td>
                 </tr>
             </tbody>
@@ -711,8 +711,8 @@
         </table>
     </div>
     <div class="kv-grid" style="margin-top:1rem;">
-        <div><span class="muted">Totale maandlasten scenario</span><br><strong>€ {{ coverage.monthly_total | euro }}</strong></div>
-        <div><span class="muted">Totaal bijdragen</span><br>€ {{ coverage.contributions_total | euro }}</div>
+        <div><span class="muted">Totale maandlasten scenario</span><br><strong>{{ coverage.monthly_total|euro_sign }}</strong></div>
+        <div><span class="muted">Totaal bijdragen</span><br>{{ coverage.contributions_total|euro_sign }}</div>
         <div>
             <span class="muted">Dekking</span><br>
             {% if coverage.covered %}
@@ -723,7 +723,7 @@
         </div>
         <div>
             <span class="muted">Verschil</span><br>
-            <strong style="color: {% if coverage.difference >= 0 %}var(--orange){% else %}var(--red){% endif %};">€ {{ coverage.difference | euro }}</strong>
+            <strong style="color: {% if coverage.difference >= 0 %}var(--orange){% else %}var(--red){% endif %};">{{ coverage.difference|euro_sign }}</strong>
         </div>
     </div>
     {% else %}
@@ -759,10 +759,10 @@
                 <tr>
                     <td>{{ row.month }}</td>
                     <td>{{ row.year }}</td>
-                    <td class="text-right">€ {{ row.payment | euro }}</td>
-                    <td class="text-right">€ {{ row.interest | euro }}</td>
-                    <td class="text-right">€ {{ row.principal | euro }}</td>
-                    <td class="text-right">€ {{ row.balance | euro }}</td>
+                    <td class="text-right">{{ row.payment|euro_sign }}</td>
+                    <td class="text-right">{{ row.interest|euro_sign }}</td>
+                    <td class="text-right">{{ row.principal|euro_sign }}</td>
+                    <td class="text-right">{{ row.balance|euro_sign }}</td>
                 </tr>
                 {% endfor %}
             </tbody>

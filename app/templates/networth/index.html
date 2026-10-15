@@ -8,16 +8,16 @@
 <!-- Net Worth Summary -->
 <div class="import-summary">
     <div class="summary-card">
-        <div class="value amount-positive">&euro;&nbsp;{{ total_assets|euro }}</div>
+        <div class="value amount-positive">{{ total_assets|euro_sign }}</div>
         <div class="label">Bezittingen</div>
     </div>
     <div class="summary-card">
-        <div class="value amount-negative">&euro;&nbsp;{{ total_liabilities|euro }}</div>
+        <div class="value amount-negative">{{ total_liabilities|euro_sign }}</div>
         <div class="label">Schulden</div>
     </div>
     <div class="summary-card">
         <div class="value {% if net_worth >= 0 %}amount-positive{% else %}amount-negative{% endif %}" style="font-size:1.5rem;">
-            &euro;&nbsp;{{ net_worth|euro }}
+            {{ net_worth|euro_sign }}
         </div>
         <div class="label"><strong>Netto vermogen</strong></div>
     </div>
@@ -229,7 +229,7 @@
                 </div>
             </div>
             <span style="width:120px; font-size:0.85rem; text-align:right;" class="{% if entry.net_worth >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
-                &euro;&nbsp;{{ entry.net_worth|euro0 }}
+                {{ entry.net_worth|euro0_sign }}
             </span>
         </div>
         {% endfor %}
@@ -256,10 +256,10 @@
                 {% endif %}
                 <tr>
                     <td>{{ month_names[entry.month] }} {{ entry.year }}</td>
-                    <td class="text-right nowrap amount-positive">&euro;&nbsp;{{ entry.assets|euro }}</td>
-                    <td class="text-right nowrap amount-negative">&euro;&nbsp;{{ entry.liabilities|euro }}</td>
+                    <td class="text-right nowrap amount-positive">{{ entry.assets|euro_sign }}</td>
+                    <td class="text-right nowrap amount-negative">{{ entry.liabilities|euro_sign }}</td>
                     <td class="text-right nowrap {% if entry.net_worth >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
-                        <strong>&euro;&nbsp;{{ entry.net_worth|euro }}</strong>
+                        <strong>{{ entry.net_worth|euro_sign }}</strong>
                     </td>
                     <td class="text-right nowrap {% if change >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
                         {% if loop.index > 1 %}
@@ -284,7 +284,7 @@
                 {% for acc in inactive %}
                 <tr style="opacity:0.6;">
                     <td>{{ acc.name }} <span class="muted">({{ account_types[acc.account_type] }})</span></td>
-                    <td class="text-right nowrap">&euro;&nbsp;{{ acc.balance|euro }}</td>
+                    <td class="text-right nowrap">{{ acc.balance|euro_sign }}</td>
                     <td>
                         <form method="post" action="/networth/accounts/{{ acc.id }}/toggle" style="display:inline;">
                             <button type="submit" class="btn btn-sm">Activeren</button>

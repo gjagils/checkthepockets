@@ -48,7 +48,7 @@
             <div class="muted" style="margin-top:0.15rem; padding-left:1.4rem;">
                 Laatst gesynced:
                 {% if _bank.last_synced_at %}
-                    {{ _bank.last_synced_at.strftime('%d-%m-%Y %H:%M') }}
+                    {{ _bank.last_synced_at|datetime }}
                 {% else %}
                     nog nooit
                 {% endif %}
@@ -71,7 +71,7 @@
             <div class="muted" style="margin-top:0.15rem; padding-left:1.4rem;">
                 Laatste transactie:
                 {% if _last_tx %}
-                    {{ _last_tx.strftime('%d-%m-%Y') }}
+                    {{ _last_tx|date }}
                 {% else %}
                     nog geen
                 {% endif %}

@@ -15,7 +15,7 @@
     {% if connection %}
     <h2>Sleutel opgeslagen</h2>
     <p class="muted">Versleuteld bewaard. Laatste controle:
-        {% if connection.last_checked_at %}{{ connection.last_checked_at.strftime('%d-%m-%Y %H:%M') }} ({{ 'gelukt' if connection.last_status == 'ok' else 'mislukt' }}){% else %}nog niet{% endif %}</p>
+        {% if connection.last_checked_at %}{{ connection.last_checked_at|datetime }} ({{ 'gelukt' if connection.last_status == 'ok' else 'mislukt' }}){% else %}nog niet{% endif %}</p>
     <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
         <form method="post" action="/banking/bunq/check"><button type="submit" class="btn btn-primary">Rekeningen ophalen</button></form>
         <form method="post" action="/banking/bunq/delete"

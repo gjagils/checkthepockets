@@ -50,7 +50,7 @@
             <tbody>
             {% for pair in plan.duplicates[:200] %}
             <tr>
-                <td>{{ pair.source.date.strftime('%d-%m-%Y') }}</td>
+                <td>{{ pair.source.date|date }}</td>
                 <td>{{ pair.source.amount }}</td>
                 <td>{{ pair.source.counterparty or pair.source.description or '—' }}</td>
                 <td>{{ pair.target.counterparty or pair.target.description or '—' }}</td>

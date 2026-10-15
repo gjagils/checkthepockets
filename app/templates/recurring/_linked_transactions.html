@@ -13,11 +13,11 @@
                 <tbody>
                 {% for tx in entry.linked_transactions %}
                 <tr>
-                    <td class="nowrap">{{ tx.date.strftime('%d-%m-%Y') }}</td>
+                    <td class="nowrap">{{ tx.date|date }}</td>
                     <td>{{ tx.counterparty or '—' }}</td>
                     <td class="muted" style="font-size:0.72rem; word-break:break-all;">{{ tx.description or '—' }}</td>
                     <td class="text-right nowrap {% if tx.amount < 0 %}amount-negative{% else %}amount-positive{% endif %}">
-                        &euro;&nbsp;{{ tx.amount|euro }}
+                        {{ tx.amount|euro_sign }}
                     </td>
                     <td>
                         <form method="post" action="/recurring/{{ item.id }}/unlink" style="display:inline;">

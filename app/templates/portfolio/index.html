@@ -154,17 +154,17 @@
                         <span class="muted" style="font-size:0.72rem; margin-left:0.35rem;" title="{% if asset.exchange %}{{ asset.exchange }}{% else %}Ticker{% endif %}">{{ asset.ticker }}</span>
                         {% endif %}
                     </td>
-                    <td class="text-right nowrap">&euro;&nbsp;{{ asset.current_price_eur|euro }}</td>
+                    <td class="text-right nowrap">{{ asset.current_price_eur|euro_sign }}</td>
                     <td class="text-right nowrap" style="font-size:0.75rem;">
                         {% if asset.price_updated_at and stale_days is not none %}
                             {% if stale_days > 30 %}
-                            <span style="color:var(--ctp-danger); font-weight:600;" title="{{ asset.price_updated_at.strftime('%d-%m-%Y %H:%M') }}">
+                            <span style="color:var(--ctp-danger); font-weight:600;" title="{{ asset.price_updated_at|datetime }}">
                                 ⚠ {{ stale_days }} dgn geleden
                             </span>
                             {% elif stale_days == 0 %}
-                            <span class="muted" title="{{ asset.price_updated_at.strftime('%d-%m-%Y %H:%M') }}">vandaag</span>
+                            <span class="muted" title="{{ asset.price_updated_at|datetime }}">vandaag</span>
                             {% else %}
-                            <span class="muted" title="{{ asset.price_updated_at.strftime('%d-%m-%Y %H:%M') }}">{{ stale_days }} dgn geleden</span>
+                            <span class="muted" title="{{ asset.price_updated_at|datetime }}">{{ stale_days }} dgn geleden</span>
                             {% endif %}
                         {% else %}
                         <span class="muted">-</span>
@@ -183,7 +183,7 @@
                                onkeydown="if(event.key==='Enter')this.blur()"
                                style="width:90px;">
                     </td>
-                    <td class="text-right nowrap muted">&euro;&nbsp;{{ val|euro }}</td>
+                    <td class="text-right nowrap muted">{{ val|euro_sign }}</td>
                     <td class="text-right">
                         <input type="text" class="budget-input"
                                data-asset-id="{{ asset.id }}"
@@ -196,7 +196,7 @@
                     </td>
                     {% endfor %}
                     <td class="text-right nowrap" style="border-left:2px solid var(--ctp-border); font-weight:700;">
-                        &euro;&nbsp;{{ asset_totals.get(asset.id, 0)|euro }}
+                        {{ asset_totals.get(asset.id, 0)|euro_sign }}
                     </td>
                     <td class="text-right nowrap muted">{{ asset.monthly_growth_pct }}%</td>
                 </tr>
@@ -207,11 +207,11 @@
                     <td colspan="3"><strong>Totaal</strong></td>
                     {% for person in persons %}
                     <td></td>
-                    <td class="text-right nowrap"><strong>&euro;&nbsp;{{ person_totals.get(person.id, 0)|euro }}</strong></td>
+                    <td class="text-right nowrap"><strong>{{ person_totals.get(person.id, 0)|euro_sign }}</strong></td>
                     <td></td>
                     {% endfor %}
                     <td class="text-right nowrap" style="border-left:2px solid var(--ctp-border);">
-                        <strong>&euro;&nbsp;{{ grand_total|euro }}</strong>
+                        <strong>{{ grand_total|euro_sign }}</strong>
                     </td>
                     <td></td>
                 </tr>
@@ -232,20 +232,20 @@
     <div style="margin-bottom:1.25rem; padding-bottom:1rem; border-bottom:1px solid var(--ctp-border);">
         <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:0.5rem;">
             <span style="font-weight:700; font-size:1rem;">{{ asset.name }} <span class="badge">{{ asset.unit }}</span></span>
-            <span style="font-weight:700; font-size:1.1rem;">&euro;&nbsp;{{ atotal|euro }}</span>
+            <span style="font-weight:700; font-size:1.1rem;">{{ atotal|euro_sign }}</span>
         </div>
         <div style="display:flex; justify-content:space-between; margin-bottom:0.25rem;">
             <span class="muted">Prijs per eenheid:</span>
-            <span>&euro;&nbsp;{{ asset.current_price_eur|euro }}</span>
+            <span>{{ asset.current_price_eur|euro_sign }}</span>
         </div>
         {% if has_fees %}
         <div style="display:flex; justify-content:space-between; margin-bottom:0.25rem; color:var(--ctp-denim);">
             <span>Contant na aftrek
-                {%- if asset.cashout_fee_fixed_eur and asset.cashout_fee_fixed_eur > 0 %} &euro;&nbsp;{{ asset.cashout_fee_fixed_eur|euro }}{% endif %}
+                {%- if asset.cashout_fee_fixed_eur and asset.cashout_fee_fixed_eur > 0 %} {{ asset.cashout_fee_fixed_eur|euro_sign }}{% endif %}
                 {%- if (asset.cashout_fee_fixed_eur and asset.cashout_fee_fixed_eur > 0) and (asset.cashout_fee_pct and asset.cashout_fee_pct > 0) %} +{% endif %}
                 {%- if asset.cashout_fee_pct and asset.cashout_fee_pct > 0 %} {{ asset.cashout_fee_pct }}%{% endif %}:
             </span>
-            <span style="font-weight:700;">&euro;&nbsp;{{ acash|euro }}</span>
+            <span style="font-weight:700;">{{ acash|euro_sign }}</span>
         </div>
         {% endif %}
         {% for person in persons %}
@@ -254,7 +254,7 @@
         {% if qty > 0 %}
         <div style="display:flex; justify-content:space-between; align-items:center; padding:0.3rem 0;">
             <span>{{ person.name }} ({{ "%.8g"|format(qty) }} {{ asset.unit }})</span>
-            <span class="amount-positive nowrap" style="font-weight:600;">&euro;&nbsp;{{ val|euro }}</span>
+            <span class="amount-positive nowrap" style="font-weight:600;">{{ val|euro_sign }}</span>
         </div>
         {% endif %}
         {% endfor %}
@@ -265,7 +265,7 @@
     {% if grand_total > 0 %}
     <div style="display:flex; justify-content:space-between; align-items:baseline; padding-top:0.5rem;">
         <span style="font-weight:800; font-size:1.1rem;">Totale opnamewaarde</span>
-        <span style="font-weight:800; font-size:1.25rem; color:var(--ctp-check);">&euro;&nbsp;{{ grand_total|euro }}</span>
+        <span style="font-weight:800; font-size:1.25rem; color:var(--ctp-check);">{{ grand_total|euro_sign }}</span>
     </div>
     {% endif %}
 </div>
@@ -323,14 +323,14 @@
 {% if chart_data and chart_data.past|length > 0 and grand_total > 0 %}
 <div class="card">
     <h2>Waardeverloop {{ current_year }}</h2>
-    <p class="muted" style="margin-bottom:1rem;">Verleden op basis van historische prijzen, toekomst op basis van groeipercentage{% set total_contrib = asset_contributions.values()|sum %}{% if total_contrib %} incl. &euro;&nbsp;{{ total_contrib|euro }}/mnd storting{% endif %}.</p>
+    <p class="muted" style="margin-bottom:1rem;">Verleden op basis van historische prijzen, toekomst op basis van groeipercentage{% set total_contrib = asset_contributions.values()|sum %}{% if total_contrib %} incl. {{ total_contrib|euro_sign }}/mnd storting{% endif %}.</p>
     {% set contrib_assets = [] %}
     {% for asset in assets %}{% if asset_contributions.get(asset.id) %}{% set _ = contrib_assets.append(asset) %}{% endif %}{% endfor %}
     {% if contrib_assets %}
     <ul class="muted" style="font-size:0.85rem; margin:0 0 1rem 1.25rem;">
         {% for asset in contrib_assets %}
         {% set c = asset_contributions.get(asset.id) %}
-        <li>{{ asset.name }}: &euro;&nbsp;{{ c|euro }}/mnd{% if c < 0 %} (onttrekking){% else %} (storting){% endif %}</li>
+        <li>{{ asset.name }}: {{ c|euro_sign }}/mnd{% if c < 0 %} (onttrekking){% else %} (storting){% endif %}</li>
         {% endfor %}
     </ul>
     {% endif %}
@@ -350,7 +350,7 @@
     <div style="margin-bottom:0.75rem;">
         <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:0.25rem;">
             <span style="font-weight:600;">{{ person.name }}</span>
-            <span class="nowrap">&euro;&nbsp;{{ ptotal|euro }} <span class="muted">({{ ppct }}%)</span></span>
+            <span class="nowrap">{{ ptotal|euro_sign }} <span class="muted">({{ ppct }}%)</span></span>
         </div>
         <div style="width:100%; height:10px; background:var(--ctp-border); border-radius:5px; overflow:hidden;">
             <div style="width:{{ ppct }}%; height:100%; background:var(--ctp-denim); border-radius:5px;"></div>

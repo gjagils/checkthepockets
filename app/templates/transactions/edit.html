@@ -9,11 +9,11 @@
 <div class="transaction-detail card">
     <div class="detail-header">
         <div>
-            <span class="muted">{{ transaction.date.strftime('%d-%m-%Y') }}</span>
+            <span class="muted">{{ transaction.date|date }}</span>
             <span class="pill">{{ transaction.account.name }}</span>
         </div>
         <span class="{% if transaction.amount >= 0 %}amount-positive{% else %}amount-negative{% endif %}" style="font-size:1.25rem; font-weight:700;">
-            &euro;&nbsp;{{ transaction.amount|euro }}
+            {{ transaction.amount|euro_sign }}
         </span>
     </div>
 </div>
@@ -25,7 +25,7 @@
             <label for="date">Datum</label>
             <input type="date" id="date" name="date" value="{{ transaction.date.isoformat() }}">
             {% if transaction.original_date %}
-            <small class="muted">Oorspronkelijke bankdatum: {{ transaction.original_date.strftime('%d-%m-%Y') }}</small>
+            <small class="muted">Oorspronkelijke bankdatum: {{ transaction.original_date|date }}</small>
             {% endif %}
         </div>
 
@@ -76,7 +76,7 @@
     <table class="detail-table">
         <tr><th>Tegenpartij IBAN</th><td>{{ transaction.counterparty_iban }}</td></tr>
         {% if transaction.balance_after is not none %}
-        <tr><th>Saldo na transactie</th><td>&euro;&nbsp;{{ transaction.balance_after|euro }}</td></tr>
+        <tr><th>Saldo na transactie</th><td>{{ transaction.balance_after|euro_sign }}</td></tr>
         {% endif %}
         <tr><th>Import hash</th><td class="muted" style="font-size:0.8rem;">{{ transaction.import_hash }}</td></tr>
     </table>
