@@ -87,20 +87,20 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-38 | P2 | Afgerond | — | [Verouderde API's: TemplateResponse, lifespan, tijd](#act-38) |
 | ACT-39 | P2 | Afgerond | — | [Testfundament met conftest](#act-39) |
 | ACT-40 | P2 | Afgerond | ACT-38 | [Dependency-upgrade](#act-40) |
-| ACT-41 | P2 | Gepland | ACT-39 | [Schema-hygiëne en migratie](#act-41) |
-| ACT-42 | P2 | Gepland | ACT-39 | [Transactiegrenzen, banksync-service en scheduler-lock](#act-42) |
-| ACT-43 | P3 | Gepland | ACT-37 | [Gedeelde helpers en foutafhandelingsconventie](#act-43) |
-| ACT-44 | P3 | Gepland | ACT-39 | [Savings-service en N+1](#act-44) |
-| ACT-45 | P3 | Gepland | ACT-39 | [Recurring en transactions: batching en custom-CSV-parser](#act-45) |
-| ACT-46 | P3 | Gepland | ACT-39 | [Mortgage-formulieren en lange functies opknippen](#act-46) |
-| ACT-47 | P2 | Gepland | — | [CSS-tokens en dode CSS](#act-47) |
-| ACT-48 | P2 | Gepland | — | [Gedeeld JavaScript en gepinde Chart.js](#act-48) |
+| ACT-41 | P2 | Afgerond | ACT-39 | [Schema-hygiëne en migratie](#act-41) |
+| ACT-42 | P2 | Afgerond | ACT-39 | [Transactiegrenzen, banksync-service en scheduler-lock](#act-42) |
+| ACT-43 | P3 | Afgerond | ACT-37 | [Gedeelde helpers en foutafhandelingsconventie](#act-43) |
+| ACT-44 | P3 | Afgerond | ACT-39 | [Savings-service en N+1](#act-44) |
+| ACT-45 | P3 | Afgerond | ACT-39 | [Recurring en transactions: batching en custom-CSV-parser](#act-45) |
+| ACT-46 | P3 | Afgerond | ACT-39 | [Mortgage-formulieren en lange functies opknippen](#act-46) |
+| ACT-47 | P2 | Review | — | [CSS-tokens en dode CSS](#act-47) |
+| ACT-48 | P2 | Review | — | [Gedeeld JavaScript en gepinde Chart.js](#act-48) |
 | ACT-49 | P2 | Gepland | ACT-48 | [Jinja-macro's en filters](#act-49) |
 | ACT-50 | P3 | Gepland | ACT-47, ACT-49 | [Inline styles naar utility-classes](#act-50) |
-| ACT-51 | P2 | Gepland | ACT-39 | [HTTP-vangnet voor redesign-schermen en parsers](#act-51) |
+| ACT-51 | P2 | Afgerond | ACT-39 | [HTTP-vangnet voor redesign-schermen en parsers](#act-51) |
 | ACT-52 | P3 | Gepland | ACT-41 | [Model-typing: Boolean, enums, Mapped](#act-52) |
 | ACT-53 | P2 | Gepland | ACT-31, ACT-28 | [Persoonspagina: verwachting betaalrekeningen en vermogen](#act-53) |
-| ACT-54 | P2 | Gepland | — | [Regelvoorstellen leesbaar: volledige omschrijving en groepering](#act-54) |
+| ACT-54 | P2 | Review | — | [Regelvoorstellen leesbaar: volledige omschrijving en groepering](#act-54) |
 
 ## Beschrijving en acceptatiecriteria
 
@@ -688,3 +688,12 @@ Voeg per afgeronde actie of overdracht een regel toe. Git bevat de volledige his
 | 2026-10-14 | ACT-32 | Encryptie-bugs uit de review (A1, A2, A3, B11) opgelost met tests die met versleuteling draaien | Claude Code; 529 passed, 3 skipped; PR-CI open |
 | 2026-10-14 | ACT-32 t/m ACT-35 | Fase 1 van de codereview afgerond: encryptie-bugs, auth-hardening, crash- en datafouten (a en b), XSS | #215, #216, #217, #218, #219 gemerged; CI groen; productievalidatie deels open (zie fase 1 — uitkomst) |
 | 2026-10-14 | ACT-36 t/m ACT-40 | Fase 2 van de codereview afgerond (hygiëne, tooling, verouderde API's, testbasis, dependency-upgrade) | #221–#226 gemerged; CI groen; 586 passed, 3 skipped op Python 3.12 |
+
+### Fase 3 (ACT-41 t/m ACT-46) en fase 4 (gedeeltelijk) — uitkomst, 2026-10-15, Claude Code
+
+- **ACT-41** (migratie 069, modeluitlijning, drift-test op PostgreSQL), **ACT-42** (banksync-service, scheduler-lock, transactiegrenzen), **ACT-43** (gedeelde helpers; routeconventie alleen toegepast op de accounts-routes), **ACT-44** (savings-service; `_determine_entry_status` en GET-schrijfacties in plan_detail bewust ongemoeid), **ACT-45** (batching terugkerende posten, custom-CSV-parser; opsplitsen van `transaction_list` en `_render_recurring_page` niet gedaan), **ACT-46** (mortgage-formulieren; lange functies niet verder opgeknipt): afgerond met de genoemde beperkingen.
+- **ACT-51** HTTP-vangnet: rooktest op alle parameterloze GET-routes, schrijf-flows en bank-CSV-parsers (PR 240). `/admin/imports` is uitgesloten omdat `date_trunc` PostgreSQL-only is.
+- **ACT-47** CSS: ontbrekende tokens/klassen, 54 dode selectors weg, drie breakpoints, hex in hypotheek-/recurring-templates naar tokens, `base_public.html`. Visuele controle door de gebruiker open; de ~48 hex-kleuren in categoriekleuren-fallbacks (`#1F6FB2`) blijven bewust.
+- **ACT-48** JavaScript: `app/static/js/app.js` (thema, drawer, `formatEuro`, `escapeHtml`, `toggleEdit`, `fetchJson`), Chart.js 4.4.1 met SRI. De 15 bestaande `fetch()`-aanroepen en de overige inline scriptblokken zijn nog niet omgezet naar `fetchJson`/aparte bestanden.
+- **ACT-54** regelvoorstellen als kaartjes (PR 243).
+- **Nog niet gedaan:** ACT-49, ACT-50, ACT-52, ACT-53 en de gedeelde categorieën met budget per rekening.
