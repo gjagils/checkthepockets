@@ -98,7 +98,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-49 | P2 | Review | ACT-48 | [Jinja-macro's en filters](#act-49) |
 | ACT-50 | P3 | Review | ACT-47, ACT-49 | [Inline styles naar utility-classes](#act-50) |
 | ACT-51 | P2 | Afgerond | ACT-39 | [HTTP-vangnet voor redesign-schermen en parsers](#act-51) |
-| ACT-52 | P3 | Gepland | ACT-41 | [Model-typing: Boolean, enums, Mapped](#act-52) |
+| ACT-52 | P3 | Review | ACT-41 | [Model-typing: Boolean, enums, Mapped](#act-52) |
 | ACT-53 | P2 | Review | ACT-31, ACT-28 | [Persoonspagina: verwachting betaalrekeningen en vermogen](#act-53) |
 | ACT-54 | P2 | Review | — | [Regelvoorstellen leesbaar: volledige omschrijving en groepering](#act-54) |
 | ACT-55 | P2 | Review | ACT-31 | [Rekeninggroepen, één categorieënset en budget per groep](#act-55) |
@@ -658,6 +658,12 @@ Gemerged en gedeployed: ACT-36 [#221](https://github.com/gjagils/checkthepockets
 - **ACT-53**: rekenkern (#247), pagina `/persons/{id}` met periodes 3/6/12 mnd en 2/3/5 jaar, grafiek, maandtabel en blok "Naar 18 jaar" (#248), menu-item Verwachting onder Portfolio (#251). Keuzes: gedeelde rekeningen gelijk verdeeld; spaaropdrachten als aparte regel "Naar sparen" in de verwachting; variabele uitgaven en budgetten zitten er nog niet in.
 - **ACT-55**: rekeninggroepen (#250, migratie 070), budget per groep (#252, migratie 071), categorieën consolideren met preview, samenvoegen en archiveren (#253), pagina's op de gedeelde set (#254). Gebruiker moet de preview in productie doorlopen; er is geen automatische undo.
 - **Bewust niet gedaan:** ACT-52 (Boolean-migratie raakt alle `== 0/1`-vergelijkingen in queries; apart en samen met de gebruiker). De oude route `POST /categories/merge` volgt nog niet de fold-logica.
+
+### Model-typing (ACT-52, deel) — uitkomst, 2026-10-15, Claude Code
+
+- **Gedaan:** type `Flag` (`app/db_types.py`): integer in de database, `bool` in Python, zonder migratie en zonder driftverschil. Toegepast op alle 16 vlagkolommen: `User` (#256), `Transaction` (#257), `Category` (#258) en de overige (#259). Queries met `== 0/1` en toewijzingen met `= 0/1` blijven werken; de back-up-export schrijft de vlaggen met `int()` zodat het bestandsformaat 0/1 blijft.
+- **Bewust niet gedaan:** de echte PostgreSQL-`Boolean`-migratie (raakt elke `== 0/1` in SQL-filters en brengt productierisico zonder functionele winst); `StrEnum` met `CheckConstraint`, `JSON`-kolom voor `accounts_json`, `Mapped[]`/`mapped_column()` en `pydantic-settings`.
+- **Besluit gebruiker (2026-10-15):** aanpak in stappen, eerst alleen het Python-type; de overige onderdelen alleen oppakken als er een concrete aanleiding is.
 
 ## Besluitenlog
 
