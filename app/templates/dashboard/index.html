@@ -165,7 +165,10 @@
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block vendor %}{% include "_chartjs.html" %}{% endblock %}
+{% block scripts %}
 <script>
 // ===== SHARED DATA & HELPERS =====
 var overviewData = {{ overview_data | tojson }};
@@ -205,10 +208,6 @@ function createStripePattern(color, bgAlpha, stripeAlpha) {
 }
 
 // Format euro for tooltips
-function fmtEuro(val) {
-    return '\u20AC ' + Math.abs(val).toLocaleString('nl-NL', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-}
-
 // Drill-down links (for navigating to month/category views)
 {% set drill = {} %}
 {% for row in overview_rows %}{% if row.link %}{% set _ = drill.update({row.label: row.link}) %}{% endif %}{% endfor %}
@@ -378,12 +377,12 @@ var sharedTooltipCallbacks = {
         var idx = tooltipItems[0].dataIndex;
         var d = overviewData[idx];
         var lines = [];
-        if (d.income_budget > 0) lines.push('Inkomen budget: ' + fmtEuro(d.income_budget));
-        if (d.expense_budget > 0) lines.push('Uitgaven budget: ' + fmtEuro(d.expense_budget));
+        if (d.income_budget > 0) lines.push('Inkomen budget: ' + formatEuro(d.income_budget));
+        if (d.expense_budget > 0) lines.push('Uitgaven budget: ' + formatEuro(d.expense_budget));
         return lines;
     },
     label: function(ctx) {
-        return ctx.dataset.label + ': ' + fmtEuro(ctx.raw);
+        return ctx.dataset.label + ': ' + formatEuro(ctx.raw);
     }
 };
 
@@ -452,7 +451,7 @@ function initBarChart() {
                     suggestedMax: Math.max.apply(null, overviewData.map(function(d) {
                         return Math.max(d.income_budget, d.income_actual + d.income_expected, d.expense_budget, d.expense_actual + d.expense_expected);
                     })) * 1.05,
-                    ticks: { color: C.muted, callback: function(v) { return fmtEuro(v); }, font: {family:C.font} },
+                    ticks: { color: C.muted, callback: function(v) { return formatEuro(v); }, font: {family:C.font} },
                     grid: { color: C.border + '44' },
                 },
             },
@@ -520,7 +519,7 @@ function initMirrorChart() {
                     callbacks: {
                         afterBody: sharedTooltipCallbacks.afterBody,
                         label: function(ctx) {
-                            return ctx.dataset.label + ': ' + fmtEuro(ctx.raw);
+                            return ctx.dataset.label + ': ' + formatEuro(ctx.raw);
                         }
                     }
                 },
@@ -557,7 +556,7 @@ function initMirrorChart() {
                     })(),
                     ticks: {
                         color: C.muted,
-                        callback: function(v) { return fmtEuro(v); },
+                        callback: function(v) { return formatEuro(v); },
                         font: { family: C.font },
                     },
                     grid: { color: C.border + '44' },

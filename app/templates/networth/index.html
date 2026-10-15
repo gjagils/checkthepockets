@@ -65,7 +65,7 @@
                     <td class="muted" style="font-size:0.85rem;">{{ acc.updated_at.strftime('%d-%m-%Y') if acc.updated_at else '-' }}</td>
                     <td>
                         <div style="display:flex; gap:0.25rem;">
-                            <button class="btn btn-sm" onclick="toggleEdit('nw-{{ acc.id }}')">Bewerken</button>
+                            <button class="btn btn-sm" onclick="toggleEdit('nw-{{ acc.id }}', 'table-row')">Bewerken</button>
                             <form method="post" action="/networth/accounts/{{ acc.id }}/toggle" style="display:inline;">
                                 <button type="submit" class="btn btn-sm">Deactiveren</button>
                             </form>
@@ -154,7 +154,7 @@
                     <td class="muted" style="font-size:0.85rem;">{{ acc.updated_at.strftime('%d-%m-%Y') if acc.updated_at else '-' }}</td>
                     <td>
                         <div style="display:flex; gap:0.25rem;">
-                            <button class="btn btn-sm" onclick="toggleEdit('nw-{{ acc.id }}')">Bewerken</button>
+                            <button class="btn btn-sm" onclick="toggleEdit('nw-{{ acc.id }}', 'table-row')">Bewerken</button>
                             <form method="post" action="/networth/accounts/{{ acc.id }}/toggle" style="display:inline;">
                                 <button type="submit" class="btn btn-sm">Deactiveren</button>
                             </form>
@@ -344,11 +344,6 @@
 
 {% block scripts %}
 <script>
-function toggleEdit(id) {
-    var el = document.getElementById(id);
-    el.style.display = el.style.display === 'none' ? 'table-row' : 'none';
-}
-
 function saveBalance(input) {
     var accountId = input.dataset.accountId;
     var value = input.value.trim().replace(/\./g, '').replace(',', '.');
