@@ -90,6 +90,22 @@ class AuthToken(Base):
     user = relationship("User", back_populates="auth_tokens")
 
 
+class AccountGroup(Base):
+    """Rekeningen die functioneel één rekening vormen (bijv. betaalrekening + bunq-potje).
+
+    Elke rekening zit in precies één groep; een nieuwe rekening krijgt vanzelf een eigen
+    groep (zie ``app/account_groups.py``). Budgetten gelden per groep (ACT-55).
+    """
+    __tablename__ = "account_groups"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(255), nullable=False)
+    created_at = Column(DateTime, default=clock.now_utc)
+
+    accounts = relationship("Account", back_populates="group")
+
+
 class Account(Base):
     __tablename__ = "accounts"
 
@@ -100,9 +116,11 @@ class Account(Base):
     bank = Column(String(50), nullable=False)  # "abn_amro", "bunq", "ics"
     external_uid = Column(String(255), nullable=True, index=True)  # Enable Banking account_uid
     kind = Column(String(20), nullable=False, default="payment", server_default="payment")  # "payment" of "savings"
+    group_id = Column(Integer, ForeignKey("account_groups.id", ondelete="SET NULL"), nullable=True, index=True)
     created_at = Column(DateTime, default=clock.now_utc)
 
     user = relationship("User", back_populates="accounts")
+    group = relationship("AccountGroup", back_populates="accounts")
     transactions = relationship(
         "Transaction", back_populates="account", cascade="all, delete-orphan"
     )
@@ -903,3 +921,6 @@ class BunqAccountLink(Base):
     __table_args__ = (
         UniqueConstraint("connection_id", "bunq_account_id", name="uq_bunq_link_account"),
     )
+
+
+from app import account_groups  # noqa: E402,F401  (registreert de before_flush-hook voor nieuwe rekeningen)

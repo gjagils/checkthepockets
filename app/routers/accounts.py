@@ -8,8 +8,9 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import (
-    Account, BankConnection, Transaction, SavingsPlan, Category, Rule, Person,
+    Account, AccountGroup, BankConnection, Transaction, SavingsPlan, Category, Rule, Person,
 )
+from app.account_groups import delete_empty_groups, group_label, set_account_group
 from app.account_merge import merge_accounts, plan_merge
 from app.auth import require_login
 from app.ownership import get_owned_or_404
@@ -134,6 +135,11 @@ def accounts_list(request: Request, merged: str | None = None, db: Session = Dep
             "user": user,
             "accounts": accounts,
             "persons": persons,
+            "group_choices": [
+                (g.id, group_label(g))
+                for g in db.query(AccountGroup).filter(AccountGroup.user_id == user.id).order_by(AccountGroup.name).all()
+                if g.accounts
+            ],
             "bank_info_by_account_id": bank_info_by_account_id,
             "latest_tx_by_account_id": latest_tx_by_account_id,
             "merged": _parse_merged(merged),
@@ -167,6 +173,37 @@ def set_account_owners(
         owners = []
     account.owners = owners
     db.commit()
+    return RedirectResponse("/accounts", status_code=302)
+
+
+@router.post("/accounts/{account_id}/group")
+def set_group(
+    account_id: int,
+    request: Request,
+    group_id: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """Zet een rekening in een bestaande groep, of ("nieuw") in een eigen groep."""
+    user = require_login(request, db)
+    account = get_owned_or_404(db, Account, account_id, user.id)
+    try:
+        target = int(group_id) if group_id.strip().isdigit() else None
+        set_account_group(db, account, target)
+    except ValueError:
+        db.rollback()
+        return RedirectResponse("/accounts", status_code=302)
+    db.commit()
+    return RedirectResponse("/accounts", status_code=302)
+
+
+@router.post("/accounts/groups/{group_id}/rename")
+def rename_group(group_id: int, request: Request, name: str = Form(...), db: Session = Depends(get_db)):
+    user = require_login(request, db)
+    group = get_owned_or_404(db, AccountGroup, group_id, user.id)
+    name = " ".join(name.split())
+    if name:
+        group.name = name[:255]
+        db.commit()
     return RedirectResponse("/accounts", status_code=302)
 
 
@@ -206,6 +243,8 @@ def delete_account(account_id: int, request: Request, db: Session = Depends(get_
         db.query(Category).filter(Category.account_id == account.id).update({"account_id": None}, synchronize_session=False)
         db.query(Rule).filter(Rule.condition_account_id == account.id).update({"condition_account_id": None}, synchronize_session=False)
         db.delete(account)
+        db.flush()
+        delete_empty_groups(db, user.id)
         db.commit()
     return RedirectResponse("/accounts", status_code=302)
 
@@ -263,6 +302,8 @@ def merge_account(
         return RedirectResponse("/accounts", status_code=303)
     try:
         result = merge_accounts(db, source, target)
+        db.flush()
+        delete_empty_groups(db, user.id)
         db.commit()
     except Exception:
         db.rollback()
