@@ -632,6 +632,15 @@ Alle vijf PR's gemerged en gedeployed (Build and Deploy geslaagd): ACT-32 [#215]
 
 Gemerged en gedeployed: ACT-36 [#221](https://github.com/gjagils/checkthepockets/pull/221), ACT-37 [#222](https://github.com/gjagils/checkthepockets/pull/222), ACT-38a [#223](https://github.com/gjagils/checkthepockets/pull/223), ACT-38b [#224](https://github.com/gjagils/checkthepockets/pull/224), ACT-40 [#225](https://github.com/gjagils/checkthepockets/pull/225), ACT-39 [#226](https://github.com/gjagils/checkthepockets/pull/226). Bijzonderheden: `app/clock.py` (`today_nl()` verandert gedrag tussen 00:00 en 02:00 NL-tijd); dependency-upgrade gevalideerd op een echte Python 3.12 uit het lock, met oude→nieuwe leesbaarheid van Fernet/bcrypt/sessiecookies; `apscheduler` 3.11 had `pytz` niet meer (nu `zoneinfo`); SQLAlchemy 2.1 en bcrypt 5 bewust niet meegenomen (eigen actie nodig); de testbasis dwingt nu foreign keys af en isoleert per test. Productievalidatie: pagina's laden (bevestigd door gebruiker); scheduler-pagina `/admin/scheduler` nog te bevestigen; bunq-voorbeeld en CSV-import door gebruiker later.
 
+### Fase 3 (ACT-41 t/m ACT-46) en fase 4 (gedeeltelijk) — uitkomst, 2026-10-15, Claude Code
+
+- **ACT-41** (migratie 069, modeluitlijning, drift-test op PostgreSQL), **ACT-42** (banksync-service, scheduler-lock, transactiegrenzen), **ACT-43** (gedeelde helpers; routeconventie alleen toegepast op de accounts-routes), **ACT-44** (savings-service; `_determine_entry_status` en GET-schrijfacties in plan_detail bewust ongemoeid), **ACT-45** (batching terugkerende posten, custom-CSV-parser; opsplitsen van `transaction_list` en `_render_recurring_page` niet gedaan), **ACT-46** (mortgage-formulieren; lange functies niet verder opgeknipt): afgerond met de genoemde beperkingen.
+- **ACT-51** HTTP-vangnet: rooktest op alle parameterloze GET-routes, schrijf-flows en bank-CSV-parsers (PR 240). `/admin/imports` is uitgesloten omdat `date_trunc` PostgreSQL-only is.
+- **ACT-47** CSS: ontbrekende tokens/klassen, 54 dode selectors weg, drie breakpoints, hex in hypotheek-/recurring-templates naar tokens, `base_public.html`. Visuele controle door de gebruiker open; de ~48 hex-kleuren in categoriekleuren-fallbacks (`#1F6FB2`) blijven bewust.
+- **ACT-48** JavaScript: `app/static/js/app.js` (thema, drawer, `formatEuro`, `escapeHtml`, `toggleEdit`, `fetchJson`), Chart.js 4.4.1 met SRI. De 15 bestaande `fetch()`-aanroepen en de overige inline scriptblokken zijn nog niet omgezet naar `fetchJson`/aparte bestanden.
+- **ACT-54** regelvoorstellen als kaartjes (PR 243).
+- **Nog niet gedaan:** ACT-49, ACT-50, ACT-52, ACT-53 en de gedeelde categorieën met budget per rekening.
+
 ## Besluitenlog
 
 | Datum | Besluit | Reden / gevolgen |
@@ -688,12 +697,3 @@ Voeg per afgeronde actie of overdracht een regel toe. Git bevat de volledige his
 | 2026-10-14 | ACT-32 | Encryptie-bugs uit de review (A1, A2, A3, B11) opgelost met tests die met versleuteling draaien | Claude Code; 529 passed, 3 skipped; PR-CI open |
 | 2026-10-14 | ACT-32 t/m ACT-35 | Fase 1 van de codereview afgerond: encryptie-bugs, auth-hardening, crash- en datafouten (a en b), XSS | #215, #216, #217, #218, #219 gemerged; CI groen; productievalidatie deels open (zie fase 1 — uitkomst) |
 | 2026-10-14 | ACT-36 t/m ACT-40 | Fase 2 van de codereview afgerond (hygiëne, tooling, verouderde API's, testbasis, dependency-upgrade) | #221–#226 gemerged; CI groen; 586 passed, 3 skipped op Python 3.12 |
-
-### Fase 3 (ACT-41 t/m ACT-46) en fase 4 (gedeeltelijk) — uitkomst, 2026-10-15, Claude Code
-
-- **ACT-41** (migratie 069, modeluitlijning, drift-test op PostgreSQL), **ACT-42** (banksync-service, scheduler-lock, transactiegrenzen), **ACT-43** (gedeelde helpers; routeconventie alleen toegepast op de accounts-routes), **ACT-44** (savings-service; `_determine_entry_status` en GET-schrijfacties in plan_detail bewust ongemoeid), **ACT-45** (batching terugkerende posten, custom-CSV-parser; opsplitsen van `transaction_list` en `_render_recurring_page` niet gedaan), **ACT-46** (mortgage-formulieren; lange functies niet verder opgeknipt): afgerond met de genoemde beperkingen.
-- **ACT-51** HTTP-vangnet: rooktest op alle parameterloze GET-routes, schrijf-flows en bank-CSV-parsers (PR 240). `/admin/imports` is uitgesloten omdat `date_trunc` PostgreSQL-only is.
-- **ACT-47** CSS: ontbrekende tokens/klassen, 54 dode selectors weg, drie breakpoints, hex in hypotheek-/recurring-templates naar tokens, `base_public.html`. Visuele controle door de gebruiker open; de ~48 hex-kleuren in categoriekleuren-fallbacks (`#1F6FB2`) blijven bewust.
-- **ACT-48** JavaScript: `app/static/js/app.js` (thema, drawer, `formatEuro`, `escapeHtml`, `toggleEdit`, `fetchJson`), Chart.js 4.4.1 met SRI. De 15 bestaande `fetch()`-aanroepen en de overige inline scriptblokken zijn nog niet omgezet naar `fetchJson`/aparte bestanden.
-- **ACT-54** regelvoorstellen als kaartjes (PR 243).
-- **Nog niet gedaan:** ACT-49, ACT-50, ACT-52, ACT-53 en de gedeelde categorieën met budget per rekening.
