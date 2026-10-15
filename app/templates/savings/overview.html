@@ -125,14 +125,6 @@
 
 {% block scripts %}
 <script>
-function fmtEuroSigned(val) {
-    var sign = val < 0 ? '-' : '';
-    var abs = Math.abs(val).toFixed(2).replace('.', ',');
-    var parts = abs.split(',');
-    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-    return '\u20AC\u00A0' + sign + parts.join(',');
-}
-
 function startEditStartingBalance(displayEl) {
     var wrap = displayEl.parentElement;
     var input = wrap.querySelector('.starting-balance-input');
@@ -177,7 +169,7 @@ function saveStartingBalance(input) {
             if (data.error) alert(data.error);
             return;
         }
-        display.innerHTML = fmtEuroSigned(data.starting_balance);
+        display.innerHTML = formatEuro(data.starting_balance, true);
         input.value = data.starting_balance.toFixed(2);
     });
 }

@@ -536,10 +536,6 @@
 
 {% block scripts %}
 <script>
-function fmtEuro(val) {
-    return '\u20AC\u00A0' + Math.abs(val).toFixed(2).replace('.', ',');
-}
-
 function toggleTargetMonth(freq) {
     var group = document.getElementById('target-month-group');
     var label = document.getElementById('target-month-label');
@@ -580,15 +576,6 @@ function toggleEditRow(lineId) {
 }
 
 // ── Startsaldo inline-edit ───────────────────────────────────────────
-function fmtEuroSigned(val) {
-    var sign = val < 0 ? '-' : '';
-    var abs = Math.abs(val).toFixed(2).replace('.', ',');
-    // Add thousand separators (dots)
-    var parts = abs.split(',');
-    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-    return '\u20AC\u00A0' + sign + parts.join(',');
-}
-
 function startEditStartingBalance() {
     var d = document.getElementById('starting-balance-display');
     var i = document.getElementById('starting-balance-input');
@@ -632,7 +619,7 @@ function saveStartingBalance() {
             if (data.error) alert(data.error);
             return;
         }
-        d.innerHTML = fmtEuroSigned(data.starting_balance);
+        d.innerHTML = formatEuro(data.starting_balance, true);
         i.value = data.starting_balance.toFixed(2);
 
         if (data.running_balances) {
@@ -641,7 +628,7 @@ function saveStartingBalance() {
                 if (balCell) {
                     var bal = data.running_balances[m];
                     var cls = bal >= 0 ? 'amount-positive' : 'amount-negative';
-                    balCell.innerHTML = '<strong class="' + cls + '">' + fmtEuro(bal) + '</strong>';
+                    balCell.innerHTML = '<strong class="' + cls + '">' + formatEuro(bal) + '</strong>';
                 }
             }
         }
@@ -700,18 +687,18 @@ function saveCell(td, value) {
             td.classList.remove('cell-saving');
             if (!data.ok) { alert(data.error || 'Opslaan mislukt'); return; }
             td.dataset.amount = data.amount === null ? '' : data.amount.toFixed(2);
-            td.querySelector('.cell-display').innerHTML = data.amount === null ? '-' : fmtEuroSigned(data.amount);
+            td.querySelector('.cell-display').innerHTML = data.amount === null ? '-' : formatEuro(data.amount, true);
             var total = document.querySelector('.line-total[data-line-id="' + data.line_id + '"]');
-            if (total) total.innerHTML = '<strong>' + fmtEuroSigned(data.line_total) + '</strong>';
+            if (total) total.innerHTML = '<strong>' + formatEuro(data.line_total, true) + '</strong>';
             var badge = document.querySelector('[data-line-badge="' + data.line_id + '"]');
             if (badge && data.frequency === 'custom') { badge.textContent = 'O'; badge.title = 'Onregelmatig'; }
             for (var m in data.running_balances) {
                 var bal = data.running_balances[m];
                 var balCell = document.querySelector('.balance-cell[data-month="' + m + '"]');
-                if (balCell) balCell.innerHTML = '<strong class="' + (bal >= 0 ? 'amount-positive' : 'amount-negative') + '">' + fmtEuroSigned(bal) + '</strong>';
+                if (balCell) balCell.innerHTML = '<strong class="' + (bal >= 0 ? 'amount-positive' : 'amount-negative') + '">' + formatEuro(bal, true) + '</strong>';
                 var mv = data.movements[m];
                 var mvCell = document.querySelector('.movement-cell[data-month="' + m + '"]');
-                if (mvCell) mvCell.innerHTML = '<span class="' + (mv >= 0 ? 'amount-positive' : 'amount-negative') + '">' + fmtEuroSigned(mv) + '</span>';
+                if (mvCell) mvCell.innerHTML = '<span class="' + (mv >= 0 ? 'amount-positive' : 'amount-negative') + '">' + formatEuro(mv, true) + '</span>';
             }
         })
         .catch(function () { td.classList.remove('cell-saving'); alert('Opslaan mislukt'); });

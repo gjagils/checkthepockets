@@ -340,7 +340,7 @@
                                 onclick='openPreview({{ rule.id }}, {{ rule.name|tojson }})'>
                             Toepassen
                         </button>
-                        <button class="btn btn-sm" onclick="toggleEdit({{ rule.id }})">Bewerken</button>
+                        <button class="btn btn-sm" onclick="toggleEdit('edit-{{ rule.id }}', 'block')">Bewerken</button>
                         <form method="post" action="/rules/{{ rule.id }}/toggle" style="display:inline;">
                             <button type="submit" class="btn btn-sm">
                                 {{ "Deactiveren" if rule.is_active else "Activeren" }}
@@ -434,7 +434,7 @@
                         </div>
                         <div style="margin-top:0.75rem; display:flex; gap:0.5rem;">
                             <button type="submit" class="btn btn-sm btn-primary">Opslaan</button>
-                            <button type="button" class="btn btn-sm" onclick="toggleEdit({{ rule.id }})">Annuleren</button>
+                            <button type="button" class="btn btn-sm" onclick="toggleEdit('edit-{{ rule.id }}', 'block')">Annuleren</button>
                         </div>
                     </form>
                 </div>
@@ -474,11 +474,6 @@
 
 {% block scripts %}
 <script>
-function toggleEdit(id) {
-    const el = document.getElementById('edit-' + id);
-    el.style.display = el.style.display === 'none' ? 'block' : 'none';
-}
-
 let _allTransactions = [];
 
 function openPreview(ruleId, ruleName) {
@@ -537,12 +532,6 @@ function updateCount() {
 function closeModal() {
     document.getElementById('rule-preview-modal').style.display = 'none';
     _allTransactions = [];
-}
-
-function escapeHtml(str) {
-    const d = document.createElement('div');
-    d.appendChild(document.createTextNode(str));
-    return d.innerHTML;
 }
 
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });

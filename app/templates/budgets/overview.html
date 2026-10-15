@@ -503,12 +503,6 @@ document.getElementById('presetSaveModal').addEventListener('click', function(e)
     if (e.target === this) this.style.display = 'none';
 });
 
-function formatEuro(val) {
-    var parts = Math.abs(val).toFixed(2).split('.');
-    var intPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-    return '\u00a0' + intPart + ',' + parts[1];
-}
-
 function recalcParentRow(input) {
     // Find the parent <tr class="category-parent"> for this input
     var row = input.closest('tr');
@@ -534,7 +528,7 @@ function recalcParentRow(input) {
     // Update the parent row budget cell (2nd <td>)
     var cells = parentRow.querySelectorAll('td');
     if (cells.length >= 2) {
-        cells[1].innerHTML = '<strong>\u20ac' + formatEuro(total) + '</strong>';
+        cells[1].innerHTML = '<strong>' + formatEuro(total) + '</strong>';
     }
 }
 

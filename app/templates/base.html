@@ -11,6 +11,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
     <link rel="stylesheet" href="/static/css/style.css?v={{ request.state.asset_version }}">
+    <script src="/static/js/app.js?v={{ request.state.asset_version }}"></script>
     <script>
         /* Apply saved theme before render to prevent flash */
         (function() {
@@ -178,42 +179,7 @@
     <main class="container {% block container_class %}{% endblock %}">
         {% block content %}{% endblock %}
     </main>
+    {% block vendor %}{% endblock %}
     {% block scripts %}{% endblock %}
-    <script>
-        function toggleTheme() {
-            var html = document.documentElement;
-            var current = html.getAttribute('data-theme') || 'light';
-            var next = current === 'light' ? 'dark' : 'light';
-            html.setAttribute('data-theme', next);
-            localStorage.setItem('ctp-theme', next);
-            updateThemeIcon(next);
-        }
-        function updateThemeIcon(theme) {
-            var btn = document.getElementById('theme-toggle-btn');
-            if (btn) btn.textContent = theme === 'dark' ? '☀' : '🌙';
-        }
-        updateThemeIcon(document.documentElement.getAttribute('data-theme') || 'light');
-
-        (function() {
-            var btn = document.getElementById('nav-hamburger-btn');
-            var drawer = document.getElementById('mobile-drawer');
-            if (!btn || !drawer) return;
-            function setOpen(open) {
-                drawer.classList.toggle('open', open);
-                btn.classList.toggle('is-active', open);
-                btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-                drawer.setAttribute('aria-hidden', open ? 'false' : 'true');
-                document.body.classList.toggle('nav-drawer-open', open);
-                if (!open) btn.focus();
-            }
-            btn.addEventListener('click', function() { setOpen(!drawer.classList.contains('open')); });
-            drawer.querySelectorAll('[data-drawer-close]').forEach(function(el) {
-                el.addEventListener('click', function() { setOpen(false); });
-            });
-            document.addEventListener('keydown', function(e) {
-                if (e.key === 'Escape' && drawer.classList.contains('open')) setOpen(false);
-            });
-        })();
-    </script>
 </body>
 </html>

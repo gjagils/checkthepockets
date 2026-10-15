@@ -371,8 +371,8 @@
 {% endif %}
 {% endblock %}
 
+{% block vendor %}{% include "_chartjs.html" %}{% endblock %}
 {% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 function fillPreset(val) {
     if (!val) return;
