@@ -50,6 +50,19 @@ def list_persons(request: Request, db: Session = Depends(get_db)):
 PERIODS = [(3, "3 mnd"), (6, "6 mnd"), (12, "12 mnd"), (24, "2 jaar"), (36, "3 jaar"), (60, "5 jaar")]
 
 
+@router.get("/verwachting")
+def first_person_forecast(request: Request, period: int = Query(12), db: Session = Depends(get_db)):
+    """Menu-ingang: de verwachting van de eerste persoon in de ingestelde volgorde."""
+    user = require_login(request, db)
+    first = (
+        db.query(Person).filter(Person.user_id == user.id)
+        .order_by(Person.sort_order, Person.name).first()
+    )
+    if first is None:
+        return RedirectResponse("/persons", status_code=302)
+    return RedirectResponse(f"/persons/{first.id}?period={period}", status_code=302)
+
+
 @router.get("/{person_id}")
 def person_page(request: Request, person_id: int, period: int = Query(12), db: Session = Depends(get_db)):
     """Verwachting per persoon: betaalrekeningen en vermogen (ACT-53)."""

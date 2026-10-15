@@ -28,7 +28,7 @@
         else 'inbox' if path == '/inbox' or path.startswith('/inbox/')
         else 'financien' if path in ['/transactions', '/categories', '/rules', '/recurring'] or path.startswith('/transactions')
         else 'budgetten' if path.startswith('/budgets') or path.startswith('/savings')
-        else 'portfolio' if path.startswith('/analytics') or path.startswith('/portfolio') or path.startswith('/networth')
+        else 'portfolio' if path.startswith('/analytics') or path.startswith('/portfolio') or path.startswith('/networth') or path == '/persons/verwachting' or (path.startswith('/persons/') and path.split('/')|length == 3 and path.split('/')[2].isdigit())
         else 'hypotheek' if path.startswith('/hypotheek')
         else 'rekeningen' if path.startswith('/accounts') or path.startswith('/import') or path.startswith('/banking') or path.startswith('/persons')
         else 'info' if path.startswith('/info')
@@ -88,6 +88,7 @@
                 <a href="/portfolio" class="{{ 'active' if path == '/portfolio' or (path.startswith('/portfolio') and not path.startswith('/portfolio/dashboard')) }}">Portfolio</a>
                 <a href="/portfolio/dashboard" class="{{ 'active' if path.startswith('/portfolio/dashboard') }}">Dashboard</a>
                 <a href="/portfolio/wealth-forecast" class="{{ 'active' if path.startswith('/portfolio/wealth-forecast') }}">Vermogensprognose</a>
+                <a href="/persons/verwachting" class="{{ 'active' if main_active == 'portfolio' and path.startswith('/persons') }}">Verwachting</a>
             {% elif main_active == 'hypotheek' %}
                 <a href="/hypotheek" class="{{ 'active' if path == '/hypotheek' }}">Overzicht</a>
                 <a href="/hypotheek/scenarios" class="{{ 'active' if path.startswith('/hypotheek/scenarios') }}">Scenarios</a>
@@ -95,7 +96,7 @@
                 <a href="/hypotheek/rentes" class="{{ 'active' if path.startswith('/hypotheek/rentes') }}">Rentes</a>
             {% elif main_active == 'rekeningen' %}
                 <a href="/accounts" class="{{ 'active' if path.startswith('/accounts') }}">Rekeningen</a>
-                <a href="/persons" class="{{ 'active' if path.startswith('/persons') }}">Personen</a>
+                <a href="/persons" class="{{ 'active' if path == '/persons' }}">Personen</a>
                 <a href="/import" class="{{ 'active' if path.startswith('/import') }}">Importeren</a>
                 <a href="/banking/connect" class="{{ 'active' if path.startswith('/banking') }}">Bankkoppeling</a>
             {% endif %}
@@ -139,6 +140,7 @@
                         <a href="/portfolio" class="{{ 'active' if path == '/portfolio' or (path.startswith('/portfolio') and not path.startswith('/portfolio/dashboard')) }}">Portfolio</a>
                         <a href="/portfolio/dashboard" class="{{ 'active' if path.startswith('/portfolio/dashboard') }}">Dashboard</a>
                         <a href="/portfolio/wealth-forecast" class="{{ 'active' if path.startswith('/portfolio/wealth-forecast') }}">Vermogensprognose</a>
+                        <a href="/persons/verwachting" class="{{ 'active' if main_active == 'portfolio' and path.startswith('/persons') }}">Verwachting</a>
                     </div>
                 </div>
 
@@ -158,7 +160,7 @@
                     <a href="/accounts" class="m-nav-main {{ 'active' if main_active == 'rekeningen' }}">Rekeningen</a>
                     <div class="m-nav-children">
                         <a href="/accounts" class="{{ 'active' if path.startswith('/accounts') }}">Rekeningen</a>
-                        <a href="/persons" class="{{ 'active' if path.startswith('/persons') }}">Personen</a>
+                        <a href="/persons" class="{{ 'active' if path == '/persons' }}">Personen</a>
                         <a href="/import" class="{{ 'active' if path.startswith('/import') }}">Importeren</a>
                         <a href="/banking/connect" class="{{ 'active' if path.startswith('/banking') }}">Bankkoppeling</a>
                     </div>
