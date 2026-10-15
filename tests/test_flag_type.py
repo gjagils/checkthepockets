@@ -35,3 +35,28 @@ def test_existing_style_filters_still_work(db):
     _user(db, username="b", is_admin=0)
     assert [u.username for u in db.query(User).filter(User.is_admin == 1).all()] == ["a"]
     assert [u.username for u in db.query(User).filter(User.is_admin == 0).all()] == ["b"]
+
+
+def test_transaction_flags_are_bools_and_filters_keep_working(db):
+    import datetime
+
+    from app.models import Account, Transaction
+
+    user = _user(db, username="tx")
+    account = Account(user_id=user.id, name="A", bank="abn_amro")
+    db.add(account)
+    db.flush()
+    db.add_all([
+        Transaction(account_id=account.id, date=datetime.date(2026, 1, 1), amount=1, import_hash="a", is_excluded=1),
+        Transaction(account_id=account.id, date=datetime.date(2026, 1, 2), amount=1, import_hash="b"),
+        Transaction(account_id=account.id, date=datetime.date(2026, 1, 3), amount=1, import_hash="c", is_projected=1),
+    ])
+    db.commit()
+    rows = {t.import_hash: t for t in db.query(Transaction).all()}
+    assert rows["a"].is_excluded is True and rows["b"].is_excluded is False and rows["b"].is_reviewed is False
+    assert rows["c"].is_projected is True
+    assert db.query(Transaction).filter(Transaction.is_excluded == 0, Transaction.is_projected == 0).count() == 1
+    db.query(Transaction).filter(Transaction.import_hash == "b").update({"is_reviewed": 1})
+    db.commit()
+    db.expire_all()
+    assert db.query(Transaction).filter_by(import_hash="b").one().is_reviewed is True
