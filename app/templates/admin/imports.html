@@ -37,9 +37,9 @@
                 <td style="text-align:right;">{{ b.tx_count }}</td>
                 <td>
                     {% if b.first_date == b.last_date %}
-                    {{ b.first_date.strftime('%d-%m-%Y') }}
+                    {{ b.first_date|date }}
                     {% else %}
-                    {{ b.first_date.strftime('%d-%m-%Y') }} — {{ b.last_date.strftime('%d-%m-%Y') }}
+                    {{ b.first_date|date }} — {{ b.last_date|date }}
                     {% endif %}
                 </td>
                 <td style="text-align:right;">

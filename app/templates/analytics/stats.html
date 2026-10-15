@@ -39,11 +39,11 @@
 <!-- Summary -->
 <div class="import-summary">
     <div class="summary-card">
-        <div class="value amount-positive">&euro;&nbsp;{{ total_income|euro }}</div>
+        <div class="value amount-positive">{{ total_income|euro_sign }}</div>
         <div class="label">Inkomen</div>
     </div>
     <div class="summary-card">
-        <div class="value amount-negative">&euro;&nbsp;{{ total_expenses|euro }}</div>
+        <div class="value amount-negative">{{ total_expenses|euro_sign }}</div>
         <div class="label">Uitgaven</div>
     </div>
     <div class="summary-card">
@@ -81,7 +81,7 @@
                             <div style="width:{{ bar_w }}%; height:100%; background:var(--red); border-radius:4px;"></div>
                         </div>
                     </td>
-                    <td class="text-right nowrap amount-negative">&euro;&nbsp;{{ m.total|euro }}</td>
+                    <td class="text-right nowrap amount-negative">{{ m.total|euro_sign }}</td>
                     <td class="text-right nowrap muted">{{ m.tx_count }}×</td>
                 </tr>
                 {% endfor %}
@@ -121,7 +121,7 @@
                             <div style="width:{{ bar_w }}%; height:100%; background:var(--orange); border-radius:4px;"></div>
                         </div>
                     </td>
-                    <td class="text-right nowrap amount-negative">&euro;&nbsp;{{ cat.total|euro }}</td>
+                    <td class="text-right nowrap amount-negative">{{ cat.total|euro_sign }}</td>
                     <td class="text-right nowrap muted">{{ cat.tx_count }}×</td>
                 </tr>
                 {% endfor %}
@@ -152,7 +152,7 @@
                 {% for cp in new_counterparties %}
                 <tr>
                     <td>{{ cp.counterparty }}</td>
-                    <td class="text-right nowrap {% if cp.total >= 0 %}amount-positive{% else %}amount-negative{% endif %}">&euro;&nbsp;{{ cp.total|euro }}</td>
+                    <td class="text-right nowrap {% if cp.total >= 0 %}amount-positive{% else %}amount-negative{% endif %}">{{ cp.total|euro_sign }}</td>
                     <td class="text-right nowrap muted">{{ cp.tx_count }}×</td>
                 </tr>
                 {% endfor %}

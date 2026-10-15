@@ -26,7 +26,7 @@
 <div class="card" style="margin-bottom:1rem;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
         <span class="muted" style="font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; font-family:'Syne',sans-serif;">
-            {{ group|length }}× duplicaat — {{ group[0].date.strftime('%d-%m-%Y') }} · €{{ group[0].amount|euro }} · {{ group[0].counterparty or '—' }}
+            {{ group|length }}× duplicaat — {{ group[0].date|date }} · {{ group[0].amount|euro_sign }} · {{ group[0].counterparty or '—' }}
         </span>
         <label class="check-row" style="font-size:0.78rem; color:var(--muted);">
             <input type="checkbox" class="select-group-cb" data-group="{{ loop.index }}"> <span>Selecteer alles behalve eerste</span>
@@ -57,12 +57,12 @@
                         <span title="Eerste — wordt bewaard" style="color:var(--green); font-size:0.9rem;">✓</span>
                         {% endif %}
                     </td>
-                    <td class="nowrap">{{ tx.date.strftime('%d-%m-%Y') }}</td>
+                    <td class="nowrap">{{ tx.date|date }}</td>
                     <td>{{ tx.description or '—' }}</td>
                     <td>{{ tx.counterparty or '—' }}</td>
                     <td>{{ tx.category.name if tx.category else '—' }}</td>
                     <td class="text-right nowrap {% if tx.amount >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
-                        €&nbsp;{{ tx.amount|euro }}
+                        {{ tx.amount|euro_sign }}
                     </td>
                     <td class="nowrap">{{ tx.account.name }}</td>
                 </tr>

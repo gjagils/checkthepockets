@@ -53,7 +53,7 @@
             <textarea name="match_value" rows="2" required class="suggestion-match js-autogrow">{{ s.match_value }}</textarea>
             {% if c.example_description or c.example_counterparty %}
             <div class="suggestion-example muted">
-                <strong>Voorbeeld{% if c.example_date %} ({{ c.example_date.strftime('%d-%m-%Y') }}){% endif %}:</strong>
+                <strong>Voorbeeld{% if c.example_date %} ({{ c.example_date|date }}){% endif %}:</strong>
                 {% if c.example_counterparty %}{{ c.example_counterparty }} — {% endif %}{{ c.example_description or '—' }}
             </div>
             {% endif %}
@@ -302,8 +302,8 @@
                             {% endif %}
                             {% if rule.amount_min is not none or rule.amount_max is not none %}
                             <span class="muted">
-                                {% if rule.amount_min is not none %}van &euro;&nbsp;{{ rule.amount_min|euro }}{% endif %}
-                                {% if rule.amount_max is not none %}t/m &euro;&nbsp;{{ rule.amount_max|euro }}{% endif %}
+                                {% if rule.amount_min is not none %}van {{ rule.amount_min|euro_sign }}{% endif %}
+                                {% if rule.amount_max is not none %}t/m {{ rule.amount_max|euro_sign }}{% endif %}
                             </span>
                             {% endif %}
                             <span class="muted">→</span>

@@ -297,10 +297,10 @@
                                 <tbody>
                                 {% for cand in candidates %}
                                     <tr>
-                                        <td class="nowrap">{{ cand.date.strftime('%d-%m-%Y') }}</td>
+                                        <td class="nowrap">{{ cand.date|date }}</td>
                                         <td>{{ cand.counterparty or '-' }}</td>
                                         <td class="muted">{{ cand.description or '-' }}</td>
-                                        <td class="text-right nowrap {% if cand.amount < 0 %}amount-negative{% else %}amount-positive{% endif %}">&euro;&nbsp;{{ cand.amount|euro }}</td>
+                                        <td class="text-right nowrap {% if cand.amount < 0 %}amount-negative{% else %}amount-positive{% endif %}">{{ cand.amount|euro_sign }}</td>
                                         <td>
                                             <form method="post" action="/recurring/{{ tx.recurring_id }}/link" style="margin:0;">
                                                 <input type="hidden" name="transaction_id" value="{{ cand.id }}">
@@ -337,7 +337,7 @@
                     <td style="text-align:center;">
                         <input type="checkbox" class="tx-select" data-id="{{ tx.id }}" style="cursor:pointer; accent-color:var(--navy-mid);">
                     </td>
-                    <td class="nowrap">{{ tx.date.strftime('%d-%m-%Y') }}</td>
+                    <td class="nowrap">{{ tx.date|date }}</td>
                     <td class="desc-cell">
                         {% if tx.is_excluded %}
                             <span class="tx-rule-label" style="background:var(--red-bg); color:var(--red); border-color:var(--red);" title="Uitgesloten van overzichten — open de acties om terug te zetten">Uitgesloten</span>
@@ -371,7 +371,7 @@
                         </form>
                     </td>
                     <td class="text-right nowrap {% if tx.amount >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
-                        &euro;&nbsp;{{ tx.amount|euro }}
+                        {{ tx.amount|euro_sign }}
                     </td>
                     <td class="nowrap col-account">{{ tx.account.name }}</td>
                     <td style="text-align:center; padding:0.3rem;">
@@ -387,7 +387,7 @@
                         <div class="tx-panel-inner">
                             <div class="tx-panel-info">
                                 <strong>{{ tx.counterparty or tx.description or '—' }}</strong>
-                                <span class="muted">{{ tx.date.strftime('%d-%m-%Y') }} &middot; {{ tx.category.name if tx.category else 'Geen categorie' }} &middot; €{{ tx.amount|euro }}</span>
+                                <span class="muted">{{ tx.date|date }} &middot; {{ tx.category.name if tx.category else 'Geen categorie' }} &middot; {{ tx.amount|euro_sign }}</span>
                             </div>
                             <div class="tx-panel-actions">
                                 <a href="/rules?from_tx={{ tx.id }}" class="tx-panel-btn">
@@ -450,7 +450,7 @@
                                         <input type="hidden" name="redirect_to" value="/transactions?page={{ page }}{% for k, v in filter_params.items() %}&{{ k }}={{ v }}{% endfor %}">
                                         <select name="recurring_id" style="padding:0.2rem 0.4rem; font-size:0.8rem; max-width:200px;">
                                             {% for ri in recurring_items %}
-                                            <option value="{{ ri.id }}">{{ ri.name }} (€{{ ri.amount_expected|euro }})</option>
+                                            <option value="{{ ri.id }}">{{ ri.name }} ({{ ri.amount_expected|euro_sign }})</option>
                                             {% endfor %}
                                         </select>
                                         <button type="submit" class="btn btn-sm btn-accent">OK</button>

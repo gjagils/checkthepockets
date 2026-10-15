@@ -69,7 +69,7 @@
     </td>
     {% endfor %}
     <td class="text-right nowrap line-total" data-line-id="{{ line.id }}">
-        <strong>&euro;&nbsp;{{ line_totals.get(line.id, 0)|euro }}</strong>
+        <strong>{{ line_totals.get(line.id, 0)|euro_sign }}</strong>
     </td>
 </tr>
 <tr class="edit-row" id="edit-row-{{ line.id }}" style="display:none;">
@@ -152,7 +152,7 @@
             Startsaldo:
             {% if source_plan %}
             <span title="Gekoppeld aan eindsaldo {{ source_plan.year }} — past zich automatisch aan wanneer {{ source_plan.year }} wijzigt">
-                &euro;&nbsp;{{ effective_starting_balance|euro }}
+                {{ effective_starting_balance|euro_sign }}
             </span>
             &middot;
             <span title="Gekoppeld aan eindsaldo {{ source_plan.year }}">🔗 Volgt {{ source_plan.year }}</span>
@@ -166,7 +166,7 @@
                 <span id="starting-balance-display"
                       onclick="startEditStartingBalance()"
                       title="Klik om het startsaldo aan te passen"
-                      style="cursor:pointer; text-decoration:underline dotted; text-underline-offset:3px;">&euro;&nbsp;{{ plan.starting_balance|euro }}</span>
+                      style="cursor:pointer; text-decoration:underline dotted; text-underline-offset:3px;">{{ plan.starting_balance|euro_sign }}</span>
                 <input type="text" id="starting-balance-input" class="cell-input"
                        style="display:none; width:7rem;"
                        value="{{ "%.2f"|format(plan.starting_balance or 0) }}"
@@ -282,7 +282,7 @@
                     {% set bal = running_balance.get(m, 0) %}
                     {% set movement = bal - prev.balance %}
                     <td class="text-right nowrap movement-cell" data-month="{{ m }}">
-                        <span class="{% if movement >= 0 %}amount-positive{% else %}amount-negative{% endif %}">&euro;&nbsp;{{ movement|euro }}</span>
+                        <span class="{% if movement >= 0 %}amount-positive{% else %}amount-negative{% endif %}">{{ movement|euro_sign }}</span>
                     </td>
                     {% set prev.balance = bal %}
                     {% endfor %}
@@ -296,7 +296,7 @@
                     <td class="text-right nowrap balance-cell" data-month="{{ m }}">
                         {% set bal = running_balance.get(m, 0) %}
                         <strong class="{% if bal >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
-                            &euro;&nbsp;{{ bal|euro }}
+                            {{ bal|euro_sign }}
                         </strong>
                     </td>
                     {% endfor %}
@@ -373,7 +373,7 @@
         {% for sug in category_suggestions %}
         <div class="card" style="margin-bottom: 0;">
             <h3>{{ sug.category_name }}</h3>
-            <p class="muted">{{ sug.tx_count }} transacties &middot; Totaal: &euro;&nbsp;{{ sug.total|euro }}</p>
+            <p class="muted">{{ sug.tx_count }} transacties &middot; Totaal: {{ sug.total|euro_sign }}</p>
             <form method="post" action="/savings/lines" style="margin-top: 0.75rem;">
                 <input type="hidden" name="plan_id" value="{{ plan.id }}">
                 <input type="hidden" name="name" value="{{ sug.category_name }}">

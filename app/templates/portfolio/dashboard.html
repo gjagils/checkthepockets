@@ -34,15 +34,15 @@
         <h2 style="margin-bottom:0.5rem;">{{ p.name }}</h2>
         <div style="display:grid; grid-template-columns:1fr auto; gap:0.25rem 1rem; font-size:0.95rem;">
             <span class="muted">Sparen</span>
-            <span class="text-right nowrap">&euro;&nbsp;{{ totals.savings|euro }}</span>
+            <span class="text-right nowrap">{{ totals.savings|euro_sign }}</span>
             <span class="muted">Beleggen (bruto)</span>
-            <span class="text-right nowrap">&euro;&nbsp;{{ totals.portfolio_gross|euro }}</span>
+            <span class="text-right nowrap">{{ totals.portfolio_gross|euro_sign }}</span>
             <span class="muted">Beleggen (netto na fee)</span>
-            <span class="text-right nowrap">&euro;&nbsp;{{ totals.portfolio_net|euro }}</span>
+            <span class="text-right nowrap">{{ totals.portfolio_net|euro_sign }}</span>
             <span style="font-weight:600; border-top:1px solid var(--ctp-border); padding-top:0.4rem;">Totaal (bruto)</span>
-            <span class="text-right nowrap" style="font-weight:600; border-top:1px solid var(--ctp-border); padding-top:0.4rem;">&euro;&nbsp;{{ totals.total_gross|euro }}</span>
+            <span class="text-right nowrap" style="font-weight:600; border-top:1px solid var(--ctp-border); padding-top:0.4rem;">{{ totals.total_gross|euro_sign }}</span>
             <span style="font-weight:600;">Contant totaal</span>
-            <span class="text-right nowrap" style="font-weight:600;">&euro;&nbsp;{{ totals.total_net|euro }}</span>
+            <span class="text-right nowrap" style="font-weight:600;">{{ totals.total_net|euro_sign }}</span>
         </div>
     </div>
     {% endfor %}
@@ -53,15 +53,15 @@
         <h2 style="margin-bottom:0.5rem;">Samen</h2>
         <div style="display:grid; grid-template-columns:1fr auto; gap:0.25rem 1rem; font-size:0.95rem;">
             <span class="muted">Sparen</span>
-            <span class="text-right nowrap">&euro;&nbsp;{{ st.savings|euro }}</span>
+            <span class="text-right nowrap">{{ st.savings|euro_sign }}</span>
             <span class="muted">Beleggen (bruto)</span>
-            <span class="text-right nowrap">&euro;&nbsp;{{ st.portfolio_gross|euro }}</span>
+            <span class="text-right nowrap">{{ st.portfolio_gross|euro_sign }}</span>
             <span class="muted">Beleggen (netto na fee)</span>
-            <span class="text-right nowrap">&euro;&nbsp;{{ st.portfolio_net|euro }}</span>
+            <span class="text-right nowrap">{{ st.portfolio_net|euro_sign }}</span>
             <span style="font-weight:600; border-top:1px solid var(--ctp-border); padding-top:0.4rem;">Totaal (bruto)</span>
-            <span class="text-right nowrap" style="font-weight:600; border-top:1px solid var(--ctp-border); padding-top:0.4rem;">&euro;&nbsp;{{ st.total_gross|euro }}</span>
+            <span class="text-right nowrap" style="font-weight:600; border-top:1px solid var(--ctp-border); padding-top:0.4rem;">{{ st.total_gross|euro_sign }}</span>
             <span style="font-weight:600;">Contant totaal</span>
-            <span class="text-right nowrap" style="font-weight:600;">&euro;&nbsp;{{ st.total_net|euro }}</span>
+            <span class="text-right nowrap" style="font-weight:600;">{{ st.total_net|euro_sign }}</span>
         </div>
     </div>
     {% endif %}
@@ -92,17 +92,17 @@
             {% else %}
             <div style="display:grid; grid-template-columns:1fr auto; gap:0.25rem 1rem; font-size:0.95rem;">
                 <span class="muted">Portfolio nu</span>
-                <span class="text-right nowrap">&euro;&nbsp;{{ c.current_portfolio|euro }}</span>
+                <span class="text-right nowrap">{{ c.current_portfolio|euro_sign }}</span>
                 <span class="muted">Sparen nu</span>
-                <span class="text-right nowrap">&euro;&nbsp;{{ c.current_savings|euro }}</span>
+                <span class="text-right nowrap">{{ c.current_savings|euro_sign }}</span>
                 <span style="font-weight:600; border-top:1px solid var(--ctp-border); padding-top:0.35rem;">Totaal nu</span>
-                <span class="text-right nowrap" style="font-weight:600; border-top:1px solid var(--ctp-border); padding-top:0.35rem;">&euro;&nbsp;{{ c.current_total|euro }}</span>
+                <span class="text-right nowrap" style="font-weight:600; border-top:1px solid var(--ctp-border); padding-top:0.35rem;">{{ c.current_total|euro_sign }}</span>
                 <span class="muted" style="padding-top:0.4rem;">Portfolio op 18e</span>
-                <span class="text-right nowrap" style="padding-top:0.4rem;">&euro;&nbsp;{{ c.projected_portfolio|euro }}</span>
+                <span class="text-right nowrap" style="padding-top:0.4rem;">{{ c.projected_portfolio|euro_sign }}</span>
                 <span class="muted">Sparen op 18e</span>
-                <span class="text-right nowrap">&euro;&nbsp;{{ c.projected_savings|euro }}</span>
+                <span class="text-right nowrap">{{ c.projected_savings|euro_sign }}</span>
                 <span style="font-weight:600; color:var(--ctp-denim);">Totaal op 18e</span>
-                <span class="text-right nowrap" style="font-weight:600; color:var(--ctp-denim);">&euro;&nbsp;{{ c.projected_total|euro }}</span>
+                <span class="text-right nowrap" style="font-weight:600; color:var(--ctp-denim);">{{ c.projected_total|euro_sign }}</span>
             </div>
             {% endif %}
         </div>
@@ -143,13 +143,13 @@
                         {{ acc.name }}
                         {% if not acc.has_plan %}<br><span class="muted" style="font-size:0.8rem;">geen spaarplan dit jaar</span>{% endif %}
                     </td>
-                    <td class="text-right nowrap">&euro;&nbsp;{{ acc.current_total|euro }}</td>
-                    <td class="text-right nowrap">&euro;&nbsp;{{ acc.projected_total|euro }}</td>
+                    <td class="text-right nowrap">{{ acc.current_total|euro_sign }}</td>
+                    <td class="text-right nowrap">{{ acc.projected_total|euro_sign }}</td>
                     <td>
                         {% for o in acc.owners %}
                         <div style="font-size:0.9rem;">
                             {{ o.person_name }}
-                            <span class="muted">— &euro;&nbsp;{{ o.current|euro }} ({{ (o.share * 100)|round(0) }}%)</span>
+                            <span class="muted">— {{ o.current|euro_sign }} ({{ (o.share * 100)|round(0) }}%)</span>
                         </div>
                         {% endfor %}
                     </td>
@@ -179,15 +179,15 @@
                 {% for asset in data.portfolio_breakdown %}
                 <tr>
                     <td>{{ asset.name }} <span class="muted" style="font-size:0.8rem;">({{ asset.asset_class }})</span></td>
-                    <td class="text-right nowrap">&euro;&nbsp;{{ asset.current_gross|euro }}</td>
-                    <td class="text-right nowrap">&euro;&nbsp;{{ asset.current_net|euro }}</td>
-                    <td class="text-right nowrap">&euro;&nbsp;{{ asset.projected_gross|euro }}</td>
+                    <td class="text-right nowrap">{{ asset.current_gross|euro_sign }}</td>
+                    <td class="text-right nowrap">{{ asset.current_net|euro_sign }}</td>
+                    <td class="text-right nowrap">{{ asset.projected_gross|euro_sign }}</td>
                     <td>
                         {% for o in asset.owners %}
                         <div style="font-size:0.9rem;">
                             {{ o.person_name }}
                             <span class="muted">
-                                — {{ o.quantity|float|round(4) }}× · &euro;&nbsp;{{ o.value|euro }}{% if o.contribution %} ({% if o.contribution > 0 %}+{% endif %}&euro;&nbsp;{{ o.contribution|euro }}/mnd){% endif %}
+                                — {{ o.quantity|float|round(4) }}× · {{ o.value|euro_sign }}{% if o.contribution %} ({% if o.contribution > 0 %}+{% endif %}{{ o.contribution|euro_sign }}/mnd){% endif %}
                             </span>
                         </div>
                         {% endfor %}

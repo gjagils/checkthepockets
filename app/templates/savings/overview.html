@@ -38,7 +38,7 @@
                 <span class="starting-balance-display"
                       onclick="startEditStartingBalance(this)"
                       title="Klik om het startsaldo aan te passen"
-                      style="cursor:pointer; text-decoration:underline dotted; text-underline-offset:3px;">&euro;&nbsp;{{ plan.starting_balance|euro }}</span>
+                      style="cursor:pointer; text-decoration:underline dotted; text-underline-offset:3px;">{{ plan.starting_balance|euro_sign }}</span>
                 <input type="text" class="starting-balance-input cell-input"
                        style="display:none; width:7rem;"
                        value="{{ "%.2f"|format(plan.starting_balance or 0) }}"

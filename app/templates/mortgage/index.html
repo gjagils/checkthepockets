@@ -29,8 +29,8 @@
                 {% for s in scenarios %}
                 <tr>
                     <td><a href="/hypotheek/scenarios/{{ s.id }}">{{ s.name }}</a></td>
-                    <td class="text-right">€ {{ s.valuation | euro0 }}</td>
-                    <td class="text-right">€ {{ s.offer | euro0 }}</td>
+                    <td class="text-right">{{ s.valuation|euro0_sign }}</td>
+                    <td class="text-right">{{ s.offer|euro0_sign }}</td>
                 </tr>
                 {% endfor %}
             </tbody>

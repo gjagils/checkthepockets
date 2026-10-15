@@ -48,7 +48,7 @@
             Budget — nog toe te wijzen
         </span>
         <span style="font-family:'Syne',sans-serif; font-weight:700; font-size:1.1rem; {% if budget_unallocated >= 0 %}color:var(--green);{% else %}color:var(--red);{% endif %}">
-            {% if budget_unallocated >= 0 %}+{% endif %}&euro;&nbsp;{{ budget_unallocated|euro }}
+            {% if budget_unallocated >= 0 %}+{% endif %}{{ budget_unallocated|euro_sign }}
         </span>
     </div>
     <div style="background:var(--bg); border-radius:6px; height:10px; overflow:hidden;">
@@ -56,12 +56,12 @@
             background: {% if pct_budget > 100 %}var(--red){% elif pct_budget > 90 %}var(--gold){% else %}var(--sky){% endif %};"></div>
     </div>
     <div style="display:flex; justify-content:space-between; margin-top:0.35rem; font-size:0.78rem; color:var(--muted);">
-        <span>&euro;&nbsp;{{ total_budgeted|euro }} gebudgetteerd</span>
-        <span>&euro;&nbsp;{{ total_income_budgeted|euro }} begroot inkomen · {{ pct_budget }}%</span>
+        <span>{{ total_budgeted|euro_sign }} gebudgetteerd</span>
+        <span>{{ total_income_budgeted|euro_sign }} begroot inkomen · {{ pct_budget }}%</span>
     </div>
     {% if budget_unallocated < 0 %}
     <div class="alert alert-error" style="margin-top:0.75rem; padding:0.5rem 0.85rem; font-size:0.83rem;">
-        <strong>Overbudgeted!</strong> Je hebt &euro;&nbsp;{{ (budget_unallocated * -1)|euro }} meer gebudgetteerd dan je begrote inkomen.
+        <strong>Overbudgeted!</strong> Je hebt {{ (budget_unallocated * -1)|euro_sign }} meer gebudgetteerd dan je begrote inkomen.
     </div>
     {% endif %}
 
@@ -73,7 +73,7 @@
             Werkelijk — ruimte over
         </span>
         <span style="font-family:'Syne',sans-serif; font-weight:700; font-size:1.1rem; {% if actual_unallocated >= 0 %}color:var(--green);{% else %}color:var(--red);{% endif %}">
-            {% if actual_unallocated >= 0 %}+{% endif %}&euro;&nbsp;{{ actual_unallocated|euro }}
+            {% if actual_unallocated >= 0 %}+{% endif %}{{ actual_unallocated|euro_sign }}
         </span>
     </div>
     <div style="background:var(--bg); border-radius:6px; height:10px; overflow:hidden;">
@@ -81,8 +81,8 @@
             background: {% if pct_actual > 100 %}var(--red){% elif pct_actual > 90 %}var(--gold){% else %}var(--sky){% endif %};"></div>
     </div>
     <div style="display:flex; justify-content:space-between; margin-top:0.35rem; font-size:0.78rem; color:var(--muted);">
-        <span>&euro;&nbsp;{{ total_budgeted|euro }} gebudgetteerd</span>
-        <span>&euro;&nbsp;{{ total_income_received|euro }} ontvangen{% if expected_income > 0 %} + &euro;&nbsp;{{ expected_income|euro }} verwacht{% endif %} · {{ pct_actual }}%</span>
+        <span>{{ total_budgeted|euro_sign }} gebudgetteerd</span>
+        <span>{{ total_income_received|euro_sign }} ontvangen{% if expected_income > 0 %} + {{ expected_income|euro_sign }} verwacht{% endif %} · {{ pct_actual }}%</span>
     </div>
 </div>
 
@@ -125,33 +125,33 @@
 <!-- Summary -->
 <div class="import-summary">
     <div class="summary-card">
-        <div class="value amount-positive">&euro;&nbsp;{{ total_income_received|euro }}</div>
+        <div class="value amount-positive">{{ total_income_received|euro_sign }}</div>
         <div class="label">Ontvangen</div>
     </div>
     <div class="summary-card">
-        <div class="value">&euro;&nbsp;{{ total_budgeted|euro }}</div>
+        <div class="value">{{ total_budgeted|euro_sign }}</div>
         <div class="label">Gebudgetteerd</div>
     </div>
     <div class="summary-card">
-        <div class="value">&euro;&nbsp;{{ total_spent|euro }}</div>
+        <div class="value">{{ total_spent|euro_sign }}</div>
         <div class="label">Uitgegeven</div>
     </div>
     <div class="summary-card">
         <div class="value {% if total_remaining >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
-            &euro;&nbsp;{{ total_remaining|euro }}
+            {{ total_remaining|euro_sign }}
         </div>
         <div class="label">Resterend</div>
     </div>
     <div class="summary-card">
         <div class="value {% if actual_unallocated >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
-            &euro;&nbsp;{{ actual_unallocated|euro }}
+            {{ actual_unallocated|euro_sign }}
         </div>
         <div class="label">Niet toegewezen</div>
     </div>
     {% if total_rollover != 0 %}
     <div class="summary-card">
         <div class="value {% if total_rollover >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
-            &euro;&nbsp;{{ total_rollover|euro }}
+            {{ total_rollover|euro_sign }}
         </div>
         <div class="label">Rollover {{ months[prev_month] }}</div>
     </div>
@@ -177,11 +177,11 @@
                 {% for group in income_budget_data %}
                 <tr class="category-parent">
                     <td><strong>{{ group.parent.name }}</strong></td>
-                    <td class="text-right nowrap"><strong>&euro;&nbsp;{{ group.group_budget|euro }}</strong></td>
-                    <td class="text-right nowrap"><strong>&euro;&nbsp;{{ group.group_actual|euro }}</strong></td>
+                    <td class="text-right nowrap"><strong>{{ group.group_budget|euro_sign }}</strong></td>
+                    <td class="text-right nowrap"><strong>{{ group.group_actual|euro_sign }}</strong></td>
                     <td class="text-right nowrap">
                         <strong class="{% if group.group_difference >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
-                            &euro;&nbsp;{{ group.group_difference|euro }}
+                            {{ group.group_difference|euro_sign }}
                         </strong>
                     </td>
                     <td>
@@ -226,10 +226,10 @@
                                onblur="saveBudget(this)"
                                onkeydown="if(event.key==='Enter')this.blur()">
                     </td>
-                    <td class="text-right nowrap">&euro;&nbsp;{{ child.actual|euro }}</td>
+                    <td class="text-right nowrap">{{ child.actual|euro_sign }}</td>
                     <td class="text-right nowrap">
                         <span class="{% if child.difference >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
-                            &euro;&nbsp;{{ child.difference|euro }}
+                            {{ child.difference|euro_sign }}
                         </span>
                     </td>
                     <td>
@@ -274,7 +274,7 @@
                 {% for group in budget_data %}
                 <tr class="category-parent">
                     <td><strong>{{ group.parent.name }}</strong></td>
-                    <td class="text-right nowrap"><strong>&euro;&nbsp;{{ group.group_budget|euro }}</strong></td>
+                    <td class="text-right nowrap"><strong>{{ group.group_budget|euro_sign }}</strong></td>
                     <td class="text-right nowrap">
                         {% if group.group_rollover != 0 %}
                         <span class="{% if group.group_rollover >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
@@ -282,22 +282,22 @@
                         </span>
                         {% else %}<span class="muted">-</span>{% endif %}
                     </td>
-                    <td class="text-right nowrap"><strong>&euro;&nbsp;{{ group.group_effective|euro }}</strong></td>
-                    <td class="text-right nowrap"><strong>&euro;&nbsp;{{ group.group_spent|euro }}</strong></td>
+                    <td class="text-right nowrap"><strong>{{ group.group_effective|euro_sign }}</strong></td>
+                    <td class="text-right nowrap"><strong>{{ group.group_spent|euro_sign }}</strong></td>
                     <td class="text-right nowrap">
                         {% if group.group_projected > 0 %}
-                        <span class="muted" style="font-size:0.85rem;">&euro;&nbsp;{{ group.group_projected|euro }}</span>
+                        <span class="muted" style="font-size:0.85rem;">{{ group.group_projected|euro_sign }}</span>
                         {% else %}<span class="muted">-</span>{% endif %}
                     </td>
                     <td class="text-right nowrap muted">-</td>
                     <td class="text-right nowrap muted" style="font-size:0.85rem;">
                         {% if group.group_avg_3m and group.group_avg_3m > 0 %}
-                        &euro;&nbsp;{{ group.group_avg_3m|euro }}
+                        {{ group.group_avg_3m|euro_sign }}
                         {% else %}-{% endif %}
                     </td>
                     <td class="text-right nowrap">
                         <strong class="{% if group.group_effective_remaining >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
-                            &euro;&nbsp;{{ group.group_effective_remaining|euro }}
+                            {{ group.group_effective_remaining|euro_sign }}
                         </strong>
                     </td>
                     <td>
@@ -350,26 +350,26 @@
                         </span>
                         {% else %}<span class="muted">-</span>{% endif %}
                     </td>
-                    <td class="text-right nowrap">&euro;&nbsp;{{ child.effective_budget|euro }}</td>
-                    <td class="text-right nowrap">&euro;&nbsp;{{ child.spent|euro }}</td>
+                    <td class="text-right nowrap">{{ child.effective_budget|euro_sign }}</td>
+                    <td class="text-right nowrap">{{ child.spent|euro_sign }}</td>
                     <td class="text-right nowrap" style="font-size:0.85rem;">
                         {% if child.projected > 0 %}
-                        <span class="muted">&euro;&nbsp;{{ child.projected|euro }}</span>
+                        <span class="muted">{{ child.projected|euro_sign }}</span>
                         {% else %}-{% endif %}
                     </td>
                     <td class="text-right nowrap muted" style="font-size:0.85rem;">
                         {% if child.prev_spent > 0 %}
-                        &euro;&nbsp;{{ child.prev_spent|euro }}
+                        {{ child.prev_spent|euro_sign }}
                         {% else %}-{% endif %}
                     </td>
                     <td class="text-right nowrap muted" style="font-size:0.85rem;">
                         {% if child.avg_3m_spent and child.avg_3m_spent > 0 %}
-                        &euro;&nbsp;{{ child.avg_3m_spent|euro }}
+                        {{ child.avg_3m_spent|euro_sign }}
                         {% else %}-{% endif %}
                     </td>
                     <td class="text-right nowrap">
                         <span class="{% if child.effective_remaining >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
-                            &euro;&nbsp;{{ child.effective_remaining|euro }}
+                            {{ child.effective_remaining|euro_sign }}
                         </span>
                     </td>
                     <td>

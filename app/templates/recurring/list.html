@@ -52,7 +52,7 @@
         </div>
         <div style="min-width:100px; text-align:right;">
             <span class="{% if s.amount < 0 %}amount-negative{% else %}amount-positive{% endif %}" style="font-weight:700;">
-                &euro;&nbsp;{{ s.amount|euro }}
+                {{ s.amount|euro_sign }}
             </span>
             <div class="muted" style="font-size:.75rem;">
                 {% if s.frequency == 'weekly' %}Wekelijks{% elif s.frequency == 'monthly' %}Maandelijks{% elif s.frequency == 'quarterly' %}Per kwartaal{% elif s.frequency == 'yearly' %}Jaarlijks{% else %}{{ s.frequency }}{% endif %}
@@ -104,7 +104,7 @@
                 <span class="pill" style="background:rgba(224,62,62,0.12); color:var(--red); margin-left:0.4rem;">Gemist</span>
             </div>
             <div class="recurring-amount {% if item.amount_expected < 0 %}amount-negative{% else %}amount-positive{% endif %}">
-                &euro;&nbsp;{{ item.amount_expected|euro }}
+                {{ item.amount_expected|euro_sign }}
             </div>
         </div>
         <div class="recurring-meta">
@@ -125,7 +125,7 @@
             </span>
             {% endif %}
             <span class="muted" style="font-size:0.78rem;">
-                Vorige periode: {{ entry.prev_period_start.strftime('%d-%m') }} t/m {{ entry.prev_period_end.strftime('%d-%m-%Y') }}
+                Vorige periode: {{ entry.prev_period_start.strftime('%d-%m') }} t/m {{ entry.prev_period_end|date }}
             </span>
         </div>
         {% include "recurring/_skipped_months.html" %}
@@ -162,7 +162,7 @@
                 <div class="recurring-header">
                     <strong>{{ item.name }}</strong>
                     <div class="recurring-amount {% if item.amount_expected < 0 %}amount-negative{% else %}amount-positive{% endif %}">
-                        &euro;&nbsp;{{ item.amount_expected|euro }}
+                        {{ item.amount_expected|euro_sign }}
                     </div>
                 </div>
                 <div class="recurring-meta">
@@ -175,7 +175,7 @@
                         {% endfor %}
                     </span>
                     {% endif %}
-                    <span class="muted" style="font-size:0.78rem;">t/m {{ entry.period_end.strftime('%d-%m-%Y') }}</span>
+                    <span class="muted" style="font-size:0.78rem;">t/m {{ entry.period_end|date }}</span>
                     <span class="recurring-badge recurring-badge-due">Nog niet gevonden</span>
                 </div>
                 {% include "recurring/_skipped_months.html" %}
@@ -211,7 +211,7 @@
                 <div class="recurring-header">
                     <strong>{{ item.name }}</strong>
                     <div class="recurring-amount {% if item.amount_expected < 0 %}amount-negative{% else %}amount-positive{% endif %}">
-                        &euro;&nbsp;{{ item.amount_expected|euro }}
+                        {{ item.amount_expected|euro_sign }}
                     </div>
                 </div>
                 <div class="recurring-meta">
@@ -226,7 +226,7 @@
                     {% endif %}
                     <span class="recurring-badge recurring-badge-ok">
                         {{ entry.matched_transaction.date.strftime('%d-%m') }}
-                        &euro;&nbsp;{{ entry.matched_transaction.amount|euro }}
+                        {{ entry.matched_transaction.amount|euro_sign }}
                         {% if entry.matched_transaction.recurring_id == item.id %}· handmatig{% endif %}
                     </span>
                     {% if entry.matched_transaction.recurring_id == item.id %}
@@ -274,12 +274,12 @@
                             <span class="pill" style="background:var(--bg); color:var(--muted);">Buiten periode</span>
                             {% endif %}
                         </div>
-                        <div class="recurring-amount muted">&euro;&nbsp;{{ item.amount_expected|euro }}</div>
+                        <div class="recurring-amount muted">{{ item.amount_expected|euro_sign }}</div>
                     </div>
                     <div class="recurring-meta">
                         <span class="pill">{{ frequencies.get(item.frequency, item.frequency) }}</span>
-                        {% if item.start_date %}<span class="muted" style="font-size:0.75rem;">Vanaf {{ item.start_date.strftime('%d-%m-%Y') }}</span>{% endif %}
-                        {% if item.end_date %}<span class="muted" style="font-size:0.75rem;">T/m {{ item.end_date.strftime('%d-%m-%Y') }}</span>{% endif %}
+                        {% if item.start_date %}<span class="muted" style="font-size:0.75rem;">Vanaf {{ item.start_date|date }}</span>{% endif %}
+                        {% if item.end_date %}<span class="muted" style="font-size:0.75rem;">T/m {{ item.end_date|date }}</span>{% endif %}
                     </div>
                     {% include "recurring/_skipped_months.html" %}
                     <div class="recurring-actions">
@@ -342,7 +342,7 @@
                             <td>{{ tx.counterparty or '—' }}</td>
                             <td class="muted" style="font-size:0.75rem; word-break:break-all;">{{ tx.description or '—' }}</td>
                             <td class="text-right nowrap {% if tx.amount < 0 %}amount-negative{% else %}amount-positive{% endif %}">
-                                &euro;&nbsp;{{ tx.amount|euro }}
+                                {{ tx.amount|euro_sign }}
                             </td>
                         </tr>
                         {% endfor %}

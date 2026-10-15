@@ -42,7 +42,7 @@
             <tbody>
                 {% for tx in transactions %}
                 <tr data-txid="{{ tx.id }}"{% if tx.is_excluded %} class="tx-excluded" style="opacity:0.55;"{% endif %}>
-                    <td class="nowrap">{{ tx.date.strftime('%d-%m-%Y') }}</td>
+                    <td class="nowrap">{{ tx.date|date }}</td>
                     <td class="desc-cell">{{ tx.description or '-' }}</td>
                     <td class="col-counterparty">{{ tx.counterparty or '-' }}</td>
                     <td class="nowrap">
@@ -66,7 +66,7 @@
                         </form>
                     </td>
                     <td class="text-right nowrap {% if tx.amount >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
-                        &euro;&nbsp;{{ tx.amount|euro }}
+                        {{ tx.amount|euro_sign }}
                     </td>
                     <td class="nowrap col-account">{{ tx.account.name }}</td>
                     <td style="text-align:center; padding:0.3rem;">
@@ -82,7 +82,7 @@
                         <div class="tx-panel-inner">
                             <div class="tx-panel-info">
                                 <strong>{{ tx.counterparty or tx.description or '—' }}</strong>
-                                <span class="muted">{{ tx.date.strftime('%d-%m-%Y') }} &middot; €{{ tx.amount|euro }}</span>
+                                <span class="muted">{{ tx.date|date }} &middot; {{ tx.amount|euro_sign }}</span>
                             </div>
                             <div class="tx-panel-footer">
                                 <a href="/transactions/{{ tx.id }}/edit?redirect_to={{ redirect_back }}" class="tx-panel-footer-btn">Bewerken</a>
@@ -111,7 +111,7 @@
                                         <input type="hidden" name="redirect_to" value="{{ redirect_back }}">
                                         <select name="recurring_id" style="padding:0.2rem 0.4rem; font-size:0.8rem; max-width:200px;">
                                             {% for ri in recurring_items %}
-                                            <option value="{{ ri.id }}">{{ ri.name }} (€{{ ri.amount_expected|euro }})</option>
+                                            <option value="{{ ri.id }}">{{ ri.name }} ({{ ri.amount_expected|euro_sign }})</option>
                                             {% endfor %}
                                         </select>
                                         <button type="submit" class="btn btn-sm btn-accent">OK</button>
