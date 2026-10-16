@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Standaardset - Check Your Pockets{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Standaardset invoeren</h1>
+        <p class="muted">Eén categorieënset voor alle rekeningen. Je ziet eerst per categorie waar die naartoe gaat; er verandert niets tot je bevestigt.</p>
+    </div>
+    <a class="btn btn-sm" href="/categories">Terug naar categorieën</a>
+</div>
+
+{% if done == 'error' %}
+<div class="alert alert-danger">Invoeren is niet gelukt. Er is niets gewijzigd; zie de serverlog.</div>
+{% elif done %}
+<div class="alert alert-success">Klaar: {{ done }} categorieën verplaatst of samengevoegd.</div>
+{% endif %}
+
+{% if not plan.moves and not plan.to_create %}
+<div class="card u-empty-lg">Er is niets te verplaatsen.</div>
+{% else %}
+<form method="get" action="/categories/standaard" id="preview-form"></form>
+<form method="post" action="/categories/standaard">
+<div class="accounts-grid u-mb-15">
+    <section class="card"><p class="muted u-mb-0">Categorieën verplaatsen</p><strong style="font-size:1.6rem;">{{ plan.moves|length }}</strong></section>
+    <section class="card"><p class="muted u-mb-0">Nieuw aan te maken</p><strong style="font-size:1.6rem;">{{ plan.to_create|length }}</strong></section>
+    <section class="card"><p class="muted u-mb-0">Oude hoofdcategorieën archiveren</p><strong style="font-size:1.6rem;">{{ plan.archive_parents|length }}</strong></section>
+</div>
+
+<div class="card u-mb-15">
+    <h3 class="u-m-0-0-075">Verplaatsen</h3>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Huidige categorie</th><th>Rekening</th><th class="text-right">Transacties</th><th>Wordt</th></tr></thead>
+            <tbody>
+            {% for r in plan.moves %}
+            <tr>
+                <td>{{ r.category.name }}</td>
+                <td>{{ r.account_name }}</td>
+                <td class="text-right">{{ r.transactions }}</td>
+                <td>
+                    {% if r.split %}
+                    <span class="badge badge-warning">Gesplitst</span>
+                    {% for t, n in r.split.items() %}<div class="u-fs-85">{{ n }} × {{ t[0] }} › {{ t[1] }}</div>{% endfor %}
+                    {% else %}
+                    <select name="map_{{ r.category.id }}" class="u-fs-85">
+                        <option value="">Laten staan</option>
+                        {% for t in plan.targets %}
+                        <option value="{{ target_key(t) }}" {% if r.target == t %}selected{% endif %}>{{ t[0] }} › {{ t[1] }}</option>
+                        {% endfor %}
+                    </select>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if plan.untouched %}
+<div class="card u-mb-15">
+    <h3 class="u-m-0-0-075">Blijft staan</h3>
+    <p class="muted u-fs-85">Deze staan niet in de standaardmapping. Kies een doel als je ze toch wilt verplaatsen.</p>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Categorie</th><th>Rekening</th><th class="text-right">Transacties</th><th>Verplaats naar</th></tr></thead>
+            <tbody>
+            {% for r in plan.untouched %}
+            <tr>
+                <td>{{ r.category.name }}</td><td>{{ r.account_name }}</td><td class="text-right">{{ r.transactions }}</td>
+                <td>
+                    <select name="map_{{ r.category.id }}" class="u-fs-85">
+                        <option value="">Laten staan</option>
+                        {% for t in plan.targets %}<option value="{{ target_key(t) }}">{{ t[0] }} › {{ t[1] }}</option>{% endfor %}
+                    </select>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{% if plan.to_create %}
+<div class="card u-mb-15">
+    <h3 class="u-m-0-0-075">Nieuw aan te maken</h3>
+    <p class="u-fs-85">{% for t in plan.to_create %}{{ t[0] }}{% if t[1] %} › {{ t[1] }}{% endif %}{% if not loop.last %}; {% endif %}{% endfor %}</p>
+</div>
+{% endif %}
+
+{% if plan.archive_parents %}
+<div class="card u-mb-15">
+    <h3 class="u-m-0-0-075">Wordt gearchiveerd</h3>
+    <p class="muted u-fs-85">Oude hoofdcategorieën die leeg zijn nadat alles is verplaatst. Ze blijven beschikbaar in oude overzichten.</p>
+    <p class="u-fs-85">{% for c in plan.archive_parents %}{{ c.name }}{% if c.account %} ({{ c.account.name }}){% endif %}{% if not loop.last %}, {% endif %}{% endfor %}</p>
+</div>
+{% endif %}
+
+<div class="form-actions">
+    <button type="submit" class="btn btn-primary" onclick="return confirm('Standaardset nu invoeren? Dit kan niet automatisch worden teruggedraaid.')">Bevestigen en invoeren</button>
+    <button type="submit" class="btn" form="preview-form" onclick="return refreshPreview(event)">Preview vernieuwen met mijn keuzes</button>
+    <a class="btn" href="/categories">Annuleren</a>
+</div>
+</form>
+<script>
+function refreshPreview(e) {
+    e.preventDefault();
+    var params = new URLSearchParams();
+    document.querySelectorAll('select[name^="map_"]').forEach(function (s) { params.append(s.name, s.value); });
+    window.location = '/categories/standaard?' + params.toString();
+    return false;
+}
+</script>
+{% endif %}
+{% endblock %}
