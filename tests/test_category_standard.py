@@ -141,3 +141,32 @@ def test_override_and_web_flow(db):
 def test_standard_set_has_no_duplicate_names():
     names = [n for h, subs in STANDARD_SET for n in [h, *subs]]
     assert len(names) == len(set(names))
+
+
+def test_apply_creates_the_whole_standard_set_including_unused_categories(db):
+    user, accounts, cats, client = _world(db)
+    apply_standard(db, user.id)
+    db.commit()
+    db.expire_all()
+    shared, _names = _by_name(db, user)
+    for hoofd, subs in STANDARD_SET:
+        assert hoofd in shared and shared[hoofd].parent_id is None
+        for sub in subs:
+            assert sub in shared and shared[sub].parent_id == shared[hoofd].id
+    assert {"Lunch en onderweg", "Sport", "Kleding", "Verzorging", "Internet, tv en telefoon"} <= set(shared)
+    assert plan_standard(db, user.id).to_create == []
+    assert client.get("/categories/standaard").status_code == 200
+
+
+def test_preview_offers_missing_categories_even_when_nothing_moves(db):
+    user, accounts, cats, client = _world(db)
+    apply_standard(db, user.id)
+    db.commit()
+    # een van de standaardcategorieën ontbreekt weer: de preview biedt aan die aan te maken
+    sport = db.query(Category).filter_by(name="Sport", account_id=None).one()
+    db.delete(sport)
+    db.commit()
+    page = client.get("/categories/standaard").text
+    assert "Nieuw aan te maken" in page and "Sport" in page
+    client.post("/categories/standaard", data={})
+    assert db.query(Category).filter_by(name="Sport", account_id=None).count() == 1
