@@ -14,6 +14,7 @@ from app.models import (
 )
 from app.auth import require_login
 from app.category_consolidation import apply_consolidation, plan_consolidation
+from app.category_standard import apply_standard, plan_standard, target_key
 from app.template_config import templates
 
 logger = logging.getLogger(__name__)
@@ -379,6 +380,38 @@ async def consolidate_apply(request: Request, db: Session = Depends(get_db)):
         return RedirectResponse("/categories/consolidate?done=error", status_code=302)
     return RedirectResponse(
         f"/categories/consolidate?done={plan.merges}-{len(plan.archive)}", status_code=302)
+
+
+def _standard_overrides(items) -> dict[int, str]:
+    """Keuzes uit de preview: velden ``map_<categorie-id>`` met "Hoofd|Sub" of leeg (laten staan)."""
+    return {int(name[4:]): str(value) for name, value in items if name.startswith("map_") and name[4:].isdigit()}
+
+
+@router.get("/standaard")
+def standard_preview(request: Request, db: Session = Depends(get_db)):
+    """Preview: bestaande categorieën afbeelden op de standaardset."""
+    user = require_login(request, db)
+    overrides = _standard_overrides(request.query_params.items())
+    plan = plan_standard(db, user.id, overrides)
+    return templates.TemplateResponse(
+        request, "categories/standard.html",
+        {"request": request, "user": user, "plan": plan, "target_key": target_key,
+         "overrides": overrides, "done": request.query_params.get("done")},
+    )
+
+
+@router.post("/standaard")
+async def standard_apply(request: Request, db: Session = Depends(get_db)):
+    user = require_login(request, db)
+    form = await request.form()
+    try:
+        plan = apply_standard(db, user.id, _standard_overrides(form.items()))
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.exception("Standaardset invoeren mislukt")
+        return RedirectResponse("/categories/standaard?done=error", status_code=302)
+    return RedirectResponse(f"/categories/standaard?done={len(plan.moves)}", status_code=302)
 
 
 @router.post("/merge")
