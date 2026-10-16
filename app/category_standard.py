@@ -170,8 +170,14 @@ def plan_standard(db: Session, user_id: int, overrides: dict[int, str] | None = 
                        if c.account_id is None and c.parent_id in by_id}
 
     used: set[Target] = set()
-    candidates = [c for c in cats if c.parent_id is not None
-                  or (c.account_id is not None and counts.get(c.id, 0) > 0)]       # hoofdcategorie met eigen boekingen
+    standard_paths = set(all_targets())
+
+    def is_standard(c: Category) -> bool:
+        """Een gedeelde categorie die al op zijn plek in de standaardset staat is nooit een bron."""
+        return c.account_id is None and c.parent_id in by_id and (by_id[c.parent_id].name, c.name) in standard_paths
+
+    candidates = [c for c in cats if not is_standard(c) and (c.parent_id is not None
+                  or (c.account_id is not None and counts.get(c.id, 0) > 0))]       # hoofdcategorie met eigen boekingen
     for category in sorted(candidates, key=lambda c: c.id):
         key = _norm(category.name)
         default = MAPPING.get(key)
@@ -197,8 +203,8 @@ def plan_standard(db: Session, user_id: int, overrides: dict[int, str] | None = 
                 used.add(row.target)
         plan.rows.append(row)
 
-    for hoofd, sub in all_targets():
-        if (hoofd, sub) in used and (hoofd, sub) not in shared_children:
+    for hoofd, sub in all_targets():          # ook ongebruikte categorieën: de hele standaardset hoort beschikbaar te zijn
+        if (hoofd, sub) not in shared_children:
             if hoofd not in shared_parents and (hoofd, None) not in plan.to_create:
                 plan.to_create.append((hoofd, None))
             plan.to_create.append((hoofd, sub))
@@ -268,6 +274,8 @@ def apply_standard(db: Session, user_id: int, overrides: dict[int, str] | None =
             if target.id != category.id:
                 fold_category(db, category.id, target.id, sum_budgets=True)
         db.flush()
+    for hoofd, sub in plan.to_create:
+        _ensure_target(db, user_id, hoofd, sub, cache)
     for parent in plan.archive_parents:
         remaining = db.query(Category).filter(Category.parent_id == parent.id).count()
         if remaining == 0 and db.get(Category, parent.id) is not None:

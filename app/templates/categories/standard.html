@@ -15,8 +15,8 @@
 <div class="alert alert-success">Klaar: {{ done }} categorieën verplaatst of samengevoegd.</div>
 {% endif %}
 
-{% if not plan.moves and not plan.to_create %}
-<div class="card u-empty-lg">Er is niets te verplaatsen.</div>
+{% if not plan.moves and not plan.to_create and not plan.untouched %}
+<div class="card u-empty-lg">De standaardset is compleet en er is niets te verplaatsen.</div>
 {% else %}
 <form method="get" action="/categories/standaard" id="preview-form"></form>
 <form method="post" action="/categories/standaard">
