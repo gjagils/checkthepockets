@@ -13,6 +13,7 @@ from app.budget_scope import (
 from app.budget_stats import category_spending_average
 from app.forms import parse_amount
 from app.database import get_db
+from app.transfer_scope import not_internal_transfer
 from app.models import Account, AccountGroup, Budget, BudgetPreset, BudgetPresetLine, Category, RecurringTransaction, Transaction
 from app.auth import require_login
 from app.transaction_queries import transaction_years
@@ -99,7 +100,7 @@ def budget_overview(
             func.extract("month", Transaction.date) == prev_month,
             Transaction.amount < 0,
             Transaction.is_excluded == 0,
-            Transaction.transfer_id.is_(None),
+            not_internal_transfer(account_ids),
             Category.exclude_from_budget == 0,
         )
     )
@@ -140,7 +141,7 @@ def budget_overview(
             func.extract("month", Transaction.date) == current_month,
             Transaction.amount < 0,
             Transaction.is_excluded == 0,
-            Transaction.transfer_id.is_(None),
+            not_internal_transfer(account_ids),
             Category.exclude_from_budget == 0,
         )
     )
@@ -339,7 +340,7 @@ def budget_overview(
             func.extract("year", Transaction.date) == current_year,
             func.extract("month", Transaction.date) == current_month,
             Transaction.is_excluded == 0,
-            Transaction.transfer_id.is_(None),
+            not_internal_transfer(account_ids),
         )
     )
     if group_id:

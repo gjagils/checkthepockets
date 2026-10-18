@@ -9,6 +9,7 @@ from sqlalchemy import case, func, or_
 
 from app import clock
 from app.database import get_db
+from app.transfer_scope import not_internal_transfer
 from app.models import Account, Transaction, Category
 from app.auth import require_login
 from app.transaction_queries import transaction_years
@@ -46,7 +47,7 @@ def analytics(
         Account.user_id == user.id,
         func.extract("year", Transaction.date) == current_year,
         Transaction.is_excluded == 0,
-        Transaction.transfer_id.is_(None),
+        not_internal_transfer([account_id] if account_id else None),
     ]
     if account_id:
         tx_filter.append(Transaction.account_id == account_id)
@@ -185,7 +186,7 @@ def analytics_stats(
         Account.user_id == user.id,
         func.extract("year", Transaction.date) == current_year,
         Transaction.is_excluded == 0,
-        Transaction.transfer_id.is_(None),
+        not_internal_transfer([account_id] if account_id else None),
         Transaction.is_projected == 0,
     ]
     if current_month:
@@ -372,7 +373,7 @@ def analytics_query(
         base_filter = [
             Account.user_id == user.id,
             Transaction.is_excluded == 0,
-            Transaction.transfer_id.is_(None),
+            not_internal_transfer([account_id] if account_id else None),
             Transaction.is_projected == 0,
         ]
         if date_from:

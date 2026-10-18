@@ -7,6 +7,7 @@ from sqlalchemy import case, func, or_
 
 from app import clock
 from app.database import get_db
+from app.transfer_scope import not_internal_transfer
 from app.models import Account, Transaction, Category, Budget, BankConnection
 from app.auth import require_login
 from app.transaction_queries import transaction_years
@@ -45,7 +46,7 @@ def dashboard(
         func.extract("year", Transaction.date) == current_year,
         Transaction.is_excluded == 0,
         Transaction.is_projected == 0,
-        Transaction.transfer_id.is_(None),
+        not_internal_transfer(None),
     ]
 
     # Determine which level we're at

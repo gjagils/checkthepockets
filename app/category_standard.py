@@ -28,7 +28,7 @@ STANDARD_SET: list[tuple[str, list[str]]] = [
     ("Zorg en verzekeringen", ["Verzekeringen", "Zorgkosten"]),
     ("Kinderen", ["Hannah", "Suze", "Sport en hobby", "Algemeen"]),
     ("Vrije tijd", ["Overig vrije tijd", "Sport", "Entertainment", "Abonnementen", "Vakantie", "Giften"]),
-    ("Financieel", ["Bankkosten", "Goudkosten"]),
+    ("Financieel", ["Bankkosten", "Goudkosten", "Bijdrage aan gezamenlijk"]),
     ("Sparen", ["Storting Nelleke", "Storting Gerd-Jan", "Storting samen", "Storting familie",
                 "Storting zorgpremie", "Overige storting", "Terugboeking naar betaalrekening", "Opname spaardoel"]),
     ("Overboekingen", ["Eigen rekeningen"]),
