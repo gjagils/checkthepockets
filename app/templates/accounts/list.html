@@ -5,6 +5,11 @@
     <h1>Rekeningen</h1>
     <a class="btn btn-sm" href="/accounts/transfers">Overboekingen koppelen</a>
 </div>
+{% if error == 'iban_invalid' %}
+<div class="alert alert-danger u-mb-1">Dit IBAN is ongeldig. Controleer de tekens en de lengte.</div>
+{% elif error == 'iban_used' %}
+<div class="alert alert-danger u-mb-1">Dit IBAN hoort al bij een andere rekening.</div>
+{% endif %}
 {% if merged %}
 <div class="card u-mb-1">
     Rekeningen samengevoegd: {{ merged[0] }} transacties verplaatst, {{ merged[1] }} dubbele samengevoegd.
@@ -27,13 +32,14 @@
         <p class="muted" style="font-size:0.85rem; margin-top:0.5rem;">{% if acc.iban %}{{ acc.iban }}{% else %}Geen IBAN bekend{% endif %}</p>
 
         <details style="margin-top:0.5rem; font-size:0.85rem;">
-            <summary style="cursor:pointer;">Naam en soort wijzigen</summary>
+            <summary style="cursor:pointer;">Naam, soort en IBAN wijzigen</summary>
             <form method="post" action="/accounts/{{ acc.id }}/update" style="display:flex; flex-wrap:wrap; gap:0.4rem; margin-top:0.4rem;">
                 <input type="text" name="name" value="{{ acc.name or '' }}" maxlength="255" required style="flex:1 1 10rem;" aria-label="Naam van de rekening">
                 <select name="kind" aria-label="Soort rekening">
                     <option value="payment" {% if acc.kind != 'savings' %}selected{% endif %}>Betaalrekening</option>
                     <option value="savings" {% if acc.kind == 'savings' %}selected{% endif %}>Spaarrekening</option>
                 </select>
+                <input type="text" name="iban" value="{{ acc.iban or '' }}" maxlength="42" placeholder="IBAN (nodig om overboekingen te koppelen)" style="flex:1 1 14rem;" aria-label="IBAN van de rekening" autocomplete="off">
                 <button type="submit" class="btn btn-sm">Opslaan</button>
             </form>
         </details>
