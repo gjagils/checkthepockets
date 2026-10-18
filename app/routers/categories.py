@@ -3,7 +3,7 @@ import logging
 from fastapi import APIRouter, Depends, Request, Form, Query
 from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 from typing import List
 
@@ -145,6 +145,17 @@ def create_category(
             )
         acc_id = parent.account_id
         is_income = parent.is_income
+
+    clean = name.strip()
+    twins = db.query(Category).filter(Category.user_id == user.id, func.lower(Category.name) == clean.lower())
+    if acc_id is None:
+        twins = twins.filter(Category.account_id.is_(None))         # gedeelde namen zijn globaal uniek
+    else:
+        twins = twins.filter(Category.account_id == acc_id, Category.parent_id.is_(par_id) if par_id is None
+                             else Category.parent_id == par_id)
+    if not clean or twins.first() is not None:
+        return RedirectResponse(
+            _categories_redirect(redirect_account_id, redirect_show_archived, error="exists"), status_code=302)
 
     max_order = (
         db.query(Category.sort_order)
