@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Overboekingen koppelen - Check Your Pockets{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Overboekingen koppelen</h1>
+        <p class="muted">Boekingen tussen je eigen rekeningen worden aan elkaar gekoppeld en krijgen een categorie. Er verandert niets tot je bevestigt; een bestaande categorie wordt nooit overschreven.</p>
+    </div>
+    <a class="btn btn-sm" href="/accounts">Terug naar rekeningen</a>
+</div>
+
+{% if done == 'error' %}
+<div class="alert alert-danger">Koppelen is niet gelukt. Er is niets gewijzigd; zie de serverlog.</div>
+{% elif done %}
+{% set parts = done.split('-') %}
+<div class="alert alert-success">Klaar: {{ parts[0] }} overboekingen gekoppeld, {{ parts[1] }} categorieën gezet.</div>
+{% endif %}
+
+<div class="accounts-grid u-mb-15">
+    <section class="card"><p class="muted u-mb-0">Eigen rekening</p><strong style="font-size:1.6rem;">{{ kinds['own'] }}</strong><p class="muted u-fs-85 u-mb-0">zelfde groep of eigenaar</p></section>
+    <section class="card"><p class="muted u-mb-0">Tussen personen</p><strong style="font-size:1.6rem;">{{ kinds['persons'] }}</strong><p class="muted u-fs-85 u-mb-0">bijdrage aan gezamenlijk</p></section>
+    <section class="card"><p class="muted u-mb-0">Alleen koppelen</p><strong style="font-size:1.6rem;">{{ kinds[''] }}</strong><p class="muted u-fs-85 u-mb-0">spaar of onbekend: categorie blijft</p></section>
+</div>
+
+{% if unmatched %}
+<div class="alert alert-info">
+    Bijdragen zonder tegenboeking:
+    {% for name, n in unmatched.items() %}{{ name }}: {{ n }}{% if not loop.last %}, {% endif %}{% endfor %}.
+    Die hebben geen overeenkomstige boeking op een andere eigen rekening (de afzender staat niet in de app, het IBAN ontbreekt, of de bedragen of datums komen niet overeen). Ze blijven zoals ze zijn.
+</div>
+{% endif %}
+
+{% if not rows %}
+<div class="card u-empty-lg">Er zijn geen overeenkomende overboekingen om te koppelen.</div>
+{% else %}
+<form method="post" action="/accounts/transfers">
+<div class="card u-mb-15" style="padding:0; overflow:hidden;">
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Datum</th><th class="text-right">Bedrag</th><th>Van → naar</th><th>Categorie afzender</th><th>Categorie ontvanger</th></tr></thead>
+            <tbody>
+            {% for r in rows %}
+            {% set s = r.sides[0] %}{% set o = r.sides[1] %}
+            <tr>
+                <td class="nowrap">{{ r.date|date }}</td>
+                <td class="text-right nowrap">{{ r.amount|euro_sign }}</td>
+                <td>{{ s.account }} → {{ o.account }}{% if r.pair.kind == 'own' %} <span class="badge badge-success">eigen rekening</span>{% elif r.pair.kind == 'persons' %} <span class="badge badge-warning">tussen personen</span>{% endif %}</td>
+                {% for side in (s, o) %}
+                <td>
+                    {% if side.existing %}<span class="muted">blijft: {{ side.existing }}</span>
+                    {% elif side.planned %}{{ side.planned[0] }} › {{ side.planned[1] }}
+                    {% else %}<span class="muted">geen wijziging</span>{% endif %}
+                </td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+<div class="form-actions">
+    <button type="submit" class="btn btn-primary" onclick="return confirm('Deze overboekingen nu koppelen en categoriseren? Dit kan niet automatisch worden teruggedraaid.')">Bevestigen en koppelen</button>
+    <a class="btn" href="/accounts">Annuleren</a>
+</div>
+</form>
+{% endif %}
+{% endblock %}
