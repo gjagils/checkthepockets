@@ -95,3 +95,33 @@ def test_ambiguous_candidates_are_not_linked_and_second_run_is_idempotent(db):
     _tx(db, acc["otg"], 5, "70", GJ_IBAN, day=20)
     assert link_and_classify(db, user.id, since_days=None).linked == 1
     assert link_and_classify(db, user.id, since_days=None).linked == 0 and only.transfer_id is not None
+
+
+def test_repair_page_previews_then_applies_and_reports_unmatched_contributions(db):
+    from fastapi.testclient import TestClient
+
+    from app.auth import create_session_cookie
+    from app.main import app
+
+    user, acc, cats = _world(db)
+    own_a = _tx(db, acc["gj"], 1, "-50", OTG_IBAN)
+    own_b = _tx(db, acc["otg"], 2, "50", GJ_IBAN, day=1)
+    sender = _tx(db, acc["gj"], 3, "-2400", SAMEN_IBAN, day=5)
+    receiver = _tx(db, acc["samen"], 4, "2400", GJ_IBAN, day=5)
+    lonely = _tx(db, acc["samen"], 5, "9900", None, day=9, category=cats["Bijdrage Nelleke"])   # geen tegenboeking
+    db.commit()
+    client = TestClient(app)
+    client.cookies.set("session", create_session_cookie(user.id))
+    page = client.get("/accounts/transfers").text
+    assert "eigen rekening" in page and "tussen personen" in page and "Bijdragen zonder tegenboeking" in page
+    assert "Bijdrage Nelleke: 1" in page
+    db.expire_all()
+    assert db.get(Transaction, own_a.id).transfer_id is None                # preview schrijft niets
+    res = client.post("/accounts/transfers")
+    assert res.status_code == 200 and "overboekingen gekoppeld" in res.text
+    db.expire_all()
+    assert db.get(Transaction, own_a.id).transfer_id == own_b.id
+    assert db.get(Transaction, sender.id).category_id == cats["Bijdrage aan gezamenlijk"].id
+    assert db.get(Transaction, receiver.id).category_id == cats["Bijdrage Gerd-Jan"].id
+    assert db.get(Transaction, lonely.id).transfer_id is None
+    assert "geen overeenkomende overboekingen" in client.get("/accounts/transfers").text

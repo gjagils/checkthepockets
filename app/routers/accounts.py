@@ -14,6 +14,7 @@ from app.account_groups import delete_empty_groups, group_label, set_account_gro
 from app.account_merge import merge_accounts, plan_merge
 from app.auth import require_login
 from app.ownership import get_owned_or_404
+from app.transfer_service import link_and_classify, plan_pairs
 from app.template_config import templates
 
 logger = logging.getLogger(__name__)
@@ -174,6 +175,53 @@ def set_account_owners(
     account.owners = owners
     db.commit()
     return RedirectResponse("/accounts", status_code=302)
+
+
+@router.get("/accounts/transfers")
+def transfers_preview(request: Request, done: str | None = None, db: Session = Depends(get_db)):
+    """Preview: bestaande overboekingen tussen eigen rekeningen koppelen en categoriseren."""
+    user = require_login(request, db)
+    pairs = plan_pairs(db, user.id, since_days=None)
+    names = {a.id: a.name for a in db.query(Account).filter(Account.user_id == user.id)}
+    cats = {c.id: c for c in db.query(Category).filter(Category.user_id == user.id)}
+    rows = []
+    for pair in pairs:
+        planned = {tx.id: path for tx, path in pair.assignments}
+        sides = []
+        for tx in sorted((pair.a, pair.b), key=lambda x: x.amount):
+            existing = cats.get(tx.category_id)
+            sides.append({"tx": tx, "account": names.get(tx.account_id, "?"),
+                          "existing": existing.name if existing else None, "planned": planned.get(tx.id)})
+        rows.append({"pair": pair, "date": min(pair.a.date, pair.b.date), "amount": abs(pair.a.amount), "sides": sides})
+    rows.sort(key=lambda r: r["date"], reverse=True)
+    kinds = {"own": 0, "persons": 0, "": 0}
+    for pair in pairs:
+        kinds[pair.kind] += 1
+    contribution_names = ("Bijdrage Gerd-Jan", "Bijdrage Nelleke")
+    unmatched = (
+        db.query(Category.name, func.count(Transaction.id))
+        .join(Transaction, Transaction.category_id == Category.id)
+        .filter(Category.user_id == user.id, Category.name.in_(contribution_names), Transaction.transfer_id.is_(None))
+        .group_by(Category.name).all()
+    )
+    return templates.TemplateResponse(
+        request, "accounts/transfers.html",
+        {"request": request, "user": user, "rows": rows, "kinds": kinds, "unmatched": dict(unmatched),
+         "done": done},
+    )
+
+
+@router.post("/accounts/transfers")
+def transfers_apply(request: Request, db: Session = Depends(get_db)):
+    user = require_login(request, db)
+    try:
+        result = link_and_classify(db, user.id, since_days=None)
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.exception("Overboekingen koppelen mislukt")
+        return RedirectResponse("/accounts/transfers?done=error", status_code=302)
+    return RedirectResponse(f"/accounts/transfers?done={result.linked}-{result.categorized}", status_code=302)
 
 
 @router.post("/accounts/{account_id}/group")
