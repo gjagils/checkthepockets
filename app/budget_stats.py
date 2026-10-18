@@ -11,6 +11,7 @@ from decimal import Decimal
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.transfer_scope import not_internal_transfer
 from app.models import Account, Category, Transaction
 
 
@@ -82,7 +83,7 @@ def category_spending_average(
             Transaction.amount < 0,
             Transaction.is_excluded == 0,
             Transaction.is_projected == 0,
-            Transaction.transfer_id.is_(None),
+            not_internal_transfer(account_ids or ([account_id] if account_id else None)),
             Category.exclude_from_budget == 0,
         )
     )
