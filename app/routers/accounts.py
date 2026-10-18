@@ -16,6 +16,7 @@ from app.auth import require_login
 from app.ownership import get_owned_or_404
 from app.transfer_service import link_and_classify, plan_pairs
 from app.template_config import templates
+from app.validation import clean_iban
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -30,7 +31,8 @@ def _parse_merged(value: str | None) -> tuple[int, int] | None:
 
 
 @router.get("/accounts")
-def accounts_list(request: Request, merged: str | None = None, db: Session = Depends(get_db)):
+def accounts_list(request: Request, merged: str | None = None, error: str | None = None,
+                  db: Session = Depends(get_db)):
     user = require_login(request, db)
     accounts = (
         db.query(Account)
@@ -144,6 +146,7 @@ def accounts_list(request: Request, merged: str | None = None, db: Session = Dep
             "bank_info_by_account_id": bank_info_by_account_id,
             "latest_tx_by_account_id": latest_tx_by_account_id,
             "merged": _parse_merged(merged),
+            "error": error,
         },
     )
 
@@ -261,17 +264,31 @@ def update_account(
     request: Request,
     name: str = Form(...),
     kind: str = Form(""),
+    iban: str = Form(""),
     db: Session = Depends(get_db),
 ):
-    """Rename an account and set whether it is a payment or savings account."""
+    """Rename an account, set payment/savings and (optionally) its IBAN. A blank IBAN leaves the current one alone."""
     user = require_login(request, db)
     account = get_owned_or_404(db, Account, account_id, user.id)
     name = " ".join(name.split())
-    if name:
-        account.name = name[:255]
-        if kind in ("payment", "savings"):
-            account.kind = kind
-        db.commit()
+    if not name:
+        return RedirectResponse("/accounts", status_code=302)
+    cleaned = clean_iban(iban)
+    if cleaned is None:
+        return RedirectResponse("/accounts?error=iban_invalid", status_code=302)
+    if cleaned and cleaned != (account.iban or ""):
+        clash = (
+            db.query(Account)
+            .filter(Account.user_id == user.id, Account.id != account.id, Account.iban == cleaned)
+            .first()
+        )
+        if clash is not None:
+            return RedirectResponse("/accounts?error=iban_used", status_code=302)
+        account.iban = cleaned
+    account.name = name[:255]
+    if kind in ("payment", "savings"):
+        account.kind = kind
+    db.commit()
     return RedirectResponse("/accounts", status_code=302)
 
 
