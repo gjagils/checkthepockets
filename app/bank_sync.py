@@ -219,6 +219,11 @@ def post_import(db: Session, user_id: int) -> int:
     from app.recurring_service import resync_after_import
     from app.rules_engine import apply_rules_to_all
 
+    from app.transfer_service import link_and_classify
+
+    transfers = link_and_classify(db, user_id)
+    if transfers.linked:
+        logger.info("Bank sync: %d overboekingen gekoppeld, %d categorieën gezet", transfers.linked, transfers.categorized)
     extra = apply_rules_to_all(db, user_id)
     if extra:
         logger.info("Bank sync: %d extra existing transactions categorised via apply_rules_to_all", extra)
