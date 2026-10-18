@@ -197,7 +197,10 @@ def sync_connection(db: Session, connection: BunqConnection, client: BunqClient,
 
 
 def _post_import(db: Session, user_id: int) -> None:
-    """Same follow-up as the Enable Banking sync: recurring links and projections."""
+    """Same follow-up as the Enable Banking sync: transfer links, recurring links and projections."""
+    from app.transfer_service import link_and_classify
+
+    link_and_classify(db, user_id)
     from app.recurring_service import resync_after_import
     db.flush()
     resync_after_import(db, user_id)

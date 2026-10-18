@@ -22,6 +22,7 @@ from app.auth import require_login
 from app.parsers import abn_amro, bunq, ics, ing, rabobank
 from app.parsers.base import ParseError, ParsedTransaction
 from app.parsers.ics_pdf import parse_ics_pdf
+from app.transfer_service import link_and_classify
 from app.import_service import existing_import_hashes, find_import_account, store_confirmed_csv_rows
 from app.recurring_service import find_recurring_candidates, resync_after_import
 from app.rules_engine import apply_rules_to_transaction
@@ -1256,7 +1257,8 @@ async def import_confirm(request: Request, db: Session = Depends(get_db)):
     batch.rejected_count = rejected
     db.commit()
 
-    # Auto-link new transactions to recurring items, then clean up projections
+    # Koppel overboekingen tussen eigen rekeningen, daarna recurring items en projecties
+    link_and_classify(db, user.id)
     resync_after_import(db, user.id)
     db.commit()
 
