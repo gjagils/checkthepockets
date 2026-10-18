@@ -15,6 +15,9 @@
     </div>
 </div>
 
+{% if request.query_params.get('error') == 'exists' %}
+<div class="alert alert-danger u-mb-1">Deze categorie bestaat al. Kies een andere naam, of gebruik de bestaande categorie.</div>
+{% endif %}
 {% if request.query_params.get('error') == 'invalid_parent' %}
 <div class="alert alert-danger u-mb-1">Ongeldige hoofdcategorie gekozen.</div>
 {% endif %}
@@ -26,64 +29,79 @@
 <div class="accounts-grid">
     <!-- Hoofdcategorie -->
     <div class="card">
-        <h2>Hoofdcategorie toevoegen</h2>
-        <form method="post" action="/categories">
+        <h2>Categorie toevoegen</h2>
+        <form method="post" action="/categories" id="add-category-form">
             {{ filter_state() }}
             <div class="form-stack">
                 <div class="form-group">
-                    <label for="cat_name">Naam</label>
-                    <input type="text" name="name" id="cat_name" required placeholder="bijv. Vaste lasten">
+                    <label>Soort</label>
+                    <div style="display:flex; gap:1.25rem;">
+                        <label class="check-row"><input type="radio" name="kind" value="sub" checked> <span>Subcategorie</span></label>
+                        <label class="check-row"><input type="radio" name="kind" value="main"> <span>Hoofdcategorie</span></label>
+                    </div>
                 </div>
                 <div class="form-group">
-                    <label for="cat_account">Rekening</label>
-                    <select name="account_id" id="cat_account" required>
-                        <option value="">Kies rekening...</option>
-                        {% for acc in accounts %}
-                        <option value="{{ acc.id }}">{{ acc.name }}</option>
-                        {% endfor %}
-                    </select>
+                    <label for="add_name">Naam</label>
+                    <input type="text" name="name" id="add_name" required placeholder="bijv. Salaris">
                 </div>
-                <div class="form-group">
-                    <label for="cat_color">Kleur (optioneel)</label>
-                    <input type="color" name="color" id="cat_color" value="#89b4fa">
-                </div>
-                <div class="form-group">
-                    <label class="check-row">
-                        <input type="checkbox" name="is_income" value="1"> <span>Inkomen</span>
-                    </label>
-                </div>
-                <button type="submit" class="btn btn-primary">Toevoegen</button>
-            </div>
-        </form>
-    </div>
-
-    <!-- Subcategorie -->
-    <div class="card">
-        <h2>Subcategorie toevoegen</h2>
-        <form method="post" action="/categories">
-            {{ filter_state() }}
-            <div class="form-stack">
-                <div class="form-group">
-                    <label for="sub_parent">Hoofdcategorie</label>
-                    <select name="parent_id" id="sub_parent" required>
+                <div class="form-group" id="add_parent_group">
+                    <label for="add_parent">Onder hoofdcategorie</label>
+                    <select name="parent_id" id="add_parent" required>
                         <option value="">Kies hoofdcategorie...</option>
                         {% for cat in top_level %}
-                        <option value="{{ cat.id }}">{{ cat.name }}{% if cat.account %} ({{ cat.account.name }}){% endif %}</option>
+                        <option value="{{ cat.id }}" data-scope="{{ cat.account.name if cat.account else '' }}" data-income="{{ 1 if cat.is_income else 0 }}">{{ cat.name }} — {{ ('alleen ' ~ cat.account.name) if cat.account else 'alle rekeningen' }}</option>
                         {% endfor %}
                     </select>
                 </div>
-                <div class="form-group">
-                    <label for="sub_name">Naam</label>
-                    <input type="text" name="name" id="sub_name" required placeholder="bijv. Huur">
+                <div class="form-group" id="add_account_group" style="display:none;">
+                    <label for="add_account">Beschikbaar voor</label>
+                    <select name="account_id" id="add_account" disabled>
+                        <option value="0">Alle rekeningen</option>
+                        {% for acc in accounts %}
+                        <option value="{{ acc.id }}">Alleen {{ acc.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <p class="muted u-fs-85 u-mb-0" id="add_scope_note">Kies een hoofdcategorie: de nieuwe subcategorie is beschikbaar voor dezelfde rekeningen als die hoofdcategorie.</p>
+                <div class="form-group" id="add_income_group" style="display:none;">
+                    <label class="check-row">
+                        <input type="checkbox" name="is_income" value="1" id="add_income" disabled> <span>Inkomen</span>
+                    </label>
                 </div>
                 <div class="form-group">
-                    <label for="sub_color">Kleur (optioneel)</label>
-                    <input type="color" name="color" id="sub_color" value="#89b4fa">
+                    <label for="add_color">Kleur (optioneel)</label>
+                    <input type="color" name="color" id="add_color" value="#89b4fa">
                 </div>
                 <button type="submit" class="btn btn-primary">Toevoegen</button>
             </div>
         </form>
     </div>
+    <script>
+    (function () {
+        var form = document.getElementById('add-category-form');
+        if (!form) return;
+        var parent = document.getElementById('add_parent'), account = document.getElementById('add_account'),
+            income = document.getElementById('add_income'), note = document.getElementById('add_scope_note');
+        function sync() {
+            var main = form.querySelector('input[name="kind"]:checked').value === 'main';
+            document.getElementById('add_parent_group').style.display = main ? 'none' : '';
+            document.getElementById('add_account_group').style.display = main ? '' : 'none';
+            document.getElementById('add_income_group').style.display = main ? '' : 'none';
+            parent.disabled = main; parent.required = !main;
+            account.disabled = !main; income.disabled = !main;
+            if (main) {
+                note.textContent = 'Standaard beschikbaar voor alle rekeningen.';
+            } else {
+                var opt = parent.options[parent.selectedIndex];
+                note.textContent = opt && opt.value
+                    ? (opt.dataset.scope ? 'Alleen beschikbaar voor ' + opt.dataset.scope + '.' : 'Beschikbaar voor alle rekeningen.')
+                    : 'Kies een hoofdcategorie: de nieuwe subcategorie is beschikbaar voor dezelfde rekeningen als die hoofdcategorie.';
+            }
+        }
+        form.addEventListener('change', sync);
+        sync();
+    })();
+    </script>
 </div>
 
 <!-- Account filter -->
