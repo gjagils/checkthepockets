@@ -125,3 +125,14 @@ def test_repair_page_previews_then_applies_and_reports_unmatched_contributions(d
     assert db.get(Transaction, receiver.id).category_id == cats["Bijdrage Gerd-Jan"].id
     assert db.get(Transaction, lonely.id).transfer_id is None
     assert "geen overeenkomende overboekingen" in client.get("/accounts/transfers").text
+
+
+def test_iban_in_the_description_is_used_when_the_counterparty_field_is_empty(db):
+    user, acc, cats = _world(db)
+    a = _tx(db, acc["gj"], 1, "-25", None)
+    a.description = f"SEPA Periodieke overb. IBAN: {SPAAR_IBAN} BIC: BUNQNL2A Naam: Hannah"
+    b = _tx(db, acc["spaar"], 2, "25", None, day=1)
+    b.description = f"SEPA Periodieke overb. IBAN: {GJ_IBAN} BIC: ABNANL2A Naam: GJA VAN GILS"
+    db.flush()
+    assert link_and_classify(db, user.id, since_days=None).linked == 1
+    assert a.transfer_id == b.id and b.transfer_id == a.id

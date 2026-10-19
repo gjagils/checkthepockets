@@ -12,6 +12,7 @@ nooit overschreven. ``find_pairs`` en ``plan_*`` lezen alleen; ``link_and_classi
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from datetime import timedelta
 
@@ -27,6 +28,20 @@ SENDER = ("Financieel", "Bijdrage aan gezamenlijk")
 
 def _iban(value: str | None) -> str:
     return (value or "").replace(" ", "").upper()
+
+
+# ABN AMRO schrijft het IBAN van de tegenrekening bij periodieke overboekingen alleen in de omschrijving:
+# "SEPA Periodieke overb. IBAN: NL47ABNA0468808086 BIC: ABNANL2A Naam: ..."
+_IBAN_IN_TEXT = re.compile(r"IBAN:\s*([A-Z]{2}\d{2}[A-Z0-9]{10,30})")
+
+
+def counterparty_iban(tx: Transaction) -> str:
+    """IBAN van de tegenrekening: het veld, of anders het IBAN uit de omschrijving."""
+    iban = _iban(tx.counterparty_iban)
+    if iban:
+        return iban
+    match = _IBAN_IN_TEXT.search((tx.description or "").upper())
+    return match.group(1) if match else ""
 
 
 @dataclass
@@ -56,7 +71,7 @@ def find_pairs(db: Session, user_id: int, tx_ids=None, since_days: int | None = 
     for tx in query.order_by(Transaction.date, Transaction.id).all():
         if tx.id in used:
             continue
-        other = own.get(_iban(tx.counterparty_iban))
+        other = own.get(counterparty_iban(tx))
         if other is None or other == tx.account_id:
             continue
         def candidates_for(source: Transaction, target_account_id: int) -> list[Transaction]:
