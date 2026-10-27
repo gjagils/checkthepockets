@@ -102,6 +102,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-53 | P2 | Review | ACT-31, ACT-28 | [Persoonspagina: verwachting betaalrekeningen en vermogen](#act-53) |
 | ACT-54 | P2 | Review | — | [Regelvoorstellen leesbaar: volledige omschrijving en groepering](#act-54) |
 | ACT-55 | P2 | Review | ACT-31 | [Rekeninggroepen, één categorieënset en budget per groep](#act-55) |
+| ACT-58 | P2 | Review | — | [Categoriesuggesties bij transacties met weinig AI-calls](#act-58) |
 
 ## Beschrijving en acceptatiecriteria
 
@@ -618,6 +619,17 @@ commit `339a4d8`; controleer ze bij het oppakken.
 - **Klaar wanneer:** Templates vergelijken booleans niet meer met `1`; nieuwe code heeft typed modellen; autogenerate blijft leeg na de migratie.
 - **Validatie:** Volledige suite, PostgreSQL-CI met up/down/up, productievalidatie na uitrol.
 
+<a id="act-58"></a>
+
+### ACT-58 — Categoriesuggesties bij transacties met weinig AI-calls
+
+- **Aanleiding (gebruiker, 2026-10-27):** categoriseren kost veel tijd; per transactie moet een voorbeeldcategorie zichtbaar zijn, met zo min mogelijk AI-calls. De gebruiker koos voor historie én AI-fallback in batch met cache.
+- **Gedrag:** op de transactiepagina staat onder de keuzelijst een groene chip "✓ Categorie · n× eerder" (historie) of een blauwe "AI-suggestie"; één klik wijst toe. De knop "Neem n suggesties over" doet dat voor de hele pagina; de server berekent de suggesties dan opnieuw.
+- **Historie (geen AI):** sleutels IBAN → tegenpartij → merchant uit de omschrijving (`parse_description`), genormaliseerd (hoofdletters, rechtsvormen, winkelnummers). Een sleutel telt pas bij ≥ 60 % voor één categorie, anders de volgende sleutel (betaaldienst-IBAN's). Alleen kiesbare subcategorieën: niet gearchiveerd, gedeeld of van dezelfde rekening. Splitsdelen en projecties tellen niet mee. Telling in Python vanwege versleutelde velden.
+- **AI-fallback:** unieke tegenpartijen zonder historie gaan in één call (max. 40) naar Claude; het antwoord staat per tegenpartij in `merchant_category_suggestions` (migratie 072), met een HMAC van de naam (geen leesbare tegenpartij) en ook "weet niet" (NULL), zodat niets twee keer gevraagd wordt. Draait na een CSV-import (achtergrondtaak), na de geplande bank- en bunq-sync en via de knop "AI-suggesties voor n nieuwe tegenpartijen"; nooit bij het laden van een pagina. Een verwijderde categorie wist de cacheregel; samenvoegen vouwt hem mee.
+- **Klaar wanneer:** ongecategoriseerde transacties met bekende tegenpartij tonen een suggestie zonder AI-call, de rest kost hooguit één call per nieuwe tegenpartij, en suggesties zijn per stuk of per pagina over te nemen.
+- **Validatie:** `tests/test_category_suggest.py` (normalisatie, sleutelvolgorde, ambigue IBAN, archief, eigenaarschap, cache en één call, API-fout, pagina en bulkovername). Niet getest: de echte Anthropic-API, de PostgreSQL-migratie (CI) en de suggestiekwaliteit op productiedata. Bij een nieuwe `SECRET_KEY` vervalt de cache (er wordt dan opnieuw gevraagd).
+
 <a id="act-55"></a>
 
 ### ACT-55 — Rekeninggroepen, één categorieënset en budget per groep
@@ -721,3 +733,4 @@ Voeg per afgeronde actie of overdracht een regel toe. Git bevat de volledige his
 | 2026-10-14 | ACT-32 | Encryptie-bugs uit de review (A1, A2, A3, B11) opgelost met tests die met versleuteling draaien | Claude Code; 529 passed, 3 skipped; PR-CI open |
 | 2026-10-14 | ACT-32 t/m ACT-35 | Fase 1 van de codereview afgerond: encryptie-bugs, auth-hardening, crash- en datafouten (a en b), XSS | #215, #216, #217, #218, #219 gemerged; CI groen; productievalidatie deels open (zie fase 1 — uitkomst) |
 | 2026-10-14 | ACT-36 t/m ACT-40 | Fase 2 van de codereview afgerond (hygiëne, tooling, verouderde API's, testbasis, dependency-upgrade) | #221–#226 gemerged; CI groen; 586 passed, 3 skipped op Python 3.12 |
+| 2026-10-27 | ACT-58 | Categoriesuggesties uit historie plus AI-batch met cache op de transactiepagina; status Review | Claude Code; 708 passed, 10 skipped (lokaal Python 3.14, niet de 3.12-locks); branch `claude/transaction-categorization-examples-f9fe8b`; PR-CI open |

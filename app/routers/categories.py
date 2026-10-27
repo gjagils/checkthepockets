@@ -9,7 +9,8 @@ from typing import List
 
 from app.database import get_db
 from app.models import (
-    Account, Budget, BudgetPresetLine, Category, MortgageScenarioBudget, RecurringSuggestion,
+    Account, Budget, BudgetPresetLine, Category, MerchantCategorySuggestion, MortgageScenarioBudget,
+    RecurringSuggestion,
     RecurringTransaction, Rule, RuleSuggestion, SavingsLine, Transaction,
 )
 from app.auth import require_login
@@ -524,7 +525,8 @@ def delete_category_tree(db: Session, user_id: int, category_id: int) -> None:
     ):
         db.query(model).filter(getattr(model, column).in_(ids)).update(
             {column: None}, synchronize_session=False)
-    for model in (Budget, BudgetPresetLine, MortgageScenarioBudget):
+    # Een AI-suggestie naar een verwijderde categorie mag opnieuw gevraagd worden.
+    for model in (Budget, BudgetPresetLine, MortgageScenarioBudget, MerchantCategorySuggestion):
         db.query(model).filter(model.category_id.in_(ids)).delete(synchronize_session=False)
 
     # Children first so no row still points at a parent that is already gone.

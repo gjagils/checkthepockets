@@ -257,6 +257,8 @@ def _sync_all_bank_connections():
             logger.info("Bank sync: geen actieve koppelingen gevonden")
             return "geen actieve koppelingen"
 
+        from app.category_suggest import fill_ai_suggestions_in_background
+
         imported = failed = 0
         user_ids: set[int] = set()
         for conn in connections:
@@ -280,6 +282,8 @@ def _sync_all_bank_connections():
             except Exception:
                 db.rollback()
                 logger.exception("Bank sync: vervolgstappen mislukt voor user %s", user_id)
+            # Eén AI-call per gebruiker voor nieuwe tegenpartijen zonder historie (ACT-58).
+            fill_ai_suggestions_in_background(user_id)
 
         logger.info("Bank sync voltooid voor %d koppelingen", len(connections))
         return f"{imported} tx geïmporteerd uit {len(connections)} koppeling(en), {failed} mislukt"
@@ -292,6 +296,7 @@ def _sync_all_bunq():
     """Import new payments of all selected bunq accounts (ACT-31b)."""
     from app.bunq_client import BunqClient, BunqError
     from app.bunq_sync import sync_connection
+    from app.category_suggest import fill_ai_suggestions_in_background
     from app.config import BUNQ_API_BASE
     from app.database import SessionLocal
     from app.models import BunqAccountLink, BunqConnection
@@ -310,6 +315,8 @@ def _sync_all_bunq():
                 reports = sync_connection(db, connection, BunqClient(BUNQ_API_BASE), dry_run=False)
                 db.commit()
                 total += sum(r.new for r in reports)
+                if any(r.new for r in reports):
+                    fill_ai_suggestions_in_background(connection.user_id)  # ACT-58
             except BunqError as exc:
                 db.rollback()
                 logger.warning("bunq sync mislukt (%s, HTTP %s)", exc.kind, exc.status)

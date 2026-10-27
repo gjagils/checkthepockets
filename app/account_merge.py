@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from sqlalchemy.orm import Session
 
 from app.models import (
-    Account, Budget, BudgetPresetLine, Category, ImportBatch, MortgageScenarioBudget,
+    Account, Budget, BudgetPresetLine, Category, ImportBatch, MerchantCategorySuggestion, MortgageScenarioBudget,
     RecurringSuggestion, RecurringTransaction, Rule, RuleSuggestion, SavingsLine, SavingsPlan,
     Transaction,
 )
@@ -128,6 +128,7 @@ def _fold_category(db: Session, source_id: int, target_id: int, sum_budgets: boo
         (BudgetPresetLine, "category_id"), (Transaction, "category_id"),
         (SavingsLine, "category_id"), (RecurringTransaction, "category_id"),
         (RuleSuggestion, "category_id"), (RecurringSuggestion, "category_id"),
+        (MerchantCategorySuggestion, "category_id"),
         (Rule, "assign_category_id"), (Category, "parent_id"),
     ):
         db.query(model).filter(getattr(model, column) == source_id).update(
