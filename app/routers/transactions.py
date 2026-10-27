@@ -191,9 +191,18 @@ def transaction_list(
     back: str = Query(""),         # optionele deep-link-terug (bijv. /savings/42)
     back_label: str = Query(""),   # tekst op de terugknop
     show_excluded: str = Query(""),  # "1" → toon ook uitgesloten transacties
+    uncategorized: str = Query(""),  # "1" → alias voor category_id=-1 (dashboard-links)
     db: Session = Depends(get_db),
 ):
     user = require_login(request, db)
+
+    # Het kale tabblad (en /inbox) opent op "Niet gecategoriseerd";
+    # "Alle transacties" is expliciet category_id=0.
+    if not category_id.strip() and (
+        uncategorized.strip() in ("1", "true", "on", "yes")
+        or set(request.query_params) <= {"page"}
+    ):
+        category_id = "-1"
 
     # Parse optional int query params (HTML forms send "" for empty selects)
     account_id = int(account_id) if account_id.strip() else None
@@ -329,7 +338,7 @@ def transaction_list(
         filter_params["year"] = current_year
     if account_id:
         filter_params["account_id"] = account_id
-    if category_id:
+    if category_id is not None:
         filter_params["category_id"] = category_id
     if search:
         filter_params["search"] = search

@@ -1,30 +1,14 @@
 from fastapi import APIRouter, Depends, Form, Query, Request
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.auth import require_login
 from app.database import get_db
-from app.models import Account, Category, RecurringTransaction, Transaction
+from app.models import Account, Category, Transaction
 from app.redirects import safe_redirect
-from app.template_config import templates
 from app.transaction_queries import inbox_count, inbox_query as _inbox_query  # noqa: F401  (inbox_count: bestaande importeurs)
 
 router = APIRouter()
-
-
-def _grouped_categories(db: Session, user_id: int):
-    """Return (parents, children_by_parent_id) — alleen actieve (niet-gearchiveerde) categorieën."""
-    cats = (
-        db.query(Category)
-        .filter(Category.user_id == user_id, Category.is_archived == 0)
-        .order_by(Category.sort_order, Category.name)
-        .all()
-    )
-    parents = [c for c in cats if c.parent_id is None]
-    children_by_parent: dict[int, list[Category]] = {}
-    for c in cats:
-        if c.parent_id is not None:
-            children_by_parent.setdefault(c.parent_id, []).append(c)
-    return parents, children_by_parent
 
 
 @router.get("/inbox")
@@ -33,64 +17,12 @@ def inbox_page(
     account_id: str = Query(""),
     db: Session = Depends(get_db),
 ):
-    user = require_login(request, db)
-
-    query = _inbox_query(db, user.id)
-
-    # Account-filter (zelfde patroon als /transactions)
-    current_account_id: int | None = None
+    """De inbox is de transactiepagina met het filter "Niet gecategoriseerd"."""
+    require_login(request, db)
+    target = "/transactions?category_id=-1"
     if account_id.strip().isdigit():
-        aid = int(account_id.strip())
-        owned = (
-            db.query(Account)
-            .filter(Account.id == aid, Account.user_id == user.id)
-            .first()
-        )
-        if owned:
-            current_account_id = aid
-            query = query.filter(Transaction.account_id == aid)
-
-    transactions = (
-        query
-        .order_by(Transaction.date.desc(), Transaction.id.desc())
-        .all()
-    )
-    parents, children_by_parent = _grouped_categories(db, user.id)
-
-    accounts = (
-        db.query(Account)
-        .filter(Account.user_id == user.id)
-        .order_by(Account.name)
-        .all()
-    )
-    recurring_items = (
-        db.query(RecurringTransaction)
-        .filter(RecurringTransaction.user_id == user.id, RecurringTransaction.is_active == 1)
-        .order_by(RecurringTransaction.name)
-        .all()
-    )
-
-    # Back-link voor acties die via POST naar /transactions/... gaan
-    redirect_back = "/inbox"
-    if current_account_id:
-        redirect_back = f"/inbox?account_id={current_account_id}"
-
-    return templates.TemplateResponse(
-        request,
-        "inbox/index.html",
-        {
-            "request": request,
-            "user": user,
-            "transactions": transactions,
-            "parents": parents,
-            "children_by_parent": children_by_parent,
-            "inbox_total": len(transactions),
-            "accounts": accounts,
-            "current_account_id": current_account_id,
-            "recurring_items": recurring_items,
-            "redirect_back": redirect_back,
-        },
-    )
+        target += f"&account_id={int(account_id.strip())}"
+    return RedirectResponse(target, status_code=302)
 
 
 @router.post("/inbox/{transaction_id}/category")
