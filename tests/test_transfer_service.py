@@ -29,7 +29,9 @@ def _world(db):
     otg.group_id = gj.group_id
     cats = {}
     for hoofd, subs in (("Overboekingen", ["Eigen rekeningen"]), ("Financieel", ["Bijdrage aan gezamenlijk"]),
-                        ("Inkomen", ["Bijdrage Gerd-Jan", "Bijdrage Nelleke"])):
+                        ("Inkomen", ["Bijdrage Gerd-Jan", "Bijdrage Nelleke"]),
+                        ("Sparen", ["Storting Gerd-Jan", "Storting Nelleke", "Storting samen"]),
+                        ("Kinderen", ["Hannah"])):
         parent = Category(user_id=user.id, name=hoofd)
         db.add(parent)
         db.flush()
@@ -38,7 +40,7 @@ def _world(db):
             db.add(c)
             cats[sub] = c
     db.flush()
-    return user, {"gj": gj, "otg": otg, "samen": samen, "spaar": spaar}, cats
+    return user, {"gj": gj, "otg": otg, "samen": joint, "spaar": spaar}, cats
 
 
 def _tx(db, account, n, amount, counterparty_iban, day=0, category=None):
@@ -82,7 +84,7 @@ def test_existing_category_is_kept_and_savings_transfers_keep_their_own_category
     s2 = _tx(db, acc["spaar"], 4, "200", GJ_IBAN, day=10)
     link_and_classify(db, user.id, since_days=None)
     assert a.category_id == keep.id and b.category_id == cats["Eigen rekeningen"].id
-    assert s1.transfer_id == s2.id and s1.category_id is None and s2.category_id is None   # gekoppeld, categorie blijft
+    assert s1.transfer_id == s2.id and s1.category_id is None and s2.category_id is None   # eenmalig: alleen koppelen
 
 
 def test_ambiguous_candidates_are_not_linked_and_second_run_is_idempotent(db):
@@ -136,3 +138,84 @@ def test_iban_in_the_description_is_used_when_the_counterparty_field_is_empty(db
     db.flush()
     assert link_and_classify(db, user.id, since_days=None).linked == 1
     assert a.transfer_id == b.id and b.transfer_id == a.id
+
+
+# ── ACT-59: vaste spaarstortingen ─────────────────────────────────────────────
+
+def _monthly(db, sender, receiver, amount, months, start=0, n0=100):
+    """Een storting per maand van `sender` naar `receiver`; geeft de paren (afzender, ontvanger) terug."""
+    out = []
+    for i in range(months):
+        day = start + 30 * i
+        s = _tx(db, sender, n0 + 2 * i, f"-{amount}", receiver.iban, day=day)
+        r = _tx(db, receiver, n0 + 2 * i + 1, amount, sender.iban, day=day)
+        out.append((s, r))
+    return out
+
+
+def test_monthly_savings_deposit_gets_storting_on_both_sides(db):
+    user, acc, cats = _world(db)
+    pairs = _monthly(db, acc["gj"], acc["spaar"], "400", 3)
+    result = link_and_classify(db, user.id, since_days=None)
+    assert result.linked == 3 and result.categorized == 6
+    for s, r in pairs:
+        assert s.category_id == r.category_id == cats["Storting Gerd-Jan"].id
+
+
+def test_deposit_from_the_joint_account_is_storting_samen_and_to_a_child_is_kinderen(db):
+    user, acc, cats = _world(db)
+    samen_person = acc["samen"].owners[0]
+    joint_spaar = Account(user_id=user.id, name="Samen Spaar Bunq", bank="bunq", iban="NL05SAMSP0000005",
+                          kind="savings")
+    hannah = Person(user_id=user.id, name="Hannah")
+    db.add_all([joint_spaar, hannah])
+    db.flush()
+    kid = Account(user_id=user.id, name="Hannah KinderSpaar", bank="abn_amro", iban="NL06HANNA0000006", kind="savings")
+    db.add(kid)
+    db.flush()
+    joint_spaar.owners, kid.owners = [samen_person], [hannah]
+    joint = _monthly(db, acc["samen"], joint_spaar, "200", 3, n0=200)
+    mine = _monthly(db, acc["gj"], joint_spaar, "100", 3, n0=300)
+    child = _monthly(db, acc["gj"], kid, "25", 3, n0=400)
+    link_and_classify(db, user.id, since_days=None)
+    assert {s.category_id for s, r in joint} == {cats["Storting samen"].id}
+    assert {r.category_id for s, r in mine} == {cats["Storting Gerd-Jan"].id}
+    assert {r.category_id for s, r in child} == {cats["Hannah"].id}
+
+
+def test_withdrawals_and_incidental_or_irregular_amounts_are_only_linked(db):
+    user, acc, cats = _world(db)
+    back = [(_tx(db, acc["spaar"], 10 + 2 * i, "-750", GJ_IBAN, day=30 * i),
+             _tx(db, acc["gj"], 11 + 2 * i, "750", SPAAR_IBAN, day=30 * i)) for i in range(3)]   # terugboeking
+    once = (_tx(db, acc["gj"], 50, "-1500", SPAAR_IBAN, day=5), _tx(db, acc["spaar"], 51, "1500", GJ_IBAN, day=5))
+    sparse = [(_tx(db, acc["gj"], 60 + 2 * i, "-500", SPAAR_IBAN, day=180 * i),
+               _tx(db, acc["spaar"], 61 + 2 * i, "500", GJ_IBAN, day=180 * i)) for i in range(3)]  # halfjaarlijks
+    link_and_classify(db, user.id, since_days=None)
+    for s, r in back + [once] + sparse:
+        assert s.transfer_id == r.id
+        assert s.category_id is None and r.category_id is None
+
+
+def test_regularity_uses_full_history_and_already_linked_pairs_are_filled(db):
+    """Bunq koppelt alleen; de volgende import vult dan alsnog de categorie, ook buiten het importvenster."""
+    user, acc, cats = _world(db)
+    pairs = _monthly(db, acc["gj"], acc["spaar"], "400", 4)
+    for s, r in pairs:                       # gekoppeld zonder categorie, zoals na de bunq-sync
+        s.transfer_id, r.transfer_id = r.id, s.id
+    db.flush()
+    preview = plan_pairs(db, user.id, since_days=None, include_linked=True)
+    assert [p.kind for p in preview] == ["savings"] * 4 and all(p.linked for p in preview)
+    assert all(s.category_id is None for s, r in pairs)        # plannen schrijft niets
+    result = link_and_classify(db, user.id, since_days=None)
+    assert (result.linked, result.categorized) == (0, 8)
+    assert {s.category_id for s, r in pairs} == {cats["Storting Gerd-Jan"].id}
+
+
+def test_has_monthly_run_needs_three_roughly_monthly_dates_in_a_row():
+    from app.transfer_service import has_monthly_run
+
+    d = datetime.date
+    assert has_monthly_run([d(2026, 1, 1), d(2026, 2, 1), d(2026, 3, 2)])
+    assert not has_monthly_run([d(2026, 1, 1), d(2026, 2, 1)])
+    assert not has_monthly_run([d(2026, 1, 1), d(2026, 1, 8), d(2026, 1, 15)])        # wekelijks: geen maandritme
+    assert not has_monthly_run([d(2025, 1, 1), d(2025, 7, 1), d(2026, 1, 1)])

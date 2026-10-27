@@ -102,7 +102,8 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-53 | P2 | Review | ACT-31, ACT-28 | [Persoonspagina: verwachting betaalrekeningen en vermogen](#act-53) |
 | ACT-54 | P2 | Review | — | [Regelvoorstellen leesbaar: volledige omschrijving en groepering](#act-54) |
 | ACT-55 | P2 | Review | ACT-31 | [Rekeninggroepen, één categorieënset en budget per groep](#act-55) |
-| ACT-58 | P2 | Review | — | [Categoriesuggesties bij transacties met weinig AI-calls](#act-58) |
+| ACT-58 | P2 | Afgerond | — | [Categoriesuggesties bij transacties met weinig AI-calls](#act-58) |
+| ACT-59 | P2 | Review | ACT-57 | [Vaste spaarstortingen automatisch categoriseren](#act-59) |
 
 ## Beschrijving en acceptatiecriteria
 
@@ -619,6 +620,17 @@ commit `339a4d8`; controleer ze bij het oppakken.
 - **Klaar wanneer:** Templates vergelijken booleans niet meer met `1`; nieuwe code heeft typed modellen; autogenerate blijft leeg na de migratie.
 - **Validatie:** Volledige suite, PostgreSQL-CI met up/down/up, productievalidatie na uitrol.
 
+<a id="act-59"></a>
+
+### ACT-59 — Vaste spaarstortingen automatisch categoriseren
+
+- **Aanleiding (gebruiker, 2026-10-27):** gekoppelde overboekingen naar een spaarrekening kregen geen categorie. De gebruiker wil dat vaste stortingen dat wel krijgen, op alle boekingen (ook uit het verleden). Terugboekingen en incidentele grotere bedragen moeten ongemoeid blijven.
+- **Analyse productie (2026-10-27, alleen lezen):** de meeste spaarhistorie heeft al een categorie uit de standaardset. Vaste bedragen veranderen in de tijd (250 → 350 → 400; 1.100 → 1.225), dus een vaste lijst bedragen werkt niet. Open zonder categorie onder meer 11× € 400 op Abn samen spaar en 3× € 500 op GJ Spaar (onregelmatig). Opvallend, buiten scope: 15× € 200 "SEPA Periodieke overb." op Abn samen spaar en 32× € 12 op Samen Spaar Bunq staan als *Rente*, en 22× € 280 van bunq als *Vakantiegeld en 13e maand*. Rekeninginstellingen: GJ – Spaar had geen eigenaar, Suze Kinderspaar stond als betaalrekening, er waren geen groepen; de gebruiker past dat zelf aan.
+- **Gedrag:** een gekoppelde storting van betaal naar spaar krijgt aan beide kanten een categorie als hetzelfde bedrag tussen dezelfde twee rekeningen minstens 3 keer achter elkaar met 20–40 dagen ertussen voorkomt (over de hele historie): *Sparen › Storting Gerd-Jan/Nelleke* (afzender van één persoon), *Sparen › Storting samen* (gezamenlijke afzender, ook "Nelleke & Gerd-Jan" als één persoon) of *Kinderen › <naam>* (spaarrekening van een ander). Terugboekingen, spaar-naar-spaar, incidentele en niet-maandelijkse bedragen worden alleen gekoppeld. Een bestaande categorie wordt nooit overschreven.
+- **Ook al gekoppelde paren:** `link_and_classify` vult nu lege kanten van al gekoppelde paren aan (alle soorten). Daardoor krijgen ook door de bunq-sync gekoppelde paren alsnog een categorie. De herstelpagina `/accounts/transfers` toont ze met "al gekoppeld" en past ze met één klik toe op de hele historie.
+- **Niet gedaan:** Nellekes eenzijdige boekingen (haar rekeningen staan niet in de app) en kwartaal- of jaarstortingen; daarvoor zijn regels per rekening (`condition_account_id`) of de suggesties uit ACT-58 bedoeld.
+- **Validatie:** `tests/test_transfer_service.py` (maandelijkse storting, samen, kind, terugboeking, incidenteel, halfjaarlijks, aanvullen gekoppelde paren, ritmecontrole). Productie: herstelpagina openen en de preview nalopen vóór toepassen.
+
 <a id="act-58"></a>
 
 ### ACT-58 — Categoriesuggesties bij transacties met weinig AI-calls
@@ -734,3 +746,5 @@ Voeg per afgeronde actie of overdracht een regel toe. Git bevat de volledige his
 | 2026-10-14 | ACT-32 t/m ACT-35 | Fase 1 van de codereview afgerond: encryptie-bugs, auth-hardening, crash- en datafouten (a en b), XSS | #215, #216, #217, #218, #219 gemerged; CI groen; productievalidatie deels open (zie fase 1 — uitkomst) |
 | 2026-10-14 | ACT-36 t/m ACT-40 | Fase 2 van de codereview afgerond (hygiëne, tooling, verouderde API's, testbasis, dependency-upgrade) | #221–#226 gemerged; CI groen; 586 passed, 3 skipped op Python 3.12 |
 | 2026-10-27 | ACT-58 | Categoriesuggesties uit historie plus AI-batch met cache op de transactiepagina; status Review | Claude Code; 708 passed, 10 skipped (lokaal Python 3.14, niet de 3.12-locks); branch `claude/transaction-categorization-examples-f9fe8b`; PR-CI open |
+| 2026-10-27 | ACT-58 | Gemerged ([PR #270](https://github.com/gjagils/checkthepockets/pull/270), `391d4a1`), CI groen, deploy geslaagd; productiecontrole van suggesties en AI-knop door gebruiker open | Claude Code |
+| 2026-10-27 | ACT-59 | Vaste spaarstortingen categoriseren en gekoppelde paren aanvullen; status Review | Claude Code; 713 passed, 10 skipped (lokaal Python 3.14); branch `claude/act-59-spaaroverboekingen`; PR-CI open |
