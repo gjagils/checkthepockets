@@ -19,7 +19,8 @@
 <div class="accounts-grid u-mb-15">
     <section class="card"><p class="muted u-mb-0">Eigen rekening</p><strong style="font-size:1.6rem;">{{ kinds['own'] }}</strong><p class="muted u-fs-85 u-mb-0">zelfde groep of eigenaar</p></section>
     <section class="card"><p class="muted u-mb-0">Tussen personen</p><strong style="font-size:1.6rem;">{{ kinds['persons'] }}</strong><p class="muted u-fs-85 u-mb-0">bijdrage aan gezamenlijk</p></section>
-    <section class="card"><p class="muted u-mb-0">Alleen koppelen</p><strong style="font-size:1.6rem;">{{ kinds[''] }}</strong><p class="muted u-fs-85 u-mb-0">spaar of onbekend: categorie blijft</p></section>
+    <section class="card"><p class="muted u-mb-0">Vaste spaarstorting</p><strong style="font-size:1.6rem;">{{ kinds['savings'] }}</strong><p class="muted u-fs-85 u-mb-0">zelfde bedrag, minstens 3 maanden op rij</p></section>
+    <section class="card"><p class="muted u-mb-0">Alleen koppelen</p><strong style="font-size:1.6rem;">{{ kinds[''] }}</strong><p class="muted u-fs-85 u-mb-0">terugboeking, incidenteel of onbekend: categorie blijft</p></section>
 </div>
 
 {% if unmatched %}
@@ -44,7 +45,7 @@
             <tr>
                 <td class="nowrap">{{ r.date|date }}</td>
                 <td class="text-right nowrap">{{ r.amount|euro_sign }}</td>
-                <td>{{ s.account }} → {{ o.account }}{% if r.pair.kind == 'own' %} <span class="badge badge-success">eigen rekening</span>{% elif r.pair.kind == 'persons' %} <span class="badge badge-warning">tussen personen</span>{% endif %}</td>
+                <td>{{ s.account }} → {{ o.account }}{% if r.pair.kind == 'own' %} <span class="badge badge-success">eigen rekening</span>{% elif r.pair.kind == 'persons' %} <span class="badge badge-warning">tussen personen</span>{% elif r.pair.kind == 'savings' %} <span class="badge badge-success">vaste spaarstorting</span>{% endif %}{% if r.pair.linked %} <span class="badge">al gekoppeld</span>{% endif %}</td>
                 {% for side in (s, o) %}
                 <td>
                     {% if side.existing %}<span class="muted">blijft: {{ side.existing }}</span>

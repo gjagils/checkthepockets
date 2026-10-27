@@ -184,7 +184,7 @@ def set_account_owners(
 def transfers_preview(request: Request, done: str | None = None, db: Session = Depends(get_db)):
     """Preview: bestaande overboekingen tussen eigen rekeningen koppelen en categoriseren."""
     user = require_login(request, db)
-    pairs = plan_pairs(db, user.id, since_days=None)
+    pairs = [p for p in plan_pairs(db, user.id, since_days=None, include_linked=True) if not p.linked or any(tx.category_id is None for tx, _ in p.assignments)]
     names = {a.id: a.name for a in db.query(Account).filter(Account.user_id == user.id)}
     cats = {c.id: c for c in db.query(Category).filter(Category.user_id == user.id)}
     rows = []
@@ -197,7 +197,7 @@ def transfers_preview(request: Request, done: str | None = None, db: Session = D
                           "existing": existing.name if existing else None, "planned": planned.get(tx.id)})
         rows.append({"pair": pair, "date": min(pair.a.date, pair.b.date), "amount": abs(pair.a.amount), "sides": sides})
     rows.sort(key=lambda r: r["date"], reverse=True)
-    kinds = {"own": 0, "persons": 0, "": 0}
+    kinds = {"own": 0, "persons": 0, "savings": 0, "": 0}
     for pair in pairs:
         kinds[pair.kind] += 1
     contribution_names = ("Bijdrage Gerd-Jan", "Bijdrage Nelleke")
