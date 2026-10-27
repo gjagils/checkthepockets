@@ -9,7 +9,7 @@ from datetime import date as date_type, timedelta
 from decimal import Decimal, InvalidOperation
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Depends, Request, UploadFile, File, Form, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, Request, UploadFile, File, Form, Query
 from fastapi.responses import RedirectResponse, StreamingResponse, JSONResponse
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, or_
@@ -19,6 +19,8 @@ from app import clock
 from app.database import get_db
 from app.models import Account, Transaction, Category, Rule, RecurringTransaction, ImportBatch
 from app.auth import require_login
+from app.category_suggest import fill_ai_suggestions, fill_ai_suggestions_in_background, suggest_for
+from app.ai_suggest import ai_available
 from app.parsers import abn_amro, bunq, ics, ing, rabobank
 from app.parsers.base import ParseError, ParsedTransaction
 from app.parsers.ics_pdf import parse_ics_pdf
@@ -390,6 +392,9 @@ def transaction_list(
             merged_children.setdefault(pid, []).extend(children)
         cats_by_account[aid] = {"parents": merged_parents, "children": merged_children}
 
+    # Categoriesuggesties uit de historie en de AI-cache (ACT-58); de AI zelf draait hier niet.
+    suggestions = suggest_for(db, user.id, transactions)
+
     # Active recurring items for linking
     recurring_items = (
         db.query(RecurringTransaction)
@@ -440,8 +445,51 @@ def transaction_list(
             "back_url": back if back.startswith("/") and not back.startswith("//") else "",
             "back_label": (back_label or "Terug")[:80],
             "show_excluded": include_excluded,
+            "suggestions": suggestions.by_tx,
+            "ai_pending": suggestions.ai_pending if ai_available() else 0,
         },
     )
+
+
+@router.post("/transactions/accept-suggestions")
+async def accept_suggestions(request: Request, db: Session = Depends(get_db)):
+    """Neem de categoriesuggesties over voor de gekozen transacties (ACT-58).
+
+    De suggesties worden hier opnieuw berekend; wat het formulier meestuurt is alleen de keuze welke
+    transacties, zodat een verouderde of aangepaste pagina geen andere categorie kan zetten.
+    """
+    user = require_login(request, db)
+    form = await request.form()
+    redirect_to = form.get("redirect_to", "/transactions")
+    tx_ids = [int(raw) for raw in form.getlist("tx_ids") if str(raw).isdigit()]
+    if tx_ids:
+        transactions = (
+            db.query(Transaction)
+            .join(Account)
+            .filter(Transaction.id.in_(tx_ids), Account.user_id == user.id)
+            .all()
+        )
+        result = suggest_for(db, user.id, transactions)
+        for tx in transactions:
+            suggestion = result.by_tx.get(tx.id)
+            if suggestion:
+                tx.category_id = suggestion.category_id
+                tx.assigned_by_rule_id = None  # handmatig bevestigd
+                tx.is_reviewed = 1
+        db.commit()
+    return safe_redirect(redirect_to, "/transactions", status_code=303)
+
+
+@router.post("/transactions/ai-suggestions")
+def request_ai_suggestions(
+    request: Request,
+    redirect_to: str = Form("/transactions"),
+    db: Session = Depends(get_db),
+):
+    """Eén AI-call voor tegenpartijen zonder historie; het antwoord wordt bewaard (ACT-58)."""
+    user = require_login(request, db)
+    fill_ai_suggestions(db, user.id)
+    return safe_redirect(redirect_to, "/transactions", status_code=303)
 
 
 @router.post("/transactions/{transaction_id}/category")
@@ -1217,7 +1265,7 @@ async def import_map(request: Request, db: Session = Depends(get_db)):
 
 
 @router.post("/import/confirm")
-async def import_confirm(request: Request, db: Session = Depends(get_db)):
+async def import_confirm(request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """Step 2: save confirmed transactions from preview."""
     user = require_login(request, db)
     form = await request.form()
@@ -1270,6 +1318,8 @@ async def import_confirm(request: Request, db: Session = Depends(get_db)):
     link_and_classify(db, user.id)
     resync_after_import(db, user.id)
     db.commit()
+    # AI-categoriesuggesties na het antwoord, zodat de import niet op de API wacht (ACT-58).
+    background_tasks.add_task(fill_ai_suggestions_in_background, user.id)
 
     return templates.TemplateResponse(
         request,

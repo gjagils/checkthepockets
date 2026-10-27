@@ -128,6 +128,24 @@
             <a href="{{ _cat_url(-2) }}" class="cat-btn {% if _is_cat %}active{% endif %}">Gecategoriseerd ({{ categorized_count }})</a>
         </div>
 
+        {% if suggestions %}
+        <form method="post" action="/transactions/accept-suggestions" class="tx-inline-form">
+            <input type="hidden" name="redirect_to" value="{{ request.url.path }}?{{ request.url.query }}">
+            {% for tx_id in suggestions %}<input type="hidden" name="tx_ids" value="{{ tx_id }}">{% endfor %}
+            <button type="submit" class="btn btn-sm btn-primary" title="Zet bij elke transactie op deze pagina de voorgestelde categorie">
+                Neem {{ suggestions|length }} suggestie{{ 's' if suggestions|length != 1 }} over
+            </button>
+        </form>
+        {% endif %}
+        {% if ai_pending %}
+        <form method="post" action="/transactions/ai-suggestions" class="tx-inline-form">
+            <input type="hidden" name="redirect_to" value="{{ request.url.path }}?{{ request.url.query }}">
+            <button type="submit" class="btn btn-sm btn-secondary" title="Eén AI-vraag voor tegenpartijen die je nog nooit gecategoriseerd hebt; het antwoord wordt onthouden">
+                AI-suggesties voor {{ ai_pending }} nieuwe tegenpartij{{ 'en' if ai_pending != 1 }}
+            </button>
+        </form>
+        {% endif %}
+
         {% if _is_uncat and old_uncat_count %}
         <form method="post" action="/transactions/exclude-old-uncategorized" class="tx-inline-form"
               data-confirm="Sluit {{ old_uncat_count }} niet-gecategoriseerde transacties van vóór {{ old_uncat_cutoff_label }} uit? (Per transactie terug te draaien via Uitsluiten)">
@@ -369,6 +387,17 @@
                                 {% endfor %}
                             </select>
                         </form>
+                        {% set sug = suggestions.get(tx.id) %}
+                        {% if sug %}
+                        <form method="post" action="/transactions/{{ tx.id }}/category" class="tx-suggestion-form">
+                            <input type="hidden" name="redirect_to" value="{{ request.url.path }}?{{ request.url.query }}">
+                            <input type="hidden" name="category_id" value="{{ sug.category_id }}">
+                            <button type="submit" class="tx-suggestion{% if sug.source == 'ai' %} tx-suggestion-ai{% endif %}"
+                                    title="Klik om {{ sug.category_name }} toe te wijzen">
+                                ✓ {{ sug.category_name }} <span class="tx-suggestion-src">· {{ sug.label }}</span>
+                            </button>
+                        </form>
+                        {% endif %}
                     </td>
                     <td class="text-right nowrap {% if tx.amount >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
                         {{ tx.amount|euro_sign }}

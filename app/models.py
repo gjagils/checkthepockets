@@ -250,6 +250,26 @@ class RuleSuggestion(Base):
     category = relationship("Category")
 
 
+class MerchantCategorySuggestion(Base):
+    """AI-categorie per tegenpartij, één keer gevraagd en daarna hergebruikt (ACT-58).
+
+    `merchant_hash` is een HMAC van de genormaliseerde naam, zodat er geen leesbare tegenpartij
+    naast de versleutelde transactievelden staat. `category_id` NULL betekent "AI wist het niet":
+    ook dat bewaren we, zodat dezelfde naam niet opnieuw wordt gevraagd.
+    """
+    __tablename__ = "merchant_category_suggestions"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    merchant_hash = Column(String(64), nullable=False)
+    category_id = Column(Integer, ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, default=clock.now_utc)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "merchant_hash", name="uq_merchant_suggestion_user_hash"),
+    )
+
+
 class RecurringSuggestion(Base):
     __tablename__ = "recurring_suggestions"
 
