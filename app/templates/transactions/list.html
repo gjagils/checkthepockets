@@ -74,7 +74,7 @@
     <div class="tx-toolbar-row tx-row-filters">
         <!-- Jaar -->
         <form method="get" action="/transactions" class="tx-inline-form">
-            {% if current_category_id %}<input type="hidden" name="category_id" value="{{ current_category_id }}">{% endif %}
+            {% if current_category_id is not none %}<input type="hidden" name="category_id" value="{{ current_category_id }}">{% endif %}
             {% if current_account_id %}<input type="hidden" name="account_id" value="{{ current_account_id }}">{% endif %}
             {% if search %}<input type="hidden" name="search" value="{{ search }}">{% endif %}
             {{ _hidden_show_excluded() }}
@@ -87,7 +87,7 @@
 
         <!-- Maand navigatie: ‹ dropdown › -->
         {% set _nav_params = [] %}
-        {% if current_category_id %}{% set _ = _nav_params.append('category_id=' + current_category_id|string) %}{% endif %}
+        {% if current_category_id is not none %}{% set _ = _nav_params.append('category_id=' + current_category_id|string) %}{% endif %}
         {% if current_account_id %}{% set _ = _nav_params.append('account_id=' + current_account_id|string) %}{% endif %}
         {% if search %}{% set _ = _nav_params.append('search=' + search) %}{% endif %}
         {% if show_excluded %}{% set _ = _nav_params.append('show_excluded=1') %}{% endif %}
@@ -97,7 +97,7 @@
             <a href="/transactions?month={{ prev_month }}{{ _nav_suffix }}"
                class="month-nav-arrow" title="Vorige maand">‹</a>
             <form method="get" action="/transactions" class="tx-inline-form" id="monthForm">
-                {% if current_category_id %}<input type="hidden" name="category_id" value="{{ current_category_id }}">{% endif %}
+                {% if current_category_id is not none %}<input type="hidden" name="category_id" value="{{ current_category_id }}">{% endif %}
                 {% if current_account_id %}<input type="hidden" name="account_id" value="{{ current_account_id }}">{% endif %}
                     {% if search %}<input type="hidden" name="search" value="{{ search }}">{% endif %}
                 {{ _hidden_show_excluded() }}
@@ -116,14 +116,14 @@
 
         <!-- Hele jaar knop -->
         {% set allparams = "year=" + _yr|string %}
-        {% if current_category_id %}{% set allparams = allparams + "&category_id=" + current_category_id|string %}{% endif %}
+        {% if current_category_id is not none %}{% set allparams = allparams + "&category_id=" + current_category_id|string %}{% endif %}
         {% if current_account_id %}{% set allparams = allparams + "&account_id=" + current_account_id|string %}{% endif %}
         {% if search %}{% set allparams = allparams + "&search=" + search %}{% endif %}
         {% if show_excluded %}{% set allparams = allparams + "&show_excluded=1" %}{% endif %}
         <a href="/transactions?{{ allparams }}"
            class="year-btn {% if not current_month_num %}active{% endif %}" title="Heel {{ _yr }}">Hele jaar</a>
         <div class="cat-trio">
-            <a href="{{ _cat_url(none) }}" class="cat-btn {% if _is_all %}active{% endif %}">Alle transacties ({{ all_count }})</a>
+            <a href="{{ _cat_url(0) }}" class="cat-btn {% if _is_all %}active{% endif %}">Alle transacties ({{ all_count }})</a>
             <a href="{{ _cat_url(-1) }}" class="cat-btn {% if _is_uncat %}active{% endif %}">Niet gecategoriseerd ({{ uncategorized_count }})</a>
             <a href="{{ _cat_url(-2) }}" class="cat-btn {% if _is_cat %}active{% endif %}">Gecategoriseerd ({{ categorized_count }})</a>
         </div>
@@ -167,7 +167,7 @@
 
         <form method="get" action="/transactions" class="tx-inline-form">
             {% if current_month %}<input type="hidden" name="month" value="{{ current_month }}">{% elif current_year %}<input type="hidden" name="year" value="{{ current_year }}">{% endif %}
-            {% if current_category_id %}<input type="hidden" name="category_id" value="{{ current_category_id }}">{% endif %}
+            {% if current_category_id is not none %}<input type="hidden" name="category_id" value="{{ current_category_id }}">{% endif %}
             {% if search %}<input type="hidden" name="search" value="{{ search }}">{% endif %}
             {{ _hidden_show_excluded() }}
             <select name="account_id" class="select-sm" onchange="this.form.submit()">
@@ -180,7 +180,7 @@
 
         <form method="get" action="/transactions" class="tx-inline-form tx-search-form">
             {% if current_month %}<input type="hidden" name="month" value="{{ current_month }}">{% elif current_year %}<input type="hidden" name="year" value="{{ current_year }}">{% endif %}
-            {% if current_category_id %}<input type="hidden" name="category_id" value="{{ current_category_id }}">{% endif %}
+            {% if current_category_id is not none %}<input type="hidden" name="category_id" value="{{ current_category_id }}">{% endif %}
             {% if current_account_id %}<input type="hidden" name="account_id" value="{{ current_account_id }}">{% endif %}
             {{ _hidden_show_excluded() }}
             <input type="text" name="search" value="{{ search }}" placeholder="Zoeken..." class="tx-search-input">
@@ -190,7 +190,7 @@
             <summary>Meer filters</summary>
             <form method="get" action="/transactions" class="tx-more-panel">
                 {% if current_month %}<input type="hidden" name="month" value="{{ current_month }}">{% elif current_year %}<input type="hidden" name="year" value="{{ current_year }}">{% endif %}
-                {% if current_category_id %}<input type="hidden" name="category_id" value="{{ current_category_id }}">{% endif %}
+                {% if current_category_id is not none %}<input type="hidden" name="category_id" value="{{ current_category_id }}">{% endif %}
                 {% if current_account_id %}<input type="hidden" name="account_id" value="{{ current_account_id }}">{% endif %}
                 {% if search %}<input type="hidden" name="search" value="{{ search }}">{% endif %}
                 <div class="form-group">
@@ -403,6 +403,8 @@
                             </div>
                             <div class="tx-panel-footer">
                                 <a href="/transactions/{{ tx.id }}/edit?redirect_to=/transactions?page={{ page }}{% for k, v in filter_params.items() %}%26{{ k }}={{ v }}{% endfor %}" class="tx-panel-footer-btn">Bewerken</a>
+                                <span class="tx-panel-footer-sep">·</span>
+                                <a href="/transactions/{{ tx.id }}/split" class="tx-panel-footer-btn">✂ Splitsen</a>
                                 <span class="tx-panel-footer-sep">·</span>
                                 <button type="button" class="tx-panel-footer-btn"
                                         onclick="document.getElementById('mv-{{ tx.id }}').style.display='inline-flex'"

@@ -85,8 +85,9 @@ def test_inbox_shows_only_uncategorized_of_current_user(db_session):
     assert "Jumbo" not in body
     # Niet andermans tx
     assert "Other" not in body
-    # Teller klopt
-    assert "1 te categoriseren" in body
+    # Zelfde pagina als /transactions met "Niet gecategoriseerd" actief
+    assert resp.url.path == "/transactions"
+    assert "Niet gecategoriseerd (1)" in body
     # Inbox-link in nav heeft badge
     assert "nav-inbox-badge" in body
 
@@ -123,7 +124,7 @@ def test_post_category_assigns_and_removes_from_inbox(db_session):
 
     body = client.get("/inbox").text
     assert "Eneco" not in body
-    assert "0 te categoriseren" in body
+    assert "Niet gecategoriseerd (0)" in body
 
 
 # ── Cross-user (unauthorized) tests ─────────────────────────────────────────
@@ -166,7 +167,7 @@ def test_inbox_filters_by_account_id(db_session):
     body = resp.text
     assert "Albert Heijn" in body
     assert "Jumbo" not in body
-    assert "1 te categoriseren" in body
+    assert "Niet gecategoriseerd (1)" in body
 
 
 def test_inbox_account_filter_ignores_foreign_account(db_session):
@@ -176,11 +177,13 @@ def test_inbox_account_filter_ignores_foreign_account(db_session):
     acc_b = _make_account(db_session, bob, "BobAcc")
     _make_tx(db_session, acc_a, counterparty="Albert Heijn", tag="abn1")
 
-    # Alice probeert te filteren op Bob's account-id → valt terug op 'geen filter'
+    _make_tx(db_session, acc_b, counterparty="BobShop", tag="bob1")
+
+    # Alice filtert op Bob's account-id → ziet niets van Bob
     client = _login_client(alice.id)
     resp = client.get(f"/inbox?account_id={acc_b.id}")
     assert resp.status_code == 200
-    assert "Albert Heijn" in resp.text
+    assert "BobShop" not in resp.text
 
 
 def test_inbox_renders_filter_dropdown_and_action_panel(db_session):
@@ -192,8 +195,7 @@ def test_inbox_renders_filter_dropdown_and_action_panel(db_session):
     body = client.get("/inbox").text
     # Filter-dropdown met 'Alle rekeningen'
     assert "Alle rekeningen" in body
-    # Acties-paneel-markup is aanwezig (›-knop + panel)
-    assert "toggleInboxPanel" in body
+    # Acties-paneel-markup van de transactiepagina is aanwezig
     assert "tx-action-panel" in body
     # Essentiële acties
     assert "Uitsluiten" in body
@@ -220,3 +222,40 @@ def test_inbox_set_category_preserves_account_filter(db_session):
     assert resp.headers["location"] == f"/inbox?account_id={acc.id}"
 
 
+
+
+def test_inbox_redirects_to_uncategorized_transactions(db_session):
+    alice = _make_user(db_session)
+    acc = _make_account(db_session, alice, "Main")
+
+    client = _login_client(alice.id)
+    client.follow_redirects = False
+    resp = client.get(f"/inbox?account_id={acc.id}")
+    assert resp.status_code == 302
+    assert resp.headers["location"] == f"/transactions?category_id=-1&account_id={acc.id}"
+
+
+def test_transactions_tab_defaults_to_uncategorized(db_session):
+    alice = _make_user(db_session)
+    acc = _make_account(db_session, alice, "Main")
+    cat = _make_category(db_session, alice, "Boodschappen")
+    _make_tx(db_session, acc, counterparty="AH", tag="u1")
+    _make_tx(db_session, acc, category_id=cat.id, counterparty="Jumbo", tag="c1")
+
+    client = _login_client(alice.id)
+    body = client.get("/transactions").text
+    assert "AH" in body
+    assert "Jumbo" not in body
+
+    # "Alle transacties" is expliciet category_id=0 en blijft bij paginering/filters
+    body_all = client.get("/transactions?category_id=0").text
+    assert "AH" in body_all and "Jumbo" in body_all
+    assert "category_id=0" in body_all
+
+    # Deep-links met andere filters (bijv. dashboard-maand) tonen alles
+    body_month = client.get("/transactions?month=2026-01").text
+    assert "Jumbo" in body_month
+
+    # Dashboard-alias uncategorized=1
+    body_uncat = client.get("/transactions?month=2026-01&uncategorized=1").text
+    assert "AH" in body_uncat and "Jumbo" not in body_uncat

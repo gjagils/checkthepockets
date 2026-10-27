@@ -25,7 +25,7 @@
     {% set path = request.url.path %}
     {% set main_active =
         'dashboard' if path == '/dashboard'
-        else 'inbox' if path == '/inbox' or path.startswith('/inbox/')
+        else 'inbox' if path == '/inbox' or path.startswith('/inbox/') or (path == '/transactions' and request.query_params.get('category_id') == '-1')
         else 'financien' if path in ['/transactions', '/categories', '/rules', '/recurring'] or path.startswith('/transactions')
         else 'budgetten' if path.startswith('/budgets') or path.startswith('/savings')
         else 'portfolio' if path.startswith('/analytics') or path.startswith('/portfolio') or path.startswith('/networth') or path == '/persons/verwachting' or (path.startswith('/persons/') and path.split('/')|length == 3 and path.split('/')[2].isdigit())
