@@ -128,6 +128,13 @@
             <a href="{{ _cat_url(-2) }}" class="cat-btn {% if _is_cat %}active{% endif %}">Gecategoriseerd ({{ categorized_count }})</a>
         </div>
 
+        {% if uncategorized_count %}
+        <a href="/transactions/groups?{% if current_month %}month={{ current_month }}&{% endif %}{% if current_account_id %}account_id={{ current_account_id }}{% endif %}"
+           class="btn btn-sm btn-accent" title="Ongecategoriseerde transacties per tegenpartij: één keuze per groep, optioneel als regel">
+            Per tegenpartij
+        </a>
+        {% endif %}
+
         {% if suggestions %}
         <form method="post" action="/transactions/accept-suggestions" class="tx-inline-form">
             <input type="hidden" name="redirect_to" value="{{ request.url.path }}?{{ request.url.query }}">

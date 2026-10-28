@@ -281,3 +281,117 @@ def fill_ai_suggestions_in_background(user_id: int) -> None:
         logger.exception("AI-categoriesuggesties op de achtergrond mislukt voor user %s", user_id)
     finally:
         db.close()
+
+
+# ---------------------------------------------------------------------------
+# Per tegenpartij categoriseren (ACT-60)
+# ---------------------------------------------------------------------------
+
+# Kortere regeltekst matcht te makkelijk op andere namen ("bol" in "symbol").
+RULE_MIN_LENGTH = 4
+
+
+@dataclass
+class CounterpartyGroup:
+    key: str                          # merchant_hash van de genormaliseerde naam
+    name: str                         # meest voorkomende leesbare naam
+    transactions: list[Transaction]
+    suggestion: Suggestion | None = None
+    rule_field: str | None = None     # "counterparty" | "description", of None als geen veilige regel
+    rule_value: str | None = None
+
+    @property
+    def count(self) -> int:
+        return len(self.transactions)
+
+    @property
+    def total(self):
+        return sum(t.amount for t in self.transactions)
+
+    @property
+    def account_ids(self) -> set[int]:
+        return {t.account_id for t in self.transactions}
+
+
+def _display_name(tx: Transaction) -> str:
+    return (tx.counterparty or "").strip() or (parse_description(tx.description or "")["merchant"] or "").strip()
+
+
+def _rule_for(name: str, transactions: list[Transaction]) -> tuple[str | None, str | None]:
+    """Een 'bevat'-regel die alle transacties van de groep raakt, of (None, None).
+
+    Eerst de genormaliseerde naam (vangt winkelnummers en rechtsvormen), anders de meest voorkomende
+    letterlijke tegenpartij. Normaliseren haalt leestekens weg ("h&m" → "h m"), dus we controleren
+    of de tekst echt in elke transactie staat.
+    """
+    if all((t.counterparty or "").strip() for t in transactions):
+        field, values = "counterparty", [t.counterparty.lower() for t in transactions]
+        raw = Counter(t.counterparty.strip() for t in transactions).most_common(1)[0][0]
+        candidates = [name, raw]
+    elif not any((t.counterparty or "").strip() for t in transactions):
+        field, values = "description", [(t.description or "").lower() for t in transactions]
+        candidates = [name]
+    else:
+        return None, None
+    for value in candidates:
+        if len(value) >= RULE_MIN_LENGTH and all(value.lower() in v for v in values):
+            return field, value
+    return None, None
+
+
+def open_groups(
+    db: Session, user_id: int, *, account_id: int | None = None, date_from=None, date_to=None,
+) -> tuple[list[CounterpartyGroup], int]:
+    """Ongecategoriseerde transacties per tegenpartij, grootste groep eerst.
+
+    Geeft ook het aantal open transacties zonder herkenbare naam (die passen in geen groep).
+    """
+    split_parent_ids = (
+        db.query(Transaction.parent_id).filter(Transaction.parent_id.isnot(None)).distinct().scalar_subquery()
+    )
+    query = (
+        db.query(Transaction)
+        .join(Account)
+        .filter(
+            Account.user_id == user_id,
+            Transaction.category_id.is_(None),
+            Transaction.is_excluded == 0,
+            Transaction.is_projected == 0,
+            Transaction.id.notin_(split_parent_ids),
+        )
+    )
+    if account_id:
+        query = query.filter(Transaction.account_id == account_id)
+    if date_from:
+        query = query.filter(Transaction.date >= date_from)
+    if date_to:
+        query = query.filter(Transaction.date <= date_to)
+    open_txs = query.order_by(Transaction.date.desc(), Transaction.id.desc()).all()
+
+    by_key: dict[str, list[Transaction]] = {}
+    unnamed = 0
+    for tx in open_txs:
+        name = merchant_name(tx)
+        if not name:
+            unnamed += 1
+            continue
+        by_key.setdefault(merchant_hash(name), []).append(tx)
+
+    suggestions = suggest_for(db, user_id, open_txs).by_tx
+    groups = []
+    for key, txs in by_key.items():
+        name = merchant_name(txs[0])
+        display = Counter(_display_name(t) for t in txs).most_common(1)[0][0] or name
+        found = [suggestions[t.id] for t in txs if t.id in suggestions]
+        suggestion = None
+        if found:
+            best = Counter(s.category_id for s in found).most_common(1)[0][0]
+            suggestion = next(s for s in found if s.category_id == best)
+        field, value = _rule_for(name, txs)
+        groups.append(CounterpartyGroup(key, display, txs, suggestion, field, value))
+    groups.sort(key=lambda g: (-g.count, g.name.lower()))
+    return groups, unnamed
+
+
+def allowed_categories(db: Session, user_id: int) -> _Categories:
+    return _Categories(db, user_id)

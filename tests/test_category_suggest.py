@@ -10,7 +10,7 @@ from app import category_suggest
 from app.auth import create_session_cookie, hash_password
 from app.category_suggest import fill_ai_suggestions, merchant_hash, normalize_name, suggest_for
 from app.main import app
-from app.models import Account, Category, MerchantCategorySuggestion, Transaction, User
+from app.models import Account, Category, MerchantCategorySuggestion, Rule, Transaction, User
 
 
 @pytest.fixture
@@ -211,3 +211,76 @@ def test_bulk_accept_ignores_transactions_of_another_user(world):
 
     db.expire_all()
     assert db.get(Transaction, new.id).category_id is None
+
+
+# --- Per tegenpartij categoriseren (ACT-60) ---
+
+def test_open_groups_bundle_name_variants_and_put_the_largest_first(world):
+    db, user, account, cats = world
+    _tx(db, account, "old", counterparty="Albert Heijn 1234", category=cats["Boodschappen"])
+    for i in range(3):
+        _tx(db, account, f"ah{i}", counterparty=f"ALBERT HEIJN {5670 + i}")
+    _tx(db, account, "hm", counterparty="H&M")
+    _tx(db, account, "bart", description="BEA, Apple Pay Bakkerij Bart NR:X70J2J, 01.04.26/10:43 VLEUTEN")
+
+    groups, unnamed = category_suggest.open_groups(db, user.id)
+
+    assert [g.count for g in groups] == [3, 1, 1]
+    ah = groups[0]
+    assert ah.suggestion.category_id == cats["Boodschappen"].id
+    assert (ah.rule_field, ah.rule_value) == ("counterparty", "albert heijn")
+    by_name = {g.name: g for g in groups}
+    # "h m" staat niet letterlijk in "h&m" en "H&M" is te kort: geen regel.
+    assert by_name["H&M"].rule_value is None
+    assert by_name["Bakkerij Bart"].rule_field == "description"
+    assert unnamed == 0
+
+
+def test_group_apply_categorizes_the_group_and_the_rule_only_fills_open_transactions(world):
+    db, user, account, cats = world
+    a = _tx(db, account, "a", counterparty="Café Thijs")
+    b = _tx(db, account, "b", counterparty="CAFÉ THIJS B.V.")
+    other_month = _tx(db, account, "c", counterparty="Cafe Thijs")   # zonder accent: andere groep
+    done = _tx(db, account, "d", counterparty="Café Thijs Utrecht", category=cats["Kleding"])
+    later = _tx(db, account, "e", counterparty="café thijs terras")  # eigen groep, wel door de regel
+    groups, _ = category_suggest.open_groups(db, user.id)
+    key = next(g.key for g in groups if g.count == 2)
+
+    resp = _client(user.id).post(
+        "/transactions/groups/apply",
+        data={"key": key, "category_id": cats["Horeca"].id, "make_rule": "1"},
+        follow_redirects=False,
+    )
+
+    assert resp.status_code == 303
+    assert "applied=2" in resp.headers["location"]
+    assert "rule_extra=1" in resp.headers["location"]
+    db.expire_all()
+    assert {db.get(Transaction, t.id).category_id for t in (a, b, later)} == {cats["Horeca"].id}
+    assert db.get(Transaction, done.id).category_id == cats["Kleding"].id     # nooit overschreven
+    assert db.get(Transaction, other_month.id).category_id is None
+    rule = db.query(Rule).one()
+    assert (rule.match_field, rule.match_type, rule.match_value) == ("counterparty", "contains", "café thijs")
+    assert rule.assign_category_id == cats["Horeca"].id
+
+
+def test_group_page_renders_and_apply_ignores_foreign_or_unknown_input(world):
+    db, user, account, cats = world
+    tx = _tx(db, account, "a", counterparty="Wehkamp")
+    client = _client(user.id)
+
+    page = client.get("/transactions/groups")
+    assert page.status_code == 200
+    assert "Wehkamp" in page.text and "Toewijzen (1)" in page.text
+    assert "Per tegenpartij" in client.get("/transactions").text
+
+    bob = User(username="bob", email="b@x.nl", password_hash=hash_password("pw"))
+    db.add(bob)
+    db.commit()
+    key = category_suggest.open_groups(db, user.id)[0][0].key
+    _client(bob.id).post("/transactions/groups/apply", data={"key": key, "category_id": cats["Kleding"].id})
+    client.post("/transactions/groups/apply", data={"key": key, "category_id": 999999})
+
+    db.expire_all()
+    assert db.get(Transaction, tx.id).category_id is None
+    assert db.query(Rule).count() == 0

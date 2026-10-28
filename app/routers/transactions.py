@@ -19,7 +19,9 @@ from app import clock
 from app.database import get_db
 from app.models import Account, Transaction, Category, Rule, RecurringTransaction, ImportBatch
 from app.auth import require_login
-from app.category_suggest import fill_ai_suggestions, fill_ai_suggestions_in_background, suggest_for
+from app.category_suggest import (
+    allowed_categories, fill_ai_suggestions, fill_ai_suggestions_in_background, open_groups, suggest_for,
+)
 from app.ai_suggest import ai_available
 from app.parsers import abn_amro, bunq, ics, ing, rabobank
 from app.parsers.base import ParseError, ParsedTransaction
@@ -27,7 +29,7 @@ from app.parsers.ics_pdf import parse_ics_pdf
 from app.transfer_service import link_and_classify
 from app.import_service import existing_import_hashes, find_import_account, store_confirmed_csv_rows
 from app.recurring_service import find_recurring_candidates, resync_after_import
-from app.rules_engine import apply_rules_to_transaction
+from app.rules_engine import apply_rules_to_transaction, apply_single_rule
 from app.redirects import safe_redirect
 from app.nl_format import MONTHS_NL_FULL
 from app.parsers.custom_csv import (
@@ -172,6 +174,45 @@ def _build_tx_query(db, user, account_id, category_id, tag_id, search,
             pass
 
     return query
+
+
+def _categories_by_account(db, user_id: int, accounts) -> dict:
+    """{account_id: {"parents": [...], "children": {parent_id: [...]}}}; sleutel None = alleen gedeelde.
+
+    Categorieën met account_id=None gelden voor alle rekeningen.
+    """
+    all_cats = (
+        db.query(Category)
+        .filter(Category.user_id == user_id)
+        .order_by(Category.name)
+        .all()
+    )
+    global_cats = {"parents": [], "children": {}}
+    account_specific = {}
+    for c in all_cats:
+        if c.account_id is None:
+            if c.parent_id is None:
+                global_cats["parents"].append(c)
+            else:
+                global_cats["children"].setdefault(c.parent_id, []).append(c)
+        else:
+            if c.account_id not in account_specific:
+                account_specific[c.account_id] = {"parents": [], "children": {}}
+            if c.parent_id is None:
+                account_specific[c.account_id]["parents"].append(c)
+            else:
+                account_specific[c.account_id]["children"].setdefault(c.parent_id, []).append(c)
+
+    # Merge: elke rekening krijgt globale + account-specifieke categorieën
+    cats_by_account = {None: global_cats}
+    for aid in {a.id for a in accounts}:
+        specific = account_specific.get(aid, {"parents": [], "children": {}})
+        merged_parents = global_cats["parents"] + specific["parents"]
+        merged_children = dict(global_cats["children"])
+        for pid, children in specific["children"].items():
+            merged_children.setdefault(pid, []).extend(children)
+        cats_by_account[aid] = {"parents": merged_parents, "children": merged_children}
+    return cats_by_account
 
 
 _NL_MONTHS = MONTHS_NL_FULL
@@ -356,41 +397,7 @@ def transaction_list(
     if include_excluded:
         filter_params["show_excluded"] = "1"
 
-    # Get categories grouped by account_id -> parent -> children
-    all_cats = (
-        db.query(Category)
-        .filter(Category.user_id == user.id)
-        .order_by(Category.name)
-        .all()
-    )
-    # {account_id: {"parents": [...], "children": {parent_id: [...]}}}
-    # Categorieën met account_id=None gelden voor alle rekeningen
-    global_cats = {"parents": [], "children": {}}
-    account_specific = {}
-    for c in all_cats:
-        if c.account_id is None:
-            if c.parent_id is None:
-                global_cats["parents"].append(c)
-            else:
-                global_cats["children"].setdefault(c.parent_id, []).append(c)
-        else:
-            if c.account_id not in account_specific:
-                account_specific[c.account_id] = {"parents": [], "children": {}}
-            if c.parent_id is None:
-                account_specific[c.account_id]["parents"].append(c)
-            else:
-                account_specific[c.account_id]["children"].setdefault(c.parent_id, []).append(c)
-
-    # Merge: elke rekening krijgt globale + account-specifieke categorieën
-    all_account_ids = {a.id for a in accounts}
-    cats_by_account = {}
-    for aid in all_account_ids:
-        specific = account_specific.get(aid, {"parents": [], "children": {}})
-        merged_parents = global_cats["parents"] + specific["parents"]
-        merged_children = dict(global_cats["children"])
-        for pid, children in specific["children"].items():
-            merged_children.setdefault(pid, []).extend(children)
-        cats_by_account[aid] = {"parents": merged_parents, "children": merged_children}
+    cats_by_account = _categories_by_account(db, user.id, accounts)
 
     # Categoriesuggesties uit de historie en de AI-cache (ACT-58); de AI zelf draait hier niet.
     suggestions = suggest_for(db, user.id, transactions)
@@ -490,6 +497,103 @@ def request_ai_suggestions(
     user = require_login(request, db)
     fill_ai_suggestions(db, user.id)
     return safe_redirect(redirect_to, "/transactions", status_code=303)
+
+
+def _group_scope(month: str, account_id: str) -> tuple[str, int | None, date_type | None, date_type | None]:
+    """Maand (YYYY-MM) en rekening uit de query; ongeldige waarden betekenen 'alles'."""
+    acc = int(account_id) if account_id.strip().isdigit() else None
+    try:
+        y, m = int(month[:4]), int(month[5:7])
+        return month, acc, date_type(y, m, 1), date_type(y, m, _calendar.monthrange(y, m)[1])
+    except (ValueError, IndexError):
+        return "", acc, None, None
+
+
+@router.get("/transactions/groups")
+def transaction_groups(
+    request: Request,
+    month: str = Query(""),
+    account_id: str = Query(""),
+    db: Session = Depends(get_db),
+):
+    """Ongecategoriseerde transacties per tegenpartij: één keuze per groep (ACT-60)."""
+    user = require_login(request, db)
+    month, acc, date_from, date_to = _group_scope(month, account_id)
+    groups, unnamed = open_groups(db, user.id, account_id=acc, date_from=date_from, date_to=date_to)
+    accounts = db.query(Account).filter(Account.user_id == user.id).order_by(Account.name).all()
+    period_label = f"{MONTHS_NL_FULL[date_from.month]} {date_from.year}" if date_from else "Alle periodes"
+    return templates.TemplateResponse(
+        request,
+        "transactions/groups.html",
+        {
+            "request": request,
+            "user": user,
+            "groups": groups,
+            "unnamed": unnamed,
+            "open_count": sum(g.count for g in groups) + unnamed,
+            "accounts": accounts,
+            "accounts_by_id": {a.id: a for a in accounts},
+            "cats_by_account": _categories_by_account(db, user.id, accounts),
+            "current_month": month,
+            "current_account_id": acc,
+            "period_label": period_label,
+            "applied": request.query_params.get("applied", ""),
+            "rule_extra": request.query_params.get("rule_extra", ""),
+            "rule_name": request.query_params.get("rule_name", "")[:120],
+        },
+    )
+
+
+@router.post("/transactions/groups/apply")
+def apply_group_category(
+    request: Request,
+    key: str = Form(...),
+    category_id: int = Form(0),
+    make_rule: str = Form(""),
+    month: str = Form(""),
+    account_id: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """Zet één categorie op alle open transacties van een tegenpartij, en maak desgewenst een regel.
+
+    De groep wordt hier opnieuw bepaald; het formulier kiest alleen welke groep en welke categorie.
+    """
+    user = require_login(request, db)
+    month, acc, date_from, date_to = _group_scope(month, account_id)
+    params = {k: v for k, v in (("month", month), ("account_id", acc or "")) if v}
+    groups, _ = open_groups(db, user.id, account_id=acc, date_from=date_from, date_to=date_to)
+    group = next((g for g in groups if g.key == key), None)
+    cats = allowed_categories(db, user.id)
+    category = cats.by_id.get(category_id)
+    if group is None or category is None:
+        return RedirectResponse(f"/transactions/groups?{urlencode(params)}", status_code=303)
+
+    applied = 0
+    for tx in group.transactions:
+        if cats.allowed(category.id, tx.account_id):
+            tx.category_id = category.id
+            tx.assigned_by_rule_id = None  # handmatig bevestigd
+            tx.is_reviewed = 1
+            applied += 1
+    params["applied"] = applied
+
+    if make_rule and group.rule_value:
+        rule = Rule(
+            user_id=user.id,
+            name=f"{group.name} → {category.name}"[:100],
+            match_field=group.rule_field,
+            match_type="contains",
+            match_value=group.rule_value[:255],
+            condition_account_id=category.account_id,
+            assign_category_id=category.id,
+        )
+        db.add(rule)
+        db.flush()
+        # Alleen nog open transacties: een eerder gekozen categorie blijft staan.
+        params["rule_extra"] = apply_single_rule(db, user.id, rule.id, only_uncategorized=True)
+        params["rule_name"] = rule.name
+    db.commit()
+    return RedirectResponse(f"/transactions/groups?{urlencode(params)}", status_code=303)
 
 
 @router.post("/transactions/{transaction_id}/category")

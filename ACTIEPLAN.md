@@ -104,6 +104,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-55 | P2 | Review | ACT-31 | [Rekeninggroepen, één categorieënset en budget per groep](#act-55) |
 | ACT-58 | P2 | Afgerond | — | [Categoriesuggesties bij transacties met weinig AI-calls](#act-58) |
 | ACT-59 | P2 | Afgerond | ACT-57 | [Vaste spaarstortingen automatisch categoriseren](#act-59) |
+| ACT-60 | P2 | Review | ACT-58 | [Categoriseren per tegenpartij, met regel in één klik](#act-60) |
 
 ## Beschrijving en acceptatiecriteria
 
@@ -620,6 +621,15 @@ commit `339a4d8`; controleer ze bij het oppakken.
 - **Klaar wanneer:** Templates vergelijken booleans niet meer met `1`; nieuwe code heeft typed modellen; autogenerate blijft leeg na de migratie.
 - **Validatie:** Volledige suite, PostgreSQL-CI met up/down/up, productievalidatie na uitrol.
 
+<a id="act-60"></a>
+
+### ACT-60 — Categoriseren per tegenpartij, met regel in één klik
+
+- **Aanleiding (gebruiker, 2026-10-28):** nog 642 ongecategoriseerde transacties. Van de voorgestelde versnellingen koos de gebruiker groeperen per tegenpartij (2) en na de keuze een regel aanbieden (3). Automatisch toepassen bij zekere historie (1) wil de gebruiker niet.
+- **Gedrag:** `/transactions/groups` (knop "Per tegenpartij" op de transactiepagina, met maand en rekening als filter) toont de open transacties gegroepeerd op dezelfde genormaliseerde naam als ACT-58, grootste groep eerst. De suggestie uit historie of AI-cache staat voorgeselecteerd. "Toewijzen" zet de categorie op de hele groep; de server bepaalt de groep opnieuw. Transacties zonder herkenbare naam blijven op de transactiepagina.
+- **Regel:** het vinkje "Maak er een regel van" (standaard aan vanaf 2 transacties) maakt een *bevat*-regel op tegenpartij of omschrijving. Die wordt alleen aangeboden als de tekst letterlijk in elke transactie van de groep staat en minstens 4 tekens lang is. De regel wordt meteen toegepast op andere open transacties, nooit op al gecategoriseerde.
+- **Validatie:** `tests/test_category_suggest.py` (groeperen, regeltekst, toepassen inclusief regel, eigenaarschap, onbekende categorie). Productie: kwaliteit van de groepen op echte data door de gebruiker.
+
 <a id="act-59"></a>
 
 ### ACT-59 — Vaste spaarstortingen automatisch categoriseren
@@ -749,3 +759,4 @@ Voeg per afgeronde actie of overdracht een regel toe. Git bevat de volledige his
 | 2026-10-27 | ACT-58 | Gemerged ([PR #270](https://github.com/gjagils/checkthepockets/pull/270), `391d4a1`), CI groen, deploy geslaagd; productiecontrole van suggesties en AI-knop door gebruiker open | Claude Code |
 | 2026-10-27 | ACT-59 | Vaste spaarstortingen categoriseren en gekoppelde paren aanvullen; status Review | Claude Code; 713 passed, 10 skipped (lokaal Python 3.14); branch `claude/act-59-spaaroverboekingen`; PR-CI open |
 | 2026-10-27 | ACT-59 | Gemerged ([PR #271](https://github.com/gjagils/checkthepockets/pull/271), `e86a5ef`), CI groen, deploy geslaagd; gebruiker heeft rekeninginstellingen aangepast en de herstelpagina toegepast. Ook in productie: regel #82 naar Storting samen (alleen Abn samen spaar, tegenpartij "Samen Betaal"), drie dubbele € 200-boekingen (feb–apr 2026) uitgesloten. Volgende sessie: nog 642 ongecategoriseerde transacties | Claude Code; bevestiging gebruiker |
+| 2026-10-28 | ACT-60 | Categoriseren per tegenpartij met optionele regel; status Review | Claude Code; 716 passed, 10 skipped (lokaal Python 3.14); branch `claude/act-60-groepen`; PR-CI open |
