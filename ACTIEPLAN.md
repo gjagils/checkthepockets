@@ -103,7 +103,7 @@ criteria en overdracht. Neem nooit impliciet alle geplande acties in uitvoering.
 | ACT-54 | P2 | Review | — | [Regelvoorstellen leesbaar: volledige omschrijving en groepering](#act-54) |
 | ACT-55 | P2 | Review | ACT-31 | [Rekeninggroepen, één categorieënset en budget per groep](#act-55) |
 | ACT-58 | P2 | Afgerond | — | [Categoriesuggesties bij transacties met weinig AI-calls](#act-58) |
-| ACT-59 | P2 | Review | ACT-57 | [Vaste spaarstortingen automatisch categoriseren](#act-59) |
+| ACT-59 | P2 | Afgerond | ACT-57 | [Vaste spaarstortingen automatisch categoriseren](#act-59) |
 
 ## Beschrijving en acceptatiecriteria
 
@@ -748,3 +748,4 @@ Voeg per afgeronde actie of overdracht een regel toe. Git bevat de volledige his
 | 2026-10-27 | ACT-58 | Categoriesuggesties uit historie plus AI-batch met cache op de transactiepagina; status Review | Claude Code; 708 passed, 10 skipped (lokaal Python 3.14, niet de 3.12-locks); branch `claude/transaction-categorization-examples-f9fe8b`; PR-CI open |
 | 2026-10-27 | ACT-58 | Gemerged ([PR #270](https://github.com/gjagils/checkthepockets/pull/270), `391d4a1`), CI groen, deploy geslaagd; productiecontrole van suggesties en AI-knop door gebruiker open | Claude Code |
 | 2026-10-27 | ACT-59 | Vaste spaarstortingen categoriseren en gekoppelde paren aanvullen; status Review | Claude Code; 713 passed, 10 skipped (lokaal Python 3.14); branch `claude/act-59-spaaroverboekingen`; PR-CI open |
+| 2026-10-27 | ACT-59 | Gemerged ([PR #271](https://github.com/gjagils/checkthepockets/pull/271), `e86a5ef`), CI groen, deploy geslaagd; gebruiker heeft rekeninginstellingen aangepast en de herstelpagina toegepast. Ook in productie: regel #82 naar Storting samen (alleen Abn samen spaar, tegenpartij "Samen Betaal"), drie dubbele € 200-boekingen (feb–apr 2026) uitgesloten. Volgende sessie: nog 642 ongecategoriseerde transacties | Claude Code; bevestiging gebruiker |
