@@ -2,6 +2,15 @@
 {% block title %}Per tegenpartij - Check Your Pockets{% endblock %}
 {% block container_class %}container-wide{% endblock %}
 {% block content %}
+{% macro _cat_options(tree, selected_id) -%}
+    {% for parent in tree["parents"] %}
+    <optgroup label="{{ parent.name }}">
+        {% for sub in tree["children"].get(parent.id, []) if not sub.is_archived %}
+        <option value="{{ sub.id }}" {% if selected_id == sub.id %}selected{% endif %}>{{ sub.name }}</option>
+        {% endfor %}
+    </optgroup>
+    {% endfor %}
+{%- endmacro %}
 {% set _scope = [] %}
 {% if current_month %}{% set _ = _scope.append('month=' + current_month) %}{% endif %}
 {% if current_account_id %}{% set _ = _scope.append('account_id=' + current_account_id|string) %}{% endif %}
@@ -52,15 +61,9 @@
                     · {% for aid in _accs %}{{ accounts_by_id[aid].name }}{% if not loop.last %}, {% endif %}{% endfor %}</span>
             </div>
             <div class="tx-group-actions">
-                <select name="category_id" class="select-sm" required>
+                <select name="category_id" class="select-sm tx-group-category" required>
                     <option value="">— kies categorie —</option>
-                    {% for parent in _tree["parents"] %}
-                    <optgroup label="{{ parent.name }}">
-                        {% for sub in _tree["children"].get(parent.id, []) if not sub.is_archived %}
-                        <option value="{{ sub.id }}" {% if g.suggestion and g.suggestion.category_id == sub.id %}selected{% endif %}>{{ sub.name }}</option>
-                        {% endfor %}
-                    </optgroup>
-                    {% endfor %}
+                    {{ _cat_options(_tree, g.suggestion.category_id if g.suggestion else none) }}
                 </select>
                 {% if g.suggestion %}
                 <span class="tx-suggestion{% if g.suggestion.source == 'ai' %} tx-suggestion-ai{% endif %}" title="Voorgeselecteerd">
@@ -78,7 +81,7 @@
         </label>
         {% endif %}
         <details class="tx-group-list">
-            <summary class="muted">Toon {{ g.count }} transactie{{ 's' if g.count != 1 }} — vink uit wat niet mee moet</summary>
+            <summary class="muted">Toon {{ g.count }} transactie{{ 's' if g.count != 1 }} — vink uit wat niet mee moet of kies daar een andere categorie</summary>
             <table>
                 {% for tx in g.transactions %}
                 <tr>
@@ -88,6 +91,13 @@
                     <td>{{ tx.description or '-' }}</td>
                     <td class="nowrap col-account">{{ accounts_by_id[tx.account_id].name }}</td>
                     <td class="text-right nowrap {% if tx.amount >= 0 %}amount-positive{% else %}amount-negative{% endif %}">{{ tx.amount|euro_sign }}</td>
+                    <td>
+                        <select name="other_cat_{{ tx.id }}" class="select-sm tx-group-other" hidden
+                                aria-label="Andere categorie voor deze transactie">
+                            <option value="">— open laten —</option>
+                            {{ _cat_options(cats_by_account.get(tx.account_id, cats_by_account[none]), none) }}
+                        </select>
+                    </td>
                 </tr>
                 {% endfor %}
             </table>
@@ -96,19 +106,31 @@
     {% endfor %}
 </div>
 <script>
-    // Uitgevinkte transacties gaan niet mee. Een regel zou ze later alsnog raken, dus die vinken we dan uit.
+    // Uitgevinkte transacties krijgen de groepscategorie niet, maar eventueel een eigen keuze uit hun
+    // keuzelijst. Een regel zou ze later alsnog raken, dus die vinken we bij uitvinken uit.
     document.querySelectorAll('form.tx-group').forEach(function(form) {
-        var picks = form.querySelectorAll('.tx-group-pick');
         var count = form.querySelector('.tx-group-count');
         var button = form.querySelector('button[type=submit]');
         var rule = form.querySelector('.tx-group-make-rule');
-        picks.forEach(function(pick) {
+        var groupCat = form.querySelector('.tx-group-category');
+        function update() {
+            var picked = form.querySelectorAll('.tx-group-pick:checked').length;
+            var others = Array.prototype.filter.call(form.querySelectorAll('.tx-group-other'), function(s) {
+                return !s.hidden && s.value;
+            }).length;
+            count.textContent = picked + others;
+            button.disabled = picked + others === 0;
+            groupCat.required = picked > 0;  // alleen andere categorieën gekozen: groepskeuze niet nodig
+        }
+        form.querySelectorAll('.tx-group-pick').forEach(function(pick) {
+            var other = pick.closest('tr').querySelector('.tx-group-other');
             pick.addEventListener('change', function() {
-                var n = form.querySelectorAll('.tx-group-pick:checked').length;
-                count.textContent = n;
-                button.disabled = n === 0;
+                other.hidden = pick.checked;
+                if (pick.checked) other.value = '';
                 if (rule && !pick.checked) rule.checked = false;
+                update();
             });
+            other.addEventListener('change', update);
         });
     });
 </script>

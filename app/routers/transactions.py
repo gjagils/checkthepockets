@@ -557,30 +557,43 @@ async def apply_group_category(
     """Zet één categorie op de gekozen open transacties van een tegenpartij, en maak desgewenst een regel.
 
     De groep wordt hier opnieuw bepaald; het formulier kiest alleen welke groep, welke categorie en
-    welke transacties daarvan (`tx_ids`, uitgevinkte blijven open).
+    welke transacties daarvan (`tx_ids`). Een uitgevinkte transactie krijgt de categorie uit haar eigen
+    keuzelijst (`other_cat_<id>`), of blijft open.
     """
     user = require_login(request, db)
-    picked = {int(raw) for raw in (await request.form()).getlist("tx_ids") if str(raw).isdigit()}
+    form = await request.form()
+    picked = {int(raw) for raw in form.getlist("tx_ids") if str(raw).isdigit()}
     month, acc, date_from, date_to = _group_scope(month, account_id)
     params = {k: v for k, v in (("month", month), ("account_id", acc or "")) if v}
     groups, _ = open_groups(db, user.id, account_id=acc, date_from=date_from, date_to=date_to)
     group = next((g for g in groups if g.key == key), None)
     cats = allowed_categories(db, user.id)
     category = cats.by_id.get(category_id)
-    if group is None or category is None or not picked:
+    if group is None or (picked and category is None):
         return RedirectResponse(f"/transactions/groups?{urlencode(params)}", status_code=303)
 
-    applied = 0
-    skipped = {tx.id for tx in group.transactions if tx.id not in picked}
+    choice: dict[int, int] = {}
+    skipped = set()
     for tx in group.transactions:
-        if tx.id in picked and cats.allowed(category.id, tx.account_id):
-            tx.category_id = category.id
+        if tx.id in picked:
+            cid = category.id
+        else:
+            skipped.add(tx.id)
+            raw = str(form.get(f"other_cat_{tx.id}", ""))
+            cid = int(raw) if raw.isdigit() else None
+        if cid and cats.allowed(cid, tx.account_id):
+            choice[tx.id] = cid
+    if not choice:
+        return RedirectResponse(f"/transactions/groups?{urlencode(params)}", status_code=303)
+
+    for tx in group.transactions:
+        if tx.id in choice:
+            tx.category_id = choice[tx.id]
             tx.assigned_by_rule_id = None  # handmatig bevestigd
             tx.is_reviewed = 1
-            applied += 1
-    params["applied"] = applied
+    params["applied"] = len(choice)
 
-    if make_rule and group.rule_value:
+    if make_rule and group.rule_value and picked and category:
         rule = Rule(
             user_id=user.id,
             name=f"{group.name} → {category.name}"[:100],
