@@ -305,3 +305,27 @@ def test_deselected_transactions_stay_open_also_when_a_rule_is_made(world):
     assert db.get(Transaction, keep.id).category_id == cats["Kleding"].id
     assert db.get(Transaction, skip.id).category_id is None
     assert db.query(Rule).count() == 1
+
+
+def test_a_deselected_transaction_can_get_its_own_category(world):
+    db, user, account, cats = world
+    keep = _tx(db, account, "a", counterparty="Bol")
+    other = _tx(db, account, "b", counterparty="BOL")
+    left = _tx(db, account, "c", counterparty="bol")
+    key = category_suggest.open_groups(db, user.id)[0][0].key
+    client = _client(user.id)
+
+    client.post("/transactions/groups/apply", data={
+        "key": key, "category_id": cats["Boodschappen"].id, "tx_ids": [keep.id],
+        f"other_cat_{other.id}": cats["Kleding"].id, f"other_cat_{keep.id}": cats["Horeca"].id,
+    })
+
+    db.expire_all()
+    assert db.get(Transaction, keep.id).category_id == cats["Boodschappen"].id   # aangevinkt wint
+    assert db.get(Transaction, other.id).category_id == cats["Kleding"].id
+    assert db.get(Transaction, left.id).category_id is None
+
+    # Alleen een eigen keuze, niets aangevinkt en geen groepscategorie: werkt ook.
+    client.post("/transactions/groups/apply", data={"key": key, f"other_cat_{left.id}": cats["Horeca"].id})
+    db.expire_all()
+    assert db.get(Transaction, left.id).category_id == cats["Horeca"].id

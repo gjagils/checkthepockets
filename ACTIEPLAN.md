@@ -629,6 +629,7 @@ commit `339a4d8`; controleer ze bij het oppakken.
 - **Gedrag:** `/transactions/groups` (knop "Per tegenpartij" op de transactiepagina, met maand en rekening als filter) toont de open transacties gegroepeerd op dezelfde genormaliseerde naam als ACT-58, grootste groep eerst. De suggestie uit historie of AI-cache staat voorgeselecteerd. "Toewijzen" zet de categorie op de hele groep; de server bepaalt de groep opnieuw. Transacties zonder herkenbare naam blijven op de transactiepagina.
 - **Regel:** het vinkje "Maak er een regel van" (standaard aan vanaf 2 transacties) maakt een *bevat*-regel op tegenpartij of omschrijving. Die wordt alleen aangeboden als de tekst letterlijk in elke transactie van de groep staat en minstens 4 tekens lang is. De regel wordt meteen toegepast op andere open transacties, nooit op al gecategoriseerde.
 - **Uitvinken (gebruiker, 2026-10-28):** in de uitgeklapte lijst staat per transactie een vinkje (standaard aan); alleen aangevinkte krijgen de categorie. Uitvinken zet het regelvinkje uit, en een toch gemaakte regel slaat de uitgevinkte transacties over.
+- **Andere categorie (gebruiker, 2026-10-28):** een uitgevinkte transactie toont een eigen keuzelijst (standaard "open laten"); een keuze daar wordt in dezelfde klik toegekend, ook zonder groepscategorie als niets is aangevinkt.
 - **Validatie:** `tests/test_category_suggest.py` (groeperen, regeltekst, toepassen inclusief regel, eigenaarschap, onbekende categorie). Productie: kwaliteit van de groepen op echte data door de gebruiker.
 
 <a id="act-59"></a>
@@ -763,3 +764,4 @@ Voeg per afgeronde actie of overdracht een regel toe. Git bevat de volledige his
 | 2026-10-28 | ACT-60 | Categoriseren per tegenpartij met optionele regel; status Review | Claude Code; 716 passed, 10 skipped (lokaal Python 3.14); branch `claude/act-60-groepen`; PR-CI open |
 | 2026-10-28 | ACT-60 | Gemerged ([PR #273](https://github.com/gjagils/checkthepockets/pull/273), `bb31a34`), CI groen, deploy geslaagd; productiecontrole van de groepenpagina door gebruiker open | Claude Code |
 | 2026-10-28 | ACT-60 | Transacties in een groep uit te vinken vóór toewijzen | Claude Code; 717 passed, 10 skipped (lokaal Python 3.14); branch `claude/act-60-deselecteren`; PR-CI open |
+| 2026-10-28 | ACT-60 | Uitgevinkte transactie in een groep direct een andere categorie geven | Claude Code; 718 passed, 10 skipped (lokaal Python 3.14); branch `claude/act-60-andere-categorie`; PR-CI open |
