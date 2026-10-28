@@ -565,7 +565,9 @@ async def apply_group_category(
     picked = {int(raw) for raw in form.getlist("tx_ids") if str(raw).isdigit()}
     month, acc, date_from, date_to = _group_scope(month, account_id)
     params = {k: v for k, v in (("month", month), ("account_id", acc or "")) if v}
-    groups, _ = open_groups(db, user.id, account_id=acc, date_from=date_from, date_to=date_to)
+    groups, _ = open_groups(
+        db, user.id, account_id=acc, date_from=date_from, date_to=date_to, with_suggestions=False,
+    )
     group = next((g for g in groups if g.key == key), None)
     cats = allowed_categories(db, user.id)
     category = cats.by_id.get(category_id)
