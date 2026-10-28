@@ -545,7 +545,7 @@ def transaction_groups(
 
 
 @router.post("/transactions/groups/apply")
-def apply_group_category(
+async def apply_group_category(
     request: Request,
     key: str = Form(...),
     category_id: int = Form(0),
@@ -554,23 +554,26 @@ def apply_group_category(
     account_id: str = Form(""),
     db: Session = Depends(get_db),
 ):
-    """Zet één categorie op alle open transacties van een tegenpartij, en maak desgewenst een regel.
+    """Zet één categorie op de gekozen open transacties van een tegenpartij, en maak desgewenst een regel.
 
-    De groep wordt hier opnieuw bepaald; het formulier kiest alleen welke groep en welke categorie.
+    De groep wordt hier opnieuw bepaald; het formulier kiest alleen welke groep, welke categorie en
+    welke transacties daarvan (`tx_ids`, uitgevinkte blijven open).
     """
     user = require_login(request, db)
+    picked = {int(raw) for raw in (await request.form()).getlist("tx_ids") if str(raw).isdigit()}
     month, acc, date_from, date_to = _group_scope(month, account_id)
     params = {k: v for k, v in (("month", month), ("account_id", acc or "")) if v}
     groups, _ = open_groups(db, user.id, account_id=acc, date_from=date_from, date_to=date_to)
     group = next((g for g in groups if g.key == key), None)
     cats = allowed_categories(db, user.id)
     category = cats.by_id.get(category_id)
-    if group is None or category is None:
+    if group is None or category is None or not picked:
         return RedirectResponse(f"/transactions/groups?{urlencode(params)}", status_code=303)
 
     applied = 0
+    skipped = {tx.id for tx in group.transactions if tx.id not in picked}
     for tx in group.transactions:
-        if cats.allowed(category.id, tx.account_id):
+        if tx.id in picked and cats.allowed(category.id, tx.account_id):
             tx.category_id = category.id
             tx.assigned_by_rule_id = None  # handmatig bevestigd
             tx.is_reviewed = 1
@@ -589,8 +592,14 @@ def apply_group_category(
         )
         db.add(rule)
         db.flush()
-        # Alleen nog open transacties: een eerder gekozen categorie blijft staan.
-        params["rule_extra"] = apply_single_rule(db, user.id, rule.id, only_uncategorized=True)
+        # Alleen nog open transacties, en niet wat de gebruiker net uitvinkte.
+        open_ids = [
+            tid for (tid,) in db.query(Transaction.id).join(Account).filter(
+                Account.user_id == user.id, Transaction.category_id.is_(None),
+            )
+            if tid not in skipped
+        ]
+        params["rule_extra"] = apply_single_rule(db, user.id, rule.id, transaction_ids=open_ids)
         params["rule_name"] = rule.name
     db.commit()
     return RedirectResponse(f"/transactions/groups?{urlencode(params)}", status_code=303)

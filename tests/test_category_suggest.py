@@ -248,7 +248,7 @@ def test_group_apply_categorizes_the_group_and_the_rule_only_fills_open_transact
 
     resp = _client(user.id).post(
         "/transactions/groups/apply",
-        data={"key": key, "category_id": cats["Horeca"].id, "make_rule": "1"},
+        data={"key": key, "category_id": cats["Horeca"].id, "make_rule": "1", "tx_ids": [a.id, b.id]},
         follow_redirects=False,
     )
 
@@ -271,16 +271,37 @@ def test_group_page_renders_and_apply_ignores_foreign_or_unknown_input(world):
 
     page = client.get("/transactions/groups")
     assert page.status_code == 200
-    assert "Wehkamp" in page.text and "Toewijzen (1)" in page.text
+    assert "Wehkamp" in page.text and "Toewijzen (<span class=\"tx-group-count\">1</span>)" in page.text
     assert "Per tegenpartij" in client.get("/transactions").text
 
     bob = User(username="bob", email="b@x.nl", password_hash=hash_password("pw"))
     db.add(bob)
     db.commit()
     key = category_suggest.open_groups(db, user.id)[0][0].key
-    _client(bob.id).post("/transactions/groups/apply", data={"key": key, "category_id": cats["Kleding"].id})
-    client.post("/transactions/groups/apply", data={"key": key, "category_id": 999999})
+    _client(bob.id).post("/transactions/groups/apply",
+                         data={"key": key, "category_id": cats["Kleding"].id, "tx_ids": [tx.id]})
+    client.post("/transactions/groups/apply", data={"key": key, "category_id": 999999, "tx_ids": [tx.id]})
+    client.post("/transactions/groups/apply", data={"key": key, "category_id": cats["Kleding"].id})  # niets gekozen
 
     db.expire_all()
     assert db.get(Transaction, tx.id).category_id is None
     assert db.query(Rule).count() == 0
+
+
+def test_deselected_transactions_stay_open_also_when_a_rule_is_made(world):
+    db, user, account, cats = world
+    keep = _tx(db, account, "a", counterparty="Wehkamp")
+    skip = _tx(db, account, "b", counterparty="WEHKAMP", amount="250.00")   # retour: niet meenemen
+    key = category_suggest.open_groups(db, user.id)[0][0].key
+
+    resp = _client(user.id).post(
+        "/transactions/groups/apply",
+        data={"key": key, "category_id": cats["Kleding"].id, "make_rule": "1", "tx_ids": [keep.id]},
+        follow_redirects=False,
+    )
+
+    assert "applied=1" in resp.headers["location"]
+    db.expire_all()
+    assert db.get(Transaction, keep.id).category_id == cats["Kleding"].id
+    assert db.get(Transaction, skip.id).category_id is None
+    assert db.query(Rule).count() == 1

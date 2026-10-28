@@ -67,21 +67,23 @@
                     {{ g.suggestion.label }}
                 </span>
                 {% endif %}
-                <button type="submit" class="btn btn-sm btn-primary">Toewijzen ({{ g.count }})</button>
+                <button type="submit" class="btn btn-sm btn-primary">Toewijzen (<span class="tx-group-count">{{ g.count }}</span>)</button>
             </div>
         </div>
         {% if g.rule_value %}
         <label class="tx-group-rule">
-            <input type="checkbox" name="make_rule" value="1" {% if g.count >= 2 %}checked{% endif %}>
+            <input type="checkbox" name="make_rule" value="1" class="tx-group-make-rule" {% if g.count >= 2 %}checked{% endif %}>
             Maak er een regel van: {{ 'tegenpartij' if g.rule_field == 'counterparty' else 'omschrijving' }} bevat
             “<code>{{ g.rule_value }}</code>” — ook voor toekomstige transacties
         </label>
         {% endif %}
         <details class="tx-group-list">
-            <summary class="muted">Toon {{ g.count }} transactie{{ 's' if g.count != 1 }}</summary>
+            <summary class="muted">Toon {{ g.count }} transactie{{ 's' if g.count != 1 }} — vink uit wat niet mee moet</summary>
             <table>
                 {% for tx in g.transactions %}
                 <tr>
+                    <td><input type="checkbox" name="tx_ids" value="{{ tx.id }}" class="tx-group-pick" checked
+                               aria-label="Meenemen bij toewijzen"></td>
                     <td class="nowrap">{{ tx.date|date }}</td>
                     <td>{{ tx.description or '-' }}</td>
                     <td class="nowrap col-account">{{ accounts_by_id[tx.account_id].name }}</td>
@@ -93,5 +95,22 @@
     </form>
     {% endfor %}
 </div>
+<script>
+    // Uitgevinkte transacties gaan niet mee. Een regel zou ze later alsnog raken, dus die vinken we dan uit.
+    document.querySelectorAll('form.tx-group').forEach(function(form) {
+        var picks = form.querySelectorAll('.tx-group-pick');
+        var count = form.querySelector('.tx-group-count');
+        var button = form.querySelector('button[type=submit]');
+        var rule = form.querySelector('.tx-group-make-rule');
+        picks.forEach(function(pick) {
+            pick.addEventListener('change', function() {
+                var n = form.querySelectorAll('.tx-group-pick:checked').length;
+                count.textContent = n;
+                button.disabled = n === 0;
+                if (rule && !pick.checked) rule.checked = false;
+            });
+        });
+    });
+</script>
 {% endif %}
 {% endblock %}
