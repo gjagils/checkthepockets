@@ -1611,6 +1611,25 @@ a.cell-display:hover { text-decoration: none; color: inherit; }
 }
 .tx-suggestion-src { opacity: 0.75; }
 
+/* ===== Per tegenpartij categoriseren (ACT-60) ===== */
+.tx-groups { display: flex; flex-direction: column; gap: 0.6rem; }
+.tx-group { padding: 0.75rem 1rem; margin: 0; }
+.tx-group-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 1rem;
+}
+.tx-group-name { min-width: 0; overflow-wrap: anywhere; }
+.tx-group-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+.tx-group-actions .select-sm { max-width: 100%; }
+.tx-group-rule { display: block; margin-top: 0.4rem; font-size: 0.85rem; }
+.tx-group-rule code { overflow-wrap: anywhere; }
+.tx-group-list { margin-top: 0.35rem; font-size: 0.85rem; }
+.tx-group-list summary { cursor: pointer; }
+.tx-group-list table { width: 100%; margin-top: 0.35rem; }
+
 /* ===== Month Picker (Sprint 11) ===== */
 .month-picker {
     display: flex;

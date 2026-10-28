@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Per tegenpartij - Check Your Pockets{% endblock %}
+{% block container_class %}container-wide{% endblock %}
+{% block content %}
+{% set _scope = [] %}
+{% if current_month %}{% set _ = _scope.append('month=' + current_month) %}{% endif %}
+{% if current_account_id %}{% set _ = _scope.append('account_id=' + current_account_id|string) %}{% endif %}
+<div class="u-mb-075">
+    <a href="/transactions?category_id=-1{% for p in _scope %}&{{ p }}{% endfor %}" class="btn btn-sm">&larr; Transacties</a>
+</div>
+<div class="page-header">
+    <h1>Per tegenpartij <span class="muted" style="font-weight:400; font-size:0.9rem;">({{ open_count }} open)</span></h1>
+    <form method="get" action="/transactions/groups" class="tx-inline-form" style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+        <input type="month" name="month" value="{{ current_month }}" class="select-sm" title="Maand (leeg = alle periodes)">
+        <select name="account_id" class="select-sm">
+            <option value="">Alle rekeningen</option>
+            {% for a in accounts %}
+            <option value="{{ a.id }}" {% if a.id == current_account_id %}selected{% endif %}>{{ a.name }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-sm">Filter</button>
+    </form>
+</div>
+
+{% if applied %}
+<div class="alert alert-info">
+    {{ applied }} transactie{{ 's' if applied != '1' }} gecategoriseerd.
+    {% if rule_name %}Regel <em>{{ rule_name }}</em> aangemaakt{% if rule_extra and rule_extra != '0' %}; die deed er nog {{ rule_extra }} elders{% endif %}. <a href="/rules">Regels bekijken</a>{% endif %}
+</div>
+{% endif %}
+
+<p class="muted">
+    {{ period_label }}. Eén keuze per tegenpartij zet de categorie op al haar open transacties; grootste groepen eerst.
+    {% if unnamed %}{{ unnamed }} transactie{{ 's' if unnamed != 1 }} zonder herkenbare tegenpartij staan alleen op de <a href="/transactions?category_id=-1{% for p in _scope %}&{{ p }}{% endfor %}">transactiepagina</a>.{% endif %}
+</p>
+
+{% if not groups %}
+<div class="card"><p>Niets meer te categoriseren in deze selectie. 🎉</p></div>
+{% else %}
+<div class="tx-groups">
+    {% for g in groups %}
+    {% set _accs = g.account_ids %}
+    {% set _tree = cats_by_account.get(_accs|first if _accs|length == 1 else none, cats_by_account[none]) %}
+    <form method="post" action="/transactions/groups/apply" class="tx-group card">
+        <input type="hidden" name="key" value="{{ g.key }}">
+        <input type="hidden" name="month" value="{{ current_month }}">
+        <input type="hidden" name="account_id" value="{{ current_account_id or '' }}">
+        <div class="tx-group-head">
+            <div class="tx-group-name">
+                <strong>{{ g.name }}</strong>
+                <span class="muted">· {{ g.count }}× · {{ g.total|euro_sign }}
+                    · {% for aid in _accs %}{{ accounts_by_id[aid].name }}{% if not loop.last %}, {% endif %}{% endfor %}</span>
+            </div>
+            <div class="tx-group-actions">
+                <select name="category_id" class="select-sm" required>
+                    <option value="">— kies categorie —</option>
+                    {% for parent in _tree["parents"] %}
+                    <optgroup label="{{ parent.name }}">
+                        {% for sub in _tree["children"].get(parent.id, []) if not sub.is_archived %}
+                        <option value="{{ sub.id }}" {% if g.suggestion and g.suggestion.category_id == sub.id %}selected{% endif %}>{{ sub.name }}</option>
+                        {% endfor %}
+                    </optgroup>
+                    {% endfor %}
+                </select>
+                {% if g.suggestion %}
+                <span class="tx-suggestion{% if g.suggestion.source == 'ai' %} tx-suggestion-ai{% endif %}" title="Voorgeselecteerd">
+                    {{ g.suggestion.label }}
+                </span>
+                {% endif %}
+                <button type="submit" class="btn btn-sm btn-primary">Toewijzen ({{ g.count }})</button>
+            </div>
+        </div>
+        {% if g.rule_value %}
+        <label class="tx-group-rule">
+            <input type="checkbox" name="make_rule" value="1" {% if g.count >= 2 %}checked{% endif %}>
+            Maak er een regel van: {{ 'tegenpartij' if g.rule_field == 'counterparty' else 'omschrijving' }} bevat
+            “<code>{{ g.rule_value }}</code>” — ook voor toekomstige transacties
+        </label>
+        {% endif %}
+        <details class="tx-group-list">
+            <summary class="muted">Toon {{ g.count }} transactie{{ 's' if g.count != 1 }}</summary>
+            <table>
+                {% for tx in g.transactions %}
+                <tr>
+                    <td class="nowrap">{{ tx.date|date }}</td>
+                    <td>{{ tx.description or '-' }}</td>
+                    <td class="nowrap col-account">{{ accounts_by_id[tx.account_id].name }}</td>
+                    <td class="text-right nowrap {% if tx.amount >= 0 %}amount-positive{% else %}amount-negative{% endif %}">{{ tx.amount|euro_sign }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+        </details>
+    </form>
+    {% endfor %}
+</div>
+{% endif %}
+{% endblock %}
