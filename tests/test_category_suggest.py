@@ -329,3 +329,21 @@ def test_a_deselected_transaction_can_get_its_own_category(world):
     client.post("/transactions/groups/apply", data={"key": key, f"other_cat_{left.id}": cats["Horeca"].id})
     db.expire_all()
     assert db.get(Transaction, left.id).category_id == cats["Horeca"].id
+
+
+def test_group_apply_does_not_compute_suggestions(world, monkeypatch):
+    """Toewijzen moet licht blijven: de historie ontsleutelen hield de databaseverbinding te lang open."""
+    db, user, account, cats = world
+    tx = _tx(db, account, "a", counterparty="Wehkamp")
+    key = category_suggest.open_groups(db, user.id)[0][0].key
+
+    def no_history(*args, **kwargs):
+        raise AssertionError("suggesties niet nodig bij toewijzen")
+
+    monkeypatch.setattr(category_suggest, "suggest_for", no_history)
+    _client(user.id).post("/transactions/groups/apply",
+                          data={"key": key, "category_id": cats["Kleding"].id, "tx_ids": [tx.id]},
+                          follow_redirects=False)
+
+    db.expire_all()
+    assert db.get(Transaction, tx.id).category_id == cats["Kleding"].id

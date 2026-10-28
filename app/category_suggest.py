@@ -341,10 +341,13 @@ def _rule_for(name: str, transactions: list[Transaction]) -> tuple[str | None, s
 
 def open_groups(
     db: Session, user_id: int, *, account_id: int | None = None, date_from=None, date_to=None,
+    with_suggestions: bool = True,
 ) -> tuple[list[CounterpartyGroup], int]:
     """Ongecategoriseerde transacties per tegenpartij, grootste groep eerst.
 
     Geeft ook het aantal open transacties zonder herkenbare naam (die passen in geen groep).
+    `with_suggestions=False` slaat de historie en AI-cache over: dat is het zware deel (alle
+    gecategoriseerde transacties ontsleutelen) en toewijzen heeft het niet nodig.
     """
     split_parent_ids = (
         db.query(Transaction.parent_id).filter(Transaction.parent_id.isnot(None)).distinct().scalar_subquery()
@@ -377,7 +380,7 @@ def open_groups(
             continue
         by_key.setdefault(merchant_hash(name), []).append(tx)
 
-    suggestions = suggest_for(db, user_id, open_txs).by_tx
+    suggestions = suggest_for(db, user_id, open_txs).by_tx if with_suggestions else {}
     groups = []
     for key, txs in by_key.items():
         name = merchant_name(txs[0])
